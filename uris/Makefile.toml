@@ -1,0 +1,49 @@
+[tasks.test-no-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--release"]
+
+[tasks.test-serde]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=serde", "--release"]
+
+[tasks.test-typescript]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=typescript", "--release"]
+
+[tasks.test-components]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=components", "--release"]
+
+[tasks.test-leptos]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=leptos", "--release"]
+
+[tasks.test-tantivy]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=tantivy", "--release"]
+
+[tasks.test-all-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--all-features", "--release"]
+
+[tasks.all-tests]
+dependencies = [
+    "test-no-features",
+    "test-serde",
+    "test-typescript",
+    "test-components",
+    "test-leptos",
+    "test-tantivy",
+    "test-all-features",
+]
+
+[tasks.doc]
+command = "cargo"
+args = ["+nightly", "doc", "--no-deps", "--all-features", "--release"]

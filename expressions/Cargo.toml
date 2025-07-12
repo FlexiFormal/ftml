@@ -1,0 +1,55 @@
+[package]
+name = "ftml-expressions"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[features]
+## Adds [`Serialize`](serde::Serialize) and [`Deserialize`](serde::Deserialize)
+## to all types in this crate.
+serde = ["dep:serde", "dep:serde_with"]
+## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
+## bound to `string`, but naming still allows to make intentions in APIs explicit.
+typescript = ["serde", "dep:wasm-bindgen", "dep:tsify-next"]
+## Enables OpenMath (de)serialization for FTML expressions
+openmath = ["dep:openmath", "ftml-uris/openmath"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "-Zunstable-options",
+    "-Zrustdoc-scrape-examples",
+    "--all-features",
+    "--generate-link-to-definition",
+    "--html-in-header",
+    "doc/katex-header.html",
+    "--html-in-header",
+    "doc/docs.html",
+]
+# cargo +nightly doc --no-deps --all-features --release --open
+
+[build-dependencies]
+rustc_version = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+rstest = { workspace = true }
+criterion = { workspace = true }
+
+[dependencies]
+document-features = { workspace = true }
+ftml-uris = { workspace = true }
+
+serde_with = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+tsify-next = { workspace = true, optional = true }
+openmath = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
