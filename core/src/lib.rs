@@ -7,7 +7,7 @@
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
 mod keys;
-pub use keys::FTMLKey;
+pub use keys::{FTMLKey, NUM_RULES};
 pub mod utils {
     mod shared_arc;
     pub use shared_arc::SharedArc;
