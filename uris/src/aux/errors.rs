@@ -11,7 +11,7 @@ pub enum UriParseError {
     #[error("url parse error: {0}")]
     URL(
         #[from]
-        #[serde(with = "urlerr")]
+        #[cfg_attr(feature = "serde", serde(with = "urlerr"))]
         url::ParseError,
     ),
     /// Error occuring when trying to parse a Uri segment

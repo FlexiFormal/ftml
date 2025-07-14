@@ -2,17 +2,21 @@ use std::str::FromStr;
 
 use const_format::concatcp;
 
+#[cfg(feature = "interned")]
+use crate::aux::interning::{InternMap, InternStore};
 use crate::{
     BaseUri, IsFtmlUri, UriKind, UriWithArchive, UriWithPath,
     archive::ArchiveUri,
-    aux::interning::{InternMap, InternStore, NonEmptyInternedStr},
+    aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
 
+#[cfg(feature = "interned")]
 static PATHS: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
 
 /// Storage configuration for interned URI paths.
 pub struct PathStore;
+#[cfg(feature = "interned")]
 impl InternStore for PathStore {
     const LIMIT: usize = 1024;
     #[inline]
@@ -48,7 +52,7 @@ impl InternStore for PathStore {
     feature = "serde",
     derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
 )]
-pub struct UriPath(pub(crate) NonEmptyInternedStr<PathStore>);
+pub struct UriPath(pub(crate) NonEmptyStr<PathStore>);
 crate::ts!(UriPath);
 crate::debugdisplay!(UriPath);
 impl AsRef<str> for UriPath {
@@ -90,7 +94,7 @@ impl FromStr for UriPath {
     type Err = SegmentParseError;
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(NonEmptyInternedStr::new_with_sep::<'/'>(s)?))
+        Ok(Self(NonEmptyStr::new_with_sep::<'/'>(s)?))
     }
 }
 impl std::fmt::Display for UriPath {

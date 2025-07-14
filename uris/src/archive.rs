@@ -1,13 +1,19 @@
 use crate::{
     BaseUri, IsFtmlUri, UriKind, UriWithArchive,
-    aux::interning::{InternMap, InternStore, NonEmptyInternedStr},
+    aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
+
+#[cfg(feature = "interned")]
+use crate::aux::interning::{InternMap, InternStore};
+
 use const_format::concatcp;
 use either::Either::Right;
 use std::str::FromStr;
 
+#[cfg(feature = "interned")]
 static IDS: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
+
 static NO_ARCHIVE_URI: std::sync::LazyLock<ArchiveUri> = std::sync::LazyLock::new(||
     // SAFETY: known to be valid ArchiveUri
     unsafe {
@@ -15,6 +21,8 @@ static NO_ARCHIVE_URI: std::sync::LazyLock<ArchiveUri> = std::sync::LazyLock::ne
     });
 
 pub struct IdStore;
+
+#[cfg(feature = "interned")]
 impl InternStore for IdStore {
     const LIMIT: usize = 256;
     #[inline]
@@ -56,7 +64,7 @@ impl InternStore for IdStore {
 /// let meta_archive = ArchiveId::from_str("some/path/meta-inf").unwrap();
 /// assert!(meta_archive.is_meta());
 /// ```
-pub struct ArchiveId(NonEmptyInternedStr<IdStore>);
+pub struct ArchiveId(NonEmptyStr<IdStore>);
 crate::ts!(ArchiveId);
 impl ArchiveId {
     /// Returns a reference to the default "no archive" [`ArchiveId`].
@@ -171,7 +179,7 @@ impl ArchiveId {
     /// ```
     #[inline]
     pub fn new(s: &str) -> Result<Self, SegmentParseError> {
-        Ok(Self(NonEmptyInternedStr::new_with_sep::<'/'>(s)?))
+        Ok(Self(NonEmptyStr::new_with_sep::<'/'>(s)?))
     }
 }
 impl FromStr for ArchiveId {

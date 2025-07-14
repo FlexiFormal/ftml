@@ -47,6 +47,8 @@ use crate::{
  * # Examples
  *
  * ```
+ * # #[cfg(feature="leptos")]
+ * # {
  * # use ftml_uris::prelude::*;
  * # use ftml_uris::components::*;
  * # use ftml_uris::compfun;
@@ -78,6 +80,7 @@ use crate::{
  *     let actual_uri: Uri = uri.parse(get_archive_uri)?;
  *     if expensive { do_something(actual_uri)} else {dom_something_else(actual_uri)}
  * }}
+ * # }
  * ```
  *
  *

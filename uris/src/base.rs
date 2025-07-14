@@ -1,6 +1,8 @@
 use crate::{IsFtmlUri, errors::UriParseError};
 use either::{Either, Either::Left, Either::Right};
-use std::{hash::BuildHasher, str::FromStr};
+#[cfg(feature = "interned")]
+use std::hash::BuildHasher;
+use std::str::FromStr;
 use triomphe::Arc;
 
 /// A base URI that serves as the foundation for all FTML URI types.
@@ -139,15 +141,34 @@ impl BaseUri {
     /// assert!(BaseUri::new(bad_url).is_err());
     /// ```
     pub fn new(url: url::Url) -> Result<Self, UriParseError> {
-        let mut base = BASE_URIS.lock();
-        #[allow(clippy::map_unwrap_or)]
-        base.iter()
-            .rev()
-            .find(|e| **e == url)
-            .map(|e| Ok(Self(e.url.clone())))
-            .unwrap_or_else(|| Self::make_new(url, &mut base))
+        #[cfg(feature = "interned")]
+        {
+            let mut base = BASE_URIS.lock();
+            #[allow(clippy::map_unwrap_or)]
+            base.iter()
+                .rev()
+                .find(|e| **e == url)
+                .map(|e| Ok(Self(e.url.clone())))
+                .unwrap_or_else(|| Self::make_new(url, &mut base))
+        }
+        #[cfg(not(feature = "interned"))]
+        {
+            Self::make_new(url)
+        }
     }
 
+    #[cfg(not(feature = "interned"))]
+    fn make_new(url: url::Url) -> Result<Self, UriParseError> {
+        if url.fragment().is_some() || url.query().is_some() {
+            return Err(UriParseError::HasQueryOrFragment);
+        }
+        if url.cannot_be_a_base() {
+            return Err(UriParseError::CannotBeABase);
+        }
+        Ok(Self(url.into()))
+    }
+
+    #[cfg(feature = "interned")]
     fn make_new(url: url::Url, cache: &mut Vec<InternedBaseURI>) -> Result<Self, UriParseError> {
         if url.fragment().is_some() || url.query().is_some() {
             return Err(UriParseError::HasQueryOrFragment);
@@ -184,13 +205,23 @@ impl BaseUri {
 impl std::hash::Hash for BaseUri {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        #[cfg(feature = "interned")]
         (self.0.as_ptr().cast::<()>() as usize).hash(state);
+        #[cfg(not(feature = "interned"))]
+        self.0.hash(state);
     }
 }
 impl PartialEq for BaseUri {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.0.as_ptr(), other.0.as_ptr())
+        #[cfg(feature = "interned")]
+        {
+            std::ptr::eq(self.0.as_ptr(), other.0.as_ptr())
+        }
+        #[cfg(not(feature = "interned"))]
+        {
+            self.0.eq(&other.0)
+        }
     }
 }
 impl Eq for BaseUri {}
@@ -211,7 +242,14 @@ impl<'s> TryFrom<&'s str> for BaseUri {
 }
 impl FromStr for BaseUri {
     type Err = UriParseError;
+
+    #[cfg(not(feature = "interned"))]
     #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::make_new(url::Url::parse(s)?)
+    }
+
+    #[cfg(feature = "interned")]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim().trim_end_matches('/');
         let mut base = BASE_URIS.lock();
@@ -235,11 +273,14 @@ impl std::fmt::Display for BaseUri {
 ///
 /// This structure stores a hash of the URL string for fast lookups,
 /// the string representation, and the shared URL instance.
+#[cfg(feature = "interned")]
 struct InternedBaseURI {
     hash: u64,
     string: Box<str>,
     url: Arc<url::Url>,
 }
+
+#[cfg(feature = "interned")]
 impl From<url::Url> for InternedBaseURI {
     fn from(url: url::Url) -> Self {
         let string = url.as_str().trim_end_matches('/').into();
@@ -252,6 +293,7 @@ impl From<url::Url> for InternedBaseURI {
     }
 }
 
+#[cfg(feature = "interned")]
 impl PartialEq<str> for InternedBaseURI {
     #[inline]
     fn eq(&self, other: &str) -> bool {
@@ -259,6 +301,8 @@ impl PartialEq<str> for InternedBaseURI {
         h == self.hash && *other == *self.string
     }
 }
+
+#[cfg(feature = "interned")]
 impl PartialEq<url::Url> for InternedBaseURI {
     #[inline]
     fn eq(&self, other: &url::Url) -> bool {
@@ -267,17 +311,21 @@ impl PartialEq<url::Url> for InternedBaseURI {
     }
 }
 
+#[cfg(feature = "interned")]
 static BASE_URIS: std::sync::LazyLock<parking_lot::Mutex<Vec<InternedBaseURI>>> =
     std::sync::LazyLock::new(|| parking_lot::Mutex::new(Vec::with_capacity(8)));
+
 static UNKNOWN_BASE: std::sync::LazyLock<BaseUri> = std::sync::LazyLock::new(||
     // SAFETY: known to be well-formed Url
     unsafe{
         BaseUri::from_str("http://unknown.source").unwrap_unchecked()
     });
 
+#[cfg(feature = "interned")]
 const MAX: usize = 8;
 
 /// Cleans up the base URI cache by removing entries that are no longer referenced.
+#[cfg(feature = "interned")]
 #[inline]
 fn clean(v: &mut Vec<InternedBaseURI>) {
     fn actually_clean(v: &mut Vec<InternedBaseURI>) {

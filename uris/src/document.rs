@@ -5,7 +5,7 @@ use const_format::concatcp;
 use crate::{
     ArchiveUri, BaseUri, IsFtmlUri, IsNarrativeUri, Language, ModuleUri, PathUri, UriComponentKind,
     UriKind, UriName, UriPath, UriWithArchive, UriWithPath,
-    aux::interning::NonEmptyInternedStr,
+    aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
 
@@ -39,7 +39,7 @@ static NO_DOCUMENT: std::sync::LazyLock<DocumentUri> = std::sync::LazyLock::new(
     feature = "serde",
     derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
 )]
-pub struct SimpleUriName(pub(crate) NonEmptyInternedStr<super::module::NameStore>);
+pub struct SimpleUriName(pub(crate) NonEmptyStr<super::module::NameStore>);
 crate::ts!(SimpleUriName);
 crate::debugdisplay!(SimpleUriName);
 impl AsRef<str> for SimpleUriName {
@@ -55,7 +55,7 @@ impl FromStr for SimpleUriName {
         if s.contains('/') {
             return Err(SegmentParseError::IllegalChar('/'));
         }
-        Ok(Self(NonEmptyInternedStr::new(s)?))
+        Ok(Self(NonEmptyStr::new(s)?))
     }
 }
 impl std::fmt::Display for SimpleUriName {

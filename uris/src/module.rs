@@ -5,13 +5,18 @@ use const_format::concatcp;
 use crate::{
     ArchiveUri, BaseUri, IsDomainUri, IsFtmlUri, PathUri, SymbolUri, UriComponentKind, UriKind,
     UriWithArchive, UriWithPath,
-    aux::interning::{InternMap, InternStore, NonEmptyInternedStr},
+    aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
 
+#[cfg(feature = "interned")]
+use crate::aux::interning::{InternMap, InternStore};
+
+#[cfg(feature = "interned")]
 static NAMES: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
 
 pub struct NameStore;
+#[cfg(feature = "interned")]
 impl InternStore for NameStore {
     const LIMIT: usize = 1024;
     #[inline]
@@ -51,7 +56,7 @@ impl InternStore for NameStore {
     feature = "serde",
     derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
 )]
-pub struct UriName(pub(crate) NonEmptyInternedStr<NameStore>);
+pub struct UriName(pub(crate) NonEmptyStr<NameStore>);
 crate::ts!(UriName);
 crate::debugdisplay!(UriName);
 impl AsRef<str> for UriName {
@@ -196,7 +201,7 @@ impl FromStr for UriName {
     type Err = SegmentParseError;
     #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(NonEmptyInternedStr::new_with_sep::<'/'>(s)?))
+        Ok(Self(NonEmptyStr::new_with_sep::<'/'>(s)?))
     }
 }
 impl std::fmt::Display for UriName {

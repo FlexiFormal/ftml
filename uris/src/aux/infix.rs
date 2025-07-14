@@ -32,8 +32,7 @@ use std::ops::{BitAnd, BitOr, Div, Not};
 
 use crate::{
     ArchiveId, BaseUri, DocumentElementUri, DocumentUri, Language, ModuleUri, PathUri,
-    SimpleUriName, SymbolUri, UriName, UriPath, archive::ArchiveUri,
-    aux::interning::NonEmptyInternedStr,
+    SimpleUriName, SymbolUri, UriName, UriPath, archive::ArchiveUri, aux::NonEmptyStr,
 };
 
 /// Combines a [`BaseUri`] with an [`ArchiveId`] to create an [`ArchiveUri`].
@@ -77,7 +76,7 @@ impl<'a> Div<&'a UriPath> for &'a UriPath {
         // SAFETY: since both sides are UriPaths, no empty segments and no
         // illegal characters
         unsafe {
-            UriPath(NonEmptyInternedStr::new_from_nonempty(
+            UriPath(NonEmptyStr::new_from_nonempty(
                 format!("{self}/{rhs}").parse().unwrap_unchecked(),
             ))
         }
@@ -202,7 +201,7 @@ impl<'a> Div<&'a UriName> for &'a UriName {
         // SAFETY: since both sides are UriNames, no empty segments and no
         // illegal characters
         unsafe {
-            UriName(NonEmptyInternedStr::new_from_nonempty(
+            UriName(NonEmptyStr::new_from_nonempty(
                 format!("{self}/{rhs}").parse().unwrap_unchecked(),
             ))
         }

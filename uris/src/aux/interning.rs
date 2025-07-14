@@ -34,6 +34,7 @@ impl<Store: InternStore> Borrow<str> for InternedStr<Store> {
 }
 impl<Store: InternStore> std::ops::Deref for InternedStr<Store> {
     type Target = str;
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -167,7 +168,7 @@ impl<Store: InternStore> InternedStr<Store> {
     }
 }
 
-type Inner = (std::num::NonZeroU32, u32, usize); //std::num::NonZeroU128; //(u64, std::num::NonZeroUsize); //std::num::NonZeroU128; //(std::num::NonZeroU64,usize);
+type Inner = (std::num::NonZeroU32, u32, usize);
 
 // transmute-fuckery to get a niche for optimisations; e.g.
 // `size_of::<Option<NonEmptyInternedStr>>()==size_of::<NonEmptyInternedStr>()`
