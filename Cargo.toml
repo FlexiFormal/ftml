@@ -65,7 +65,7 @@ base64 = "0.22"
 enum_dispatch = "0.3"
 tantivy = "0.24"
 
-openmath = { path = "../OMDoc/openmath" }
+openmath = "0.1"
 
 proc-macro2 = "1"
 quote = "1"
