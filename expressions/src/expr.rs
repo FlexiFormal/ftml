@@ -1,6 +1,6 @@
 use ftml_uris::SymbolUri;
 
-use crate::variables::Variable;
+use crate::{Argument, variables::Variable};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -9,19 +9,23 @@ use crate::variables::Variable;
 pub enum Expr {
     Symbol(SymbolUri),
     Var(Variable),
+    Application {
+        head: Box<Self>,
+        arguments: Vec<Argument>,
+    },
 }
 impl Expr {
-    #[must_use]
+    /*#[must_use]
     #[inline]
     pub const fn normalize(self) -> Self {
         self
-    }
+    }*/
 }
 
 #[cfg(feature = "openmath")]
 pub mod om {
     use super::Variable;
-    use crate::Expr;
+    use crate::{Argument, Expr};
     use ftml_uris::{PathUri, UriName};
     use openmath::OM;
     use openmath::ser::AsOMS;
@@ -46,28 +50,37 @@ pub mod om {
                 Self::Symbol(s) => s.as_oms().as_openmath(serializer),
                 Self::Var(Variable::Name(n)) => serializer.omv(n),
                 Self::Var(Variable::Ref { declaration, .. }) => serializer.omv(declaration.name()),
+                _ => todo!(),
+                /*Self::Application { head, arguments }
+                    if arguments
+                        .iter
+                        .any(|a| matches!(a, Argument::Bound(_) | Argument::BoundSeq(_))) =>
+                {
+                    serializer.ombind(head, vars, body)
+                }
+                */
                 /*
-                Self::Var(Variable::Ref {
-                    declaration,
-                    is_sequence: None | Some(false),
-                }) => serializer.omattr(
-                    std::iter::once((
-                        &*ftml_uris::metatheory::RESOLVED_VARIABLE_URI,
-                        &declaration.as_oms(),
-                    )),
-                    openmath::ser::Omv(declaration.name()),
-                ),
-                Self::Var(Variable::Ref { declaration, .. }) => serializer.omattr(
-                    [
-                        (
-                            &*ftml_uris::metatheory::RESOLVED_VARIABLE_URI,
-                            &Either::Left(declaration.as_oms()),
-                        ),
-                        (&*ftml_uris::metatheory::SEQUENCE_TYPE, &Either::Right(1u64)),
-                    ]
-                    .into_iter(),
-                    openmath::ser::Omv(declaration.name()),
-                ), */
+                  Self::Var(Variable::Ref {
+                      declaration,
+                      is_sequence: None | Some(false),
+                  }) => serializer.omattr(
+                      std::iter::once((
+                          &*ftml_uris::metatheory::RESOLVED_VARIABLE_URI,
+                          &declaration.as_oms(),
+                      )),
+                      openmath::ser::Omv(declaration.name()),
+                  ),
+                  Self::Var(Variable::Ref { declaration, .. }) => serializer.omattr(
+                      [
+                          (
+                              &*ftml_uris::metatheory::RESOLVED_VARIABLE_URI,
+                              &Either::Left(declaration.as_oms()),
+                          ),
+                          (&*ftml_uris::metatheory::SEQUENCE_TYPE, &Either::Right(1u64)),
+                      ]
+                      .into_iter(),
+                      openmath::ser::Omv(declaration.name()),
+                  ), */
             }
         }
     }

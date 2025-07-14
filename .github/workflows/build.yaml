@@ -1,0 +1,49 @@
+on:
+  push:
+    branches: [main]
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: rustups
+        run: |
+          rustup update &&
+          rustup target add x86_64-unknown-linux-gnu &&
+          rustup toolchain install nightly-x86_64-unknown-linux-gnu &&
+        #  rustup +nightly component add miri
+      - name: cargo
+        run: cargo install --force cargo-make
+      - name: ftml-uris tests
+        run: cd uris && cargo make all-tests
+      - name: uris doc
+        run: cd uris && cargo make doc
+      #- name: miri
+      #  run: cd openmath && cargo make miri
+      - name: ftml-ulo tests
+        run: cd ulo && cargo +nightly test
+      - name: ulo doc
+        run: cd ulo && cargo +nightly doc --no-deps
+      - name: ftml-core tests
+        run: cd core && cargo make all-tests
+      - name: core doc
+        run: cd core && cargo make doc
+      - name: Upload Docs
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc
+  deploy-docs:
+    needs: linux
+    permissions:
+      pages: write # to deploy to Pages
+      id-token: write # to verify the deployment originates from an appropriate source
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

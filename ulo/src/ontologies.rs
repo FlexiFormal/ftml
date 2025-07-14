@@ -20,7 +20,7 @@ macro_rules! dict {
         #[allow(non_upper_case_globals)]
         pub mod $name {
 
-            use crate::rdf::*;
+            use crate::rdf_types::*;
 
             #[doc=concat!("`",$uri,"`")]
             pub const NAMESPACE: NamedNodeRef = NamedNodeRef::new_unchecked($uri);

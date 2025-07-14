@@ -54,3 +54,8 @@ dependencies = [
 command = "cargo"
 install_crate = false
 args = ["+nightly", "doc", "--no-deps", "--all-features"]
+
+[tasks.miri]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "miri", "test", "--all-features"]

@@ -6,7 +6,7 @@ numbers in FTML documents. As such, it is important that they are fast to parse,
 (de)serialize, and ideally are parsimonious with respect to memory usage.
 
 Naturally, these desiderata are contradictory. Hence, as a tradeoff, we
-- intern [Uri]s and Uri *components* for deduplication,
+- intern [Uri]s and Uri *components* for deduplication (if the `interned`-feature is active),
 - use [strumbra](strumbra::SharedString) strings to keep allocations infrequent,
 - use [Arc](triomphe::Arc)s where heap is unavoidable
 - use pointer-equality (thanks to interning) for fast equality checks

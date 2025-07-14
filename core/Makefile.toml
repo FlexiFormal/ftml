@@ -1,0 +1,22 @@
+[tasks.test-no-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--no-default-features"]
+
+[tasks.test-serde]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=serde"]
+
+[tasks.test-all-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--all-features"]
+
+[tasks.all-tests]
+dependencies = ["test-no-features", "test-serde", "test-all-features"]
+
+[tasks.doc]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "doc", "--no-deps", "--all-features"]

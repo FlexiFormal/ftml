@@ -2,20 +2,17 @@
 //#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
 #![recursion_limit = "512"]
 #![doc = include_str!("../README.md")]
-/*!
- * ## Feature flags
- **/
-#![cfg_attr(doc,doc = document_features::document_features!())]
 
 /// Reexports for convenience
-pub mod rdf {
+pub mod rdf_types {
     pub use oxrdf::{
         BlankNode, GraphName, GraphNameRef, Literal, LiteralRef, NamedNode, NamedNodeRef, Quad,
         QuadRef, Subject, SubjectRef, Term as RDFTerm, TermRef as RDFTermRef, Triple, TripleRef,
         Variable,
     };
 }
-pub mod ontologies;
+mod ontologies;
+pub use ontologies::{dc, owl, rdf, rdfs, ulo, xsd};
 
 #[macro_export]
 macro_rules! triple {

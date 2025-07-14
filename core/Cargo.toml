@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [features]
-# Adds serde support
+## Adds serde support
 serde = ["dep:serde", "ftml-uris/serde"]
 
 [package.metadata.docs.rs]
@@ -19,8 +19,6 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
     "-Zunstable-options",
-    "-Zrustdoc-scrape-examples",
-    "--all-features",
     "--generate-link-to-definition",
     "--html-in-header",
     "doc/katex-header.html",

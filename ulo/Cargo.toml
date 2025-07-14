@@ -18,8 +18,6 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
     "-Zunstable-options",
-    "-Zrustdoc-scrape-examples",
-    "--all-features",
     "--generate-link-to-definition",
     "--html-in-header",
     "doc/katex-header.html",
@@ -37,5 +35,5 @@ rstest = { workspace = true }
 criterion = { workspace = true }
 
 [dependencies]
-document-features = { workspace = true }
+#document-features = { workspace = true }
 oxrdf = { workspace = true }
