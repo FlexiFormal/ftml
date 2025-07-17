@@ -31,8 +31,8 @@
 use std::ops::{BitAnd, BitOr, Div, Not};
 
 use crate::{
-    ArchiveId, BaseUri, DocumentElementUri, DocumentUri, Language, ModuleUri, PathUri,
-    SimpleUriName, SymbolUri, UriName, UriPath, archive::ArchiveUri, aux::NonEmptyStr,
+    ArchiveId, BaseUri, DocumentElementUri, DocumentUri, Language, ModuleUri, NarrativeUri,
+    PathUri, SimpleUriName, SymbolUri, UriName, UriPath, archive::ArchiveUri, aux::NonEmptyStr,
 };
 
 /// Combines a [`BaseUri`] with an [`ArchiveId`] to create an [`ArchiveUri`].
@@ -195,9 +195,9 @@ impl Div<&UriPath> for PathUri {
 /// let combined = &name1 / &name2;
 /// assert_eq!(combined.as_ref(), "math/algebra");
 /// ```
-impl<'a> Div<&'a UriName> for &'a UriName {
+impl Div<&UriName> for &UriName {
     type Output = UriName;
-    fn div(self, rhs: &'a UriName) -> Self::Output {
+    fn div(self, rhs: &UriName) -> Self::Output {
         // SAFETY: since both sides are UriNames, no empty segments and no
         // illegal characters
         unsafe {
@@ -437,10 +437,39 @@ impl Div<&UriName> for DocumentElementUri {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl BitAnd<UriName> for NarrativeUri {
+    type Output = DocumentElementUri;
+    #[inline]
+    fn bitand(self, rhs: UriName) -> Self::Output {
+        match self {
+            Self::Document(d) => DocumentElementUri {
+                document: d,
+                name: rhs,
+            },
+            Self::Element(e) => e / &rhs,
+        }
+    }
+}
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl BitAnd<&UriName> for NarrativeUri {
+    type Output = DocumentElementUri;
+    #[inline]
+    fn bitand(self, rhs: &UriName) -> Self::Output {
+        match self {
+            Self::Document(d) => DocumentElementUri {
+                document: d,
+                name: rhs.clone(),
+            },
+            Self::Element(e) => e / rhs,
+        }
+    }
+}
+
 crate::tests! {
     infix_base {
         use std::str::FromStr;
-        use crate::{IsFtmlUri, UriWithArchive};
+        use crate::{FtmlUri, UriWithArchive};
         let base = BaseUri::from_str("http://example.com").expect("works");
         let archive_id = ArchiveId::from_str("my/archive").expect("works");
 
@@ -531,7 +560,7 @@ crate::tests! {
     };
     complex_combinations {
         use std::str::FromStr;
-        use crate::{IsFtmlUri, UriWithArchive, UriWithPath};
+        use crate::{FtmlUri, UriWithArchive, UriWithPath};
 
         // Test complex operator chaining
         let base = BaseUri::from_str("http://example.com").expect("works");

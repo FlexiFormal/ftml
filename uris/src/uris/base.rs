@@ -1,4 +1,4 @@
-use crate::{IsFtmlUri, errors::UriParseError};
+use crate::{FtmlUri, errors::UriParseError};
 use either::{Either, Either::Left, Either::Right};
 #[cfg(feature = "interned")]
 use std::hash::BuildHasher;
@@ -42,10 +42,14 @@ crate::ts!(BaseUri);
 crate::debugdisplay!(BaseUri);
 impl crate::sealed::Sealed for BaseUri {}
 
-impl IsFtmlUri for BaseUri {
+impl FtmlUri for BaseUri {
     #[inline]
     fn base(&self) -> &BaseUri {
         self
+    }
+    #[inline]
+    fn as_uri(&self) -> crate::UriRef {
+        crate::UriRef::Base(self)
     }
     fn could_be(maybe_uri: &str) -> bool {
         if maybe_uri.is_empty() {
@@ -187,7 +191,7 @@ impl BaseUri {
     ///
     /// This method handles the common parsing logic for all FTML URI types,
     /// separating the base URI from query parameters.
-    pub(super) fn pre_parse(
+    pub(crate) fn pre_parse(
         s: &str,
     ) -> Result<Either<Self, (Self, std::str::Split<'_, char>)>, UriParseError> {
         let Some((base, rest)) = s.split_once('?') else {

@@ -3,8 +3,8 @@ use std::{fmt::Write, str::FromStr};
 use const_format::concatcp;
 
 use crate::{
-    ArchiveUri, BaseUri, IsDomainUri, IsFtmlUri, PathUri, SymbolUri, UriComponentKind, UriKind,
-    UriWithArchive, UriWithPath,
+    ArchiveUri, BaseUri, FtmlUri, IsDomainUri, NamedUri, PathUri, SymbolUri, UriComponentKind,
+    UriKind, UriWithArchive, UriWithPath,
     aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
@@ -195,6 +195,21 @@ impl UriName {
             Self(unsafe { self.first().parse().unwrap_unchecked() })
         }
     }
+
+    #[must_use]
+    pub fn with_last_name(&self, s: &crate::SimpleUriName) -> Self {
+        if self.is_simple() {
+            return s.clone().0;
+        }
+        // SAFETY: !self.is_simple() => at least two steps
+        unsafe {
+            let init = self.0.rsplit_once('/').unwrap_unchecked().0;
+            Self(NonEmptyStr::new_from_nonempty(
+                // SAFETY: known to entirely consist of valid segments
+                format!("{init}/{s}").parse().unwrap_unchecked(),
+            ))
+        }
+    }
 }
 
 impl FromStr for UriName {
@@ -304,7 +319,7 @@ impl ModuleUri {
     ///
     /// This method handles the common parsing logic for module URIs and
     /// URI types that extend module URIs (like symbol URIs).
-    pub(super) fn pre_parse<R>(
+    pub(crate) fn pre_parse<R>(
         s: &str,
         uri_kind: UriKind,
         f: impl FnOnce(Self, std::str::Split<char>) -> Result<R, UriParseError>,
@@ -372,10 +387,10 @@ impl ModuleUri {
 impl FromStr for ModuleUri {
     type Err = UriParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::pre_parse(s, UriKind::ModuleUri, |u, mut split| {
+        Self::pre_parse(s, UriKind::Module, |u, mut split| {
             if split.next().is_some() {
                 return Err(UriParseError::TooManyPartsFor {
-                    uri_kind: UriKind::ModuleUri,
+                    uri_kind: UriKind::Module,
                 });
             }
             Ok(u)
@@ -400,10 +415,14 @@ impl From<ModuleUri> for BaseUri {
         value.path.archive.base
     }
 }
-impl IsFtmlUri for ModuleUri {
+impl FtmlUri for ModuleUri {
     #[inline]
     fn base(&self) -> &crate::BaseUri {
         &self.path.archive.base
+    }
+    #[inline]
+    fn as_uri(&self) -> crate::UriRef {
+        crate::UriRef::Module(self)
     }
     fn could_be(maybe_uri: &str) -> bool {
         let Some((a, p)) = maybe_uri.rsplit_once('&') else {
@@ -437,6 +456,13 @@ impl IsDomainUri for ModuleUri {
     #[inline]
     fn module_uri(&self) -> &ModuleUri {
         self
+    }
+}
+
+impl NamedUri for ModuleUri {
+    #[inline]
+    fn name(&self) -> &UriName {
+        &self.name
     }
 }
 
@@ -544,11 +570,11 @@ crate::tests! {
     };
     module_uri_traits {
         use std::str::FromStr;
-        use crate::{IsFtmlUri, UriWithArchive, UriWithPath, IsDomainUri};
+        use crate::{FtmlUri, UriWithArchive, UriWithPath, IsDomainUri};
 
         let module_uri = ModuleUri::from_str("http://example.com?a=math&p=textbooks&m=algebra/groups").expect("works");
 
-        // Test IsFtmlUri
+        // Test FtmlUri
         assert_eq!(module_uri.base().as_str(), "http://example.com");
 
         // Test UriWithArchive

@@ -3,8 +3,8 @@ use std::str::FromStr;
 use const_format::concatcp;
 
 use crate::{
-    ArchiveUri, BaseUri, IsFtmlUri, IsNarrativeUri, Language, ModuleUri, PathUri, UriComponentKind,
-    UriKind, UriName, UriPath, UriWithArchive, UriWithPath,
+    ArchiveUri, BaseUri, FtmlUri, IsNarrativeUri, Language, ModuleUri, NamedUri, PathUri,
+    UriComponentKind, UriKind, UriName, UriPath, UriWithArchive, UriWithPath,
     aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
@@ -39,13 +39,13 @@ static NO_DOCUMENT: std::sync::LazyLock<DocumentUri> = std::sync::LazyLock::new(
     feature = "serde",
     derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
 )]
-pub struct SimpleUriName(pub(crate) NonEmptyStr<super::module::NameStore>);
+pub struct SimpleUriName(pub(crate) UriName);
 crate::ts!(SimpleUriName);
 crate::debugdisplay!(SimpleUriName);
 impl AsRef<str> for SimpleUriName {
     #[inline]
     fn as_ref(&self) -> &str {
-        &self.0
+        &self.0.0
     }
 }
 impl FromStr for SimpleUriName {
@@ -55,7 +55,7 @@ impl FromStr for SimpleUriName {
         if s.contains('/') {
             return Err(SegmentParseError::IllegalChar('/'));
         }
-        Ok(Self(NonEmptyStr::new(s)?))
+        Ok(Self(UriName(NonEmptyStr::new(s)?)))
     }
 }
 impl std::fmt::Display for SimpleUriName {
@@ -200,7 +200,7 @@ impl DocumentUri {
             if rest.is_some() {
                 Ok(self.path.clone() | name.parse()?)
             } else {
-                Ok(self.path.clone() | UriName(self.name.0.clone()))
+                Ok(self.path.clone() | self.name.0.clone())
             }
         } else {
             Ok((self.path.clone() / UriPath(self.name.as_ref().parse()?)) | name.parse()?)
@@ -211,7 +211,7 @@ impl DocumentUri {
     ///
     /// This method handles the common parsing logic for module URIs and
     /// URI types that extend module URIs (like symbol URIs).
-    pub(super) fn pre_parse<R>(
+    pub(crate) fn pre_parse<R>(
         s: &str,
         uri_kind: UriKind,
         f: impl FnOnce(Self, std::str::Split<char>) -> Result<R, UriParseError>,
@@ -268,10 +268,10 @@ impl DocumentUri {
 impl FromStr for DocumentUri {
     type Err = UriParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::pre_parse(s, UriKind::DocumentUri, |u, mut split| {
+        Self::pre_parse(s, UriKind::Document, |u, mut split| {
             if split.next().is_some() {
                 return Err(UriParseError::TooManyPartsFor {
-                    uri_kind: UriKind::DocumentUri,
+                    uri_kind: UriKind::Document,
                 });
             }
             Ok(u)
@@ -296,10 +296,15 @@ impl From<DocumentUri> for BaseUri {
         value.path.archive.base
     }
 }
-impl IsFtmlUri for DocumentUri {
+impl FtmlUri for DocumentUri {
     #[inline]
     fn base(&self) -> &crate::BaseUri {
         &self.path.archive.base
+    }
+
+    #[inline]
+    fn as_uri(&self) -> crate::UriRef {
+        crate::UriRef::Document(self)
     }
 
     fn could_be(maybe_uri: &str) -> bool {
@@ -334,6 +339,13 @@ impl IsNarrativeUri for DocumentUri {
     #[inline]
     fn document_uri(&self) -> &DocumentUri {
         self
+    }
+}
+
+impl NamedUri for DocumentUri {
+    #[inline]
+    fn name(&self) -> &UriName {
+        &self.name.0
     }
 }
 

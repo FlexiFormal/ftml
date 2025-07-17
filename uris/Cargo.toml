@@ -43,6 +43,8 @@ tantivy = ["dep:tantivy"]
 openmath = ["dep:openmath"]
 ## interns Uris for deduplication, reduced memory usage and faster equality checks.
 interned = []
+## Allows for creating RDF IRIs from URIs using [`oxrdf::NamedNode`](oxrdf::NamedNode)
+rdf = ["dep:oxrdf"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -92,3 +94,4 @@ wasm-bindgen = { workspace = true, optional = true }
 leptos_router = { workspace = true, optional = true }
 tantivy = { workspace = true, optional = true }
 openmath = { workspace = true, optional = true }
+oxrdf = { workspace = true, optional = true }

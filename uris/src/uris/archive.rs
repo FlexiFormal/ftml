@@ -1,5 +1,5 @@
 use crate::{
-    BaseUri, IsFtmlUri, UriKind, UriWithArchive,
+    BaseUri, FtmlUri, UriKind, UriWithArchive,
     aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
@@ -289,11 +289,17 @@ impl From<ArchiveUri> for BaseUri {
         value.base
     }
 }
-impl IsFtmlUri for ArchiveUri {
+impl FtmlUri for ArchiveUri {
     #[inline]
     fn base(&self) -> &BaseUri {
         &self.base
     }
+
+    #[inline]
+    fn as_uri(&self) -> crate::UriRef {
+        crate::UriRef::Archive(self)
+    }
+
     fn could_be(maybe_uri: &str) -> bool {
         let Some((start, e)) = maybe_uri.split_once('?') else {
             return false;
@@ -325,10 +331,10 @@ impl std::fmt::Display for ArchiveUri {
 impl FromStr for ArchiveUri {
     type Err = UriParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::pre_parse(s, UriKind::ArchiveUri, |a, mut split| {
+        Self::pre_parse(s, UriKind::Archive, |a, mut split| {
             if split.next().is_some() {
                 return Err(UriParseError::TooManyPartsFor {
-                    uri_kind: UriKind::ArchiveUri,
+                    uri_kind: UriKind::Archive,
                 });
             }
             Ok(a)

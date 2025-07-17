@@ -6,6 +6,7 @@ macro_rules! ftml {
         concat!(ftml!(), $l)
     };
 }
+pub const PREFIX: &str = "data-ftml-";
 
 macro_rules! do_keys {
     ( $count:literal: $(
@@ -30,7 +31,7 @@ macro_rules! do_keys {
         pub enum FTMLKey {
             $(
                 #[doc = concat!(
-                    "<div class=\"ftml-syntax\">\n\n`data-ftml-",
+                    "<div class=\"ftml-syntax\">\n\n`","data-ftml-",
                         $val
                         $(,"`[`=\"`<[",stringify!($otp),"]>`\"`]`")?
                         $(,"=\"`<[",stringify!($tp),"]>`\"")?

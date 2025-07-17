@@ -15,7 +15,7 @@ Naturally, these desiderata are contradictory. Hence, as a tradeoff, we
 
 | Type  |     | Cases/Def | Trait |
 |----------- |---- | -----|-------|
-| [`Uri`]      | ::= | [`BaseUri`]⏐[`ArchiveUri`]⏐[`PathUri`]⏐[`ModuleUri`]⏐[`SymbolUri`]⏐[`DocumentUri`]⏐[`DocumentElementUri`] | [`IsFtmlUri`] |
+| [`Uri`]      | ::= | [`BaseUri`]⏐[`ArchiveUri`]⏐[`PathUri`]⏐[`ModuleUri`]⏐[`SymbolUri`]⏐[`DocumentUri`]⏐[`DocumentElementUri`] | [`FtmlUri`] |
 | [`BaseUri`]  | ::= | (URL with no query/fragment) | - |
 | [`ArchiveUri`] | ::= | <code>[BaseUri]?a=[ArchiveId]</code> | [`UriWithArchive`] |
 | [`PathUri`]  | ::= | <code>[ArchiveUri][&p=[UriPath]]</code> | [`UriWithPath`] |

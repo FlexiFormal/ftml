@@ -5,7 +5,7 @@ use const_format::concatcp;
 #[cfg(feature = "interned")]
 use crate::aux::interning::{InternMap, InternStore};
 use crate::{
-    BaseUri, IsFtmlUri, UriKind, UriWithArchive, UriWithPath,
+    BaseUri, FtmlUri, UriKind, UriWithArchive, UriWithPath,
     archive::ArchiveUri,
     aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
@@ -87,6 +87,28 @@ impl UriPath {
     #[inline]
     pub fn up(&self) -> Option<Self> {
         self.0.up::<'/'>().map(Self)
+    }
+
+    /// Returns an iterator over all segments in the path.
+    ///
+    /// The iterator supports both forward and backward iteration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let name = UriPath::from_str("math/algebra/groups").unwrap();
+    /// let segments: Vec<&str> = name.steps().collect();
+    /// assert_eq!(segments, vec!["math", "algebra", "groups"]);
+    ///
+    /// let reversed: Vec<&str> = name.steps().rev().collect();
+    /// assert_eq!(reversed, vec!["groups", "algebra", "math"]);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn steps(&self) -> impl DoubleEndedIterator<Item = &str> {
+        self.0.segmented::<'/'>()
     }
 }
 
@@ -248,10 +270,10 @@ impl std::fmt::Display for PathUri {
 impl FromStr for PathUri {
     type Err = UriParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::pre_parse(s, UriKind::PathUri, |u, next, mut split| {
+        Self::pre_parse(s, UriKind::Path, |u, next, mut split| {
             if next.is_some() || split.next().is_some() {
                 return Err(UriParseError::TooManyPartsFor {
-                    uri_kind: UriKind::PathUri,
+                    uri_kind: UriKind::Path,
                 });
             }
             Ok(u)
@@ -279,11 +301,17 @@ impl From<PathUri> for BaseUri {
         value.archive.base
     }
 }
-impl IsFtmlUri for PathUri {
+impl FtmlUri for PathUri {
     #[inline]
     fn base(&self) -> &crate::BaseUri {
         &self.archive.base
     }
+
+    #[inline]
+    fn as_uri(&self) -> crate::UriRef {
+        crate::UriRef::Path(self)
+    }
+
     fn could_be(maybe_uri: &str) -> bool {
         if let Some((a, p)) = maybe_uri.rsplit_once('&') {
             ArchiveUri::could_be(a) && p.starts_with("p=") && !p.contains(['&', '?', '\\'])

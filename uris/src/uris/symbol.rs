@@ -3,8 +3,8 @@ use std::str::FromStr;
 use const_format::concatcp;
 
 use crate::{
-    ArchiveUri, BaseUri, IsDomainUri, IsFtmlUri, ModuleUri, PathUri, UriComponentKind, UriKind,
-    UriName, UriWithArchive, UriWithPath, errors::UriParseError,
+    ArchiveUri, BaseUri, FtmlUri, IsDomainUri, ModuleUri, NamedUri, PathUri, UriComponentKind,
+    UriKind, UriName, UriWithArchive, UriWithPath, errors::UriParseError,
 };
 
 /// A URI that identifies a specific concept.
@@ -131,10 +131,10 @@ impl SymbolUri {
 impl FromStr for SymbolUri {
     type Err = UriParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::pre_parse(s, UriKind::SymbolUri, |u, mut split| {
+        Self::pre_parse(s, UriKind::Symbol, |u, mut split| {
             if split.next().is_some() {
                 return Err(UriParseError::TooManyPartsFor {
-                    uri_kind: UriKind::SymbolUri,
+                    uri_kind: UriKind::Symbol,
                 });
             }
             Ok(u)
@@ -165,10 +165,15 @@ impl From<SymbolUri> for BaseUri {
         value.module.path.archive.base
     }
 }
-impl IsFtmlUri for SymbolUri {
+impl FtmlUri for SymbolUri {
     #[inline]
     fn base(&self) -> &crate::BaseUri {
         &self.module.path.archive.base
+    }
+
+    #[inline]
+    fn as_uri(&self) -> crate::UriRef {
+        crate::UriRef::Symbol(self)
     }
 
     fn could_be(maybe_uri: &str) -> bool {
@@ -203,6 +208,13 @@ impl IsDomainUri for SymbolUri {
     #[inline]
     fn module_uri(&self) -> &ModuleUri {
         &self.module
+    }
+}
+
+impl NamedUri for SymbolUri {
+    #[inline]
+    fn name(&self) -> &UriName {
+        &self.name
     }
 }
 
@@ -268,11 +280,11 @@ crate::tests! {
     };
     symbol_uri_traits {
         use std::str::FromStr;
-        use crate::{IsFtmlUri, UriWithArchive, UriWithPath, IsDomainUri};
+        use crate::{FtmlUri, UriWithArchive, UriWithPath, IsDomainUri};
 
         let symbol_uri = SymbolUri::from_str("http://example.com?a=math&p=textbooks&m=algebra/groups&s=cyclic").expect("works");
 
-        // Test IsFtmlUri
+        // Test FtmlUri
         assert_eq!(symbol_uri.base().as_str(), "http://example.com");
 
         // Test UriWithArchive

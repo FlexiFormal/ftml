@@ -297,15 +297,15 @@ pub type UriComponentFun3<S, T1, T2, T3, R> = fn(
 #[derive(Clone, Hash, PartialEq, Eq)]
 #[impl_tools::autoimpl(Default)]
 pub struct UriComponentTuple<S: AsRef<str> = String> {
-    uri: Option<Uri>,
-    rp: Option<S>,
-    a: Option<ArchiveId>,
-    p: Option<S>,
-    m: Option<S>,
-    d: Option<S>,
-    l: Option<Language>,
-    s: Option<S>,
-    e: Option<S>,
+    pub uri: Option<Uri>,
+    pub rp: Option<S>,
+    pub a: Option<ArchiveId>,
+    pub p: Option<S>,
+    pub m: Option<S>,
+    pub d: Option<S>,
+    pub l: Option<Language>,
+    pub s: Option<S>,
+    pub e: Option<S>,
 }
 impl<S: AsRef<str>> UriComponentTuple<S> {
     #[inline]
@@ -378,6 +378,46 @@ pub enum UriComponents<S: AsRef<str> = String> {
         m: S,
         s: S,
     },
+}
+impl From<UriComponents<&str>> for UriComponents<String> {
+    fn from(value: UriComponents<&str>) -> Self {
+        match value {
+            UriComponents::Full(u) => Self::Full(u),
+            UriComponents::RelPath { a, rp } => Self::RelPath {
+                a,
+                rp: rp.to_string(),
+            },
+            UriComponents::ArchiveComponents { a } => Self::ArchiveComponents { a },
+            UriComponents::PathComponents { a, p } => Self::PathComponents {
+                a,
+                p: p.to_string(),
+            },
+            UriComponents::DocumentComponents { a, p, l, d } => Self::DocumentComponents {
+                a,
+                p: p.map(ToString::to_string),
+                l,
+                d: d.to_string(),
+            },
+            UriComponents::ElementComponents { a, p, l, d, e } => Self::ElementComponents {
+                a,
+                p: p.map(ToString::to_string),
+                l,
+                d: d.to_string(),
+                e: e.to_string(),
+            },
+            UriComponents::ModuleComponents { a, p, m } => Self::ModuleComponents {
+                a,
+                p: p.map(ToString::to_string),
+                m: m.to_string(),
+            },
+            UriComponents::SymbolComponents { a, p, m, s } => Self::SymbolComponents {
+                a,
+                p: p.map(ToString::to_string),
+                m: m.to_string(),
+                s: s.to_string(),
+            },
+        }
+    }
 }
 impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> From<UriComponents<S2>> for UriComponentTuple<S1> {
     fn from(value: UriComponents<S2>) -> Self {
@@ -465,30 +505,30 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> TryFrom<UriComponentTuple<S2>>
         }
         if let Some(rp) = value.rp {
             let Some(a) = value.a else {
-                missing!(DocumentUri:a);
+                missing!(Document:a);
             };
-            forbidden!(value => UriKind::DocumentUri;p,d,l,e,m,s);
+            forbidden!(value => UriKind::Document;p,d,l,e,m,s);
             return Ok(Self::RelPath { a, rp: rp.into() });
         }
         if let Some(d) = value.d {
             let Some(l) = value.l else {
                 let kind = if value.e.is_some() {
-                    UriKind::DocumentElementUri
+                    UriKind::DocumentElement
                 } else {
-                    UriKind::DocumentUri
+                    UriKind::Document
                 };
                 missing!(>kind; l);
             };
             let Some(a) = value.a else {
                 let kind = if value.e.is_some() {
-                    UriKind::DocumentElementUri
+                    UriKind::DocumentElement
                 } else {
-                    UriKind::DocumentUri
+                    UriKind::Document
                 };
                 missing!(>kind; a);
             };
             if let Some(e) = value.e {
-                forbidden!(value => UriKind::DocumentElementUri;m,s);
+                forbidden!(value => UriKind::DocumentElement;m,s);
                 return Ok(Self::ElementComponents {
                     a,
                     p: value.p.map(Into::into),
@@ -497,7 +537,7 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> TryFrom<UriComponentTuple<S2>>
                     e: e.into(),
                 });
             }
-            forbidden!(value => UriKind::DocumentUri;m,s);
+            forbidden!(value => UriKind::Document;m,s);
             return Ok(Self::DocumentComponents {
                 a,
                 p: value.p.map(Into::into),
@@ -507,14 +547,14 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> TryFrom<UriComponentTuple<S2>>
         } else if let Some(m) = value.m {
             let Some(a) = value.a else {
                 let kind = if value.s.is_some() {
-                    UriKind::SymbolUri
+                    UriKind::Symbol
                 } else {
-                    UriKind::ModuleUri
+                    UriKind::Module
                 };
                 missing!(>kind; a);
             };
             if let Some(s) = value.s {
-                forbidden!(value => UriKind::SymbolUri;d,l,e);
+                forbidden!(value => UriKind::Symbol;d,l,e);
                 return Ok(Self::SymbolComponents {
                     a,
                     p: value.p.map(Into::into),
@@ -522,7 +562,7 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> TryFrom<UriComponentTuple<S2>>
                     s: s.into(),
                 });
             }
-            forbidden!(value => UriKind::ModuleUri;d,l,e);
+            forbidden!(value => UriKind::Module;d,l,e);
             return Ok(Self::ModuleComponents {
                 a,
                 p: value.p.map(Into::into),
@@ -530,10 +570,10 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> TryFrom<UriComponentTuple<S2>>
             });
         } else if let Some(a) = value.a {
             if let Some(p) = value.p {
-                forbidden!(value => UriKind::PathUri;e,l,s);
+                forbidden!(value => UriKind::Path;e,l,s);
                 return Ok(Self::PathComponents { a, p: p.into() });
             }
-            forbidden!(value => UriKind::ArchiveUri;e,l,s);
+            forbidden!(value => UriKind::Archive;e,l,s);
             return Ok(Self::ArchiveComponents { a });
         }
         Err(ComponentError::NoValidCombination)
@@ -689,12 +729,12 @@ pub type DocumentUriComponentFun3<S, T1, T2, T3, R> = fn(
 #[derive(Clone, Hash, PartialEq, Eq)]
 #[impl_tools::autoimpl(Default)]
 pub struct DocumentUriComponentTuple<S: AsRef<str> = String> {
-    uri: Option<DocumentUri>,
-    rp: Option<S>,
-    a: Option<ArchiveId>,
-    p: Option<S>,
-    d: Option<S>,
-    l: Option<Language>,
+    pub uri: Option<DocumentUri>,
+    pub rp: Option<S>,
+    pub a: Option<ArchiveId>,
+    pub p: Option<S>,
+    pub d: Option<S>,
+    pub l: Option<Language>,
 }
 impl<S: AsRef<str>> DocumentUriComponentTuple<S> {
     #[inline]
@@ -735,7 +775,7 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> From<DocumentUriComponentTuple<S
         }: DocumentUriComponentTuple<S2>,
     ) -> Self {
         Self {
-            uri: uri.map(Uri::DocumentUri),
+            uri: uri.map(Uri::Document),
             rp: rp.map(Into::into),
             a,
             p: p.map(Into::into),
@@ -759,6 +799,23 @@ pub enum DocumentUriComponents<S: AsRef<str> = String> {
         l: Language,
         d: S,
     },
+}
+impl From<DocumentUriComponents<&str>> for DocumentUriComponents {
+    fn from(value: DocumentUriComponents<&str>) -> Self {
+        match value {
+            DocumentUriComponents::Full(u) => Self::Full(u),
+            DocumentUriComponents::RelPath { a, rp } => Self::RelPath {
+                a,
+                rp: rp.to_string(),
+            },
+            DocumentUriComponents::Components { a, p, l, d } => Self::Components {
+                a,
+                p: p.map(ToString::to_string),
+                l,
+                d: d.to_string(),
+            },
+        }
+    }
 }
 impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> From<DocumentUriComponents<S2>>
     for UriComponents<S1>
@@ -808,21 +865,21 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> TryFrom<DocumentUriComponentTupl
     type Error = ComponentError;
     fn try_from(value: DocumentUriComponentTuple<S2>) -> Result<Self, Self::Error> {
         if let Some(uri) = value.uri {
-            forbidden!(value => UriKind::DocumentUri; rp, a, p, d, l);
+            forbidden!(value => UriKind::Document; rp, a, p, d, l);
             return Ok(Self::Full(uri));
         }
         let Some(a) = value.a else {
-            missing!(DocumentUri: a);
+            missing!(Document: a);
         };
         if let Some(rp) = value.rp {
-            forbidden!(value => UriKind::DocumentUri;p,d,l);
+            forbidden!(value => UriKind::Document;p,d,l);
             return Ok(Self::RelPath { a, rp: rp.into() });
         }
         let Some(d) = value.d else {
-            missing!(DocumentUri: d);
+            missing!(Document: d);
         };
         let Some(l) = value.l else {
-            missing!(DocumentUri: l);
+            missing!(Document: l);
         };
         Ok(Self::Components {
             a,
@@ -863,11 +920,11 @@ pub type SymbolUriComponentFun3<S, T1, T2, T3, R> =
 #[derive(Clone, Hash, PartialEq, Eq)]
 #[impl_tools::autoimpl(Default)]
 pub struct SymbolUriComponentTuple<S: AsRef<str> = String> {
-    uri: Option<SymbolUri>,
-    a: Option<ArchiveId>,
-    p: Option<S>,
-    m: Option<S>,
-    s: Option<S>,
+    pub uri: Option<SymbolUri>,
+    pub a: Option<ArchiveId>,
+    pub p: Option<S>,
+    pub m: Option<S>,
+    pub s: Option<S>,
 }
 impl<S: AsRef<str>> SymbolUriComponentTuple<S> {
     #[inline]
@@ -899,7 +956,7 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> From<SymbolUriComponentTuple<S2>
 {
     fn from(SymbolUriComponentTuple { uri, a, p, m, s }: SymbolUriComponentTuple<S2>) -> Self {
         Self {
-            uri: uri.map(Uri::SymbolUri),
+            uri: uri.map(Uri::Symbol),
             a,
             p: p.map(Into::into),
             m: m.map(Into::into),
@@ -961,17 +1018,17 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> TryFrom<SymbolUriComponentTuple<
     type Error = ComponentError;
     fn try_from(value: SymbolUriComponentTuple<S2>) -> Result<Self, Self::Error> {
         if let Some(uri) = value.uri {
-            forbidden!(value => UriKind::SymbolUri; a,m,s);
+            forbidden!(value => UriKind::Symbol; a,m,s);
             return Ok(Self::Full(uri));
         }
         let Some(a) = value.a else {
-            missing!(SymbolUri: a);
+            missing!(Symbol: a);
         };
         let Some(m) = value.m else {
-            missing!(SymbolUri: m);
+            missing!(Symbol: m);
         };
         let Some(s) = value.s else {
-            missing!(SymbolUri: s);
+            missing!(Symbol: s);
         };
         Ok(Self::Components {
             a,
@@ -1043,15 +1100,15 @@ pub trait UriComponentsTrait {
                 uri.as_ref(),
             )?));
         }
-        let a = need!(self[ArchiveId] => DocumentUri;a);
+        let a = need!(self[ArchiveId] => Document;a);
         if let Some(rp) = self.get("rp") {
-            forbidden!(self => UriKind::DocumentUri;p,d,l,e,m,s);
+            forbidden!(self => UriKind::Document;p,d,l,e,m,s);
             Ok(DocumentUriComponents::RelPath { a, rp })
         } else {
-            forbidden!(self => UriKind::DocumentUri;e,m,s);
+            forbidden!(self => UriKind::Document;e,m,s);
             let p = self.get("p");
-            let l = need!(self[Language] => DocumentUri;l);
-            let d = need!(self => DocumentUri;d);
+            let l = need!(self[Language] => Document;l);
+            let d = need!(self => Document;d);
             Ok(DocumentUriComponents::Components { a, p, l, d })
         }
     }
@@ -1062,33 +1119,33 @@ pub trait UriComponentsTrait {
             return Ok(UriComponents::Full(Uri::from_str(uri.as_ref())?));
         }
         if let Some(rp) = self.get("rp") {
-            let a = need!(self[ArchiveId] => DocumentUri;a);
-            forbidden!(self => UriKind::DocumentUri;p,d,l,e,m,s);
+            let a = need!(self[ArchiveId] => Document;a);
+            forbidden!(self => UriKind::Document;p,d,l,e,m,s);
             return Ok(UriComponents::RelPath { a, rp });
         }
         let p = self.get("p");
         if let Some(e) = self.get("e") {
-            let a = need!(self[ArchiveId] => DocumentElementUri;a);
-            let l = need!(self[Language] => DocumentElementUri;l);
-            let d = need!(self => DocumentElementUri;d);
-            forbidden!(self => UriKind::DocumentElementUri;m,s);
+            let a = need!(self[ArchiveId] => DocumentElement;a);
+            let l = need!(self[Language] => DocumentElement;l);
+            let d = need!(self => DocumentElement;d);
+            forbidden!(self => UriKind::DocumentElement;m,s);
             return Ok(UriComponents::ElementComponents { a, p, l, d, e });
         }
         if let Some(d) = self.get("d") {
-            forbidden!(self => UriKind::DocumentUri;m,s);
-            let a = need!(self[ArchiveId] => DocumentElementUri;a);
-            let l = need!(self[Language] => DocumentElementUri;l);
+            forbidden!(self => UriKind::Document;m,s);
+            let a = need!(self[ArchiveId] => DocumentElement;a);
+            let l = need!(self[Language] => DocumentElement;l);
             return Ok(UriComponents::DocumentComponents { a, p, l, d });
         }
         if let Some(s) = self.get("s") {
-            forbidden!(self => UriKind::SymbolUri;d,l,e);
-            let a = need!(self[ArchiveId] => SymbolUri;a);
-            let m = need!(self => SymbolUri;m);
+            forbidden!(self => UriKind::Symbol;d,l,e);
+            let a = need!(self[ArchiveId] => Symbol;a);
+            let m = need!(self => Symbol;m);
             return Ok(UriComponents::SymbolComponents { a, p, m, s });
         }
         if let Some(m) = self.get("m") {
-            forbidden!(self => UriKind::SymbolUri;d,l,e);
-            let a = need!(self[ArchiveId] => SymbolUri;a);
+            forbidden!(self => UriKind::Symbol;d,l,e);
+            let a = need!(self[ArchiveId] => Symbol;a);
             return Ok(UriComponents::ModuleComponents { a, p, m });
         }
         Err(ComponentError::NoValidCombination)
