@@ -172,7 +172,7 @@ impl FtmlUri for SymbolUri {
     }
 
     #[inline]
-    fn as_uri(&self) -> crate::UriRef {
+    fn as_uri(&self) -> crate::UriRef<'_> {
         crate::UriRef::Symbol(self)
     }
 
@@ -250,6 +250,18 @@ impl openmath::ser::AsOMS for SymbolUri {
     #[inline]
     fn name(&self) -> impl std::fmt::Display {
         self.name()
+    }
+}
+
+#[cfg(feature = "openmath")]
+impl openmath::OMSerializable for SymbolUri {
+    #[inline]
+    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Err> {
+        use openmath::ser::AsOMS;
+        self.as_oms().as_openmath(serializer)
     }
 }
 

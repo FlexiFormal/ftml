@@ -33,6 +33,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=tantivy"]
 
+[tasks.test-openmath]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=openmath"]
+
 [tasks.test-all-features]
 command = "cargo"
 install_crate = false
@@ -47,6 +52,7 @@ dependencies = [
     "test-components",
     "test-leptos",
     "test-tantivy",
+    "test-openmath",
     "test-all-features",
 ]
 

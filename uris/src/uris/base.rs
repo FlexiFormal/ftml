@@ -48,7 +48,7 @@ impl FtmlUri for BaseUri {
         self
     }
     #[inline]
-    fn as_uri(&self) -> crate::UriRef {
+    fn as_uri(&self) -> crate::UriRef<'_> {
         crate::UriRef::Base(self)
     }
     fn could_be(maybe_uri: &str) -> bool {

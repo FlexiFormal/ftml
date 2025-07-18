@@ -35,7 +35,7 @@ pub trait FtmlUri:
     /// Returns a reference to the [`BaseUri`] component.
     fn base(&self) -> &BaseUri;
     fn could_be(maybe_uri: &str) -> bool;
-    fn as_uri(&self) -> UriRef;
+    fn as_uri(&self) -> UriRef<'_>;
     #[cfg(feature = "rdf")]
     /// Returns this URI as an RDF-IRI; possibly escaping invalid characters.
     fn to_iri(&self) -> oxrdf::NamedNode {

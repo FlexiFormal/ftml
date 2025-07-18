@@ -67,6 +67,7 @@ pub mod prelude {
     pub use super::paths::{PathUri, UriPath};
     pub use super::symbol::SymbolUri;
     pub use super::{DomainUri, NarrativeUri, Uri};
+    pub use crate::aux::Id;
     pub use crate::doc_element::DocumentElementUri;
     pub use crate::document::{DocumentUri, SimpleUriName};
     pub use crate::module::{ModuleUri, UriName};
@@ -99,8 +100,8 @@ pub(crate) mod sealed {
 /// let archive_uri = ArchiveUri::from_str("http://example.com?a=archive").unwrap();
 ///
 /// let uris: Vec<Uri> = vec![
-///     Uri::BaseUri(base_uri),
-///     Uri::ArchiveUri(archive_uri),
+///     Uri::Base(base_uri),
+///     Uri::Archive(archive_uri),
 /// ];
 ///
 /// for uri in &uris {
@@ -520,7 +521,7 @@ impl FtmlUri for Uri {
     }
 
     #[inline]
-    fn as_uri(&self) -> UriRef {
+    fn as_uri(&self) -> UriRef<'_> {
         match self {
             Self::Base(b) => UriRef::Base(b),
             Self::Archive(a) => UriRef::Archive(a),
@@ -651,7 +652,7 @@ impl FtmlUri for DomainUri {
         }
     }
 
-    fn as_uri(&self) -> UriRef {
+    fn as_uri(&self) -> UriRef<'_> {
         match self {
             Self::Module(m) => UriRef::Module(m),
             Self::Symbol(s) => UriRef::Symbol(s),
@@ -883,7 +884,7 @@ impl FtmlUri for NarrativeUri {
         }
     }
 
-    fn as_uri(&self) -> UriRef {
+    fn as_uri(&self) -> UriRef<'_> {
         match self {
             Self::Document(d) => UriRef::Document(d),
             Self::Element(e) => UriRef::DocumentElement(e),

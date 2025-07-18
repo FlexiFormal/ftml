@@ -359,14 +359,14 @@ fn bench_segment_operations(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("first_name", name), &path, |b, path| {
             b.iter(|| {
-                let first = path.first_name();
+                let first = path.first();
                 black_box(first);
             });
         });
 
         group.bench_with_input(BenchmarkId::new("last_name", name), &path, |b, path| {
             b.iter(|| {
-                let last = path.last_name();
+                let last = path.last();
                 black_box(last);
             });
         });

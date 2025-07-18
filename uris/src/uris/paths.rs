@@ -1,16 +1,15 @@
 use std::str::FromStr;
 
-use const_format::concatcp;
-
-#[cfg(feature = "interned")]
-use crate::aux::interning::{InternMap, InternStore};
 use crate::{
     BaseUri, FtmlUri, UriKind, UriWithArchive, UriWithPath,
     archive::ArchiveUri,
     aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
+use const_format::concatcp;
 
+#[cfg(feature = "interned")]
+use crate::aux::interned::{InternMap, InternStore};
 #[cfg(feature = "interned")]
 static PATHS: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
 
@@ -308,7 +307,7 @@ impl FtmlUri for PathUri {
     }
 
     #[inline]
-    fn as_uri(&self) -> crate::UriRef {
+    fn as_uri(&self) -> crate::UriRef<'_> {
         crate::UriRef::Path(self)
     }
 

@@ -3,14 +3,12 @@ use crate::{
     aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
-
-#[cfg(feature = "interned")]
-use crate::aux::interning::{InternMap, InternStore};
-
 use const_format::concatcp;
 use either::Either::Right;
 use std::str::FromStr;
 
+#[cfg(feature = "interned")]
+use crate::aux::interned::{InternMap, InternStore};
 #[cfg(feature = "interned")]
 static IDS: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
 
@@ -56,8 +54,8 @@ impl InternStore for IdStore {
 /// # use std::str::FromStr;
 /// let archive_id = ArchiveId::from_str("org/project/archive").unwrap();
 ///
-/// assert_eq!(archive_id.first_name(), "org");
-/// assert_eq!(archive_id.last_name(), "archive");
+/// assert_eq!(archive_id.first(), "org");
+/// assert_eq!(archive_id.last(), "archive");
 /// assert_eq!(archive_id.steps().collect::<Vec<_>>(), vec!["org", "project", "archive"]);
 ///
 /// // Test for META-INF detection
@@ -82,14 +80,14 @@ impl ArchiveId {
     /// # use ftml_uris::prelude::*;
     /// # use std::str::FromStr;
     /// let archive_id = ArchiveId::from_str("org/project/archive").unwrap();
-    /// assert_eq!(archive_id.last_name(), "archive");
+    /// assert_eq!(archive_id.last(), "archive");
     ///
     /// let simple = ArchiveId::from_str("simple").unwrap();
-    /// assert_eq!(simple.last_name(), "simple");
+    /// assert_eq!(simple.last(), "simple");
     /// ```
     #[inline]
     #[must_use]
-    pub fn last_name(&self) -> &str {
+    pub fn last(&self) -> &str {
         self.0.last_of::<'/'>()
     }
 
@@ -108,7 +106,7 @@ impl ArchiveId {
     /// ```
     #[inline]
     #[must_use]
-    pub fn first_name(&self) -> &str {
+    pub fn first(&self) -> &str {
         self.0.first_of::<'/'>()
     }
 
@@ -152,7 +150,7 @@ impl ArchiveId {
     /// ```
     #[must_use]
     pub fn is_meta(&self) -> bool {
-        self.last_name().eq_ignore_ascii_case("meta-inf")
+        self.last().eq_ignore_ascii_case("meta-inf")
     }
 
     /// Creates a new [`ArchiveId`] from a string.
@@ -296,7 +294,7 @@ impl FtmlUri for ArchiveUri {
     }
 
     #[inline]
-    fn as_uri(&self) -> crate::UriRef {
+    fn as_uri(&self) -> crate::UriRef<'_> {
         crate::UriRef::Archive(self)
     }
 
@@ -366,8 +364,8 @@ crate::tests! {
         let segments: Vec<&str> = archive.steps().collect();
         assert_eq!(segments, vec!["org", "example", "project"]);
 
-        assert_eq!(archive.first_name(), "org");
-        assert_eq!(archive.last_name(), "project");
+        assert_eq!(archive.first(), "org");
+        assert_eq!(archive.last(), "project");
 
         // Test reverse iteration
         let rev_segments: Vec<&str> = archive.steps().rev().collect();

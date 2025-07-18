@@ -10,8 +10,7 @@ use crate::{
 };
 
 #[cfg(feature = "interned")]
-use crate::aux::interning::{InternMap, InternStore};
-
+use crate::aux::interned::{InternMap, InternStore};
 #[cfg(feature = "interned")]
 static NAMES: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
 
@@ -421,7 +420,7 @@ impl FtmlUri for ModuleUri {
         &self.path.archive.base
     }
     #[inline]
-    fn as_uri(&self) -> crate::UriRef {
+    fn as_uri(&self) -> crate::UriRef<'_> {
         crate::UriRef::Module(self)
     }
     fn could_be(maybe_uri: &str) -> bool {

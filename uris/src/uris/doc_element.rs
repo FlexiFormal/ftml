@@ -1,6 +1,5 @@
-use std::str::FromStr;
-
 use const_format::concatcp;
+use std::str::FromStr;
 
 use crate::{
     ArchiveUri, BaseUri, DocumentUri, FtmlUri, IsNarrativeUri, NamedUri, PathUri, UriComponentKind,
@@ -192,7 +191,7 @@ impl FtmlUri for DocumentElementUri {
     }
 
     #[inline]
-    fn as_uri(&self) -> crate::UriRef {
+    fn as_uri(&self) -> crate::UriRef<'_> {
         crate::UriRef::DocumentElement(self)
     }
 
@@ -271,6 +270,18 @@ impl openmath::ser::AsOMS for DocumentElementUri {
     #[inline]
     fn name(&self) -> impl std::fmt::Display {
         self.name()
+    }
+}
+
+#[cfg(feature = "openmath")]
+impl openmath::OMSerializable for DocumentElementUri {
+    #[inline]
+    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Err> {
+        use openmath::ser::AsOMS;
+        self.as_oms().as_openmath(serializer)
     }
 }
 

@@ -312,11 +312,11 @@ fn bench_archive_operations(c: &mut Criterion) {
         let id = ArchiveId::from_str(id_str).expect("impossible");
 
         group.bench_with_input(BenchmarkId::new("first_name", name), &id, |b, id| {
-            b.iter(|| id.first_name());
+            b.iter(|| id.first());
         });
 
         group.bench_with_input(BenchmarkId::new("last_name", name), &id, |b, id| {
-            b.iter(|| id.last_name());
+            b.iter(|| id.last());
         });
 
         group.bench_with_input(BenchmarkId::new("is_meta", name), &id, |b, id| {
