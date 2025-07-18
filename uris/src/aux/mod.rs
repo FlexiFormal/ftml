@@ -10,7 +10,7 @@ pub type NonEmptyStr<Store> = interned::NonEmptyInternedStr<Store>;
 #[cfg(not(feature = "interned"))]
 mod uninterned;
 #[cfg(not(feature = "interned"))]
-pub use uninterned::{NonEmptyStr, Str};
+pub use uninterned::NonEmptyStr;
 
 #[cfg(feature = "interned")]
 pub mod ids {

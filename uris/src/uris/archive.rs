@@ -99,10 +99,10 @@ impl ArchiveId {
     /// # use ftml_uris::prelude::*;
     /// # use std::str::FromStr;
     /// let archive_id = ArchiveId::from_str("org/project/archive").unwrap();
-    /// assert_eq!(archive_id.first_name(), "org");
+    /// assert_eq!(archive_id.first(), "org");
     ///
     /// let simple = ArchiveId::from_str("simple").unwrap();
-    /// assert_eq!(simple.first_name(), "simple");
+    /// assert_eq!(simple.first(), "simple");
     /// ```
     #[inline]
     #[must_use]
