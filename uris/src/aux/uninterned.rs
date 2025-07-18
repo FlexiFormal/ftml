@@ -1,7 +1,6 @@
 use crate::errors::SegmentParseError;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 
