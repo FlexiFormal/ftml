@@ -8,13 +8,29 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=serde"]
 
+[tasks.test-rdf]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=rdf"]
+
+[tasks.test-typescript]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=typescript"]
+
 [tasks.test-all-features]
 command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--all-features"]
 
 [tasks.all-tests]
-dependencies = ["test-no-features", "test-serde", "test-all-features"]
+dependencies = [
+    "test-no-features",
+    "test-serde",
+    "test-rdf",
+    "test-typescript",
+    "test-all-features",
+]
 
 [tasks.doc]
 command = "cargo"

@@ -10,8 +10,19 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [features]
-## Adds serde support
-serde = ["dep:serde", "ftml-uris/serde"]
+## Adds [`Serialize`](serde::Serialize) and [`Deserialize`](serde::Deserialize)
+## to all types in this crate.
+serde = ["dep:serde", "ftml-uris/serde", "ftml-ontology/serde"]
+## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
+## bound to `string`, but naming still allows to make intentions in APIs explicit.
+typescript = [
+    "serde",
+    "dep:wasm-bindgen",
+    "dep:tsify-next",
+    "ftml-ontology/typescript",
+]
+## Adds support for RDF triple extraction
+rdf = ["ftml-uris/rdf", "ftml-ontology/rdf", "dep:ulo"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -32,13 +43,30 @@ rustc_version = { workspace = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
 rstest = { workspace = true }
 criterion = { workspace = true }
 
 [dependencies]
 document-features = { workspace = true }
-paste = { workspace = true }
+
+ftml-ontology = { workspace = true }
 ftml-uris = { workspace = true }
+
+paste = { workspace = true }
 triomphe = { workspace = true }
+either = { workspace = true }
+either_of = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }
+rustc-hash = { workspace = true }
+
+# syntree = { workspace = true }
+
+ulo = { workspace = true, optional = true }
 
 serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
+
+wasm-bindgen = { workspace = true, optional = true }
+tsify-next = { workspace = true, optional = true }
