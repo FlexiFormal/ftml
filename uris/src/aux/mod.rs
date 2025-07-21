@@ -12,25 +12,7 @@ mod uninterned;
 #[cfg(not(feature = "interned"))]
 pub use uninterned::NonEmptyStr;
 
-#[cfg(feature = "interned")]
-pub mod ids {
-    use crate::aux::interned::{InternMap, InternStore};
-
-    static IDS: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
-    pub(super) struct IdStore;
-    impl InternStore for IdStore {
-        const LIMIT: usize = 1024;
-        #[inline]
-        fn get() -> &'static InternMap {
-            &IDS
-        }
-    }
-    pub(super) type IdStr = super::interned::NonEmptyInternedStr<IdStore>;
-}
-#[cfg(not(feature = "interned"))]
-pub mod ids {
-    pub(super) type IdStr = super::NonEmptyStr<()>;
-}
+macros::intern!(IDS IdStr = IdStore:NonEmptyInternedStr|NonEmptyStr @ 1024);
 
 /// An arbitrary Identifier; not part of a URI,
 /// but similarly implemented, e.g. (if `interned`-feature is active)
@@ -40,7 +22,7 @@ pub mod ids {
     feature = "serde",
     derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
 )]
-pub struct Id(ids::IdStr);
+pub struct Id(IdStr);
 impl Id {
     /// Creates a new [`Id`] from a string.
     ///
@@ -53,7 +35,7 @@ impl Id {
     /// - Exceeds the maximum length supported by the interning system (`u32::MAX`)
     #[inline]
     pub fn new(s: &str) -> Result<Self, errors::SegmentParseError> {
-        ids::IdStr::new(s).map(Self)
+        IdStr::new(s).map(Self)
     }
 }
 impl std::str::FromStr for Id {

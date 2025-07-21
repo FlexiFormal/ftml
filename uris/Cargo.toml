@@ -45,6 +45,9 @@ openmath = ["dep:openmath"]
 interned = []
 ## Allows for creating RDF IRIs from URIs using [`oxrdf::NamedNode`](oxrdf::NamedNode)
 rdf = ["dep:oxrdf"]
+## Hides interning global statics behind extern blocks for compatibility with
+## dynamically loaded libraries
+api = ["interned"]
 
 [package.metadata.docs.rs]
 all-features = true

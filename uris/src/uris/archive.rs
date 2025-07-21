@@ -7,27 +7,15 @@ use const_format::concatcp;
 use either::Either::Right;
 use std::str::FromStr;
 
-#[cfg(feature = "interned")]
-use crate::aux::interned::{InternMap, InternStore};
-#[cfg(feature = "interned")]
-static IDS: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
+crate::aux::macros::intern!(
+    IDS = IdStore:NonEmptyStr @ 256
+);
 
 static NO_ARCHIVE_URI: std::sync::LazyLock<ArchiveUri> = std::sync::LazyLock::new(||
     // SAFETY: known to be valid ArchiveUri
     unsafe {
         ArchiveUri::from_str("http://unknown.source?a=no/archive").unwrap_unchecked()
     });
-
-pub struct IdStore;
-
-#[cfg(feature = "interned")]
-impl InternStore for IdStore {
-    const LIMIT: usize = 256;
-    #[inline]
-    fn get() -> &'static InternMap {
-        &IDS
-    }
-}
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(

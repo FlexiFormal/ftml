@@ -246,6 +246,7 @@ pub enum DomainUriRef<'u> {
     /// A symbol URI identifying a specific concept.
     Symbol(&'u SymbolUri),
 }
+impl crate::sealed::Sealed for DomainUriRef<'_> {}
 
 /// Like [`NarrativeUri`] but wrapping around references
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -667,6 +668,7 @@ impl FtmlUri for DomainUri {
         }
     }
 }
+
 impl PartialEq<str> for DomainUri {
     fn eq(&self, other: &str) -> bool {
         match self {
@@ -775,6 +777,55 @@ impl std::fmt::Debug for DomainUriRef<'_> {
         <Self as std::fmt::Display>::fmt(self, f)
     }
 }
+
+impl<'u> DomainUriRef<'u> {
+    #[inline]
+    #[must_use]
+    pub fn base(self) -> &'u BaseUri {
+        match self {
+            Self::Module(m) => m.base(),
+            Self::Symbol(s) => s.base(),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn as_uri(self) -> UriRef<'u> {
+        match self {
+            Self::Module(m) => UriRef::Module(m),
+            Self::Symbol(s) => UriRef::Symbol(s),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn could_be(maybe_uri: &str) -> bool {
+        if maybe_uri.contains("&s") {
+            SymbolUri::could_be(maybe_uri)
+        } else {
+            ModuleUri::could_be(maybe_uri)
+        }
+    }
+
+    #[cfg(feature = "rdf")]
+    #[inline]
+    #[must_use]
+    /// Returns this URI as an RDF-IRI; possibly escaping invalid characters.
+    pub fn to_iri(self) -> oxrdf::NamedNode {
+        match self {
+            Self::Module(m) => m.to_iri(),
+            Self::Symbol(s) => s.to_iri(),
+        }
+    }
+}
+impl PartialEq<str> for DomainUriRef<'_> {
+    fn eq(&self, other: &str) -> bool {
+        match self {
+            Self::Module(m) => **m == *other,
+            Self::Symbol(s) => **s == *other,
+        }
+    }
+}
 /*
 impl<'a> FtmlUri for DomainUriRef<'a> {
     fn base(&self) -> &'a BaseUri {
@@ -812,6 +863,47 @@ impl<'a> NamedUri for DomainUriRef<'a> {
     }
 }
  */
+
+impl<'u> NarrativeUriRef<'u> {
+    #[inline]
+    #[must_use]
+    pub fn base(self) -> &'u BaseUri {
+        match self {
+            Self::Document(m) => m.base(),
+            Self::Element(s) => s.base(),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn as_uri(self) -> UriRef<'u> {
+        match self {
+            Self::Document(m) => UriRef::Document(m),
+            Self::Element(s) => UriRef::DocumentElement(s),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn could_be(maybe_uri: &str) -> bool {
+        if maybe_uri.contains("&s") {
+            DocumentElementUri::could_be(maybe_uri)
+        } else {
+            DocumentUri::could_be(maybe_uri)
+        }
+    }
+
+    #[cfg(feature = "rdf")]
+    #[inline]
+    #[must_use]
+    /// Returns this URI as an RDF-IRI; possibly escaping invalid characters.
+    pub fn to_iri(self) -> oxrdf::NamedNode {
+        match self {
+            Self::Document(m) => m.to_iri(),
+            Self::Element(s) => s.to_iri(),
+        }
+    }
+}
 
 impl std::fmt::Display for NarrativeUriRef<'_> {
     #[inline]

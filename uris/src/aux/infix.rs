@@ -31,8 +31,9 @@
 use std::ops::{BitAnd, BitOr, Div, Not};
 
 use crate::{
-    ArchiveId, BaseUri, DocumentElementUri, DocumentUri, Language, ModuleUri, NarrativeUri,
-    PathUri, SimpleUriName, SymbolUri, UriName, UriPath, archive::ArchiveUri, aux::NonEmptyStr,
+    ArchiveId, BaseUri, DocumentElementUri, DocumentUri, Id, Language, ModuleUri, NarrativeUri,
+    NarrativeUriRef, PathUri, SimpleUriName, SymbolUri, UriName, UriPath, archive::ArchiveUri,
+    aux::NonEmptyStr,
 };
 
 /// Combines a [`BaseUri`] with an [`ArchiveId`] to create an [`ArchiveUri`].
@@ -462,6 +463,44 @@ impl BitAnd<&UriName> for NarrativeUri {
                 name: rhs.clone(),
             },
             Self::Element(e) => e / rhs,
+        }
+    }
+}
+
+impl BitAnd<&Id> for NarrativeUri {
+    type Output = DocumentElementUri;
+    #[inline]
+    fn bitand(self, rhs: &Id) -> Self::Output {
+        match self {
+            Self::Document(d) => DocumentElementUri {
+                document: d,
+                // SAFETY: ids are valid names
+                name: unsafe { rhs.as_ref().parse().unwrap_unchecked() },
+            },
+            Self::Element(DocumentElementUri { name, document }) => DocumentElementUri {
+                document,
+                // SAFETY: ids are valid names
+                name: unsafe { format!("{name}/{rhs}").parse().unwrap_unchecked() },
+            },
+        }
+    }
+}
+
+impl BitAnd<&Id> for NarrativeUriRef<'_> {
+    type Output = DocumentElementUri;
+    #[inline]
+    fn bitand(self, rhs: &Id) -> Self::Output {
+        match self {
+            Self::Document(d) => DocumentElementUri {
+                document: d.clone(),
+                // SAFETY: ids are valid names
+                name: unsafe { rhs.as_ref().parse().unwrap_unchecked() },
+            },
+            Self::Element(DocumentElementUri { name, document }) => DocumentElementUri {
+                document: document.clone(),
+                // SAFETY: ids are valid names
+                name: unsafe { format!("{name}/{rhs}").parse().unwrap_unchecked() },
+            },
         }
     }
 }

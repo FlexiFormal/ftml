@@ -32,6 +32,7 @@ use triomphe::Arc;
 /// assert!(BaseUri::from_str("http://example.com?query=value").is_err());
 /// assert!(BaseUri::from_str("http://example.com#fragment").is_err());
 /// ```
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, PartialOrd, Ord)]
 #[cfg_attr(
     feature = "serde",
@@ -147,7 +148,7 @@ impl BaseUri {
     pub fn new(url: url::Url) -> Result<Self, UriParseError> {
         #[cfg(feature = "interned")]
         {
-            let mut base = BASE_URIS.lock();
+            let mut base = unsafe { get_base_uris() }.lock();
             #[allow(clippy::map_unwrap_or)]
             base.iter()
                 .rev()
@@ -256,7 +257,7 @@ impl FromStr for BaseUri {
     #[cfg(feature = "interned")]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim().trim_end_matches('/');
-        let mut base = BASE_URIS.lock();
+        let mut base = unsafe { get_base_uris() }.lock();
         #[allow(clippy::map_unwrap_or)]
         base.iter()
             .rev()
@@ -315,9 +316,19 @@ impl PartialEq<url::Url> for InternedBaseURI {
     }
 }
 
-#[cfg(feature = "interned")]
+#[cfg(all(feature = "interned", not(feature = "api")))]
 static BASE_URIS: std::sync::LazyLock<parking_lot::Mutex<Vec<InternedBaseURI>>> =
     std::sync::LazyLock::new(|| parking_lot::Mutex::new(Vec::with_capacity(8)));
+
+#[cfg(all(feature = "interned", not(feature = "api")))]
+#[inline]
+unsafe fn get_base_uris() -> &'static parking_lot::Mutex<Vec<InternedBaseURI>> {
+    &BASE_URIS
+}
+#[cfg(all(feature = "interned", feature = "api"))]
+unsafe extern "C" {
+    fn get_base_uris() -> &'static parking_lot::Mutex<Vec<InternedBaseURI>>;
+}
 
 static UNKNOWN_BASE: std::sync::LazyLock<BaseUri> = std::sync::LazyLock::new(||
     // SAFETY: known to be well-formed Url

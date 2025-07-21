@@ -1,28 +1,13 @@
-use std::{fmt::Write, str::FromStr};
-
-use const_format::concatcp;
-
 use crate::{
     ArchiveUri, BaseUri, FtmlUri, IsDomainUri, NamedUri, PathUri, SymbolUri, UriComponentKind,
     UriKind, UriWithArchive, UriWithPath,
     aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
+use const_format::concatcp;
+use std::{fmt::Write, str::FromStr};
 
-#[cfg(feature = "interned")]
-use crate::aux::interned::{InternMap, InternStore};
-#[cfg(feature = "interned")]
-static NAMES: std::sync::LazyLock<InternMap> = std::sync::LazyLock::new(InternMap::default);
-
-pub struct NameStore;
-#[cfg(feature = "interned")]
-impl InternStore for NameStore {
-    const LIMIT: usize = 1024;
-    #[inline]
-    fn get() -> &'static InternMap {
-        &NAMES
-    }
-}
+crate::aux::macros::intern!(NAMES = NameStore:NonEmptyStr @ 1024);
 
 /// A hierarchical name used in FTML URIs for modules, symbols, and other named entities.
 ///
@@ -274,6 +259,14 @@ impl std::fmt::Display for ModuleUri {
 
 impl ModuleUri {
     pub(crate) const SEPARATOR: char = 'm';
+
+    /// Returns true iff this is not the Uri of a nested module; equivalently,
+    /// that its name is *simple* (does not contain `/`).
+    #[inline]
+    #[must_use]
+    pub fn is_top(&self) -> bool {
+        self.name.is_simple()
+    }
 
     /// Converts this module URI into a symbol URI by treating the last segment
     /// of the module name as a symbol name.

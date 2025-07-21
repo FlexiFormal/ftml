@@ -54,7 +54,7 @@ crate::debugdisplay!(NonEmptyStr<A>);
 
 impl<A> NonEmptyStr<A> {
     #[inline]
-    pub(crate) unsafe fn new_from_nonempty(s: Str<A>) -> Self {
+    pub(crate) const unsafe fn new_from_nonempty(s: Str<A>) -> Self {
         Self(s)
     }
 
