@@ -343,6 +343,8 @@ dict! { ulo = "http://mathhub.info/ulo":
     predicate <: function,logical @ "A predicate is a mathematical object that \
         evaluates to true/false when applied to enough arguments.";
 
+    term <: logical;
+
     // ---------------------------------------------------------------------------
 
     declaration <: logical @ "Declarations are named objects. They can also \
@@ -365,10 +367,13 @@ dict! { ulo = "http://mathhub.info/ulo":
 
     contains: ::owl::ObjectProperty (physical -> physical);
     declares: ::owl::ObjectProperty (logical -> logical);
+    has_type  = "has-type",: ::owl::ObjectProperty (logical -> logical) ;
     specifies: ::owl::ObjectProperty (physical -> logical) -specified_in @ "The physical \
         organizational item S specifies a knowledge item O, i.e. S is represented in O.";
     specified_in = "specified-in", : ::owl::ObjectProperty (logical -> physical) -specifies;
 
+    has_meta_theory = "has-meta-theory", : ::owl::ObjectProperty (theory -> theory);
+    has_signature = "has-signature", : ::owl::DatatypeProperty;
 
     crossrefs: ::owl::ObjectProperty;
     aligned_with = "aligned-with", : ::owl::ObjectProperty,::owl::SymmetricProperty << crossrefs;
