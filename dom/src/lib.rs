@@ -1,0 +1,174 @@
+#![allow(unexpected_cfgs)]
+#![allow(clippy::must_use_candidate)]
+#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
+#![doc = include_str!("../README.md")]
+/*!
+ * ## Feature flags
+ */
+#![cfg_attr(doc,doc = document_features::document_features!())]
+
+pub mod counters;
+mod document;
+pub mod extractor;
+pub mod markers;
+pub mod mathml;
+pub mod toc;
+pub mod utils {
+    pub mod css;
+}
+
+use crate::{
+    extractor::FtmlDomElement,
+    markers::{Marker, SectionInfo},
+};
+pub use document::{DocumentMeta, setup_document};
+use ftml_core::extraction::FtmlExtractor;
+use leptos::prelude::*;
+use leptos_posthoc::OriginalNode;
+
+#[inline]
+pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
+    #[cfg(feature = "ssr")]
+    provide_context(utils::css::CssIds::default());
+    f()
+}
+
+pub trait FtmlViews: 'static {
+    #[inline]
+    fn cont(node: OriginalNode) -> impl IntoView {
+        use leptos_posthoc::{DomChildrenCont, DomChildrenContProps};
+        DomChildrenCont(DomChildrenContProps {
+            orig: node,
+            cont: iterate::<Self>,
+        })
+    }
+    #[inline]
+    fn top(node: OriginalNode) -> impl IntoView {
+        Self::cont(node)
+    }
+
+    #[inline]
+    fn section<V: IntoView>(_info: SectionInfo, then: impl FnOnce() -> V) -> impl IntoView {
+        then()
+    }
+}
+
+fn iterate<Views: FtmlViews + ?Sized>(
+    e: &leptos::web_sys::Element,
+) -> (
+    Option<impl FnOnce() -> AnyView + use<Views>>,
+    Option<impl FnOnce() + use<Views>>,
+) {
+    use extractor::DomExtractor;
+    use extractor::NodeAttrs;
+
+    tracing::trace!("iterating {}", e.outer_html());
+    #[cfg(any(feature = "csr", feature = "hydrate"))]
+    {
+        client::init();
+        if !client::has_ftml_attribute(e) {
+            tracing::trace!("No attributes");
+            return (None, None);
+        }
+    }
+    tracing::trace!("Has ftml attributes");
+    let sig = expect_context::<RwSignal<DomExtractor>>();
+    let (markers, close) = sig.update_untracked(|extractor| {
+        let mut attrs = NodeAttrs::new(e);
+        let rules = attrs.keys();
+        let mut markers = smallvec::SmallVec::<_, 2>::new();
+        let mut close = smallvec::SmallVec::<_, 2>::new();
+        for r in rules.apply(extractor, &mut attrs) {
+            match r {
+                Ok((m, c)) => {
+                    if let Some(m) = m {
+                        markers.push(m);
+                    }
+                    if let Some(c) = c {
+                        close.push(c);
+                    }
+                }
+                Err(e) => tracing::error!("{e}"),
+            }
+        }
+        (markers, close)
+    });
+    let rview = if markers.is_empty() {
+        None
+    } else {
+        tracing::trace!("got elements: {markers:?}");
+        let e: OriginalNode = e.clone().into();
+        Some(move || {
+            Marker::apply::<Views>(markers, mathml::is(&e.tag_name()).is_some(), e).into_any()
+        })
+    };
+    let and_then = if close.is_empty() {
+        None
+    } else {
+        let e = e.clone();
+        Some(move || {
+            tracing::trace!("closing element: {close:?}");
+            sig.update_untracked(move |extractor| {
+                let n = FtmlDomElement(&e);
+                for c in close.into_iter().rev() {
+                    if let Err(e) = extractor.close(c, &n) {
+                        tracing::error!("{e}");
+                    }
+                }
+            });
+        })
+    };
+    (rview, and_then)
+}
+
+#[cfg(any(feature = "csr", feature = "hydrate"))]
+mod client {
+    use wasm_bindgen::{JsCast, JsValue};
+    static INIT: std::sync::Once = std::sync::Once::new();
+
+    #[inline]
+    pub fn init() {
+        INIT.call_once(|| {
+            let window = leptos::tachys::dom::window();
+
+            web_sys::js_sys::Reflect::set(
+                &JsValue::from(window.clone()),
+                &JsValue::from("hasFtmlAttribute"),
+                &JsValue::from(web_sys::js_sys::Function::new_with_args(
+                    "node",
+                    include_str!("hasFtmlAttribute.js"),
+                )),
+            )
+            .expect("error defining js function");
+
+            #[cfg(feature = "csr")]
+            web_sys::js_sys::Reflect::set(
+                &JsValue::from(window),
+                &JsValue::from("FLAMS_SERVER_URL"),
+                &JsValue::from("https://mathhub.info"),
+            )
+            .expect("error setting Window property");
+        });
+    }
+
+    std::thread_local! {
+        static HAS_FTML_ATTRIBUTE: std::cell::LazyCell<web_sys::js_sys::Function> =
+            const { std::cell::LazyCell::new(|| {
+                let window = leptos::tachys::dom::window();
+                let ga = window
+                    .get("hasFtmlAttribute")
+                    .expect("error getting Window property");
+                ga.dyn_into()
+                    .expect("Window.hasFtmlAttribute is not a function")
+            })  };
+    }
+
+    pub fn has_ftml_attribute(node: &web_sys::Node) -> bool {
+        HAS_FTML_ATTRIBUTE.with(|o| {
+            o.call1(&JsValue::NULL, &JsValue::from(node))
+                .expect("error calling hasFtmlAttribute")
+                .as_bool()
+                .expect("error calling hasFtmlAttribute")
+        })
+    }
+}

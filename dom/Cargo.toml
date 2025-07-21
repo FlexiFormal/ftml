@@ -1,0 +1,72 @@
+[package]
+name = "ftml-dom"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[features]
+## Pure client-side rendering
+csr = ["leptos-posthoc/csr", "dep:wasm-bindgen", "dep:web-sys", "leptos/csr"]
+## Client-side in compbination with ssr
+hydrate = [
+    "leptos-posthoc/hydrate",
+    "dep:wasm-bindgen",
+    "dep:web-sys",
+    "leptos/hydrate",
+]
+## Server-side rendering
+ssr = ["leptos/ssr"]
+## generate typescript bindings
+typescript = ["csr", "dep:tsify-next", "ftml-core/typescript"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--html-in-header",
+    "doc/katex-header.html",
+    "--html-in-header",
+    "doc/docs.html",
+]
+# cargo +nightly doc --no-deps --all-features --release --open
+
+[build-dependencies]
+rustc_version = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+rstest = { workspace = true }
+criterion = { workspace = true }
+
+[dependencies]
+document-features = { workspace = true }
+
+ftml-core = { workspace = true, features = ["serde"] }
+ftml-uris = { workspace = true, features = ["serde"] }
+ftml-ontology = { workspace = true, features = ["serde"] }
+
+leptos-posthoc = { workspace = true }
+serde = { workspace = true }
+leptos = { workspace = true }
+leptos_meta = { workspace = true }
+tracing = { workspace = true }
+smallvec = { workspace = true }
+serde_json = { workspace = true }
+rustc-hash = { workspace = true }
+parking_lot = { workspace = true }
+
+tsify-next = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = [
+    "Window",
+    "ScrollIntoViewOptions",
+    "ScrollLogicalPosition",
+] }
