@@ -1,0 +1,83 @@
+[package]
+name = "ftml-ontology"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[features]
+## Should be used for wasm targets; uses js regexes instead of
+## the regex crate
+wasm = ["dep:js-regexp"]
+## Adds [`Serialize`](serde::Serialize) and [`Deserialize`](serde::Deserialize)
+## to all types in this crate.
+serde = ["dep:serde", "ftml-uris/serde", "smallvec/serde", "dep:bincode"]
+## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
+## bound to `string`, but naming still allows to make intentions in APIs explicit.
+typescript = [
+    "serde",
+    "wasm",
+    "dep:wasm-bindgen",
+    "dep:tsify-next",
+    "ftml-uris/typescript",
+]
+## Enables OpenMath (de)serialization for FTML expressions
+openmath = ["dep:openmath", "ftml-uris/openmath"]
+## Enables RDF support
+rdf = ["ftml-uris/rdf", "dep:ulo", "dep:arrayvec"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--html-in-header",
+    "doc/katex-header.html",
+    "--html-in-header",
+    "doc/docs.html",
+]
+# cargo +nightly doc --no-deps --all-features --release --open
+
+[build-dependencies]
+rustc_version = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+rstest = { workspace = true }
+criterion = { workspace = true }
+
+[dependencies]
+document-features = { workspace = true }
+
+ftml-uris = { workspace = true }
+
+paste = { workspace = true }
+triomphe = { workspace = true }
+either = { workspace = true }
+either_of = { workspace = true }
+thiserror = { workspace = true }
+rustc-hash = { workspace = true }
+smallvec = { workspace = true }
+regex = { workspace = true }
+# lightningcss = { workspace = true }
+# tracing = { workspace = true }
+
+# syntree = { workspace = true }
+
+serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
+bincode = { workspace = true, optional = true }
+
+wasm-bindgen = { workspace = true, optional = true }
+tsify-next = { workspace = true, optional = true }
+js-regexp = { workspace = true, optional = true }
+
+openmath = { workspace = true, optional = true }
+ulo = { workspace = true, optional = true }
+arrayvec = { workspace = true, optional = true }

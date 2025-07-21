@@ -1,0 +1,50 @@
+[tasks.test-no-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--no-default-features"]
+
+[tasks.test-serde]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=serde"]
+
+[tasks.test-wasm]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=wasm"]
+
+[tasks.test-typescript]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=typescript"]
+
+[tasks.test-rdf]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=rdf"]
+
+[tasks.test-openmath]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=openmath"]
+
+[tasks.test-all-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--all-features"]
+
+[tasks.all-tests]
+dependencies = [
+    "test-no-features",
+    "test-serde",
+    "test-wasm",
+    "test-typescript",
+    "test-rdf",
+    "test-openmath",
+    "test-all-features",
+]
+
+[tasks.doc]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "doc", "--no-deps", "--all-features"]
