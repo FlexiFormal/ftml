@@ -1,0 +1,70 @@
+[package]
+name = "ftml-leptos"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[features]
+## Pure client-side rendering
+csr = ["leptos/csr", "ftml-dom/csr", "thaw/csr", "dep:gloo-storage"]
+## Client-side in compbination with ssr
+hydrate = [
+    "leptos/hydrate",
+    "ftml-dom/hydrate",
+    "thaw/hydrate",
+    "dep:gloo-storage",
+]
+## Server-side rendering
+ssr = ["leptos/ssr", "thaw/ssr"]
+## generate typescript bindings
+typescript = [
+    "csr",
+    "ftml-dom/typescript",
+    "dep:tsify-next",
+    "dep:wasm-bindgen",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--html-in-header",
+    "doc/katex-header.html",
+    "--html-in-header",
+    "doc/docs.html",
+]
+# cargo +nightly doc --no-deps --all-features --release --open
+
+[build-dependencies]
+rustc_version = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+rstest = { workspace = true }
+criterion = { workspace = true }
+
+[dependencies]
+document-features = { workspace = true }
+
+ftml-dom = { workspace = true }
+ftml-uris = { workspace = true }
+
+leptos = { workspace = true }
+leptos-posthoc = { workspace = true }
+thaw = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+
+gloo-storage = { workspace = true, optional = true }
+
+tsify-next = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
