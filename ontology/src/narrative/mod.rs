@@ -2,14 +2,15 @@ pub mod documents;
 pub mod elements;
 
 use ftml_uris::{DocumentUri, NarrativeUriRef};
-use smallvec::SmallVec;
 use std::marker::PhantomData;
 
-use crate::narrative::elements::DocumentElement;
+use crate::narrative::elements::DocumentElementRef;
 
 pub trait Narrative: crate::Ftml {
     fn narrative_uri(&self) -> Option<NarrativeUriRef<'_>>;
-    fn children(&self) -> &[DocumentElement];
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator;
 
     #[cfg(feature = "rdf")]
     #[deprecated(note = "inputref etc missing")]
@@ -21,14 +22,11 @@ pub trait Narrative: crate::Ftml {
         };
         either::Either::Right(
             self.children()
-                .iter()
                 .flat_map(|e| {
-                    let ch = e.opaque_children();
-                    if ch.is_empty() {
-                        either::Either::Left(std::iter::once(e))
-                    } else {
-                        either::Either::Right(ch.iter())
-                    }
+                    e.opaque_children().map_or_else(
+                        || either::Either::Left(std::iter::once(e)),
+                        either::Either::Right,
+                    )
                 })
                 .filter_map(move |e| {
                     e.element_uri()
@@ -42,118 +40,87 @@ pub trait Narrative: crate::Ftml {
         &self,
         steps: impl IntoIterator<Item = &'s str>,
     ) -> Option<&T> {
-        enum I<'a> {
-            One(std::slice::Iter<'a, DocumentElement>),
-            Mul(
-                std::slice::Iter<'a, DocumentElement>,
-                SmallVec<std::slice::Iter<'a, DocumentElement>, 2>,
-            ),
-        }
-        impl<'a> I<'a> {
-            fn push(&mut self, es: &'a [DocumentElement]) {
-                match self {
-                    Self::One(_) => {
-                        let new = Self::Mul(es.iter(), SmallVec::with_capacity(1));
-                        let Self::One(s) = std::mem::replace(self, new) else {
-                            unreachable!()
-                        };
-                        let Self::Mul(_, v) = self else {
-                            unreachable!()
-                        };
-                        v.push(s);
-                    }
-                    Self::Mul(f, r) => {
-                        let of = std::mem::replace(f, es.iter());
-                        r.push(of);
-                    }
-                }
+        fn find_e<'r, 's, T: elements::IsDocumentElement>(
+            slf: DocumentElementRef<'r>,
+            mut steps: std::iter::Peekable<impl Iterator<Item = &'s str>>,
+        ) -> Option<&'r T> {
+            let Some(step) = steps.next() else {
+                return T::from_element(slf);
+            };
+            if let Some(i) = slf.opaque_children() {
+                find_inner(i, step, steps)
+            } else {
+                find_inner(slf.children_lt(), step, steps)
             }
         }
-        impl<'a> Iterator for I<'a> {
-            type Item = &'a DocumentElement;
-            #[allow(clippy::option_if_let_else)]
-            fn next(&mut self) -> Option<Self::Item> {
-                match self {
-                    Self::One(s) => s.next(),
-                    Self::Mul(f, r) => loop {
-                        if let Some(n) = f.next() {
-                            return Some(n);
-                        }
-                        let Some(mut n) = r.pop() else { unreachable!() };
-                        if r.is_empty() {
-                            let r = n.next();
-                            *self = Self::One(n);
-                            return r;
-                        }
-                        *f = n;
-                    },
-                }
-            }
-        }
-        let mut steps = steps.into_iter().peekable();
-        let mut curr = I::One(self.children().iter());
-        'outer: while let Some(step) = steps.next() {
-            while let Some(c) = curr.next() {
+        fn find_inner<'r, 's, T: elements::IsDocumentElement>(
+            mut iter: impl Iterator<Item = DocumentElementRef<'r>>,
+            step: &'s str,
+            mut steps: std::iter::Peekable<impl Iterator<Item = &'s str>>,
+        ) -> Option<&'r T> {
+            while let Some(c) = iter.next() {
                 match c {
-                    DocumentElement::Section(elements::Section { uri, children, .. })
-                    | DocumentElement::Paragraph(elements::LogicalParagraph {
-                        uri,
-                        children,
-                        ..
-                    })
-                    | DocumentElement::Problem(elements::Problem { uri, children, .. })
+                    DocumentElementRef::Section(elements::Section { uri, .. })
+                    | DocumentElementRef::Paragraph(elements::LogicalParagraph { uri, .. })
+                    | DocumentElementRef::Problem(elements::Problem { uri, .. })
                         if uri.name().last() == step =>
                     {
-                        if steps.peek().is_none() {
-                            return T::from_element(c.as_ref());
-                        }
-                        curr = I::One(children.iter());
-                        continue 'outer;
+                        return if steps.peek().is_none() {
+                            T::from_element(c)
+                        } else {
+                            find_e(c, steps)
+                        };
                     }
-                    DocumentElement::Slide { uri, .. }
+                    DocumentElementRef::Slide { uri, .. }
                         if uri.name().last() == step && steps.peek().is_none() =>
                     {
-                        return T::from_element(c.as_ref());
+                        return T::from_element(c);
                     }
-                    DocumentElement::Module { children, .. }
-                    | DocumentElement::Morphism { children, .. }
-                    | DocumentElement::MathStructure { children, .. }
-                    | DocumentElement::Slide { children, .. }
-                    | DocumentElement::Extension { children, .. } => curr.push(children),
-                    DocumentElement::Notation { uri, .. }
-                    | DocumentElement::VariableNotation { uri, .. }
-                    | DocumentElement::VariableDeclaration(elements::VariableDeclaration {
+                    DocumentElementRef::Module { .. }
+                    | DocumentElementRef::Morphism { .. }
+                    | DocumentElementRef::MathStructure { .. }
+                    | DocumentElementRef::Slide { .. }
+                    | DocumentElementRef::Extension { .. } => {
+                        return find_inner(iter, step, steps);
+                    }
+                    DocumentElementRef::Notation { uri, .. }
+                    | DocumentElementRef::VariableNotation { uri, .. }
+                    | DocumentElementRef::VariableDeclaration(elements::VariableDeclaration {
                         uri,
                         ..
                     })
-                    | DocumentElement::Expr { uri, .. }
+                    | DocumentElementRef::Expr { uri, .. }
                         if uri.name().last() == step =>
                     {
-                        if steps.peek().is_none() {
-                            return T::from_element(c.as_ref());
-                        }
-                        return None;
+                        return if steps.peek().is_none() {
+                            T::from_element(c)
+                        } else {
+                            None
+                        };
                     }
-                    DocumentElement::Section(_)
-                    | DocumentElement::Paragraph(_)
-                    | DocumentElement::Problem(_)
-                    | DocumentElement::SetSectionLevel(_)
-                    | DocumentElement::SymbolDeclaration(_)
-                    | DocumentElement::UseModule(_)
-                    | DocumentElement::ImportModule(_)
-                    | DocumentElement::SkipSection(_)
-                    | DocumentElement::VariableDeclaration(_)
-                    | DocumentElement::Definiendum { .. }
-                    | DocumentElement::SymbolReference { .. }
-                    | DocumentElement::VariableReference { .. }
-                    | DocumentElement::DocumentReference { .. }
-                    | DocumentElement::Notation { .. }
-                    | DocumentElement::VariableNotation { .. }
-                    | DocumentElement::Expr { .. } => (),
+                    DocumentElementRef::Section(_)
+                    | DocumentElementRef::Paragraph(_)
+                    | DocumentElementRef::Problem(_)
+                    | DocumentElementRef::SetSectionLevel(_)
+                    | DocumentElementRef::SymbolDeclaration(_)
+                    | DocumentElementRef::UseModule(_)
+                    | DocumentElementRef::ImportModule(_)
+                    | DocumentElementRef::SkipSection(_)
+                    | DocumentElementRef::VariableDeclaration(_)
+                    | DocumentElementRef::Definiendum { .. }
+                    | DocumentElementRef::SymbolReference { .. }
+                    | DocumentElementRef::VariableReference { .. }
+                    | DocumentElementRef::DocumentReference { .. }
+                    | DocumentElementRef::Notation { .. }
+                    | DocumentElementRef::VariableNotation { .. }
+                    | DocumentElementRef::Expr { .. } => (),
                 }
             }
+            None
         }
-        None
+        let mut steps = steps.into_iter();
+        let step = steps.next()?;
+        find_inner(self.children(), step, steps.peekable())
     }
 }
 

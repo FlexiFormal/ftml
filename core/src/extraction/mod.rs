@@ -38,16 +38,19 @@ pub trait FtmlExtractor: 'static + Sized {
     fn get_domain_uri(&self, in_elem: FtmlKey) -> Result<&ModuleUri> {
         match self.iterate_domain().next() {
             Some(OpenDomainElement::Module { uri, .. }) => Ok(uri),
-            Some(OpenDomainElement::Symbol { .. }) | None => {
-                Err(FtmlExtractionError::NotInModule(in_elem))
-            }
+            Some(OpenDomainElement::Symbol { .. }) | None => Err(FtmlExtractionError::NotIn(
+                in_elem,
+                "a module (or inside a declaration)",
+            )),
         }
     }
 
     fn get_narrative_uri(&self) -> NarrativeUriRef<'_> {
         self.iterate_narrative()
             .find_map(|e| match e {
-                OpenNarrativeElement::Module { .. } => None,
+                OpenNarrativeElement::Module { .. } | OpenNarrativeElement::SkipSection { .. } => {
+                    None
+                }
                 OpenNarrativeElement::Section { uri, .. } => Some(uri),
             })
             .map_or_else(
@@ -207,12 +210,14 @@ pub enum FtmlExtractionError {
     InvalidLanguage(String),
     #[error("invalid uri: {0}")]
     Uri(#[from] UriParseError),
-    #[error("key {0} not allowed outside of a module (or inside a declaration)")]
-    NotInModule(FtmlKey),
+    #[error("key {0} not allowed outside of {1}")]
+    NotIn(FtmlKey, &'static str),
     #[error("value for key {0} invalid")]
     InvalidValue(FtmlKey),
     #[error("{0} ended unexpectedly")]
     UnexpectedEndOf(FtmlKey),
+    #[error("duplicate property: {0}")]
+    DuplicateValue(FtmlKey),
 }
 impl From<SegmentParseError> for FtmlExtractionError {
     #[inline]

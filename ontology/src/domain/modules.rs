@@ -29,8 +29,10 @@ impl std::ops::Deref for Module {
 
 impl HasDeclarations for ModuleData {
     #[inline]
-    fn declarations(&self) -> &[AnyDeclaration] {
-        &self.declarations
+    fn declarations(
+        &self,
+    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
+        self.declarations.iter().map(AnyDeclaration::as_ref)
     }
     #[inline]
     fn domain_uri(&self) -> ftml_uris::DomainUriRef<'_> {
@@ -78,8 +80,10 @@ impl crate::Ftml for NestedModule {
 }
 impl HasDeclarations for NestedModule {
     #[inline]
-    fn declarations(&self) -> &[AnyDeclaration] {
-        &self.declarations
+    fn declarations(
+        &self,
+    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
+        self.declarations.iter().map(AnyDeclaration::as_ref)
     }
     #[inline]
     fn domain_uri(&self) -> ftml_uris::DomainUriRef<'_> {

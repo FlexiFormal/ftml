@@ -35,6 +35,24 @@ macro_rules! ts {
                 <String as ::wasm_bindgen::describe::WasmDescribe>::describe();
             }
         }
+        #[cfg(feature = "typescript")]
+        impl$(<$($a$(:$guard)?),+>)? ::wasm_bindgen::convert::TryFromJsValue for $name$(<$($a),+>)? {
+            type Error = Option<$crate::errors::UriParseError>;
+            fn try_from_js_value(value: ::wasm_bindgen::JsValue) -> Result<Self,Self::Error> {
+                if let Some(s) = value.as_string() {
+                    s.parse().map_err(|e| Some($crate::errors::UriParseError::from(e)))
+                } else {
+                    Err(None)
+                }
+            }
+        }
+
+        #[cfg(feature = "typescript")]
+        impl$(<$($a$(:$guard)?),+>)? From<$name$(<$($a),+>)?> for wasm_bindgen::JsValue {
+            fn from(uri: $name$(<$($a),+>)?) -> Self {
+                Self::from_str(&uri.to_string())
+            }
+        }
     };
     ($name:ident$(<$($a:ident$(:$guard:ident)?),+>)?) => {
         $crate::ts!($name$(<$($a$(:$guard)?),+>)? = TS);

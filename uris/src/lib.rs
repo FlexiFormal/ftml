@@ -257,6 +257,15 @@ pub enum NarrativeUriRef<'u> {
     /// A document element URI identifying a named part of a document.
     Element(&'u DocumentElementUri),
 }
+impl NarrativeUriRef<'_> {
+    #[must_use]
+    pub fn owned(self) -> NarrativeUri {
+        match self {
+            Self::Document(d) => NarrativeUri::Document(d.clone()),
+            Self::Element(e) => NarrativeUri::Element(e.clone()),
+        }
+    }
+}
 
 /// Enum ranging over all [`IsNarrativeUri`] types ([`DocumentUri`] and [`DocumentElementUri`]).
 ///

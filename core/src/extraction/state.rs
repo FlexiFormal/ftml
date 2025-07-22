@@ -83,7 +83,10 @@ macro_rules! get_module {
             .rev()
             .find(|e| matches!(e, OpenDomainElement::Module { .. }))
         else {
-            return Err(FtmlExtractionError::NotInModule(FtmlKey::Module));
+            return Err(FtmlExtractionError::NotIn(
+                FtmlKey::Module,
+                "a module (or inside of a declaration)",
+            ));
         };
     };
 }
@@ -213,6 +216,14 @@ impl ExtractorState {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Section)),
             },
+            CloseFtmlElement::SkipSection => match self.narrative.pop() {
+                Some(OpenNarrativeElement::SkipSection { children }) => {
+                    self.push_elem(DocumentElement::SkipSection(children.into_boxed_slice()));
+                    Ok(())
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::SkipSection)),
+            },
+            CloseFtmlElement::SectionTitle => self.close_title(node),
             CloseFtmlElement::Invisible => {
                 node.delete();
                 Ok(())
@@ -225,7 +236,8 @@ impl ExtractorState {
         for p in self.narrative.iter_mut().rev() {
             match p {
                 OpenNarrativeElement::Module { children, .. }
-                | OpenNarrativeElement::Section { children, .. } => {
+                | OpenNarrativeElement::Section { children, .. }
+                | OpenNarrativeElement::SkipSection { children } => {
                     children.push(e);
                     return;
                 }
@@ -248,6 +260,25 @@ impl ExtractorState {
             children: children.into_boxed_slice(),
         };
         self.push_elem(DocumentElement::Section(sec));
+    }
+
+    fn close_title<N: FtmlNode>(&mut self, node: &N) -> super::Result<()> {
+        for e in self.narrative.iter_mut().rev() {
+            match e {
+                OpenNarrativeElement::Section { title, .. } if title.is_none() => {
+                    *title = Some(node.range());
+                    return Ok(());
+                }
+                OpenNarrativeElement::Section { title, .. } => {
+                    return Err(FtmlExtractionError::DuplicateValue(FtmlKey::Title));
+                }
+                OpenNarrativeElement::SkipSection { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
+                }
+                OpenNarrativeElement::Module { .. } => (),
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title))
     }
 
     fn close_module(

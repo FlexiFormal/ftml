@@ -236,7 +236,7 @@ do_keys! {
     Counter                     = "counter" := counter_parent
 
     DocTitle                    = "doctitle" := no_op
-    Title                       = "title" := no_op
+    Title                       = "title" := title
     ProofTitle                  = "prooftitle" := no_op
     SubproofTitle               = "subprooftitle" := no_op
 
@@ -267,7 +267,7 @@ do_keys! {
     InputRef                    = "inputref" := no_op
 
     SetSectionLevel             = "sectionlevel" := setsectionlevel
-    SkipSection                 = "skipsection" := no_op
+    SkipSection                 = "skipsection" := skipsection
 
 
     ProofMethod                 = "proofmethod" := no_op

@@ -51,8 +51,10 @@ impl Narrative for LogicalParagraph {
         Some(ftml_uris::NarrativeUriRef::Element(&self.uri))
     }
     #[inline]
-    fn children(&self) -> &[DocumentElement] {
-        &self.children
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        self.children.iter().map(DocumentElement::as_ref)
     }
 }
 impl IsDocumentElement for LogicalParagraph {

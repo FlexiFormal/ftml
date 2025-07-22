@@ -51,8 +51,10 @@ impl IsDeclaration for Morphism {
 }
 impl HasDeclarations for Morphism {
     #[inline]
-    fn declarations(&self) -> &[AnyDeclaration] {
-        &self.elements
+    fn declarations(
+        &self,
+    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
+        self.elements.iter().map(AnyDeclaration::as_ref)
     }
     #[inline]
     fn domain_uri(&self) -> DomainUriRef<'_> {

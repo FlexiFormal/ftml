@@ -11,6 +11,8 @@ use crate::{FtmlViews, counters::LogicalLevel, document::DocumentState};
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Marker {
     Section(DocumentElementUri),
+    SkipSection,
+    SectionTitle,
 }
 
 impl Marker {
@@ -19,10 +21,11 @@ impl Marker {
         is_math: bool,
         orig: OriginalNode,
     ) -> impl IntoView {
-        use leptos::either::Either::{Left, Right};
+        #[allow(clippy::enum_glob_use)]
+        use leptos::either::EitherOf5::*;
         let mut markers = markers.into_iter();
         let Some(m) = markers.next() else {
-            return Left(leptos_posthoc::DomChildrenCont(
+            return A(leptos_posthoc::DomChildrenCont(
                 leptos_posthoc::DomChildrenContProps {
                     orig,
                     cont: super::iterate::<Views>,
@@ -30,11 +33,23 @@ impl Marker {
             ));
         };
         match m {
-            Self::Section(uri) => Right(DocumentState::new_section(uri, move |info| {
+            Self::Section(uri) => B(DocumentState::new_section(uri, move |info| {
                 Views::section(info, move || {
                     Self::apply::<Views>(markers, is_math, orig).into_any()
                 })
             })),
+            Self::SkipSection => C(DocumentState::skip_section(move || {
+                Self::apply::<Views>(markers, is_math, orig).into_any()
+            })),
+            Self::SectionTitle => {
+                let (LogicalLevel::Section(lvl), cls) = DocumentState::title_class() else {
+                    tracing::error!("Unexpected section title");
+                    return D(Self::apply::<Views>(markers, is_math, orig).into_any());
+                };
+                E(Views::section_title(lvl, cls, move || {
+                    Self::apply::<Views>(markers, is_math, orig).into_any()
+                }))
+            }
         }
     }
 
@@ -54,6 +69,8 @@ impl Marker {
                 }
                 None
             }
+            OpenFtmlElement::SkipSection => Some(Self::SkipSection),
+            OpenFtmlElement::SectionTitle => Some(Self::SectionTitle),
             OpenFtmlElement::Section(uri) => Some(Self::Section(uri.clone())),
             OpenFtmlElement::Counter(_)
             | OpenFtmlElement::Invisible

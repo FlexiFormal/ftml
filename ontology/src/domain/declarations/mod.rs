@@ -62,8 +62,8 @@ impl AnyDeclaration {
 }
 impl crate::Ftml for AnyDeclaration {
     #[cfg(feature = "rdf")]
-    #[allow(clippy::enum_glob_use)]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        #[allow(clippy::enum_glob_use)]
         use either_of::EitherOf6::*;
         match self {
             Self::NestedModule(m) => A(m.triples().into_iter()),

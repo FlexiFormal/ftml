@@ -1,24 +1,133 @@
-use ftml_uris::DocumentUri;
+use ftml_dom::DocumentState;
+use ftml_ontology::narrative::elements::SectionLevel;
+use ftml_uris::{DocumentElementUri, DocumentUri, NarrativeUri};
 use leptos::context::Provider;
 use leptos::prelude::*;
 
-#[derive(Clone, PartialEq, Eq)]
+use crate::callbacks::{OnSectionTitle, SectionWrap};
+
+#[derive(Clone, Default)]
 #[cfg_attr(feature = "csr", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+//#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+//#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(default))]
     #[cfg_attr(feature = "csr", serde(rename = "allowHovers"))]
-    allow_hovers: Option<bool>,
+    pub allow_hovers: Option<bool>,
     #[cfg_attr(feature = "csr", serde(default))]
     #[cfg_attr(feature = "csr", serde(rename = "documentUri"))]
-    document_uri: Option<DocumentUri>,
+    pub document_uri: Option<DocumentUri>,
+    #[cfg_attr(feature = "csr", serde(skip))]
+    pub section_wrap: Option<SectionWrap>,
+    #[cfg_attr(feature = "csr", serde(skip))]
+    pub on_section_title: Option<OnSectionTitle>,
 }
+
+#[cfg(feature = "typescript")]
+#[derive(thiserror::Error, Debug)]
+pub enum FtmlConfigParseError {
+    #[error("not a javascript object")]
+    NotAnObject(leptos_react::utils::JsDisplay),
+    #[error("invalid value for {0}: {1}")]
+    InvalidValue(&'static str, leptos_react::utils::JsDisplay),
+    #[error("invalid URI in {0}: {1}")]
+    InvalidUri(&'static str, ftml_uris::errors::UriParseError),
+    #[error("invalid javascript function in {0}: {1}")]
+    InvalidFun(&'static str, leptos_react::functions::NotAJsFunction),
+}
+
+#[cfg(feature = "typescript")]
+impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
+    type Error = (Self, Vec<FtmlConfigParseError>);
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        macro_rules! fields {
+            ($($stat:ident = $name:literal),* $(,)?) => {
+                std::thread_local! {$(
+                    static $stat : std::cell::LazyCell<wasm_bindgen::JsValue> =std::cell::LazyCell::new(|| wasm_bindgen::JsValue::from($name));
+                )*}
+            }
+        }
+        if !value.is_object() {
+            return Err((
+                Self::default(),
+                vec![FtmlConfigParseError::NotAnObject(
+                    leptos_react::utils::JsDisplay(value),
+                )],
+            ));
+        }
+        let mut config = Self::default();
+        let mut errors = Vec::new();
+
+        macro_rules! get {
+            ($v:ident @ $name:literal = $id:ident $ast:ident $b:block) => {
+                get!($v @ $name = $id v => v.$ast(); $b)
+            };
+            ($v:ident@ $name:literal = $id:ident $i:ident => $f:expr; $b:block) => {
+                fields! {
+                    $id = $name
+                }
+                if let Ok($i) = $id.with(|s| leptos::web_sys::js_sys::Reflect::get(&value, s)) {
+                    get!(@opt $name $i $f; $v $b)
+                }
+            };
+            ($v:ident@ $name:literal = $id:ident ? $i:ident => $f:expr; $b:block) => {
+                fields! {
+                    $id = $name
+                }
+                if let Ok($i) = $id.with(|s| leptos::web_sys::js_sys::Reflect::get(&value, s)) {
+                    get!(@err $name $i $f; $v $b)
+                }
+            };
+            (@opt $name:literal $e:ident $f:expr; $v:ident $b:block) => {
+                match $f {
+                    Some($v) => $b,
+                    None => errors.push(FtmlConfigParseError::InvalidValue(
+                        $name,
+                        leptos_react::utils::JsDisplay($e),
+                    )),
+                }
+            };
+            (@err $name:literal $e:ident $f:expr; $v:ident $b:block) => {
+                match $f {
+                    Ok($v) => $b,
+                    Err(e) => errors.push(FtmlConfigParseError::InvalidFun(
+                        $name,
+                        e,
+                    )),
+                }
+            }
+        }
+
+        get!(v @ "allowHovers" = ALLOW_HOVERS as_bool { config.allow_hovers = Some(v)});
+        get!(v @ "documentUri" = DOCUMENT_URI as_string {
+            match v.parse() {
+                Ok(url) => config.document_uri = Some(url),
+                Err(e) => errors.push(FtmlConfigParseError::InvalidUri("documentUri", e))
+            }
+        });
+        get!(v @ "sectionWrap" = SECTION_WRAP ? v => leptos_react::functions::JsRet::from_js(v); { config.section_wrap = Some(v) });
+        get!(v @ "onSectionTitle" = ON_SECTION_TITLE ? v => leptos_react::functions::JsRet::from_js(v); { config.on_section_title = Some(v) });
+        // more
+
+        if errors.is_empty() {
+            Ok(config)
+        } else {
+            Err((config, errors))
+        }
+    }
+}
+
 impl FtmlConfig {
     #[must_use]
     pub fn apply(self) -> Option<DocumentUri> {
         if let Some(b) = self.allow_hovers {
             provide_context(AllowHovers(b));
+        }
+        if let Some(b) = self.section_wrap {
+            provide_context(Some(b));
+        }
+        if let Some(b) = self.on_section_title {
+            provide_context(Some(b));
         }
         self.document_uri
     }
@@ -37,13 +146,15 @@ pub enum HighlightOption {
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub(crate) struct AllowHovers(pub bool);
 
-pub(crate) struct FtmlConfigState;
+pub struct FtmlConfigState;
 impl FtmlConfigState {
     #[inline]
+    #[must_use]
     pub fn allow_hovers() -> bool {
         use_context::<AllowHovers>().is_some_and(|b| b.0)
     }
     #[inline]
+    #[must_use]
     pub fn with_allow_hovers<V: IntoView + 'static>(
         value: bool,
         children: TypedChildren<V>,
@@ -52,5 +163,29 @@ impl FtmlConfigState {
             value: AllowHovers(value),
             children,
         })
+    }
+
+    pub fn wrap_section<V: IntoView, F: FnOnce() -> V>(
+        uri: &DocumentElementUri,
+        children: F,
+    ) -> impl IntoView + use<V, F> {
+        use leptos::either::Either::{Left, Right};
+        if let Some(Some(w)) = use_context::<Option<SectionWrap>>() {
+            Left(w.wrap(uri, children))
+        } else {
+            Right(children())
+        }
+    }
+
+    pub fn insert_section_title(lvl: SectionLevel) -> impl IntoView + use<> {
+        if let Some(Some(w)) = use_context::<Option<OnSectionTitle>>() {
+            let NarrativeUri::Element(uri) = DocumentState::current_uri() else {
+                tracing::error!("Could not determine URI for current section");
+                return None;
+            };
+            Some(w.insert(&uri, &lvl))
+        } else {
+            None
+        }
     }
 }

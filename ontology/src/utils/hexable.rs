@@ -15,7 +15,6 @@ pub enum AsHexError {
     Fmt(#[from] std::fmt::Error),
 }
 
-#[deprecated(note = "TODO")]
 pub trait Hexable: Sized {
     /// #### Errors
     fn as_hex_string(&self) -> Result<String, AsHexError>;

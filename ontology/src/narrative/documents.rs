@@ -3,7 +3,7 @@ use ftml_uris::{DocumentUri, Id, NarrativeUriRef, errors::SegmentParseError};
 use crate::narrative::{
     Narrative,
     elements::{
-        DocumentElement,
+        DocumentElement, DocumentElementRef,
         paragraphs::{InvalidParagraphKind, ParagraphKind},
         sections::SectionLevel,
     },
@@ -34,8 +34,10 @@ impl Narrative for DocumentData {
         Some(NarrativeUriRef::Document(&self.uri))
     }
     #[inline]
-    fn children(&self) -> &[DocumentElement] {
-        &self.elements
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        self.elements.iter().map(DocumentElement::as_ref)
     }
 }
 

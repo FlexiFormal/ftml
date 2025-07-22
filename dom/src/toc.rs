@@ -90,6 +90,7 @@ impl NavElems {
             }
         }
     }
+    #[allow(clippy::missing_const_for_fn)]
     pub fn navigate_to(&self, id: &str) {
         #[cfg(any(feature = "csr", feature = "hydrate"))]
         {

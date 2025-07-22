@@ -21,8 +21,9 @@ use crate::{
     extractor::FtmlDomElement,
     markers::{Marker, SectionInfo},
 };
-pub use document::{DocumentMeta, setup_document};
+pub use document::{DocumentMeta, DocumentState, setup_document};
 use ftml_core::extraction::FtmlExtractor;
+use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
@@ -49,6 +50,15 @@ pub trait FtmlViews: 'static {
 
     #[inline]
     fn section<V: IntoView>(_info: SectionInfo, then: impl FnOnce() -> V) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
+    fn section_title<V: IntoView>(
+        _lvl: SectionLevel,
+        _class: &'static str,
+        then: impl FnOnce() -> V,
+    ) -> impl IntoView {
         then()
     }
 }

@@ -29,10 +29,10 @@ pub trait IsDocumentElement: super::Narrative {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum DocumentElement {
     SetSectionLevel(SectionLevel),
     UseModule(ModuleUri),
-
     Module {
         range: DocumentRange,
         module: ModuleUri,
@@ -107,7 +107,11 @@ impl super::Narrative for DocumentElement {
     fn narrative_uri(&self) -> Option<ftml_uris::NarrativeUriRef<'_>> {
         self.element_uri().map(ftml_uris::NarrativeUriRef::Element)
     }
-    fn children(&self) -> &[DocumentElement] {
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        #[allow(clippy::enum_glob_use)]
+        use either_of::EitherOf5::*;
         match self {
             Self::SetSectionLevel(_)
             | Self::UseModule(_)
@@ -120,16 +124,16 @@ impl super::Narrative for DocumentElement {
             | Self::VariableReference { .. }
             | Self::Notation { .. }
             | Self::VariableNotation { .. }
-            | Self::Expr { .. } => &[],
+            | Self::Expr { .. } => A(std::iter::empty()),
             Self::Module { children, .. }
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
             | Self::Slide { children, .. }
-            | Self::SkipSection(children) => children,
-            Self::Section(s) => &s.children,
-            Self::Paragraph(s) => &s.children,
-            Self::Problem(s) => &s.children,
+            | Self::SkipSection(children) => B(children.iter().map(Self::as_ref)),
+            Self::Section(s) => C(s.children()),
+            Self::Paragraph(s) => D(s.children()),
+            Self::Problem(s) => E(s.children()),
         }
     }
 }
@@ -198,6 +202,7 @@ impl Ftml for DocumentElement {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum DocumentElementRef<'d> {
     SetSectionLevel(SectionLevel),
     UseModule(&'d ModuleUri),
@@ -270,13 +275,13 @@ pub enum DocumentElementRef<'d> {
     },
 }
 
-impl crate::__private::Sealed for DocumentElementRef<'_> {}
-impl super::Narrative for DocumentElementRef<'_> {
-    #[inline]
-    fn narrative_uri(&self) -> Option<ftml_uris::NarrativeUriRef<'_>> {
-        self.element_uri().map(ftml_uris::NarrativeUriRef::Element)
-    }
-    fn children(&self) -> &[DocumentElement] {
+impl<'r> DocumentElementRef<'r> {
+    pub fn children_lt(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'r>> + DoubleEndedIterator {
+        use super::Narrative;
+        #[allow(clippy::enum_glob_use)]
+        use either_of::EitherOf5::*;
         match self {
             Self::SetSectionLevel(_)
             | Self::UseModule(_)
@@ -289,17 +294,31 @@ impl super::Narrative for DocumentElementRef<'_> {
             | Self::VariableReference { .. }
             | Self::Notation { .. }
             | Self::VariableNotation { .. }
-            | Self::Expr { .. } => &[],
+            | Self::Expr { .. } => A(std::iter::empty()),
             Self::Module { children, .. }
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
             | Self::Slide { children, .. }
-            | Self::SkipSection(children) => children,
-            Self::Section(s) => &s.children,
-            Self::Paragraph(s) => &s.children,
-            Self::Problem(s) => &s.children,
+            | Self::SkipSection(children) => B(children.iter().map(DocumentElement::as_ref)),
+            Self::Section(s) => C(s.children()),
+            Self::Paragraph(s) => D(s.children()),
+            Self::Problem(s) => E(s.children()),
         }
+    }
+}
+
+impl crate::__private::Sealed for DocumentElementRef<'_> {}
+impl super::Narrative for DocumentElementRef<'_> {
+    #[inline]
+    fn narrative_uri(&self) -> Option<ftml_uris::NarrativeUriRef<'_>> {
+        self.element_uri().map(ftml_uris::NarrativeUriRef::Element)
+    }
+    #[inline]
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        self.children_lt()
     }
 }
 impl crate::Ftml for DocumentElementRef<'_> {
@@ -527,7 +546,10 @@ impl DocumentElement {
 
 impl<'e> DocumentElementRef<'e> {
     #[must_use]
-    pub const fn opaque_children(&self) -> &[DocumentElement] {
+    pub fn opaque_children(
+        &self,
+    ) -> Option<impl ExactSizeIterator<Item = DocumentElementRef<'e>> + DoubleEndedIterator + use<'e>>
+    {
         match self {
             Self::SetSectionLevel(_)
             | Self::UseModule(_)
@@ -544,12 +566,12 @@ impl<'e> DocumentElementRef<'e> {
             | Self::DocumentReference { .. }
             | Self::Notation { .. }
             | Self::VariableNotation { .. }
-            | Self::Expr { .. } => &[],
+            | Self::Expr { .. } => None,
             Self::Module { children, .. }
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
-            | Self::SkipSection(children) => children,
+            | Self::SkipSection(children) => Some(children.iter().map(|e| e.as_ref())),
         }
     }
     #[must_use]

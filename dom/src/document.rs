@@ -1,13 +1,17 @@
 use std::str::FromStr;
 
 use crate::{
-    counters::SectionCounters,
+    counters::{LogicalLevel, SectionCounters},
     extractor::DomExtractor,
     markers::SectionInfo,
     toc::{NavElems, TOCElem},
 };
-use ftml_ontology::narrative::documents::{DocumentCounter, DocumentStyle};
-use ftml_uris::{DocumentElementUri, DocumentUri, Language};
+use ftml_core::extraction::FtmlExtractor;
+use ftml_ontology::narrative::{
+    documents::{DocumentCounter, DocumentStyle},
+    elements::SectionLevel,
+};
+use ftml_uris::{DocumentElementUri, DocumentUri, Language, NarrativeUri};
 use leptos::{prelude::*, tachys::reactive_graph::OwnedView};
 use smallvec::SmallVec;
 
@@ -51,8 +55,30 @@ pub fn setup_document<Ch: IntoView + 'static>(
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct InInputref(bool);
 
+macro_rules! provide {
+    ($value:expr; $ret:expr) => {{
+        let owner = Owner::current()
+            .expect("no current reactive Owner found")
+            .child();
+        let children = owner.with(move || {
+            provide_context($value);
+            $ret
+        });
+        OwnedView::new_with_owner(children, owner)
+    }};
+}
+
 pub struct DocumentState;
 impl DocumentState {
+    /// ### Panics
+    pub fn current_uri() -> NarrativeUri {
+        with_context::<RwSignal<DomExtractor>, _>(|s| {
+            s.with_untracked(|e| e.get_narrative_uri().owned())
+        })
+        .expect("Not in a document context")
+    }
+
+    /// ### Panics
     pub fn with_styles_untracked<R>(
         f: impl FnOnce(&[DocumentCounter], &[DocumentStyle]) -> R,
     ) -> R {
@@ -74,11 +100,8 @@ impl DocumentState {
         let mut counters: SectionCounters = expect_context();
         let (style, class) = counters.next_section();
         let lvl = counters.current_level();
-        let owner = Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(move || {
-            provide_context(counters);
+        provide!(
+            counters;
             f(SectionInfo {
                 uri,
                 style,
@@ -86,8 +109,45 @@ impl DocumentState {
                 lvl,
                 id,
             })
-        });
-        OwnedView::new_with_owner(children, owner)
+        )
+    }
+
+    pub(crate) fn title_class() -> (LogicalLevel, &'static str) {
+        with_context(|cntrs: &SectionCounters| {
+            let lvl = cntrs.current_level();
+            (
+                lvl,
+                match lvl {
+                    LogicalLevel::Section(l) => match l {
+                        SectionLevel::Part => "ftml-title-part",
+                        SectionLevel::Chapter => "ftml-title-chapter",
+                        SectionLevel::Section => "ftml-title-section",
+                        SectionLevel::Subsection => "ftml-title-subsection",
+                        SectionLevel::Subsubsection => "ftml-title-subsubsection",
+                        SectionLevel::Paragraph => "ftml-title-paragraph",
+                        SectionLevel::Subparagraph => "ftml-title-subparagraph",
+                    },
+                    LogicalLevel::BeamerSlide => "ftml-title-slide",
+                    LogicalLevel::Paragraph => "ftml-title-paragraph",
+                    LogicalLevel::None => "ftml-title",
+                },
+            )
+        })
+        .unwrap_or((LogicalLevel::None, "ftml-title"))
+    }
+
+    pub(crate) fn skip_section<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
+        let mut counters: SectionCounters = expect_context();
+        match counters.current_level() {
+            LogicalLevel::Section(l) => {
+                counters.current = LogicalLevel::Section(l.inc());
+            }
+            LogicalLevel::None => {
+                counters.current = LogicalLevel::Section(counters.max);
+            }
+            _ => (),
+        }
+        provide!(counters; f())
     }
 
     pub(crate) fn update_counters<R>(f: impl FnOnce(&mut SectionCounters) -> R) -> R {

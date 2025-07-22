@@ -4,7 +4,7 @@ use crate::{
     FtmlKey,
     extraction::{
         CloseFtmlElement, FtmlExtractionError, FtmlExtractor, KeyList, OpenFtmlElement,
-        attributes::Attributes,
+        OpenNarrativeElement, attributes::Attributes,
     },
 };
 use ftml_ontology::{
@@ -245,4 +245,178 @@ pub fn section<E: FtmlExtractor>(
 ) -> Result<E> {
     let uri = attrs.get_elem_uri_from_id(ext, "section")?;
     ret!(ext <- Section(uri) = Section)
+}
+
+pub fn skipsection<E: FtmlExtractor>(
+    ext: &mut E,
+    _attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+) -> Result<E> {
+    ret!(ext <- SkipSection = SkipSection)
+}
+
+pub fn title<E: FtmlExtractor>(
+    ext: &mut E,
+    _attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+) -> Result<E> {
+    let mut iter = ext.iterate_narrative();
+    while let Some(e) = iter.next() {
+        match e {
+            OpenNarrativeElement::Section { .. } => {
+                drop(iter);
+                return ret!(ext <- SectionTitle = SectionTitle);
+            }
+            OpenNarrativeElement::SkipSection { .. } => break,
+            OpenNarrativeElement::Module { .. } => (),
+        }
+    }
+    Err(FtmlExtractionError::NotIn(
+        FtmlKey::Title,
+        "a section or paragraph",
+    ))
+}
+
+pub fn slide<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn slide_number<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn definition<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn paragraph<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn assertion<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn example<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn proof<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn subproof<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn proofbody<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn problem<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn subproblem<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn problem_hint<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn solution<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn gnote<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn answer_class<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn answer_class_feedback<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn multiple_choice_block<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn single_choice_block<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
 }

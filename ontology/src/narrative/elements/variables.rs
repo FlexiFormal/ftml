@@ -5,7 +5,7 @@ use crate::{
     expressions::Expr,
     narrative::{
         Narrative,
-        elements::{DocumentElement, DocumentElementRef, IsDocumentElement},
+        elements::{DocumentElementRef, IsDocumentElement},
     },
 };
 
@@ -74,8 +74,10 @@ impl Narrative for VariableDeclaration {
         Some(ftml_uris::NarrativeUriRef::Element(&self.uri))
     }
     #[inline]
-    fn children(&self) -> &[DocumentElement] {
-        &[]
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        std::iter::empty()
     }
 }
 impl IsDocumentElement for VariableDeclaration {

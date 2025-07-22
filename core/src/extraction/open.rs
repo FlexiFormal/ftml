@@ -25,6 +25,8 @@ pub enum OpenFtmlElement {
     Style(DocumentStyle),
     Counter(DocumentCounter),
     Invisible,
+    SectionTitle,
+    SkipSection,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -33,6 +35,8 @@ pub enum CloseFtmlElement {
     Symbol,
     Invisible,
     Section,
+    SectionTitle,
+    SkipSection,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -58,6 +62,9 @@ pub enum OpenNarrativeElement {
     Section {
         uri: DocumentElementUri,
         title: Option<DocumentRange>,
+        children: Vec<DocumentElement>,
+    },
+    SkipSection {
         children: Vec<DocumentElement>,
     },
 }
@@ -111,9 +118,17 @@ impl OpenFtmlElement {
                     children: Vec::new(),
                 }),
             },
+            Self::SkipSection => Split::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::SkipSection {
+                    children: Vec::new(),
+                }),
+            },
             Self::Style(s) => Split::Meta(MetaDatum::Style(s)),
             Self::Counter(c) => Split::Meta(MetaDatum::Counter(c)),
-            Self::SetSectionLevel(_) | Self::None | Self::Invisible => Split::None,
+            Self::SetSectionLevel(_) | Self::None | Self::Invisible | Self::SectionTitle => {
+                Split::None
+            }
         }
     }
 }

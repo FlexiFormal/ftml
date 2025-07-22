@@ -16,20 +16,38 @@ jobs:
         #  rustup +nightly component add miri
       - name: cargo
         run: cargo install --force cargo-make
+      # uris
       - name: ftml-uris tests
         run: cd uris && cargo make all-tests
       - name: uris doc
         run: cd uris && cargo make doc
       #- name: miri
       #  run: cd openmath && cargo make miri
+      # ulo
       - name: ftml-ulo tests
         run: cd ulo && cargo +nightly test
       - name: ulo doc
         run: cd ulo && cargo +nightly doc --no-deps
+      # ontology
+      - name: ftml-ontology tests
+        run: cd ontology && cargo make all-tests
+      - name: ontology doc
+        run: cd ontology && cargo make doc
+      # core
       - name: ftml-core tests
         run: cd core && cargo make all-tests
       - name: core doc
         run: cd core && cargo make doc
+      # dom
+      - name: ftml-dom tests
+        run: cd dom && cargo make all-tests
+      - name: dom doc
+        run: cd dom && cargo make doc
+      # leptos
+      - name: ftml-leptos tests
+        run: cd leptos && cargo make all-tests
+      - name: leptos doc
+        run: cd leptos && cargo make doc
       - name: Upload Docs
         uses: actions/upload-pages-artifact@v3
         with:

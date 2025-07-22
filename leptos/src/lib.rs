@@ -6,11 +6,13 @@
  */
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
+pub mod callbacks;
 pub mod components;
 pub mod config;
 pub mod utils;
 
 use ftml_dom::{FtmlViews, markers::SectionInfo};
+use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
 
 struct Views;
@@ -25,6 +27,8 @@ impl FtmlViews for Views {
                     font-weight:inherit;\
                     line-height:inherit;\
                     background-color:inherit;\
+                    color:inherit;\
+                    display:contents;
                 ">
                     {Self::cont(node)}
                 </Themer>
@@ -35,6 +39,14 @@ impl FtmlViews for Views {
     #[inline]
     fn section<V: IntoView>(info: SectionInfo, then: impl FnOnce() -> V) -> impl IntoView {
         components::sections::section(info, then)
+    }
+    #[inline]
+    fn section_title<V: IntoView>(
+        lvl: SectionLevel,
+        class: &'static str,
+        then: impl FnOnce() -> V,
+    ) -> impl IntoView {
+        components::sections::section_title(lvl, class, then)
     }
 }
 
@@ -74,16 +86,5 @@ pub fn iterate_body() {
         let uri = meta.uri.unwrap_or_else(|| DocumentUri::no_doc().clone());
 
         ftml_dom::setup_document(|| Views::top(orig), uri)
-        /*
-        view!(
-            <Themer attr:style="font-family:inherit;font-size:inherit;font-weight:inherit;line-height:inherit;background-color:inherit;">
-                <FTMLGlobalSetup>
-                    <FTMLDocumentSetup uri=DocumentUri::no_doc().clone()>
-                        <DomChildrenCont orig cont=ftml_viewer_components::iterate/>
-                    </FTMLDocumentSetup>
-                </FTMLGlobalSetup>
-            </Themer>
-        )
-         */
     })
 }

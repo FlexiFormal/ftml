@@ -7,5 +7,5 @@
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
 mod keys;
-pub use keys::{FtmlKey, PREFIX};
+pub use keys::{FtmlKey, NUM_KEYS, PREFIX};
 pub mod extraction;

@@ -27,6 +27,7 @@ typescript = [
     "ftml-dom/typescript",
     "dep:tsify-next",
     "dep:wasm-bindgen",
+    "dep:leptos-react",
 ]
 
 [package.metadata.docs.rs]
@@ -56,6 +57,7 @@ document-features = { workspace = true }
 
 ftml-dom = { workspace = true }
 ftml-uris = { workspace = true }
+ftml-ontology = { workspace = true }
 
 leptos = { workspace = true }
 leptos-posthoc = { workspace = true }
@@ -63,8 +65,10 @@ thaw = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }
 
 gloo-storage = { workspace = true, optional = true }
 
 tsify-next = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
+leptos-react = { workspace = true, optional = true }
