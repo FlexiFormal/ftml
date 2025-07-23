@@ -91,18 +91,18 @@ macro_rules! debugdisplay {
 #[allow(clippy::redundant_pub_crate)]
 macro_rules! intern {
     ($static:ident = $store:ident:$str_type:ident @ $num:literal ) => {
-        #[cfg(all(feature = "interned", not(feature = "api")))]
+        #[cfg(feature = "interned")]//, not(feature = "api")))]
         static $static: std::sync::LazyLock<crate::aux::interned::InternMap> =
             std::sync::LazyLock::new(crate::aux::interned::InternMap::default);
-        #[cfg(all(feature = "interned", not(feature = "api")))]
+        #[cfg(feature = "interned")]//, not(feature = "api")))]
         #[inline]
         unsafe fn get_ids() -> &'static crate::aux::interned::InternMap {
             &$static
         }
-        #[cfg(all(feature = "interned", feature = "api"))]
+        /*#[cfg(all(feature = "interned", feature = "api"))]
         unsafe extern "C" {
             fn get_ids() -> &'static crate::aux::interned::InternMap;
-        }
+        }*/
 
         #[allow(clippy::redundant_pub_crate)]
         pub(crate) struct $store;

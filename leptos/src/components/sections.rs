@@ -17,7 +17,7 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
         <div id=id style=style class=class>
           {
             if let LogicalLevel::Section(lvl) = lvl {
-                tracing::info!("Section at level {lvl}");
+                tracing::trace!("Section at level {lvl}");
             }
             FtmlConfigState::wrap_section(&uri,children)
           }

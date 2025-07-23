@@ -1,6 +1,6 @@
 [workspace]
 members = ["uris", "core", "ulo", "dom", "ontology", "leptos"]
-exclude = []
+exclude = ["tests"]
 resolver = "3"
 
 [workspace.lints.clippy]
@@ -81,7 +81,7 @@ regex = "1.10"
 gloo-storage = "0.3"
 
 openmath = "0.1"
-leptos-posthoc = { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }
+leptos-posthoc = { path = "../leptos-posthoc" } # { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }
 leptos-react = { path = "../leptos-react" }
 
 proc-macro2 = "1"

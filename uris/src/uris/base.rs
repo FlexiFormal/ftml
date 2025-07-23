@@ -316,19 +316,19 @@ impl PartialEq<url::Url> for InternedBaseURI {
     }
 }
 
-#[cfg(all(feature = "interned", not(feature = "api")))]
+#[cfg(feature = "interned")] //, not(feature = "api")))]
 static BASE_URIS: std::sync::LazyLock<parking_lot::Mutex<Vec<InternedBaseURI>>> =
     std::sync::LazyLock::new(|| parking_lot::Mutex::new(Vec::with_capacity(8)));
 
-#[cfg(all(feature = "interned", not(feature = "api")))]
+#[cfg(feature = "interned")] //, not(feature = "api")))]
 #[inline]
 unsafe fn get_base_uris() -> &'static parking_lot::Mutex<Vec<InternedBaseURI>> {
     &BASE_URIS
 }
-#[cfg(all(feature = "interned", feature = "api"))]
+/*#[cfg(all(feature = "interned", feature = "api"))]
 unsafe extern "C" {
     fn get_base_uris() -> &'static parking_lot::Mutex<Vec<InternedBaseURI>>;
-}
+}*/
 
 static UNKNOWN_BASE: std::sync::LazyLock<BaseUri> = std::sync::LazyLock::new(||
     // SAFETY: known to be well-formed Url

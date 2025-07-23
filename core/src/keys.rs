@@ -150,7 +150,7 @@ macro_rules! do_keys {
                 #[must_use]
                 pub const fn all_rules<E:crate::extraction::FtmlExtractor>() -> crate::extraction::FtmlRuleSet<E> {
                     crate::extraction::FtmlRuleSet([$(
-                        crate::extraction::rules::$fun
+                        do_keys!(@fun $tag $fun)
                     ),*])
                 }
 
@@ -167,6 +167,8 @@ macro_rules! do_keys {
             }
         }
     };
+    (@fun $self:ident todo) => { |e,a,k| crate::extraction::rules::todo(Self::$self,e,a,k) };
+    (@fun $self:ident $fun:ident) => { crate::extraction::rules::$fun };
     (@u8 $slf:ident {$($p:ident)*}) => {0};
     (@u8 $slf:ident {$($p:ident)*} $n:ident $($r:ident)*) => {
         if matches!($slf,Self::$n) {return do_keys!(@count $($p)*);}
@@ -187,32 +189,32 @@ do_keys! {
 
     /// Denotes a new [LogicalParagraph] of [ParagraphKind::Definition]
     /// for the given [Symbol]s using the given styles.
-    Definition                              = "definition"          + Id,Inline,Fors,Styles; &>> Definiens, Definiendum; := no_op
+    Definition                              = "definition"          + Id,Inline,Fors,Styles; &>> Definiens, Definiendum; := todo
     /// Denotes a new [LogicalParagraph] of [ParagraphKind::Assertion] (Theorems, Lemmata,
     /// Axioms, etc.) for the given [Symbol]s using the given styles.
-    Assertion                               = "assertion"           + Id,Inline,Fors,Styles; := no_op
+    Assertion                               = "assertion"           + Id,Inline,Fors,Styles; := todo
     /// Denotes a new [LogicalParagraph] of [ParagraphKind::Example] (this includes counterexamples)
     /// for the given [Symbol]s using the given styles.
-    Example                                 = "example"             + Id,Inline,Fors,Styles; := no_op
+    Example                                 = "example"             + Id,Inline,Fors,Styles; := todo
     /// Denotes a new [LogicalParagraph] of [ParagraphKind::Paragraph]
     /// for the given [Symbol]s using the given styles.
-    Paragraph                               = "paragraph"           + Id,Inline,Fors,Styles; := no_op
+    Paragraph                               = "paragraph"           + Id,Inline,Fors,Styles; := todo
 
     /// Denotes a new [Problem] with [`sub_problem`](Problem::sub_problem)`=false`
-    Problem                                 = "problem"             + Id,Styles,Autogradable,ProblemPoints ; := no_op
+    Problem                                 = "problem"             + Id,Styles,Autogradable,ProblemPoints ; := todo
     /// Denotes a new [Problem] with [`sub_problem`](Problem::sub_problem)`=true`
-    SubProblem                              = "subproblem"          + Id,Styles,Autogradable,ProblemPoints ; := no_op
+    SubProblem                              = "subproblem"          + Id,Styles,Autogradable,ProblemPoints ; := todo
 
     /// Denotes a [Slide], implying that the [Document] is (or contains in some sense)
     /// a presentation.
-    Slide                                   = "slide"               + Id;    -!"in [LogicalParagraph]s, [Problem]s or [Slide]s"; := no_op
+    Slide                                   = "slide"               + Id;    -!"in [LogicalParagraph]s, [Problem]s or [Slide]s"; := todo
 
 
     // --------------------------------------------------------------------------------
 
     /// A (possibly empty) node that, when being rendered, should be replaced by the
     /// current slide number.
-    SlideNumber                 = "slide-number"            !"in [Slide]s"; := no_op
+    SlideNumber                 = "slide-number"            !"in [Slide]s"; := todo
 
     // ------------------------------------------------------------------------------------
 
@@ -221,13 +223,13 @@ do_keys! {
     Module                      @ String        = "module"              + Metatheory, Signature; := module
 
     /// Denotes a new [MathStructure] or [Extension] with the given [Name].
-    MathStructure               @ String        = "feature-structure"   + Macroname; !"in [Module]s"; := no_op
+    MathStructure               @ String        = "feature-structure"   + Macroname; !"in [Module]s"; := todo
 
     /// <div class="ftml-wip">TODO</div>
-    Morphism                                    = "feature-morphism" := no_op
+    Morphism                                    = "feature-morphism" := todo
 
-    Proof                                   = "proof"               + Id,Inline,Fors,Styles,ProofHide; := no_op
-    SubProof                                = "subproof"            + Id,Inline,Fors,Styles,ProofHide; := no_op
+    Proof                                   = "proof"               + Id,Inline,Fors,Styles,ProofHide; := todo
+    SubProof                                = "subproof"            + Id,Inline,Fors,Styles,ProofHide; := todo
 
 
 
@@ -235,126 +237,126 @@ do_keys! {
     CounterParent               = "counter-parent" := counter_parent
     Counter                     = "counter" := counter_parent
 
-    DocTitle                    = "doctitle" := no_op
+    DocTitle                    = "doctitle" := todo
     Title                       = "title" := title
-    ProofTitle                  = "prooftitle" := no_op
-    SubproofTitle               = "subprooftitle" := no_op
+    ProofTitle                  = "prooftitle" := todo
+    SubproofTitle               = "subprooftitle" := todo
 
     Symdecl                     = "symdecl" := symbol
-    Vardef                      = "vardef" := no_op
-    Varseq                      = "varseq" := no_op
+    Vardef                      = "vardef" := todo
+    Varseq                      = "varseq" := todo
 
-    Notation                    = "notation" := no_op
-    NotationComp                = "notationcomp" := no_op
-    NotationOpComp              = "notationopcomp" := no_op
-    Definiendum                 = "definiendum"         <= Definition, Paragraph, Assertion; := no_op
+    Notation                    = "notation" := todo
+    NotationComp                = "notationcomp" := todo
+    NotationOpComp              = "notationopcomp" := todo
+    Definiendum                 = "definiendum"         <= Definition, Paragraph, Assertion; := todo
 
-    Type                        = "type" := no_op
-    Conclusion                  = "conclusion" := no_op
-    Definiens                   = "definiens"           <= Definition, Paragraph, Assertion; := no_op
-    Rule                        = "rule" := no_op
+    Type                        = "type" := todo
+    Conclusion                  = "conclusion" := todo
+    Definiens                   = "definiens"           <= Definition, Paragraph, Assertion; := todo
+    Rule                        = "rule" := todo
 
-    ArgSep                      = "argsep" := no_op
-    ArgMap                      = "argmap" := no_op
-    ArgMapSep                   = "argmap-sep" := no_op
+    ArgSep                      = "argsep" := todo
+    ArgMap                      = "argmap" := todo
+    ArgMapSep                   = "argmap-sep" := todo
 
-    Term                        = "term" := no_op
-    Arg                         = "arg" := no_op
-    HeadTerm                    = "headterm" := no_op
+    Term                        = "term" := todo
+    Arg                         = "arg" := todo
+    HeadTerm                    = "headterm" := todo
 
-    ImportModule                = "import" := no_op
-    UseModule                   = "usemodule" := no_op
-    InputRef                    = "inputref" := no_op
+    ImportModule                = "import" := todo
+    UseModule                   = "usemodule" := todo
+    InputRef                    = "inputref" := todo
 
     SetSectionLevel             = "sectionlevel" := setsectionlevel
     SkipSection                 = "skipsection" := skipsection
 
 
-    ProofMethod                 = "proofmethod" := no_op
-    ProofSketch                 = "proofsketch" := no_op
-    ProofTerm                   = "proofterm" := no_op
-    ProofBody                   = "proofbody" := no_op
-    ProofAssumption             = "spfassumption" := no_op
-    ProofStep                   = "spfstep" := no_op
-    ProofStepName               = "stepname" := no_op
-    ProofEqStep                 = "spfeqstep" := no_op
-    ProofPremise                = "premise" := no_op
-    ProofConclusion             = "spfconclusion" := no_op
+    ProofMethod                 = "proofmethod" := todo
+    ProofSketch                 = "proofsketch" := todo
+    ProofTerm                   = "proofterm" := todo
+    ProofBody                   = "proofbody" := todo
+    ProofAssumption             = "spfassumption" := todo
+    ProofStep                   = "spfstep" := todo
+    ProofStepName               = "stepname" := todo
+    ProofEqStep                 = "spfeqstep" := todo
+    ProofPremise                = "premise" := todo
+    ProofConclusion             = "spfconclusion" := todo
 
-    PreconditionDimension       = "preconditiondimension" := no_op
-    PreconditionSymbol          = "preconditionsymbol" := no_op
-    ObjectiveDimension          = "objectivedimension" := no_op
-    ObjectiveSymbol             = "objectivesymbol" := no_op
-    AnswerClass                 = "answerclass" := no_op
-    AnswerClassPts              = "answerclass-pts" := no_op
-    AnswerclassFeedback         = "answerclass-feedback" := no_op
-    ProblemMinutes              = "problemminutes" := no_op
-    ProblemMultipleChoiceBlock  = "multiple-choice-block" := no_op
-    ProblemSingleChoiceBlock    = "single-choice-block" := no_op
-    ProblemChoice               = "problem-choice" := no_op
-    ProblemChoiceVerdict        = "problem-choice-verdict" := no_op
-    ProblemChoiceFeedback       = "problem-choice-feedback" := no_op
-    ProblemFillinsol            = "fillinsol" := no_op
-    ProblemFillinsolWidth       = "fillinsol-width" := no_op
-    ProblemFillinsolCase        = "fillin-case" := no_op
-    ProblemFillinsolCaseValue   = "fillin-case-value" := no_op
-    ProblemFillinsolCaseVerdict = "fillin-case-verdict" := no_op
-    ProblemSolution            = "solution" := no_op
-    ProblemHint                = "problemhint" := no_op
-    ProblemNote                 = "problemnote" := no_op
-    ProblemGradingNote         = "problemgnote" := no_op
+    PreconditionDimension       = "preconditiondimension" := todo
+    PreconditionSymbol          = "preconditionsymbol" := todo
+    ObjectiveDimension          = "objectivedimension" := todo
+    ObjectiveSymbol             = "objectivesymbol" := todo
+    AnswerClass                 = "answerclass" := todo
+    AnswerClassPts              = "answerclass-pts" := todo
+    AnswerclassFeedback         = "answerclass-feedback" := todo
+    ProblemMinutes              = "problemminutes" := todo
+    ProblemMultipleChoiceBlock  = "multiple-choice-block" := todo
+    ProblemSingleChoiceBlock    = "single-choice-block" := todo
+    ProblemChoice               = "problem-choice" := todo
+    ProblemChoiceVerdict        = "problem-choice-verdict" := todo
+    ProblemChoiceFeedback       = "problem-choice-feedback" := todo
+    ProblemFillinsol            = "fillinsol" := todo
+    ProblemFillinsolWidth       = "fillinsol-width" := todo
+    ProblemFillinsolCase        = "fillin-case" := todo
+    ProblemFillinsolCaseValue   = "fillin-case-value" := todo
+    ProblemFillinsolCaseVerdict = "fillin-case-verdict" := todo
+    ProblemSolution            = "solution" := todo
+    ProblemHint                = "problemhint" := todo
+    ProblemNote                 = "problemnote" := todo
+    ProblemGradingNote         = "problemgnote" := todo
 
-    Comp                        = "comp" := no_op
-    VarComp                     = "varcomp" := no_op
-    MainComp                    = "maincomp" := no_op
-    DefComp                     = "defcomp" := no_op
+    Comp                        = "comp" := todo
+    VarComp                     = "varcomp" := todo
+    MainComp                    = "maincomp" := todo
+    DefComp                     = "defcomp" := todo
 
     Invisible                   = "invisible" := invisible
 
-    IfInputref                  = "ifinputref" := no_op
-    ReturnType                  = "returntype" := no_op
-    ArgTypes                    = "argtypes" := no_op
+    IfInputref                  = "ifinputref" := todo
+    ReturnType                  = "returntype" := todo
+    ArgTypes                    = "argtypes" := todo
 
-    SRef                        = "sref" := no_op
-    SRefIn                      = "srefin" := no_op
-    Slideshow                   = "slideshow" := no_op
-    SlideshowSlide              = "slideshow-slide"  := no_op
-    CurrentSectionLevel         = "currentsectionlevel" := no_op
-    Capitalize                  = "capitalize" := no_op
+    SRef                        = "sref" := todo
+    SRefIn                      = "srefin" := todo
+    Slideshow                   = "slideshow" := todo
+    SlideshowSlide              = "slideshow-slide"  := todo
+    CurrentSectionLevel         = "currentsectionlevel" := todo
+    Capitalize                  = "capitalize" := todo
 
-    Assign                      = "assign" := no_op
-    Rename                      = "rename" := no_op
-    RenameTo                    = "to" := no_op
-    AssignMorphismFrom          = "assignmorphismfrom" := no_op
-    AssignMorphismTo            = "assignmorphismto" := no_op
+    Assign                      = "assign" := todo
+    Rename                      = "rename" := todo
+    RenameTo                    = "to" := todo
+    AssignMorphismFrom          = "assignmorphismfrom" := todo
+    AssignMorphismTo            = "assignmorphismto" := todo
 
-    AssocType                   = "assoctype" := no_op
-    ArgumentReordering          = "reorderargs" := no_op
-    ArgNum                      = "argnum" := no_op
-    Bind                        = "bind" := no_op
-    MorphismDomain              = "domain" := no_op
-    MorphismTotal               = "total" := no_op
-    ArgMode                     = "argmode" := no_op
-    NotationId                  = "notationid" := no_op
-    Head                        = "head" := no_op
-    Language                    = "language" := no_op
+    AssocType                   = "assoctype" := todo
+    ArgumentReordering          = "reorderargs" := todo
+    ArgNum                      = "argnum" := todo
+    Bind                        = "bind" := todo
+    MorphismDomain              = "domain" := todo
+    MorphismTotal               = "total" := todo
+    ArgMode                     = "argmode" := todo
+    NotationId                  = "notationid" := todo
+    Head                        = "head" := todo
+    Language                    = "language" := todo
     /// The metatheory of a module, that provides the formal "language" the module
     /// is in
-    Metatheory                              = "metatheory"      - Module; := no_op
-    Signature                               = "signature"       - Module; := no_op
-    Args                        = "args" := no_op
-    ProblemPoints               = "problempoints"               - Problem, SubProblem; := no_op
-    Autogradable                = "autogradable"                - Problem, SubProblem; := no_op
-    ProofHide                   = "proofhide"                   - Proof,SubProof; := no_op
-    Macroname                   = "macroname"                   - MathStructure; := no_op
-    Inline                      = "inline"                      - Definition, Paragraph, Assertion, Example, Problem, SubProblem; := no_op
-    Fors                        = "fors"                        - Definition, Paragraph, Assertion, Example, Proof, SubProof; := no_op
-    Id                          = "id"                          - Section,Definition, Paragraph, Assertion, Example, Proof, SubProof, Problem, SubProblem, Slide; := no_op
-    NotationFragment            = "notationfragment" := no_op
-    Precedence                  = "precedence" := no_op
-    Role                        = "role" := no_op
-    Styles                      = "styles" := no_op
-    Argprecs                    = "argprecs" := no_op
+    Metatheory                              = "metatheory"      - Module; := todo
+    Signature                               = "signature"       - Module; := todo
+    Args                        = "args" := todo
+    ProblemPoints               = "problempoints"               - Problem, SubProblem; := todo
+    Autogradable                = "autogradable"                - Problem, SubProblem; := todo
+    ProofHide                   = "proofhide"                   - Proof,SubProof; := todo
+    Macroname                   = "macroname"                   - MathStructure; := todo
+    Inline                      = "inline"                      - Definition, Paragraph, Assertion, Example, Problem, SubProblem; := todo
+    Fors                        = "fors"                        - Definition, Paragraph, Assertion, Example, Proof, SubProof; := todo
+    Id                          = "id"                          - Section,Definition, Paragraph, Assertion, Example, Proof, SubProof, Problem, SubProblem, Slide; := todo
+    NotationFragment            = "notationfragment" := todo
+    Precedence                  = "precedence" := todo
+    Role                        = "role" := todo
+    Styles                      = "styles" := todo
+    Argprecs                    = "argprecs" := todo
 }
 
 impl std::fmt::Display for FtmlKey {

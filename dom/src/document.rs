@@ -42,8 +42,8 @@ impl DocumentMeta {
 }
 
 pub fn setup_document<Ch: IntoView + 'static>(
-    children: impl FnOnce() -> Ch,
     uri: DocumentUri,
+    children: impl FnOnce() -> Ch,
 ) -> impl IntoView {
     provide_context(RwSignal::new(DomExtractor::new(uri)));
     provide_context(SectionCounters::default());

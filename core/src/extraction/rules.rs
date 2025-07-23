@@ -67,6 +67,17 @@ macro_rules! del {
 }
 
 #[allow(clippy::unnecessary_wraps)]
+pub fn todo<E: FtmlExtractor>(
+    key: FtmlKey,
+    ext: &mut E,
+    _: &mut E::Attributes<'_>,
+    _: &mut KeyList,
+) -> Result<E> {
+    tracing::warn!("Not yet implemented: {key}");
+    ret!(ext)
+}
+
+#[allow(clippy::unnecessary_wraps)]
 pub fn no_op<E: FtmlExtractor>(
     ext: &mut E,
     _: &mut E::Attributes<'_>,

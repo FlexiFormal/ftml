@@ -15,9 +15,9 @@ use ftml_dom::{FtmlViews, markers::SectionInfo};
 use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
 
-struct Views;
+pub struct Views;
 impl FtmlViews for Views {
-    fn top(node: leptos_posthoc::OriginalNode) -> impl IntoView {
+    fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + 'static + Send) -> impl IntoView {
         use utils::theming::Themer;
         ftml_dom::global_setup(|| {
             view!(
@@ -30,7 +30,8 @@ impl FtmlViews for Views {
                     color:inherit;\
                     display:contents;
                 ">
-                    {Self::cont(node)}
+                    {then()}
+                    //{Self::cont(node)}
                 </Themer>
             )
         })
@@ -85,6 +86,6 @@ pub fn iterate_body() {
         }
         let uri = meta.uri.unwrap_or_else(|| DocumentUri::no_doc().clone());
 
-        ftml_dom::setup_document(|| Views::top(orig), uri)
+        Views::top(|| ftml_dom::setup_document(uri, || Views::cont(orig)))
     })
 }

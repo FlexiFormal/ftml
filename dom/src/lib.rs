@@ -35,6 +35,27 @@ pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
 }
 
 pub trait FtmlViews: 'static {
+    fn render_ftml(html: String) -> impl IntoView {
+        use leptos_posthoc::{DomStringCont, DomStringContProps};
+        DomStringCont(DomStringContProps {
+            html,
+            cont: iterate::<Self>,
+            on_load: None,
+            class: None::<String>.into(),
+            style: None::<String>.into(),
+        })
+    }
+    fn render_math_ftml(html: String) -> impl IntoView {
+        use leptos_posthoc::{DomStringContMath, DomStringContMathProps};
+        DomStringContMath(DomStringContMathProps {
+            html,
+            cont: iterate::<Self>,
+            on_load: None,
+            class: None::<String>.into(),
+            style: None::<String>.into(),
+        })
+    }
+
     #[inline]
     fn cont(node: OriginalNode) -> impl IntoView {
         use leptos_posthoc::{DomChildrenCont, DomChildrenContProps};
@@ -44,8 +65,8 @@ pub trait FtmlViews: 'static {
         })
     }
     #[inline]
-    fn top(node: OriginalNode) -> impl IntoView {
-        Self::cont(node)
+    fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
+        then()
     }
 
     #[inline]
@@ -81,7 +102,7 @@ fn iterate<Views: FtmlViews + ?Sized>(
             return (None, None);
         }
     }
-    tracing::trace!("Has ftml attributes");
+    tracing::debug!("Has ftml attributes");
     let sig = expect_context::<RwSignal<DomExtractor>>();
     let (markers, close) = sig.update_untracked(|extractor| {
         let mut attrs = NodeAttrs::new(e);
@@ -104,9 +125,10 @@ fn iterate<Views: FtmlViews + ?Sized>(
         (markers, close)
     });
     let rview = if markers.is_empty() {
+        tracing::debug!("No markers");
         None
     } else {
-        tracing::trace!("got elements: {markers:?}");
+        tracing::debug!("got elements: {markers:?}");
         let e: OriginalNode = e.clone().into();
         Some(move || {
             Marker::apply::<Views>(markers, mathml::is(&e.tag_name()).is_some(), e).into_any()
@@ -117,7 +139,7 @@ fn iterate<Views: FtmlViews + ?Sized>(
     } else {
         let e = e.clone();
         Some(move || {
-            tracing::trace!("closing element: {close:?}");
+            tracing::debug!("closing element: {close:?}");
             sig.update_untracked(move |extractor| {
                 let n = FtmlDomElement(&e);
                 for c in close.into_iter().rev() {
