@@ -49,12 +49,6 @@ impl FtmlStateExtractor for DomExtractor {
     }
     //type Node = ;
 }
-/*
-struct Node(NodeAttrs);
-impl FtmlNode for Node {
-
-}
- */
 
 #[derive(Clone)]
 pub struct FtmlDomElement<'n>(pub(crate) &'n Element);

@@ -6,8 +6,8 @@ pub mod variables;
 
 use crate::{
     Ftml,
-    expressions::Expr,
     narrative::{DataRef, DocumentRange},
+    terms::Term,
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, ModuleUri, SymbolUri, UriName};
 pub use notations::Notation;
@@ -97,7 +97,7 @@ pub enum DocumentElement {
     },
     Expr {
         uri: DocumentElementUri,
-        term: Expr,
+        term: Term,
     },
 }
 
@@ -271,7 +271,7 @@ pub enum DocumentElementRef<'d> {
     },
     Expr {
         uri: &'d DocumentElementUri,
-        term: &'d Expr,
+        term: &'d Term,
     },
 }
 

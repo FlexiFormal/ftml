@@ -242,7 +242,7 @@ do_keys! {
     ProofTitle                  = "prooftitle" := todo
     SubproofTitle               = "subprooftitle" := todo
 
-    Symdecl                     = "symdecl" := symbol
+    Symdecl                     = "symdecl" := symdecl
     Vardef                      = "vardef" := todo
     Varseq                      = "varseq" := todo
 

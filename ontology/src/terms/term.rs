@@ -1,7 +1,8 @@
 use std::fmt::Write;
 
+use super::opaque::Opaque;
 use super::{BoundArgument, arguments::Argument, variables::Variable};
-use crate::{expressions::opaque::Opaque, utils::TreeIter};
+use crate::utils::TreeIter;
 use ftml_uris::{SymbolUri, UriName};
 
 /// The type of FTML expressions.
@@ -14,7 +15,7 @@ use ftml_uris::{SymbolUri, UriName};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub enum Expr {
+pub enum Term {
     /// A reference to a symbol (e.g. $\mathbb N$)
     Symbol(SymbolUri),
     /// A reference to a (bound) variable (e.g. $x$)
@@ -37,16 +38,16 @@ pub enum Expr {
     /// The optional `record_type` ideally references the type in which field names
     /// can be looked up.
     Field {
-        record: Box<Expr>,
+        record: Box<Term>,
         key: UriName,
         /// does not count as a subterm
-        record_type: Option<Box<Expr>>,
+        record_type: Option<Box<Term>>,
     },
     /// A non-alpha-renamable variable
     Label {
         name: UriName,
-        df: Option<Box<Expr>>,
-        tp: Option<Box<Expr>>,
+        df: Option<Box<Term>>,
+        tp: Option<Box<Term>>,
     },
     /// An opaque/informal expression; may contain formal islands, which are collected in
     /// `expressions`.
@@ -54,10 +55,10 @@ pub enum Expr {
         tag: String,
         attributes: Box<[(Box<str>, Box<str>)]>,
         children: Box<[Opaque]>,
-        expressions: Box<[Expr]>,
+        expressions: Box<[Term]>,
     },
 }
-impl Expr {
+impl Term {
     /*#[must_use]
     #[inline]
     pub const fn normalize(self) -> Self {
@@ -84,7 +85,7 @@ impl Expr {
     }
 }
 
-impl crate::utils::RefTree for Expr {
+impl crate::utils::RefTree for Term {
     type Child<'a>
         = &'a Self
     where
@@ -118,14 +119,14 @@ impl crate::utils::RefTree for Expr {
     }
 }
 
-fn fmt<const LONG: bool>(e: &Expr, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match e {
-        Expr::Symbol(s) if LONG => write!(f, "Sym({s})"),
-        Expr::Symbol(s) => write!(f, "Sym({})", s.name()),
-        Expr::Var(Variable::Name(n)) => write!(f, "Var({n})"),
-        Expr::Var(Variable::Ref { declaration, .. }) if LONG => write!(f, "Var({declaration})"),
-        Expr::Var(Variable::Ref { declaration, .. }) => write!(f, "Var({})", declaration.name()),
-        Expr::Field {
+        Term::Symbol(s) if LONG => write!(f, "Sym({s})"),
+        Term::Symbol(s) => write!(f, "Sym({})", s.name()),
+        Term::Var(Variable::Name(n)) => write!(f, "Var({n})"),
+        Term::Var(Variable::Ref { declaration, .. }) if LONG => write!(f, "Var({declaration})"),
+        Term::Var(Variable::Ref { declaration, .. }) => write!(f, "Var({})", declaration.name()),
+        Term::Field {
             record,
             key,
             record_type: None,
@@ -134,12 +135,12 @@ fn fmt<const LONG: bool>(e: &Expr, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             f.write_char('.')?;
             std::fmt::Debug::fmt(key, f)
         }
-        Expr::Label {
+        Term::Label {
             name,
             df: None,
             tp: None,
         } => write!(f, "Label({name})"),
-        Expr::Label {
+        Term::Label {
             name,
             df: Some(df),
             tp: Some(tp),
@@ -149,7 +150,7 @@ fn fmt<const LONG: bool>(e: &Expr, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             .field(":", tp)
             .field(":=", df)
             .finish(),
-        Expr::Label {
+        Term::Label {
             name,
             df: Some(df),
             tp: Some(tp),
@@ -159,28 +160,28 @@ fn fmt<const LONG: bool>(e: &Expr, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             .field(":", &tp.debug_short())
             .field(":=", &df.debug_short())
             .finish(),
-        Expr::Label {
+        Term::Label {
             name, tp: Some(tp), ..
         } if LONG => f
             .debug_struct("Label")
             .field("", name)
             .field(":", tp)
             .finish(),
-        Expr::Label {
+        Term::Label {
             name, tp: Some(tp), ..
         } => f
             .debug_struct("Label")
             .field("", name)
             .field(":", &tp.debug_short())
             .finish(),
-        Expr::Label {
+        Term::Label {
             name, df: Some(df), ..
         } if LONG => f
             .debug_struct("Label")
             .field("", name)
             .field(":=", df)
             .finish(),
-        Expr::Label {
+        Term::Label {
             name, df: Some(df), ..
         } => f
             .debug_struct("Label")
@@ -190,13 +191,13 @@ fn fmt<const LONG: bool>(e: &Expr, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
         _ => f.write_str("(opaque)"), // TODO
     }
 }
-impl std::fmt::Debug for Expr {
+impl std::fmt::Debug for Term {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt::<true>(self, f)
     }
 }
-struct Short<'e>(&'e Expr);
+struct Short<'e>(&'e Term);
 impl std::fmt::Debug for Short<'_> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -206,16 +207,16 @@ impl std::fmt::Debug for Short<'_> {
 
 pub enum ExprChildrenIter<'a> {
     E,
-    App(Option<&'a Expr>, &'a [Argument]),
-    Bound(Option<&'a Expr>, &'a [BoundArgument], &'a Expr),
-    Arg(&'a [Expr], &'a [Argument]),
-    BArg(&'a [Expr], &'a [BoundArgument], &'a Expr),
-    One(&'a Expr),
-    Two(&'a Expr, &'a Expr),
-    Slice(std::slice::Iter<'a, Expr>),
+    App(Option<&'a Term>, &'a [Argument]),
+    Bound(Option<&'a Term>, &'a [BoundArgument], &'a Term),
+    Arg(&'a [Term], &'a [Argument]),
+    BArg(&'a [Term], &'a [BoundArgument], &'a Term),
+    One(&'a Term),
+    Two(&'a Term, &'a Term),
+    Slice(std::slice::Iter<'a, Term>),
 }
 impl<'a> Iterator for ExprChildrenIter<'a> {
-    type Item = &'a Expr;
+    type Item = &'a Term;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::E => None,

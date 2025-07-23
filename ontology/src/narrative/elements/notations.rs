@@ -1,4 +1,4 @@
-use crate::expressions::ArgumentMode;
+use crate::terms::ArgumentMode;
 use smallvec::SmallVec;
 
 #[deprecated(note = "TODO")]

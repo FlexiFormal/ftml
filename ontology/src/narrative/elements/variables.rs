@@ -2,11 +2,11 @@ use ftml_uris::{DocumentElementUri, Id};
 
 use crate::{
     domain::declarations::symbols::{ArgumentSpec, AssocType},
-    expressions::Expr,
     narrative::{
         Narrative,
         elements::{DocumentElementRef, IsDocumentElement},
     },
+    terms::Term,
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -26,8 +26,8 @@ pub struct VariableData {
     pub arity: ArgumentSpec,
     pub macroname: Option<Id>,
     pub role: Box<[Id]>,
-    pub tp: Option<Expr>,
-    pub df: Option<Expr>,
+    pub tp: Option<Term>,
+    pub df: Option<Term>,
     pub bind: bool,
     pub assoctype: Option<AssocType>,
     pub reordering: Option<Id>,
@@ -50,14 +50,14 @@ impl crate::Ftml for VariableDeclaration {
             }};
         }
         match (&self.data.tp, &self.data.df) {
-            (Some(Expr::Symbol(tp)), Some(df)) => A(syms!(df).chain([
+            (Some(Term::Symbol(tp)), Some(df)) => A(syms!(df).chain([
                 triple!(<(iri.clone())> : ulo:variable),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
             ])),
             (Some(tp), Some(df)) => B(syms!(tp)
                 .chain(syms!(df))
                 .chain(std::iter::once(triple!(<(iri)> : ulo:variable)))),
-            (Some(Expr::Symbol(tp)), _) => C([
+            (Some(Term::Symbol(tp)), _) => C([
                 triple!(<(iri.clone())> : ulo:variable),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
             ]

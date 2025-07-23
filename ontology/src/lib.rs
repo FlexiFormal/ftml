@@ -20,8 +20,8 @@ pub mod utils {
     pub mod regex;
 }
 pub mod domain;
-pub mod expressions;
 pub mod narrative;
+pub mod terms;
 pub(crate) mod __private {
     pub trait Sealed {}
 }

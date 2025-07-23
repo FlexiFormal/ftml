@@ -2,15 +2,15 @@ use std::fmt::Write;
 
 use either::Either;
 
-use super::{Expr, Variable};
+use super::{Term, Variable};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Argument {
-    Simple(Expr),
-    Sequence(Either<Expr, Box<[Expr]>>),
+    Simple(Term),
+    Sequence(Either<Term, Box<[Term]>>),
 }
 
 impl Argument {
@@ -28,8 +28,8 @@ impl Argument {
 #[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum BoundArgument {
-    Simple(Expr),
-    Sequence(Either<Expr, Box<[Expr]>>),
+    Simple(Term),
+    Sequence(Either<Term, Box<[Term]>>),
     Bound(Variable),
     BoundSeq(Either<Variable, Box<[Variable]>>),
 }

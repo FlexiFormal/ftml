@@ -112,7 +112,7 @@ pub fn setsectionlevel<E: FtmlExtractor>(
     ret!(ext <- SetSectionLevel(lvl))
 }
 
-pub fn symbol<E: FtmlExtractor>(
+pub fn symdecl<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
     keys: &mut KeyList,
@@ -192,22 +192,6 @@ pub fn counter_parent<E: FtmlExtractor>(
     ret!(ext <- Counter(DocumentCounter { name, parent }))
 }
 
-pub fn importmodule<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    todo!()
-}
-
-pub fn usemodule<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    todo!()
-}
-
 pub fn module<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
@@ -223,6 +207,30 @@ pub fn module<E: FtmlExtractor>(
         meta,
         signature,
     } = Module)
+}
+
+pub fn term<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn importmodule<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn usemodule<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
 }
 
 pub fn mathstructure<E: FtmlExtractor>(
@@ -425,6 +433,238 @@ pub fn multiple_choice_block<E: FtmlExtractor>(
 }
 
 pub fn single_choice_block<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn problem_choice<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn problem_choice_verdict<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn problem_choice_feedback<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn fillinsol<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn fillinsol_case<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn precondition<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn objective<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn doctitle<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn prooftitle<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn subprooftitle<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn vardecl<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn varseq<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn notation<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn notationcomp<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn notationopcomp<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn argsep<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn argmap<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn argmapsep<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn definiendum<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn type_component<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn definiens<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn conclusion<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn arg<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn headterm<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn inputref<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn ifinputref<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn comp<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn maincomp<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+) -> Result<E> {
+    todo!()
+}
+
+pub fn defcomp<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
     keys: &mut KeyList,

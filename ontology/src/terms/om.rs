@@ -1,5 +1,5 @@
 use super::Variable;
-use super::{Argument, BoundArgument, Expr};
+use super::{Argument, BoundArgument, Term};
 use ftml_uris::{PathUri, UriName};
 use openmath::ser::{AsOMS, Omv};
 use openmath::{OM, OMSerializable};
@@ -15,7 +15,7 @@ pub enum Error {
     Unsupported(openmath::OMKind),
 }
 
-struct Seq<'t>(&'t [Expr]);
+struct Seq<'t>(&'t [Term]);
 impl openmath::ser::OMSerializable for Seq<'_> {
     fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
         &self,
@@ -27,7 +27,7 @@ impl openmath::ser::OMSerializable for Seq<'_> {
         )
     }
 }
-struct AsSeq<'t>(&'t Expr);
+struct AsSeq<'t>(&'t Term);
 impl openmath::ser::OMSerializable for AsSeq<'_> {
     fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
         &self,
@@ -75,10 +75,10 @@ impl<H: OMSerializable, A: OMSerializable> openmath::ser::OMSerializable for Oma
 }
 
 #[allow(clippy::struct_field_names)]
-struct Args<'a, H: OMSerializable = &'a Expr> {
+struct Args<'a, H: OMSerializable = &'a Term> {
     head: &'a H,
     args: &'a [BoundArgument],
-    bd: &'a Expr,
+    bd: &'a Term,
 }
 impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
     fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
@@ -145,7 +145,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
     }
 }
 
-impl openmath::ser::OMSerializable for Expr {
+impl openmath::ser::OMSerializable for Term {
     fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
         &self,
         serializer: S,
@@ -183,7 +183,7 @@ impl openmath::ser::OMSerializable for Expr {
     }
 }
 
-impl openmath::de::OMDeserializable<'_> for Expr {
+impl openmath::de::OMDeserializable<'_> for Term {
     type Ret = Self;
     type Err = Error;
     fn from_openmath(om: openmath::OM<'_, Self>, cd_base: &str) -> Result<Self, Self::Err>

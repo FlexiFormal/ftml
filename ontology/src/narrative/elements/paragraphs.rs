@@ -1,9 +1,9 @@
 use crate::{
-    expressions::Expr,
     narrative::{
         DocumentRange, Narrative,
         elements::{DocumentElement, DocumentElementRef, IsDocumentElement},
     },
+    terms::Term,
 };
 use ftml_uris::{DocumentElementUri, Id, SymbolUri};
 
@@ -19,7 +19,7 @@ pub struct LogicalParagraph {
     pub range: DocumentRange,
     pub styles: Box<[Id]>,
     pub children: Box<[DocumentElement]>,
-    pub fors: Box<[(SymbolUri, Option<Expr>)]>,
+    pub fors: Box<[(SymbolUri, Option<Term>)]>,
 }
 impl crate::__private::Sealed for LogicalParagraph {}
 impl crate::Ftml for LogicalParagraph {

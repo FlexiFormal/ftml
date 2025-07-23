@@ -1,5 +1,5 @@
-mod expr;
-pub use expr::Expr;
+mod term;
+pub use term::Term;
 mod variables;
 pub use variables::Variable;
 mod arguments;

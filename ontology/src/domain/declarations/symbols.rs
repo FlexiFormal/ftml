@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::{
     domain::declarations::{AnyDeclarationRef, IsDeclaration},
-    expressions::{ArgumentMode, Expr},
+    terms::{ArgumentMode, Term},
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -24,8 +24,8 @@ pub struct SymbolData {
     pub arity: ArgumentSpec,
     pub macroname: Option<Id>,
     pub role: Box<[Id]>,
-    pub tp: Option<Expr>,
-    pub df: Option<Expr>,
+    pub tp: Option<Term>,
+    pub df: Option<Term>,
     pub assoctype: Option<AssocType>,
     pub reordering: Option<Id>,
 }
@@ -48,14 +48,14 @@ impl crate::Ftml for Symbol {
             }};
         }
         match (&self.data.tp, &self.data.df) {
-            (Some(Expr::Symbol(tp)), Some(df)) => A(syms!(df).chain([
+            (Some(Term::Symbol(tp)), Some(df)) => A(syms!(df).chain([
                 triple!(<(iri.clone())> : ulo:declaration),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
             ])),
             (Some(tp), Some(df)) => B(syms!(tp)
                 .chain(syms!(df))
                 .chain(std::iter::once(triple!(<(iri)> : ulo:declaration)))),
-            (Some(Expr::Symbol(tp)), _) => C([
+            (Some(Term::Symbol(tp)), _) => C([
                 triple!(<(iri.clone())> : ulo:declaration),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
             ]
