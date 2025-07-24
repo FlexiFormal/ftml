@@ -1,5 +1,5 @@
 [workspace]
-members = ["uris", "core", "ulo", "dom", "ontology", "leptos"]
+members = ["uris", "core", "ulo", "dom", "ontology", "leptos", "backend"]
 exclude = ["tests"]
 resolver = "3"
 
@@ -52,6 +52,8 @@ arrayvec = "0.7"
 document-features = "0.2"
 strum = { version = "0.27", features = ["derive"] }
 oxrdf = "0.2.3"
+reqwasm = { version = "0.5" }
+send_wrapper = "0.6.0"
 lightningcss = { version = "1.0.0-alpha.67", default-features = false }
 
 
@@ -79,6 +81,7 @@ syntree = "0.18"
 js-regexp = "0.2"
 regex = "1.10"
 gloo-storage = "0.3"
+urlencoding = "2.1"
 
 openmath = "0.1"
 leptos-posthoc = { path = "../leptos-posthoc" } # { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }

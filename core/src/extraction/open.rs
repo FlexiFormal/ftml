@@ -5,8 +5,11 @@ use ftml_ontology::{
         documents::{DocumentCounter, DocumentStyle},
         elements::{DocumentElement, sections::SectionLevel},
     },
+    terms::{Term, Variable},
 };
-use ftml_uris::{DocumentElementUri, Language, ModuleUri, SymbolUri};
+use ftml_uris::{DocumentElementUri, Language, ModuleUri, SymbolUri, UriName};
+
+use crate::extraction::FtmlExtractor;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OpenFtmlElement {
@@ -16,7 +19,7 @@ pub enum OpenFtmlElement {
         meta: Option<ModuleUri>,
         signature: Option<Language>,
     },
-    Symbol {
+    SymbolDeclaration {
         uri: SymbolUri,
         data: Box<SymbolData>,
     },
@@ -27,16 +30,23 @@ pub enum OpenFtmlElement {
     Invisible,
     SectionTitle,
     SkipSection,
+    Comp,
+    SymbolReference {
+        uri: SymbolUri,
+        notation: Option<UriName>,
+        in_term: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CloseFtmlElement {
     Module,
-    Symbol,
+    SymbolDeclaration,
     Invisible,
     Section,
     SectionTitle,
     SkipSection,
+    SymbolReference,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -47,9 +57,14 @@ pub enum OpenDomainElement {
         signature: Option<Language>,
         children: Vec<AnyDeclaration>,
     },
-    Symbol {
+    SymbolDeclaration {
         uri: SymbolUri,
         data: Box<SymbolData>,
+    },
+    SymbolReference {
+        uri: SymbolUri,
+        notation: Option<UriName>,
+        in_term: bool,
     },
 }
 
@@ -86,6 +101,42 @@ pub enum Split {
     None,
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum PreVar {
+    Resolved(DocumentElementUri),
+    Unresolved(UriName),
+}
+
+impl std::fmt::Display for PreVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Resolved(declaration) => std::fmt::Display::fmt(declaration, f),
+            Self::Unresolved(name) => std::fmt::Display::fmt(name, f),
+        }
+    }
+}
+
+impl PreVar {
+    fn resolve<State: FtmlExtractor>(self, state: &State) -> Term {
+        Term::Var(match self {
+            Self::Resolved(declaration) => Variable::Ref {
+                declaration,
+                is_sequence: None,
+            },
+            // TODO can we know is_sequence yet?
+            Self::Unresolved(name) => state.resolve_variable_name(name),
+        })
+    }
+    #[inline]
+    #[must_use]
+    pub const fn name(&self) -> &UriName {
+        match self {
+            Self::Resolved(declaration) => declaration.name(),
+            Self::Unresolved(name) => name,
+        }
+    }
+}
+
 impl OpenFtmlElement {
     #[must_use]
     pub(crate) fn split(self) -> Split {
@@ -106,8 +157,8 @@ impl OpenFtmlElement {
                     children: Vec::new(),
                 }),
             },
-            Self::Symbol { uri, data } => Split::Open {
-                domain: Some(OpenDomainElement::Symbol { uri, data }),
+            Self::SymbolDeclaration { uri, data } => Split::Open {
+                domain: Some(OpenDomainElement::SymbolDeclaration { uri, data }),
                 narrative: None,
             },
             Self::Section(uri) => Split::Open {
@@ -124,11 +175,25 @@ impl OpenFtmlElement {
                     children: Vec::new(),
                 }),
             },
+            Self::SymbolReference {
+                uri,
+                notation,
+                in_term,
+            } => Split::Open {
+                domain: Some(OpenDomainElement::SymbolReference {
+                    uri,
+                    notation,
+                    in_term,
+                }),
+                narrative: None,
+            },
             Self::Style(s) => Split::Meta(MetaDatum::Style(s)),
             Self::Counter(c) => Split::Meta(MetaDatum::Counter(c)),
-            Self::SetSectionLevel(_) | Self::None | Self::Invisible | Self::SectionTitle => {
-                Split::None
-            }
+            Self::SetSectionLevel(_)
+            | Self::None
+            | Self::Invisible
+            | Self::SectionTitle
+            | Self::Comp => Split::None,
         }
     }
 }

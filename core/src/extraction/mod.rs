@@ -1,7 +1,11 @@
 use std::borrow::Cow;
 
+use ftml_ontology::{
+    narrative::elements::{DocumentElement, VariableDeclaration},
+    terms::Variable,
+};
 use ftml_uris::{
-    DocumentUri, Id, ModuleUri, NarrativeUriRef,
+    DocumentUri, Id, ModuleUri, NarrativeUriRef, UriName,
     errors::{SegmentParseError, UriParseError},
 };
 
@@ -33,12 +37,16 @@ pub trait FtmlExtractor: 'static + Sized {
     /// ### Errors
     fn close(&mut self, elem: CloseFtmlElement, node: &Self::Node<'_>) -> Result<()>;
     /// ### Errors
-    fn new_id(&mut self, prefix: impl Into<Cow<'static, str>>) -> Result<Id>;
+    fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id>;
     /// ### Errors
     fn get_domain_uri(&self, in_elem: FtmlKey) -> Result<&ModuleUri> {
         match self.iterate_domain().next() {
             Some(OpenDomainElement::Module { uri, .. }) => Ok(uri),
-            Some(OpenDomainElement::Symbol { .. }) | None => Err(FtmlExtractionError::NotIn(
+            Some(
+                OpenDomainElement::SymbolDeclaration { .. }
+                | OpenDomainElement::SymbolReference { .. },
+            )
+            | None => Err(FtmlExtractionError::NotIn(
                 in_elem,
                 "a module (or inside a declaration)",
             )),
@@ -57,6 +65,71 @@ pub trait FtmlExtractor: 'static + Sized {
                 || NarrativeUriRef::Document(self.in_document()),
                 NarrativeUriRef::Element,
             )
+    }
+
+    fn in_notation(&self) -> bool {
+        match self.iterate_domain().next() {
+            None
+            | Some(
+                OpenDomainElement::Module { .. }
+                | OpenDomainElement::SymbolDeclaration { .. }
+                | OpenDomainElement::SymbolReference { .. },
+            ) => false,
+        }
+        /*
+        for n in self.iterate_domain() {
+            match n {
+                OpenDomainElement::Symbol { .. } | OpenDomainElement::Module { .. } => {
+                    return false;
+                }
+            }
+        }
+        false
+         */
+    }
+
+    fn in_term(&self) -> bool {
+        match self.iterate_domain().next() {
+            None
+            | Some(
+                OpenDomainElement::Module { .. } | OpenDomainElement::SymbolDeclaration { .. },
+            ) => false,
+            Some(OpenDomainElement::SymbolReference { .. }) => true,
+        }
+    }
+
+    fn resolve_variable_name(&self, name: UriName) -> Variable {
+        fn ew(a: &UriName, b: &UriName) -> bool {
+            let mut steps = a.steps().rev();
+            for s in b.steps().rev() {
+                if steps.next() != Some(s) {
+                    return false;
+                }
+            }
+            true
+        }
+        for n in self.iterate_narrative() {
+            let ch = match n {
+                OpenNarrativeElement::Module { children, .. }
+                | OpenNarrativeElement::Section { children, .. }
+                | OpenNarrativeElement::SkipSection { children } => children,
+                // Narrative::Notation(_) => continue,
+            };
+            for c in ch.iter().rev() {
+                match c {
+                    DocumentElement::VariableDeclaration(VariableDeclaration { uri, data })
+                        if ew(uri.name(), &name) =>
+                    {
+                        return Variable::Ref {
+                            declaration: uri.clone(),
+                            is_sequence: Some(data.is_seq),
+                        };
+                    }
+                    _ => (),
+                }
+            }
+        }
+        Variable::Name(name)
     }
 }
 pub trait FtmlStateExtractor: 'static + Sized {
@@ -78,15 +151,17 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
 
     const RULES: &'static FtmlRuleSet<Self> = <Self as FtmlStateExtractor>::RULES;
     const DO_RDF: bool = <Self as FtmlStateExtractor>::DO_RDF;
+    #[inline]
     fn iterate_domain(&self) -> impl Iterator<Item = &OpenDomainElement> {
-        self.state().domain().iter().rev()
-    }
-    fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement> {
-        self.state().narrative().iter().rev()
+        self.state().domain()
     }
     #[inline]
-    fn new_id(&mut self, prefix: impl Into<Cow<'static, str>>) -> Result<Id> {
-        self.state_mut().new_id(prefix)
+    fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement> {
+        self.state().narrative()
+    }
+    #[inline]
+    fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id> {
+        self.state_mut().new_id(key, prefix)
     }
     #[inline]
     fn in_document(&self) -> &DocumentUri {
@@ -157,28 +232,6 @@ impl FromIterator<FtmlKey> for KeyList {
     }
 }
 
-/*
-pub trait FtmlNode {
-    type Ancestors<'a>: Iterator<Item = Self>
-    where
-        Self: 'a;
-    fn ancestors(&self) -> Self::Ancestors<'_>;
-
-    fn delete(&self);
-    fn delete_children(&self);
-    fn string(&self) -> String;
-    fn inner_string(&self) -> String;
-    /*
-        fn with_elements<R>(&mut self, f: impl FnMut(Option<&mut FTMLElements>) -> R) -> R;
-        fn range(&self) -> DocumentRange;
-        fn inner_range(&self) -> DocumentRange;
-        fn as_notation(&self) -> Option<NotationSpec>;
-        fn as_op_notation(&self) -> Option<OpNotation>;
-        fn as_term(&self) -> Term;
-    */
-}
- */
-
 #[allow(clippy::type_complexity)]
 pub struct FtmlRuleSet<E: FtmlExtractor>(
     pub(crate)  [fn(
@@ -207,9 +260,9 @@ pub enum FtmlExtractionError {
     #[error("`{0}` key missing in attributes")]
     MissingKey(FtmlKey),
     #[error("invalid language identifier: `{0}`")]
-    InvalidLanguage(String),
-    #[error("invalid uri: {0}")]
-    Uri(#[from] UriParseError),
+    InvalidLanguage(FtmlKey, String),
+    #[error("invalid uri in {0}: {1}")]
+    Uri(FtmlKey, #[source] UriParseError),
     #[error("key {0} not allowed outside of {1}")]
     NotIn(FtmlKey, &'static str),
     #[error("value for key {0} invalid")]
@@ -219,9 +272,28 @@ pub enum FtmlExtractionError {
     #[error("duplicate property: {0}")]
     DuplicateValue(FtmlKey),
 }
-impl From<SegmentParseError> for FtmlExtractionError {
+impl From<(FtmlKey, Self)> for FtmlExtractionError {
     #[inline]
-    fn from(value: SegmentParseError) -> Self {
-        Self::Uri(value.into())
+    fn from(value: (FtmlKey, Self)) -> Self {
+        value.1
+    }
+}
+impl From<(FtmlKey, ())> for FtmlExtractionError {
+    #[inline]
+    fn from(value: (FtmlKey, ())) -> Self {
+        Self::InvalidValue(value.0)
+    }
+}
+impl From<(FtmlKey, SegmentParseError)> for FtmlExtractionError {
+    #[inline]
+    fn from(p: (FtmlKey, SegmentParseError)) -> Self {
+        Self::Uri(p.0, p.1.into())
+    }
+}
+
+impl From<(FtmlKey, UriParseError)> for FtmlExtractionError {
+    #[inline]
+    fn from(p: (FtmlKey, UriParseError)) -> Self {
+        Self::Uri(p.0, p.1)
     }
 }

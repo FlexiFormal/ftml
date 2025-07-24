@@ -31,15 +31,21 @@ pub trait Attributes {
     }
 
     /// #### Errors
-    fn get_typed<T, E: Into<FtmlExtractionError>>(
+    fn get_typed<T, E>(
         &self,
         key: FtmlKey,
         f: impl FnOnce(&str) -> std::result::Result<T, E>,
-    ) -> Result<T> {
+    ) -> Result<T>
+    where
+        (FtmlKey, E): Into<FtmlExtractionError>,
+    {
         let Some(v) = self.get(key) else {
             return Err(FtmlExtractionError::MissingKey(key));
         };
-        f(v.as_ref().trim()).map_err(Into::into)
+        if v.as_ref().is_empty() {
+            return Err(FtmlExtractionError::MissingKey(key));
+        }
+        f(v.as_ref().trim()).map_err(|e| (key, e).into())
     }
 
     /// #### Errors
@@ -59,15 +65,18 @@ pub trait Attributes {
     }
 
     /// #### Errors
-    fn take_typed<T, E: Into<FtmlExtractionError>>(
+    fn take_typed<T, E>(
         &mut self,
         key: FtmlKey,
         f: impl FnOnce(&str) -> std::result::Result<T, E>,
-    ) -> Result<T> {
+    ) -> Result<T>
+    where
+        (FtmlKey, E): Into<FtmlExtractionError>,
+    {
         let Some(v) = self.remove(key) else {
             return Err(FtmlExtractionError::MissingKey(key));
         };
-        f(v.as_str().trim()).map_err(Into::into)
+        f(v.as_str().trim()).map_err(|e| (key, e).into())
     }
 
     // --------------------------------------------------------------------
@@ -76,7 +85,8 @@ pub trait Attributes {
     #[inline]
     fn get_language(&self, key: FtmlKey) -> Result<Language> {
         self.get_typed(key, |l| {
-            Language::from_str(l).map_err(|_| FtmlExtractionError::InvalidLanguage(l.to_string()))
+            Language::from_str(l)
+                .map_err(|_| FtmlExtractionError::InvalidLanguage(key, l.to_string()))
         })
     }
 
@@ -84,7 +94,8 @@ pub trait Attributes {
     #[inline]
     fn take_language(&mut self, key: FtmlKey) -> Result<Language> {
         self.take_typed(key, |l| {
-            Language::from_str(l).map_err(|_| FtmlExtractionError::InvalidLanguage(l.to_string()))
+            Language::from_str(l)
+                .map_err(|_| FtmlExtractionError::InvalidLanguage(key, l.to_string()))
         })
     }
 
@@ -151,13 +162,13 @@ pub trait Attributes {
                 extractor
                     .in_document()
                     .module_uri_from(v.as_ref())
-                    .map_err(Into::into)
+                    .map_err(|e| (key, e).into())
             },
             |m| {
                 v.as_ref()
                     .parse()
                     .map(|v| m.clone() / &v)
-                    .map_err(Into::into)
+                    .map_err(|e| (key, e).into())
             },
         )
     }
@@ -176,9 +187,13 @@ pub trait Attributes {
                 extractor
                     .in_document()
                     .module_uri_from(v.as_ref())
-                    .map_err(Into::into)
+                    .map_err(|e| (key, e).into())
             },
-            |m| v.parse().map(|v| m.clone() / &v).map_err(Into::into),
+            |m| {
+                v.parse()
+                    .map(|v| m.clone() / &v)
+                    .map_err(|e| (key, e).into())
+            },
         )
     }
 
@@ -196,7 +211,7 @@ pub trait Attributes {
         v.as_ref()
             .parse()
             .map(|v| module.clone() | v)
-            .map_err(Into::into)
+            .map_err(|e| (key, e).into())
     }
 
     /// #### Errors
@@ -210,7 +225,9 @@ pub trait Attributes {
             return Err(FtmlExtractionError::MissingKey(key));
         };
         let module = extractor.get_domain_uri(in_elem)?;
-        v.parse().map(|v| module.clone() | v).map_err(Into::into)
+        v.parse()
+            .map(|v| module.clone() | v)
+            .map_err(|e| (key, e).into())
     }
 
     /// #### Errors
@@ -220,9 +237,11 @@ pub trait Attributes {
         prefix: impl Into<Cow<'static, str>>,
     ) -> Result<DocumentElementUri> {
         let id: Id = if let Some(id) = self.get(FtmlKey::Id) {
-            id.as_ref().parse()?
+            id.as_ref()
+                .parse()
+                .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::Id))?
         } else {
-            extractor.new_id(prefix)?
+            extractor.new_id(FtmlKey::Id, prefix)?
         };
         let curr_uri = extractor.get_narrative_uri();
 

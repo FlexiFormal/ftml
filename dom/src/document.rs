@@ -1,19 +1,33 @@
 use std::str::FromStr;
 
 use crate::{
+    VarOrSym,
     counters::{LogicalLevel, SectionCounters},
     extractor::DomExtractor,
     markers::SectionInfo,
     toc::{NavElems, TOCElem},
 };
-use ftml_core::extraction::FtmlExtractor;
+use ftml_core::extraction::{FtmlExtractor, OpenDomainElement};
 use ftml_ontology::narrative::{
     documents::{DocumentCounter, DocumentStyle},
     elements::SectionLevel,
 };
-use ftml_uris::{DocumentElementUri, DocumentUri, Language, NarrativeUri};
+use ftml_uris::{DocumentElementUri, DocumentUri, Language, NarrativeUri, SymbolUri};
 use leptos::{prelude::*, tachys::reactive_graph::OwnedView};
 use smallvec::SmallVec;
+
+macro_rules! provide {
+    ($value:expr; $ret:expr) => {{
+        let owner = Owner::current()
+            .expect("no current reactive Owner found")
+            .child();
+        let children = owner.with(move || {
+            provide_context($value);
+            $ret
+        });
+        OwnedView::new_with_owner(children, owner)
+    }};
+}
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
@@ -55,19 +69,6 @@ pub fn setup_document<Ch: IntoView + 'static>(
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct InInputref(bool);
 
-macro_rules! provide {
-    ($value:expr; $ret:expr) => {{
-        let owner = Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(move || {
-            provide_context($value);
-            $ret
-        });
-        OwnedView::new_with_owner(children, owner)
-    }};
-}
-
 pub struct DocumentState;
 impl DocumentState {
     /// ### Panics
@@ -76,6 +77,21 @@ impl DocumentState {
             s.with_untracked(|e| e.get_narrative_uri().owned())
         })
         .expect("Not in a document context")
+    }
+
+    pub fn current_term_head() -> Option<VarOrSym> {
+        with_context::<RwSignal<DomExtractor>, _>(|s| {
+            s.with_untracked(|e| match e.iterate_domain().next() {
+                Some(OpenDomainElement::SymbolReference { uri, .. }) => {
+                    Some(VarOrSym::S(uri.clone()))
+                }
+                Some(
+                    OpenDomainElement::Module { .. } | OpenDomainElement::SymbolDeclaration { .. },
+                )
+                | None => None,
+            })
+        })
+        .flatten()
     }
 
     /// ### Panics

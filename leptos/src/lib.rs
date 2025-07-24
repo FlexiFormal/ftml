@@ -15,6 +15,8 @@ use ftml_dom::{FtmlViews, markers::SectionInfo};
 use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
 
+use crate::config::HighlightStyle;
+
 pub struct Views;
 impl FtmlViews for Views {
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + 'static + Send) -> impl IntoView {
@@ -30,7 +32,27 @@ impl FtmlViews for Views {
                     color:inherit;\
                     display:contents;
                 ">
-                    {then()}
+                    {
+                        if with_context::<RwSignal<HighlightStyle>,_>(|_| ()).is_none() {
+                            #[cfg(not(any(feature = "csr", feature = "hydrate")))]
+                            let style = RwSignal::new(HighlightStyle::Colored);
+                            #[cfg(any(feature = "csr", feature = "hydrate"))]
+                            let style = {
+                                let r = <gloo_storage::LocalStorage as gloo_storage::Storage>::get("highlight_option")
+                                    .map_or(HighlightStyle::Colored, |e| e);
+                                let r = RwSignal::new(r);
+                                Effect::new(move || {
+                                    let r = r.get();
+                                    let _ =
+                                        <gloo_storage::LocalStorage as gloo_storage::Storage>::set("highlight_option", r);
+                                });
+                                r
+                            };
+                            tracing::info!("initializing highlight style");
+                            provide_context(style);
+                        }
+                        then()
+                    }
                     //{Self::cont(node)}
                 </Themer>
             )
@@ -48,6 +70,26 @@ impl FtmlViews for Views {
         then: impl FnOnce() -> V,
     ) -> impl IntoView {
         components::sections::section_title(lvl, class, then)
+    }
+
+    #[inline]
+    fn symbol_reference<V: IntoView>(
+        uri: ftml_uris::SymbolUri,
+        _notation: Option<ftml_uris::UriName>,
+        is_math: bool,
+        then: impl FnOnce() -> V,
+    ) -> impl IntoView {
+        use leptos::either::Either::{Left, Right};
+        if is_math {
+            Left(components::terms::oms(uri, true, then))
+        } else {
+            Right(components::terms::symbol_reference(uri, then))
+        }
+    }
+
+    #[inline]
+    fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
+        components::terms::comp(then)
     }
 }
 

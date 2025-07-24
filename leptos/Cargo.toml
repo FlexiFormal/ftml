@@ -58,6 +58,7 @@ document-features = { workspace = true }
 ftml-dom = { workspace = true }
 ftml-uris = { workspace = true }
 ftml-ontology = { workspace = true }
+ftml-core = { workspace = true }
 
 leptos = { workspace = true }
 leptos-posthoc = { workspace = true }

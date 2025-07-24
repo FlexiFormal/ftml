@@ -260,7 +260,7 @@ do_keys! {
     ArgMap                      = "argmap" := todo
     ArgMapSep                   = "argmap-sep" := todo
 
-    Term                        = "term" := todo
+    Term                        = "term" := term
     Arg                         = "arg" := todo
     HeadTerm                    = "headterm" := todo
 
@@ -306,9 +306,9 @@ do_keys! {
     ProblemNote                 = "problemnote" := todo
     ProblemGradingNote         = "problemgnote" := todo
 
-    Comp                        = "comp" := todo
-    VarComp                     = "varcomp" := todo
-    MainComp                    = "maincomp" := todo
+    Comp                        = "comp" := comp
+    VarComp                     = "varcomp" := comp
+    MainComp                    = "maincomp" := maincomp
     DefComp                     = "defcomp" := todo
 
     Invisible                   = "invisible" := invisible

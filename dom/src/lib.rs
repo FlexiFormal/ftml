@@ -23,7 +23,8 @@ use crate::{
 };
 pub use document::{DocumentMeta, DocumentState, setup_document};
 use ftml_core::extraction::FtmlExtractor;
-use ftml_ontology::narrative::elements::SectionLevel;
+use ftml_ontology::{narrative::elements::SectionLevel, terms::Variable};
+use ftml_uris::{SymbolUri, UriName};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
@@ -32,6 +33,12 @@ pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
     #[cfg(feature = "ssr")]
     provide_context(utils::css::CssIds::default());
     f()
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum VarOrSym {
+    S(SymbolUri),
+    V(Variable),
 }
 
 pub trait FtmlViews: 'static {
@@ -75,11 +82,26 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
+    fn symbol_reference<V: IntoView>(
+        _uri: SymbolUri,
+        _notation: Option<UriName>,
+        _is_math: bool,
+        then: impl FnOnce() -> V,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
     fn section_title<V: IntoView>(
         _lvl: SectionLevel,
         _class: &'static str,
         then: impl FnOnce() -> V,
     ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
+    fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
         then()
     }
 }
@@ -119,7 +141,10 @@ fn iterate<Views: FtmlViews + ?Sized>(
                         close.push(c);
                     }
                 }
-                Err(e) => tracing::error!("{e}"),
+                Err(err) => {
+                    tracing::error!("{err}");
+                    leptos::web_sys::console::log_1(e);
+                }
             }
         }
         (markers, close)

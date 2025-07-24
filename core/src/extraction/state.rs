@@ -23,7 +23,7 @@ use ftml_ontology::{
 };
 #[cfg(feature = "rdf")]
 use ftml_uris::FtmlUri;
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, UriName};
 
 #[derive(Clone, Debug)]
 pub struct IdCounter {
@@ -54,17 +54,65 @@ impl IdCounter {
     }
 }
 
+struct StackVec<T> {
+    last: Option<T>,
+    rest: Vec<T>,
+}
+impl<T> Default for StackVec<T> {
+    fn default() -> Self {
+        Self {
+            last: None,
+            rest: Vec::new(),
+        }
+    }
+}
+impl<T> StackVec<T> {
+    #[inline]
+    const fn last_mut(&mut self) -> Option<&mut T> {
+        self.last.as_mut()
+    }
+    fn iter(&self) -> impl Iterator<Item = &T> {
+        use either::Either::{Left, Right};
+        self.last.as_ref().map_or_else(
+            || Right(std::iter::empty()),
+            |l| Left(std::iter::once(l).chain(self.rest.iter().rev())),
+        )
+    }
+    fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
+        use either::Either::{Left, Right};
+        if let Some(l) = &mut self.last {
+            Left(std::iter::once(l).chain(self.rest.iter_mut().rev()))
+        } else {
+            Right(std::iter::empty())
+        }
+    }
+    #[inline]
+    const fn is_empty(&self) -> bool {
+        self.last.is_none()
+    }
+
+    fn push(&mut self, e: T) {
+        if let Some(e) = self.last.replace(e) {
+            self.rest.push(e);
+        }
+    }
+
+    fn pop(&mut self) -> Option<T> {
+        std::mem::replace(&mut self.last, self.rest.pop())
+    }
+}
+
 pub struct ExtractorState {
-    document: DocumentUri,
+    pub document: DocumentUri,
     pub top: Vec<DocumentElement>,
-    domain: Vec<OpenDomainElement>,
-    narrative: Vec<OpenNarrativeElement>,
-    ids: IdCounter,
+    pub modules: Vec<ModuleData>,
     pub counters: Vec<DocumentCounter>,
     pub styles: Vec<DocumentStyle>,
+    domain: StackVec<OpenDomainElement>,
+    narrative: StackVec<OpenNarrativeElement>,
+    ids: IdCounter,
     #[allow(dead_code)]
     do_rdf: bool,
-    pub modules: Vec<ModuleData>,
     #[cfg(feature = "rdf")]
     rdf: rustc_hash::FxHashSet<ulo::rdf_types::Triple>,
     #[cfg(feature = "rdf")]
@@ -77,11 +125,11 @@ macro_rules! get_module {
             children: $children,
             uri: $uri,
             ..
-        }) = $self
-            .domain
-            .iter_mut()
-            .rev()
-            .find(|e| matches!(e, OpenDomainElement::Module { .. }))
+        }) = $self.domain.last_mut()
+        /*.iter_mut()
+        .rev()
+        .find(|e| matches!(e, OpenDomainElement::Module { .. }))
+         */
         else {
             return Err(FtmlExtractionError::NotIn(
                 FtmlKey::Module,
@@ -125,8 +173,8 @@ impl ExtractorState {
             styles: Vec::new(),
             top: Vec::new(),
             modules: Vec::new(),
-            domain: Vec::new(),
-            narrative: Vec::new(),
+            domain: StackVec::default(),
+            narrative: StackVec::default(),
             #[cfg(feature = "rdf")]
             rdf: rustc_hash::FxHashSet::default(),
         }
@@ -134,8 +182,12 @@ impl ExtractorState {
 
     #[inline]
     /// ### Errors
-    pub fn new_id(&mut self, prefix: impl Into<Cow<'static, str>>) -> super::Result<Id> {
-        Ok(self.ids.new_id(prefix).parse()?)
+    pub fn new_id(
+        &mut self,
+        key: FtmlKey,
+        prefix: impl Into<Cow<'static, str>>,
+    ) -> super::Result<Id> {
+        Ok(self.ids.new_id(prefix).parse().map_err(|e| (key, e))?)
     }
 
     #[inline]
@@ -144,14 +196,12 @@ impl ExtractorState {
         &self.document
     }
     #[inline]
-    #[must_use]
-    pub fn domain(&self) -> &[OpenDomainElement] {
-        &self.domain
+    pub fn domain(&self) -> impl Iterator<Item = &OpenDomainElement> {
+        self.domain.iter()
     }
     #[inline]
-    #[must_use]
-    pub fn narrative(&self) -> &[OpenNarrativeElement] {
-        &self.narrative
+    pub fn narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement> {
+        self.narrative.iter()
     }
 
     /// ### Errors
@@ -201,8 +251,10 @@ impl ExtractorState {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Module)),
             },
-            CloseFtmlElement::Symbol => match self.domain.pop() {
-                Some(OpenDomainElement::Symbol { uri, data }) => self.close_symbol(uri, data),
+            CloseFtmlElement::SymbolDeclaration => match self.domain.pop() {
+                Some(OpenDomainElement::SymbolDeclaration { uri, data }) => {
+                    self.close_symbol(uri, data)
+                }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Symdecl)),
             },
             CloseFtmlElement::Section => match self.narrative.pop() {
@@ -223,6 +275,14 @@ impl ExtractorState {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::SkipSection)),
             },
+            CloseFtmlElement::SymbolReference => match self.domain.pop() {
+                Some(OpenDomainElement::SymbolReference {
+                    uri,
+                    notation,
+                    in_term,
+                }) => self.close_oms(uri, notation, in_term, node.range()),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term)),
+            },
             CloseFtmlElement::SectionTitle => self.close_title(node),
             CloseFtmlElement::Invisible => {
                 node.delete();
@@ -232,18 +292,30 @@ impl ExtractorState {
     }
 
     fn push_elem(&mut self, e: DocumentElement) {
-        #[allow(clippy::never_loop)]
-        for p in self.narrative.iter_mut().rev() {
-            match p {
+        match &mut self.narrative.last {
+            Some(
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
-                | OpenNarrativeElement::SkipSection { children } => {
-                    children.push(e);
-                    return;
-                }
+                | OpenNarrativeElement::SkipSection { children },
+            ) => {
+                children.push(e);
             }
+            None => self.top.push(e),
         }
+        /*
+         #[allow(clippy::never_loop)]
+         for p in self.narrative.iter_mut().rev() {
+             match p {
+                 OpenNarrativeElement::Module { children, .. }
+                 | OpenNarrativeElement::Section { children, .. }
+                 | OpenNarrativeElement::SkipSection { children } => {
+                     children.push(e);
+                     return;
+                 }
+             }
+         }
         self.top.push(e);
+        */
     }
 
     fn close_section(
@@ -263,7 +335,7 @@ impl ExtractorState {
     }
 
     fn close_title<N: FtmlNode>(&mut self, node: &N) -> super::Result<()> {
-        for e in self.narrative.iter_mut().rev() {
+        for e in self.narrative.iter_mut() {
             match e {
                 OpenNarrativeElement::Section { title, .. } if title.is_none() => {
                     *title = Some(node.range());
@@ -279,6 +351,25 @@ impl ExtractorState {
             }
         }
         Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title))
+    }
+
+    fn close_oms(
+        &mut self,
+        uri: SymbolUri,
+        notation: Option<UriName>,
+        in_term: bool,
+        range: DocumentRange,
+    ) -> super::Result<()> {
+        if in_term {
+            todo!()
+        } else {
+            self.push_elem(DocumentElement::SymbolReference {
+                range,
+                uri,
+                notation,
+            });
+            Ok(())
+        }
     }
 
     fn close_module(

@@ -14,11 +14,18 @@ pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(default))]
     #[cfg_attr(feature = "csr", serde(rename = "allowHovers"))]
     pub allow_hovers: Option<bool>,
+
     #[cfg_attr(feature = "csr", serde(default))]
     #[cfg_attr(feature = "csr", serde(rename = "documentUri"))]
     pub document_uri: Option<DocumentUri>,
+
+    #[cfg_attr(feature = "csr", serde(default))]
+    #[cfg_attr(feature = "csr", serde(rename = "highlightStyle"))]
+    pub highlight_style: Option<HighlightStyle>,
+
     #[cfg_attr(feature = "csr", serde(skip))]
     pub section_wrap: Option<SectionWrap>,
+
     #[cfg_attr(feature = "csr", serde(skip))]
     pub on_section_title: Option<OnSectionTitle>,
 }
@@ -70,12 +77,29 @@ impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
                     get!(@opt $name $i $f; $v $b)
                 }
             };
-            ($v:ident@ $name:literal = $id:ident ? $i:ident => $f:expr; $b:block) => {
+            ($v:ident@ $name:literal = $id:ident ?F $b:block) => {
+                fields! {
+                    $id = $name
+                }
+                if let Ok(v) = $id.with(|s| leptos::web_sys::js_sys::Reflect::get(&value, s)) {
+                    match  leptos_react::functions::JsRet::from_js(v) {
+                        Ok($v) => $b,
+                        Err(e) => errors.push(FtmlConfigParseError::InvalidFun(
+                            $name,
+                            e,
+                        )),
+                    }
+                }
+            };
+            ($v:ident@ $name:literal = $id:ident ? $i:ident => $r:expr; $e:ident => $err:expr; $b:block) => {
                 fields! {
                     $id = $name
                 }
                 if let Ok($i) = $id.with(|s| leptos::web_sys::js_sys::Reflect::get(&value, s)) {
-                    get!(@err $name $i $f; $v $b)
+                    match $r {
+                        Ok($v) => $b,
+                        Err($e) => errors.push($err),
+                    }
                 }
             };
             (@opt $name:literal $e:ident $f:expr; $v:ident $b:block) => {
@@ -87,15 +111,6 @@ impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
                     )),
                 }
             };
-            (@err $name:literal $e:ident $f:expr; $v:ident $b:block) => {
-                match $f {
-                    Ok($v) => $b,
-                    Err(e) => errors.push(FtmlConfigParseError::InvalidFun(
-                        $name,
-                        e,
-                    )),
-                }
-            }
         }
 
         get!(v @ "allowHovers" = ALLOW_HOVERS as_bool { config.allow_hovers = Some(v)});
@@ -105,8 +120,13 @@ impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
                 Err(e) => errors.push(FtmlConfigParseError::InvalidUri("documentUri", e))
             }
         });
-        get!(v @ "sectionWrap" = SECTION_WRAP ? v => leptos_react::functions::JsRet::from_js(v); { config.section_wrap = Some(v) });
-        get!(v @ "onSectionTitle" = ON_SECTION_TITLE ? v => leptos_react::functions::JsRet::from_js(v); { config.on_section_title = Some(v) });
+        get!(v @ "highlightStyle" = HIGHLIGHT_STYLE ?
+            j => HighlightStyle::try_from_js_value(j);
+            e => FtmlConfigParseError::InvalidValue("highlightStyle", leptos_react::utils::JsDisplay(e));
+            {config.highlight_style = Some(v)}
+        );
+        get!(v @ "sectionWrap" = SECTION_WRAP ?F { config.section_wrap = Some(v) });
+        get!(v @ "onSectionTitle" = ON_SECTION_TITLE ?F { config.on_section_title = Some(v) });
         // more
 
         if errors.is_empty() {
@@ -129,14 +149,17 @@ impl FtmlConfig {
         if let Some(b) = self.on_section_title {
             provide_context(Some(b));
         }
+        if let Some(h) = self.highlight_style {
+            tracing::info!("initializing highlight style from config");
+            provide_context(RwSignal::new(h));
+        }
         self.document_uri
     }
 }
 
 #[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Copy, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "csr", derive(serde::Serialize, serde::Deserialize))]
-pub enum HighlightOption {
+#[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum HighlightStyle {
     Colored,
     Subtle,
     Off,
@@ -151,8 +174,15 @@ impl FtmlConfigState {
     #[inline]
     #[must_use]
     pub fn allow_hovers() -> bool {
-        use_context::<AllowHovers>().is_some_and(|b| b.0)
+        use_context::<AllowHovers>().is_none_or(|b| b.0)
     }
+
+    #[inline]
+    #[must_use]
+    pub fn highlight_style() -> ReadSignal<HighlightStyle> {
+        expect_context::<RwSignal<HighlightStyle>>().read_only()
+    }
+
     #[inline]
     #[must_use]
     pub fn with_allow_hovers<V: IntoView + 'static>(

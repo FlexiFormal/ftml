@@ -1,5 +1,5 @@
 use ftml_core::extraction::OpenFtmlElement;
-use ftml_uris::DocumentElementUri;
+use ftml_uris::{DocumentElementUri, SymbolUri, UriName};
 use leptos::{
     IntoView,
     prelude::{IntoAny, Memo},
@@ -11,8 +11,10 @@ use crate::{FtmlViews, counters::LogicalLevel, document::DocumentState};
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Marker {
     Section(DocumentElementUri),
+    SymbolReference(SymbolUri, Option<UriName>, bool),
     SkipSection,
     SectionTitle,
+    Comp,
 }
 
 impl Marker {
@@ -22,15 +24,16 @@ impl Marker {
         orig: OriginalNode,
     ) -> impl IntoView {
         #[allow(clippy::enum_glob_use)]
-        use leptos::either::EitherOf5::*;
+        use leptos::either::EitherOf7::*;
         let mut markers = markers.into_iter();
         let Some(m) = markers.next() else {
-            return A(leptos_posthoc::DomChildrenCont(
-                leptos_posthoc::DomChildrenContProps {
-                    orig,
-                    cont: super::iterate::<Views>,
-                },
-            ));
+            return A(leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
+                orig,
+                cont: super::iterate::<Views>,
+                skip_head: true,
+                class: None::<String>.into(),
+                style: None::<String>.into(),
+            }));
         };
         match m {
             Self::Section(uri) => B(DocumentState::new_section(uri, move |info| {
@@ -50,6 +53,15 @@ impl Marker {
                     Self::apply::<Views>(markers, is_math, orig).into_any()
                 }))
             }
+            Self::Comp => F(Views::comp(move || {
+                Self::apply::<Views>(markers, is_math, orig).into_any()
+            })),
+            Self::SymbolReference(uri, notation, false) => {
+                G(Views::symbol_reference(uri, notation, is_math, move || {
+                    Self::apply::<Views>(markers, is_math, orig).into_any()
+                }))
+            }
+            Self::SymbolReference(uri, notation, ..) => ftml_core::TODO!(),
         }
     }
 
@@ -69,15 +81,25 @@ impl Marker {
                 }
                 None
             }
+            OpenFtmlElement::Comp => Some(Self::Comp),
             OpenFtmlElement::SkipSection => Some(Self::SkipSection),
             OpenFtmlElement::SectionTitle => Some(Self::SectionTitle),
             OpenFtmlElement::Section(uri) => Some(Self::Section(uri.clone())),
+            OpenFtmlElement::SymbolReference {
+                uri,
+                notation,
+                in_term,
+            } => Some(Self::SymbolReference(
+                uri.clone(),
+                notation.clone(),
+                *in_term,
+            )),
             OpenFtmlElement::Counter(_)
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::None
             | OpenFtmlElement::Module { .. }
             | OpenFtmlElement::Style(_)
-            | OpenFtmlElement::Symbol { .. } => None,
+            | OpenFtmlElement::SymbolDeclaration { .. } => None,
         }
     }
 }

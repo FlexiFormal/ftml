@@ -9,3 +9,10 @@
 mod keys;
 pub use keys::{FtmlKey, NUM_KEYS, PREFIX};
 pub mod extraction;
+
+#[macro_export]
+macro_rules! TODO {
+    () => {
+        todo!()
+    }; //() => { TODO };
+}
