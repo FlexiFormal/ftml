@@ -518,6 +518,19 @@ impl std::fmt::Display for Uri {
     }
 }
 impl FtmlUri for Uri {
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        #[allow(clippy::enum_glob_use)]
+        use either_of::EitherOf7::*;
+        match self {
+            Self::Base(b) => A(b.url_encoded()),
+            Self::Archive(a) => B(a.url_encoded()),
+            Self::Path(p) => C(p.url_encoded()),
+            Self::Module(m) => D(m.url_encoded()),
+            Self::Symbol(s) => E(s.url_encoded()),
+            Self::Document(d) => F(d.url_encoded()),
+            Self::DocumentElement(e) => G(e.url_encoded()),
+        }
+    }
     fn base(&self) -> &BaseUri {
         match self {
             Self::Base(b) => b,
@@ -654,6 +667,12 @@ impl std::fmt::Display for DomainUri {
     }
 }
 impl FtmlUri for DomainUri {
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        match self {
+            Self::Module(m) => either::Left(m.url_encoded()),
+            Self::Symbol(s) => either::Right(s.url_encoded()),
+        }
+    }
     #[inline]
     fn base(&self) -> &BaseUri {
         match self {
@@ -977,6 +996,12 @@ impl std::fmt::Display for NarrativeUri {
     }
 }
 impl FtmlUri for NarrativeUri {
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        match self {
+            Self::Document(d) => either::Left(d.url_encoded()),
+            Self::Element(e) => either::Right(e.url_encoded()),
+        }
+    }
     #[inline]
     fn base(&self) -> &BaseUri {
         match self {

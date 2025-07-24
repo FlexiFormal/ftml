@@ -23,8 +23,8 @@ use arrayvec::ArrayVec;
 use strum::IntoDiscriminant;
 
 use crate::{
-    ArchiveId, ArchiveUri, DocumentElementUri, DocumentUri, Language, ModuleUri, SymbolUri, Uri,
-    UriComponentKind, UriKind, UriPath,
+    ArchiveId, ArchiveUri, DocumentElementUri, DocumentUri, FtmlUri, Language, ModuleUri,
+    SymbolUri, Uri, UriComponentKind, UriKind, UriPath,
     errors::{SegmentParseError, UriParseError},
 };
 
@@ -97,7 +97,7 @@ macro_rules! compfun {
             p:Option<std::string::String>,
             d:Option<std::string::String>,
             m:Option<std::string::String>,
-            l:Option<Language>,
+            l:Option<$crate::Language>,
             e:Option<std::string::String>,
             s:Option<std::string::String>
             $(,$arg:$argtp)?
@@ -106,6 +106,28 @@ macro_rules! compfun {
                 uri,rp,a,p,d,m,l,e,s
             };
             let $components = $crate::components::UriComponents::<String>::try_from(_comps);
+            $($body)*
+        }
+    };
+
+    (!! $(#[$meta:meta])* $vis:vis async fn $ident:ident(&$self:ident,$components:ident:Uri$(,$arg:ident:$argtp:ty)*) $(-> $ret:ty)? {$($body:tt)*}) => {
+        $(#[$meta])*
+        #[allow(clippy::too_many_arguments)]
+        $vis async fn $ident(&$self,
+            uri:Option<$crate::Uri>,
+            rp:Option<std::string::String>,
+            a:Option<$crate::ArchiveId>,
+            p:Option<std::string::String>,
+            d:Option<std::string::String>,
+            m:Option<std::string::String>,
+            l:Option<$crate::Language>,
+            e:Option<std::string::String>,
+            s:Option<std::string::String>
+            $(,$arg:$argtp)?
+        ) $(-> $ret)? {
+            let $components = $crate::components::UriComponentTuple {
+                uri,rp,a,p,d,m,l,e,s
+            };
             $($body)*
         }
     };
@@ -120,7 +142,7 @@ macro_rules! compfun {
             p:Option<std::string::String>,
             d:Option<std::string::String>,
             m:Option<std::string::String>,
-            l:Option<Language>,
+            l:Option<$crate::Language>,
             e:Option<std::string::String>,
             s:Option<std::string::String>
             $(,$arg:$argtp)?
@@ -133,6 +155,7 @@ macro_rules! compfun {
         }
     };
 
+
     ($(#[$meta:meta])* $vis:vis async fn $ident:ident($components:ident:DocumentUri $(,$arg:ident:$argtp:ty)*) $(-> $ret:ty)? {$($body:tt)*}) => {
         $(#[$meta])*
         #[allow(clippy::too_many_arguments)]
@@ -142,7 +165,7 @@ macro_rules! compfun {
             a:Option<$crate::ArchiveId>,
             p:Option<std::string::String>,
             d:Option<std::string::String>,
-            l:Option<Language>
+            l:Option<$crate::Language>
             $(,$arg:$argtp)?
         ) $(-> $ret)? {
             let _comps = $crate::components::DocumentUriComponentTuple {
@@ -162,7 +185,7 @@ macro_rules! compfun {
             a:Option<$crate::ArchiveId>,
             p:Option<std::string::String>,
             d:Option<std::string::String>,
-            l:Option<Language>
+            l:Option<$crate::Language>
             $(,$arg:$argtp)?
         ) $(-> $ret)? {
             let _comps = $crate::components::DocumentUriComponentTuple {
@@ -308,22 +331,62 @@ pub struct UriComponentTuple<S: AsRef<str> = String> {
     pub e: Option<S>,
 }
 impl<S: AsRef<str>> UriComponentTuple<S> {
+    pub fn as_query(&self) -> impl std::fmt::Display {
+        struct QueryPart<'s, S: AsRef<str>>(&'s UriComponentTuple<S>);
+        impl<S: AsRef<str>> std::fmt::Display for QueryPart<'_, S> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if let Some(uri) = &self.0.uri {
+                    return write!(f, "?uri={}", uri.url_encoded());
+                }
+                if let Some(a) = &self.0.a {
+                    write!(f, "?a={}", urlencoding::Encoded(a.as_ref()))?;
+                } else {
+                    return Err(std::fmt::Error);
+                }
+
+                macro_rules! fmt {
+                    ($id:ident) => {
+                        if let Some($id) = &self.0.$id {
+                            write!(
+                                f,
+                                concat!("&", stringify!($id), "={}"),
+                                urlencoding::Encoded($id.as_ref())
+                            )?;
+                        }
+                    };
+                }
+                fmt!(rp);
+                fmt!(p);
+                fmt!(m);
+                fmt!(d);
+                if let Some(l) = self.0.l {
+                    write!(f, "&l={l}")?;
+                }
+                fmt!(s);
+                fmt!(e);
+                Ok(())
+            }
+        }
+
+        QueryPart(self)
+    }
+
     #[inline]
     pub fn apply<R>(self, f: UriComponentFun<S, R>) -> R {
         f(
-            self.uri, self.rp, self.a, self.p, self.m, self.d, self.l, self.s, self.e,
+            self.uri, self.rp, self.a, self.p, self.d, self.m, self.l, self.e, self.s,
         )
     }
     #[inline]
     pub fn apply1<T, R>(self, f: UriComponentFun1<S, T, R>, a: T) -> R {
         f(
-            self.uri, self.rp, self.a, self.p, self.m, self.d, self.l, self.s, self.e, a,
+            self.uri, self.rp, self.a, self.p, self.d, self.m, self.l, self.e, self.s, a,
         )
     }
     #[inline]
     pub fn apply2<T1, T2, R>(self, f: UriComponentFun2<S, T1, T2, R>, a: T1, b: T2) -> R {
         f(
-            self.uri, self.rp, self.a, self.p, self.m, self.d, self.l, self.s, self.e, a, b,
+            self.uri, self.rp, self.a, self.p, self.d, self.m, self.l, self.e, self.s, a, b,
         )
     }
     #[inline]
@@ -335,8 +398,17 @@ impl<S: AsRef<str>> UriComponentTuple<S> {
         c: T3,
     ) -> R {
         f(
-            self.uri, self.rp, self.a, self.p, self.m, self.d, self.l, self.s, self.e, a, b, c,
+            self.uri, self.rp, self.a, self.p, self.d, self.m, self.l, self.e, self.s, a, b, c,
         )
+    }
+}
+
+impl From<Uri> for UriComponentTuple {
+    fn from(value: Uri) -> Self {
+        Self {
+            uri: Some(value),
+            ..Self::default()
+        }
     }
 }
 

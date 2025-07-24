@@ -34,6 +34,7 @@ pub trait FtmlUri:
 {
     /// Returns a reference to the [`BaseUri`] component.
     fn base(&self) -> &BaseUri;
+    /// whether the given string slice *might* represent this kind of Uri
     fn could_be(maybe_uri: &str) -> bool;
     fn as_uri(&self) -> UriRef<'_>;
     #[cfg(feature = "rdf")]
@@ -66,6 +67,9 @@ pub trait FtmlUri:
         let _ = std::fmt::Write::write_fmt(&mut s, format_args!("{self}"));
         oxrdf::NamedNode::new(s.0).expect("All illegal characters are replaced")
     }
+
+    /// Display as this Uri url-encoded
+    fn url_encoded(&self) -> impl std::fmt::Display;
 }
 
 /// URIs that have a name component ([`DocumentUri`], [`DocumentElementUri`], [`ModuleUri`], [`SymbolUri`])

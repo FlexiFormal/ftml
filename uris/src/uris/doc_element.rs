@@ -1,5 +1,5 @@
 use const_format::concatcp;
-use std::str::FromStr;
+use std::{fmt::Write, str::FromStr};
 
 use crate::{
     ArchiveUri, BaseUri, DocumentUri, FtmlUri, IsNarrativeUri, NamedUri, PathUri, UriComponentKind,
@@ -185,6 +185,19 @@ impl From<DocumentElementUri> for BaseUri {
     }
 }
 impl FtmlUri for DocumentElementUri {
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        struct Enc<'a>(&'a DocumentElementUri);
+        impl std::fmt::Display for Enc<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.document.url_encoded().fmt(f)?;
+                f.write_str("%26")?;
+                f.write_char(DocumentElementUri::SEPARATOR)?;
+                f.write_str("%3D")?;
+                urlencoding::Encoded(self.0.name.as_ref()).fmt(f)
+            }
+        }
+        Enc(self)
+    }
     #[inline]
     fn base(&self) -> &crate::BaseUri {
         &self.document.path.archive.base

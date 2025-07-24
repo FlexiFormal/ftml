@@ -80,6 +80,7 @@ url = { workspace = true }
 strumbra = { workspace = true }
 rustc-hash = { workspace = true }
 either = { workspace = true }
+either_of = { workspace = true }
 #smallvec = { workspace = true }
 triomphe = { workspace = true }
 parking_lot = { workspace = true }
@@ -90,6 +91,7 @@ thiserror = { workspace = true }
 arrayvec = { workspace = true }
 strum = { workspace = true }
 document-features = { workspace = true }
+urlencoding = { workspace = true }
 
 serde_with = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

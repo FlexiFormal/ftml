@@ -45,6 +45,10 @@ impl crate::sealed::Sealed for BaseUri {}
 
 impl FtmlUri for BaseUri {
     #[inline]
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        urlencoding::Encoded(self.as_str())
+    }
+    #[inline]
     fn base(&self) -> &BaseUri {
         self
     }

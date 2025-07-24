@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt::Write, str::FromStr};
 
 use const_format::concatcp;
 
@@ -297,6 +297,23 @@ impl From<DocumentUri> for BaseUri {
     }
 }
 impl FtmlUri for DocumentUri {
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        struct Enc<'a>(&'a DocumentUri);
+        impl std::fmt::Display for Enc<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.path.url_encoded().fmt(f)?;
+                f.write_str("%26")?;
+                f.write_char(DocumentUri::SEPARATOR)?;
+                f.write_str("%3D")?;
+                urlencoding::Encoded(self.0.name.as_ref()).fmt(f)?;
+                f.write_str("%26")?;
+                f.write_char(Language::SEPARATOR)?;
+                f.write_str("%3D")?;
+                self.0.language.fmt(f)
+            }
+        }
+        Enc(self)
+    }
     #[inline]
     fn base(&self) -> &crate::BaseUri {
         &self.path.archive.base

@@ -5,7 +5,7 @@ use crate::{
 };
 use const_format::concatcp;
 use either::Either::Right;
-use std::str::FromStr;
+use std::{fmt::Write, str::FromStr};
 
 crate::aux::macros::intern!(
     IDS = IdStore:NonEmptyStr @ 256
@@ -276,6 +276,19 @@ impl From<ArchiveUri> for BaseUri {
     }
 }
 impl FtmlUri for ArchiveUri {
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        struct Enc<'a>(&'a ArchiveUri);
+        impl std::fmt::Display for Enc<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.base.url_encoded().fmt(f)?;
+                f.write_str("%3F")?;
+                f.write_char(ArchiveUri::SEPARATOR)?;
+                f.write_str("%3D")?;
+                urlencoding::Encoded(self.0.id.as_ref()).fmt(f)
+            }
+        }
+        Enc(self)
+    }
     #[inline]
     fn base(&self) -> &BaseUri {
         &self.base

@@ -5,7 +5,7 @@ use crate::{
     errors::{SegmentParseError, UriParseError},
 };
 use const_format::concatcp;
-use std::str::FromStr;
+use std::{fmt::Write, str::FromStr};
 
 crate::aux::macros::intern!(PATHS = PathStore:NonEmptyStr @ 1024);
 
@@ -286,6 +286,24 @@ impl From<PathUri> for BaseUri {
     }
 }
 impl FtmlUri for PathUri {
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        struct Enc<'a>(&'a PathUri);
+        impl std::fmt::Display for Enc<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.archive.url_encoded().fmt(f)?;
+                if let Some(p) = &self.0.path {
+                    f.write_str("%26")?;
+                    f.write_char(PathUri::SEPARATOR)?;
+                    f.write_str("%3D")?;
+                    urlencoding::Encoded(p.as_ref()).fmt(f)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+        Enc(self)
+    }
+
     #[inline]
     fn base(&self) -> &crate::BaseUri {
         &self.archive.base
