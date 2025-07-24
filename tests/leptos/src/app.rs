@@ -28,6 +28,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 pub fn App() -> impl IntoView {
     use ftml_dom::FtmlViews;
     use ftml_leptos::Views;
+    use thaw::Scrollbar;
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
 
@@ -41,12 +42,14 @@ pub fn App() -> impl IntoView {
 
         // content for this welcome page
         //<Router>
-            <main>
-                {Views::top(|| view!(<HomePage/>))}
-                //<Routes fallback=|| "Page not found.".into_view()>
-                //    <Route path=StaticSegment("") view=HomePage/>
-                //</Routes>
-            </main>
+            <Scrollbar style="width:100vw;height:100vh;">
+                <main>
+                    <HomePage/>
+                    //<Routes fallback=|| "Page not found.".into_view()>
+                    //    <Route path=StaticSegment("") view=HomePage/>
+                    //</Routes>
+                </main>
+            </Scrollbar>
         //</Router>
     }
 }
@@ -66,5 +69,7 @@ fn Ftml() -> impl IntoView {
         .parse()
         .unwrap();
     const HTML: &str = include_str!("test.html");
-    ftml_dom::setup_document(uri, || ftml_leptos::Views::render_ftml(HTML.to_string()))
+    ftml_leptos::Views::top(|| {
+        ftml_dom::setup_document(uri, || ftml_leptos::Views::render_ftml(HTML.to_string()))
+    })
 }

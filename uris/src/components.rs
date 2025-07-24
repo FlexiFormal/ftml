@@ -132,6 +132,28 @@ macro_rules! compfun {
         }
     };
 
+    (!! $(#[$meta:meta])* $vis:vis fn $ident:ident(&$self:ident,$components:ident:Uri$(,$arg:ident:$argtp:ty)*) $(-> $ret:ty)? {$($body:tt)*}) => {
+        $(#[$meta])*
+        #[allow(clippy::too_many_arguments)]
+        $vis fn $ident(&$self,
+            uri:Option<$crate::Uri>,
+            rp:Option<std::string::String>,
+            a:Option<$crate::ArchiveId>,
+            p:Option<std::string::String>,
+            d:Option<std::string::String>,
+            m:Option<std::string::String>,
+            l:Option<$crate::Language>,
+            e:Option<std::string::String>,
+            s:Option<std::string::String>
+            $(,$arg:$argtp)?
+        ) $(-> $ret)? {
+            let $components = $crate::components::UriComponentTuple {
+                uri,rp,a,p,d,m,l,e,s
+            };
+            $($body)*
+        }
+    };
+
     ($(#[$meta:meta])* $vis:vis fn $ident:ident($components:ident:Uri$(,$arg:ident:$argtp:ty)*) $(-> $ret:ty)? {$($body:tt)*}) => {
         $(#[$meta])*
         #[allow(clippy::too_many_arguments)]
