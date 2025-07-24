@@ -18,6 +18,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=server_fn"]
 
+[tasks.test-cached]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=cached"]
+
 [tasks.test-all-features]
 command = "cargo"
 install_crate = false
@@ -29,6 +34,7 @@ dependencies = [
     "test-wasm",
     "test-typescript",
     "test-server_fn",
+    "test-cached",
     "test-all-features",
 ]
 

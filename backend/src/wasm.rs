@@ -1,38 +1,75 @@
+use std::{marker::PhantomData, str::FromStr};
+
 use ftml_ontology::utils::Css;
-use ftml_uris::{DocumentUri, FtmlUri, Uri};
-use send_wrapper::SendWrapper;
+use ftml_uris::{DocumentUri, FtmlUri};
 
 use crate::BackendError;
 
-pub struct RemoteBackend {
-    pub fragment_url: String,
+pub struct RemoteBackend<Url: std::fmt::Display, E: std::fmt::Debug + From<reqwasm::Error>> {
+    pub fragment_url: Url,
+    __phantom: PhantomData<E>,
 }
-
-pub struct RemoteFlamsBackend {
-    pub url: String,
-}
-
-impl RemoteBackend {
-    async fn call<R: serde::de::DeserializeOwned>(url: String) -> Result<R, BackendError> {
-        FutWrap(SendWrapper::new(async move {
-            let req = reqwasm::http::Request::get(&url)
-                .send()
-                .await
-                .map_err(|e| BackendError::Request(e.to_string()))?;
-            req.json::<R>()
-                .await
-                .map_err(|e| BackendError::Request(e.to_string()))
-        }))
-        .await
+impl<Url, E> RemoteBackend<Url, E>
+where
+    Url: std::fmt::Display,
+    E: std::fmt::Debug + From<reqwasm::Error>,
+{
+    pub const fn new(fragment_url: Url) -> Self {
+        Self {
+            fragment_url,
+            __phantom: PhantomData,
+        }
     }
 }
-impl super::FtmlBackend for RemoteBackend {
+
+#[allow(clippy::future_not_send)]
+async fn call_i<R, E>(url: String) -> Result<R, BackendError<E>>
+where
+    R: serde::de::DeserializeOwned,
+    E: From<reqwasm::Error> + std::fmt::Debug + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    let res = reqwasm::http::Request::get(&url)
+        .send()
+        .await
+        .map_err(|e| BackendError::Connection(E::from(e)))?;
+
+    let status = res.status();
+    if (400..=599).contains(&status) {
+        let str = res
+            .text()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e)))?;
+        return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
+    }
+
+    res.json::<R>()
+        .await
+        .map_err(|e| BackendError::Connection(E::from(e)))
+}
+
+fn call<R, E>(url: String) -> impl Future<Output = Result<R, BackendError<E>>>
+where
+    R: serde::de::DeserializeOwned,
+    E: From<reqwasm::Error> + std::fmt::Debug + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    crate::utils::FutWrap::new(call_i(url))
+}
+
+impl<Url, E> super::FtmlBackend for RemoteBackend<Url, E>
+where
+    Url: std::fmt::Display,
+    E: std::fmt::Debug + From<reqwasm::Error> + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    type Error = E;
     #[allow(clippy::similar_names)]
     fn get_fragment(
         &self,
         uri: ftml_uris::Uri,
         context: Option<DocumentUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), crate::BackendError>> {
+    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<E>>> {
         let url = context.map_or_else(
             || format!("{}?uri={}", self.fragment_url, uri.url_encoded()),
             |ctx| {
@@ -44,64 +81,80 @@ impl super::FtmlBackend for RemoteBackend {
                 )
             },
         );
-        Self::call(url)
+        call(url)
     }
-}
-impl super::FlamsBackend for RemoteFlamsBackend {
-    ftml_uris::compfun! {!!
-        #[allow(clippy::similar_names)]
-        async fn get_fragment(&self,uri:Uri,context:Option<DocumentUri>) -> Result<(Uri, Vec<Css>,String), BackendError> {
-            let url = context.map_or_else(|| format!(
-                "{}/content/fragment{}",
-                self.url,
-                uri.as_query(),
-            ), |ctx| format!(
-                "{}/content/fragment{}&context={}",
-                self.url,
-                uri.as_query(),
-                ctx.url_encoded()
-            ));
-            RemoteBackend::call(url).await
-        }
-    }
-    /*
-    fn get_fragment(
-        &self,
-        uri: ftml_uris::Uri,
-        context: ftml_uris::DocumentUri,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), crate::BackendError>> {
-        RemoteBackend::call(format!(
-            "{}/content/fragment?uri={}&context={}",
-            self.url,
-            urlencoding::encode(&uri.to_string()),
-            urlencoding::encode(&context.to_string())
-        ))
-        // urlencoding::encode(uri)
-    } */
 }
 
-struct FutWrap<F: Future>(send_wrapper::SendWrapper<F>);
-impl<F: Future> std::ops::Deref for FutWrap<F> {
-    type Target = F;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+#[cfg(feature = "server_fn")]
+pub struct RemoteFlamsBackend<Url: std::fmt::Display> {
+    pub url: Url,
 }
-impl<F: Future> std::ops::DerefMut for FutWrap<F> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+
+#[cfg(feature = "server_fn")]
+mod server_fn {
+    use crate::{BackendError, FlamsBackend, RemoteFlamsBackend};
+    use ::server_fn::error::ServerFnErrorErr;
+    use ftml_ontology::utils::Css;
+    use ftml_uris::{DocumentUri, FtmlUri, Uri};
+    use futures_util::TryFutureExt;
+
+    impl<Url: std::fmt::Display> FlamsBackend for RemoteFlamsBackend<Url> {
+        ftml_uris::compfun! {!!
+            #[allow(clippy::similar_names)]
+            fn get_fragment(&self,uri:Uri,context:Option<DocumentUri>) -> impl Future<Output=Result<(Uri, Vec<Css>,String), BackendError<ServerFnErrorErr>>> {
+                let url = context.map_or_else(|| format!(
+                    "{}/content/fragment{}",
+                    self.url,
+                    uri.as_query(),
+                ), |ctx| format!(
+                    "{}/content/fragment{}&context={}",
+                    self.url,
+                    uri.as_query(),
+                    ctx.url_encoded()
+                ));
+                super::call::<_,SFnE>(url).map_err(BackendError::from_other)
+            }
+        }
     }
-}
-impl<F: Future> Future for FutWrap<F> {
-    type Output = F::Output;
-    #[inline]
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let inner: std::pin::Pin<&mut F> = unsafe { self.map_unchecked_mut(|s| &mut *s.0) };
-        inner.poll(cx)
+
+    #[derive(Debug)]
+    struct SFnE(ServerFnErrorErr);
+    impl From<SFnE> for ServerFnErrorErr {
+        #[inline]
+        fn from(value: SFnE) -> Self {
+            value.0
+        }
+    }
+    impl From<reqwasm::Error> for SFnE {
+        fn from(value: reqwasm::Error) -> Self {
+            Self(match value {
+                reqwasm::Error::JsError(j) => ServerFnErrorErr::Request(j.to_string()),
+                reqwasm::Error::SerdeError(e) => ServerFnErrorErr::Deserialization(e.to_string()),
+            })
+        }
+    }
+    impl std::str::FromStr for SFnE {
+        type Err = BackendError<Self>;
+        fn from_str(string: &str) -> Result<Self, Self::Err> {
+            let Some(j) = string.find('|') else {
+                return Err(BackendError::Connection(Self(
+                    ServerFnErrorErr::Deserialization(format!(
+                        "Invalid format: missing delimiter in {string:?}"
+                    )),
+                )));
+            };
+            if j == 0 {
+                return Err(BackendError::Connection(Self(
+                    ServerFnErrorErr::Deserialization(format!(
+                        "Invalid format: missing delimiter in {string:?}"
+                    )),
+                )));
+            }
+            let data = string[j + 1..].to_string();
+            let prefix = &string[..string.len() - 1];
+            crate::server_fn_impl::decode_server_fn(prefix, data)
+                .map(Self)
+                .map_err(|e| BackendError::Connection(Self(ServerFnErrorErr::Deserialization(e))))
+        }
     }
 }
