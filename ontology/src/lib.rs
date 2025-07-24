@@ -15,8 +15,8 @@ pub mod utils {
     mod hexable;
     #[cfg(feature = "serde")]
     pub use hexable::*;
-    //mod css;
-    //pub use css::*;
+    mod css;
+    pub use css::*;
     pub mod regex;
 }
 pub mod domain;

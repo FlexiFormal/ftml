@@ -30,6 +30,9 @@ openmath = ["dep:openmath", "ftml-uris/openmath"]
 ## Enables RDF support
 rdf = ["ftml-uris/rdf", "dep:ulo", "dep:arrayvec"]
 
+## Adds lightningcss-based CSS normalization for ftml classes
+css_normalize = ["dep:lightningcss", "dep:tracing"]
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = [
@@ -65,8 +68,6 @@ thiserror = { workspace = true }
 rustc-hash = { workspace = true }
 smallvec = { workspace = true }
 regex = { workspace = true }
-# lightningcss = { workspace = true }
-# tracing = { workspace = true }
 
 # syntree = { workspace = true }
 
@@ -81,3 +82,5 @@ js-regexp = { workspace = true, optional = true }
 openmath = { workspace = true, optional = true }
 ulo = { workspace = true, optional = true }
 arrayvec = { workspace = true, optional = true }
+lightningcss = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }

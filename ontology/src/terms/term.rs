@@ -3,7 +3,7 @@ use std::fmt::Write;
 use super::opaque::Opaque;
 use super::{BoundArgument, arguments::Argument, variables::Variable};
 use crate::utils::TreeIter;
-use ftml_uris::{SymbolUri, UriName};
+use ftml_uris::{ModuleUri, SymbolUri, UriName};
 
 /// The type of FTML expressions.
 ///
@@ -18,6 +18,8 @@ use ftml_uris::{SymbolUri, UriName};
 pub enum Term {
     /// A reference to a symbol (e.g. $\mathbb N$)
     Symbol(SymbolUri),
+    // A reference to a module (e.g. $\mathbb N$)
+    //Module(ModuleUri),
     /// A reference to a (bound) variable (e.g. $x$)
     Var(Variable),
     /// An application of `head` to `arguments` (e.g. $n + m$)
@@ -96,6 +98,7 @@ impl crate::utils::RefTree for Term {
         match self {
             Self::Symbol(_)
             | Self::Var(_)
+            //| Self::Module(_)
             | Self::Label {
                 df: None, tp: None, ..
             } => ExprChildrenIter::E,

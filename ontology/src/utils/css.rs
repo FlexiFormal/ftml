@@ -1,3 +1,4 @@
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -44,9 +45,8 @@ impl Ord for Css {
     }
 }
 impl Css {
-    /*
+    #[cfg(feature = "css_normalize")]
     pub fn merge(v: Vec<Self>) -> Vec<Self> {
-        use std::hint::unreachable_unchecked;
         use lightningcss::traits::ToCss;
         use lightningcss::{
             printer::PrinterOptions,
@@ -54,6 +54,7 @@ impl Css {
             selector::Component,
             stylesheet::{MinifyOptions, ParserOptions, StyleSheet},
         };
+        use std::hint::unreachable_unchecked;
 
         let mut links = Vec::new();
         let mut strings = Vec::new();
@@ -69,7 +70,7 @@ impl Css {
             CssRuleList(Vec::new()),
             ParserOptions::default(),
         );
-        for s in strings.iter() {
+        for s in &strings {
             if let Ok(rs) = StyleSheet::parse(s, ParserOptions::default()) {
                 sheet.rules.0.extend(rs.rules.0.into_iter());
             } else {
@@ -103,13 +104,11 @@ impl Css {
                         } else {
                             tracing::warn!("Illegal CSS: {style:?}");
                         }
+                    } else if let Ok(s) = style.to_css_string(PrinterOptions::default()) {
+                        tracing::warn!("Not class-able: {s}");
+                        links.push(Self::Inline(s.into()));
                     } else {
-                        if let Ok(s) = style.to_css_string(PrinterOptions::default()) {
-                            tracing::warn!("Not class-able: {s}");
-                            links.push(Self::Inline(s.into()));
-                        } else {
-                            tracing::warn!("Illegal CSS: {style:?}");
-                        }
+                        tracing::warn!("Illegal CSS: {style:?}");
                     }
                 }
                 rule => {
@@ -126,7 +125,6 @@ impl Css {
         links.extend(classes);
         links
     }
-     */
 
     /*
     #[must_use]

@@ -28,6 +28,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=openmath"]
 
+[tasks.test-lightningcss]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=css_normalize"]
+
 [tasks.test-all-features]
 command = "cargo"
 install_crate = false
@@ -41,6 +46,7 @@ dependencies = [
     "test-typescript",
     "test-rdf",
     "test-openmath",
+    "test-lightningcss",
     "test-all-features",
 ]
 
