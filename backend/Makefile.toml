@@ -1,0 +1,38 @@
+[tasks.test-no-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--no-default-features"]
+
+[tasks.test-wasm]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=wasm"]
+
+[tasks.test-typescript]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=typescript"]
+
+[tasks.test-server_fn]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=server_fn"]
+
+[tasks.test-all-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--all-features"]
+
+[tasks.all-tests]
+dependencies = [
+    "test-no-features",
+    "test-wasm",
+    "test-typescript",
+    "test-server_fn",
+    "test-all-features",
+]
+
+[tasks.doc]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "doc", "--no-deps", "--all-features"]
