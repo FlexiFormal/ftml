@@ -6,33 +6,133 @@
  */
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
-#[cfg(feature = "wasm")]
-mod utils;
-#[cfg(feature = "wasm")]
-mod wasm;
-#[cfg(feature = "wasm")]
-pub use wasm::*;
 #[cfg(feature = "cached")]
 mod cache;
+#[cfg(feature = "wasm")]
+mod utils;
 #[cfg(feature = "cached")]
 pub use cache::*;
+
+#[cfg(any(feature = "wasm", feature = "reqwest"))]
+mod remote;
+#[cfg(any(feature = "wasm", feature = "reqwest"))]
+pub use remote::*;
 
 pub mod errors;
 pub use errors::*;
 
-use ftml_ontology::utils::Css;
-use ftml_uris::{ArchiveId, DocumentUri, Language, Uri};
-use futures_util::FutureExt;
+use ftml_ontology::{narrative::elements::Notation, utils::Css};
+use ftml_uris::{
+    ArchiveId, DocumentElementUri, DocumentUri, Language, LeafUri, NarrativeUri, SymbolUri, Uri,
+};
+use futures_util::{FutureExt, TryFutureExt};
 
 pub const DEFAULT_SERVER_URL: &str = "https://mathhub.info";
 
+#[macro_export]
+macro_rules! new_global {
+    ($name:ident = $($rest:tt)*) => {
+        struct $name;
+        impl $crate::GlobalBackend for $name {
+            type Error = <$crate::new_global!(@TYPE $($rest)*) as $crate::FtmlBackend>::Error;
+            type Backend = $crate::new_global!(@TYPE $($rest)*);
+            #[inline]
+            fn get() -> &'static Self::Backend {
+                static BACKEND: ::std::sync::LazyLock<$crate::new_global!(@TYPE $($rest)*)>
+                    = ::std::sync::LazyLock::new(|| $crate::new_global!(@NEW $($rest)*) );
+                &BACKEND
+            }
+        }
+    };
+
+    (@TYPE RemoteFlams($val:expr;$tp:ty) [$($rkey:literal = $rval:literal),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend<$tp,[(::ftml_uris::DocumentUri,&'static str);$num]>
+    };
+    (@NEW RemoteFlams($val:expr;$tp:ty) [$($rkey:literal = $rval:literal),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend::new_with_redirects($val,[$(
+            (std::str::FromStr::from_str($rkey).expect("invalid DocumentUri"),$rval)
+        ),*])
+    };
+
+    (@TYPE RemoteFlams [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend<&'static str,[(::ftml_uris::DocumentUri,&'static str);$num]>
+    };
+    (@NEW RemoteFlams [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend::new_with_redirects($crate::DEFAULT_SERVER_URL,[$(
+            (std::str::FromStr::from_str($rkey).expect("invalid DocumentUri"),$rval)
+        ),*])
+    };
+
+    (@TYPE RemoteFlams($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend<$tp,$crate::NoRedirects> };
+    (@NEW RemoteFlams($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend::new($val) };
+    (@TYPE RemoteFlams) => { $crate::RemoteFlamsBackend<&'static str,$crate::NoRedirects> };
+    (@NEW RemoteFlams) => { $crate::RemoteFlamsBackend::new($crate::DEFAULT_SERVER_URL) };
+
+    (@TYPE Cached($($rest:tt)*) ) => { $crate::CachedBackend< $crate::new_global!(@TYPE $($rest)*) > };
+    (@NEW Cached($($rest:tt)*) ) => { $crate::FtmlBackend::cached($crate::new_global!(@NEW $($rest)*)) };
+}
+
+pub trait GlobalBackend: 'static {
+    type Error: std::fmt::Debug;
+    type Backend: FtmlBackend<Error = Self::Error>;
+    fn get() -> &'static Self::Backend;
+}
+
 pub trait FtmlBackend {
     type Error: std::fmt::Debug;
+
+    #[cfg(feature = "cached")]
+    #[inline]
+    fn cached(self) -> cache::CachedBackend<Self>
+    where
+        Self: Sized,
+        Self::Error: Clone + Send + Sync,
+    {
+        cache::CachedBackend::new(self)
+    }
+
     fn get_fragment(
         &self,
         uri: Uri,
-        context: Option<DocumentUri>,
+        context: Option<NarrativeUri>,
     ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send;
+
+    #[inline]
+    fn get_definition(
+        &self,
+        uri: SymbolUri,
+        context: Option<NarrativeUri>,
+    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send {
+        self.get_fragment(uri.into(), context)
+    }
+
+    #[inline]
+    fn get_document_html(
+        &self,
+        uri: DocumentUri,
+        context: Option<NarrativeUri>,
+    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send {
+        self.get_fragment(uri.into(), context)
+    }
+
+    fn get_notations(
+        &self,
+        uri: LeafUri,
+    ) -> impl Future<Output = Result<Vec<(DocumentElementUri, Notation)>, BackendError<Self::Error>>>
+    + Send;
+
+    fn get_notation(
+        &self,
+        symbol: LeafUri,
+        uri: DocumentElementUri,
+    ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> + Send {
+        self.get_notations(symbol).map_ok_or_else(Err, move |r| {
+            r.into_iter()
+                .find(|(u, _)| *u == uri)
+                .map(|(_, n)| n)
+                .ok_or(BackendError::NotFound(ftml_uris::UriKind::DocumentElement))
+        })
+    }
 }
 
 #[cfg(feature = "server_fn")]
@@ -49,9 +149,27 @@ pub trait FlamsBackend {
         l: Option<Language>,
         e: Option<String>,
         s: Option<String>,
-        context: Option<DocumentUri>,
+        context: Option<NarrativeUri>,
     ) -> impl Future<
         Output = Result<(Uri, Vec<Css>, String), BackendError<server_fn::error::ServerFnErrorErr>>,
+    > + Send;
+
+    fn get_notations(
+        &self,
+        uri: Option<Uri>,
+        rp: Option<String>,
+        a: Option<ArchiveId>,
+        p: Option<String>,
+        d: Option<String>,
+        m: Option<String>,
+        l: Option<Language>,
+        e: Option<String>,
+        s: Option<String>,
+    ) -> impl Future<
+        Output = Result<
+            Vec<(DocumentElementUri, Notation)>,
+            BackendError<server_fn::error::ServerFnErrorErr>,
+        >,
     > + Send;
 }
 
@@ -61,10 +179,11 @@ where
     FB: FlamsBackend,
 {
     type Error = server_fn::error::ServerFnErrorErr;
+
     fn get_fragment(
         &self,
         uri: Uri,
-        context: Option<DocumentUri>,
+        context: Option<NarrativeUri>,
     ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send {
         <Self as FlamsBackend>::get_fragment(
             self,
@@ -80,5 +199,24 @@ where
             context,
         )
         .map(|r| r.map(|(_, css, s)| (s, css)))
+    }
+
+    fn get_notations(
+        &self,
+        uri: LeafUri,
+    ) -> impl Future<Output = Result<Vec<(DocumentElementUri, Notation)>, BackendError<Self::Error>>>
+    + Send {
+        <Self as FlamsBackend>::get_notations(
+            self,
+            Some(uri.into()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
     }
 }

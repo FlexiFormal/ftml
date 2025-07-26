@@ -4,33 +4,17 @@ use crate::{
     VarOrSym,
     counters::{LogicalLevel, SectionCounters},
     extractor::DomExtractor,
-    markers::SectionInfo,
-    toc::{NavElems, TOCElem},
+    markers::{InputrefInfo, SectionInfo},
+    toc::{CurrentId, NavElems, TOCElem},
 };
 use ftml_core::extraction::{FtmlExtractor, OpenDomainElement};
-use ftml_ontology::narrative::{
-    documents::{DocumentCounter, DocumentStyle},
-    elements::SectionLevel,
-};
-use ftml_uris::{DocumentElementUri, DocumentUri, Language, NarrativeUri, SymbolUri};
-use leptos::{prelude::*, tachys::reactive_graph::OwnedView};
+use ftml_ontology::narrative::elements::SectionLevel;
+use ftml_uris::{DocumentElementUri, DocumentUri, Language, NarrativeUri};
+use leptos::prelude::*;
 use smallvec::SmallVec;
 
-macro_rules! provide {
-    ($value:expr; $ret:expr) => {{
-        let owner = Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(move || {
-            provide_context($value);
-            $ret
-        });
-        OwnedView::new_with_owner(children, owner)
-    }};
-}
-
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentMeta {
     pub uri: Option<DocumentUri>,
@@ -59,7 +43,7 @@ pub fn setup_document<Ch: IntoView + 'static>(
     uri: DocumentUri,
     children: impl FnOnce() -> Ch,
 ) -> impl IntoView {
-    provide_context(RwSignal::new(DomExtractor::new(uri)));
+    provide_context(RwSignal::new(DomExtractor::new(uri.clone(), uri.into())));
     provide_context(SectionCounters::default());
     provide_context(RwSignal::new(CurrentTOC::default()));
     provide_context(RwSignal::new(NavElems::new()));
@@ -79,6 +63,20 @@ impl DocumentState {
         .expect("Not in a document context")
     }
 
+    /// ### Panics
+    pub fn document_uri() -> DocumentUri {
+        with_context::<RwSignal<DomExtractor>, _>(|s| {
+            s.with_untracked(|e| e.state.document.clone())
+        })
+        .expect("Not in a document context")
+    }
+
+    /// ### Panics
+    pub fn context_uri() -> NarrativeUri {
+        with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(|e| e.context.clone()))
+            .expect("Not in a document context")
+    }
+
     pub fn current_term_head() -> Option<VarOrSym> {
         with_context::<RwSignal<DomExtractor>, _>(|s| {
             s.with_untracked(|e| match e.iterate_domain().next() {
@@ -94,7 +92,8 @@ impl DocumentState {
         .flatten()
     }
 
-    /// ### Panics
+    /*
+    // ### Panics
     pub fn with_styles_untracked<R>(
         f: impl FnOnce(&[DocumentCounter], &[DocumentStyle]) -> R,
     ) -> R {
@@ -103,9 +102,42 @@ impl DocumentState {
         })
         .expect("Not in a document context")
     }
+     */
+
     #[inline]
     pub fn in_inputref() -> bool {
         use_context::<InInputref>().is_some_and(|b| b.0)
+    }
+
+    pub(crate) fn do_inputref<V: IntoView>(
+        target: DocumentUri,
+        uri: DocumentElementUri,
+        f: impl FnOnce(InputrefInfo) -> V,
+    ) -> impl IntoView {
+        let (id, replace, replacing_done) = NavElems::new_inpuref(uri.name.last());
+        let counters = SectionCounters::inputref(target.clone(), id.clone());
+        let title = NavElems::get_title(target.clone());
+        provide_context(counters);
+        provide_context(InInputref(true));
+        provide_context(CurrentId(id.clone()));
+        f(InputrefInfo {
+            uri,
+            target,
+            replace,
+            replacing_done,
+            id,
+            title,
+        })
+    }
+
+    pub fn inner_document<V: IntoView, F: FnOnce() -> V>(
+        target: DocumentUri,
+        uri: &DocumentElementUri,
+        f: F,
+    ) -> impl IntoView + use<V, F> {
+        let context = Self::context_uri() & uri.name();
+        provide_context(DomExtractor::new(target, context.into()));
+        f()
     }
 
     pub(crate) fn new_section<V: IntoView>(
@@ -116,16 +148,19 @@ impl DocumentState {
         let mut counters: SectionCounters = expect_context();
         let (style, class) = counters.next_section();
         let lvl = counters.current_level();
-        provide!(
-            counters;
-            f(SectionInfo {
-                uri,
-                style,
-                class,
-                lvl,
-                id,
-            })
-        )
+        provide_context(counters);
+        provide_context(CurrentId(id.clone()));
+        f(SectionInfo {
+            uri,
+            style,
+            class,
+            lvl,
+            id,
+        })
+    }
+
+    pub fn current_section_level() -> LogicalLevel {
+        with_context(|cntrs: &SectionCounters| cntrs.current_level()).unwrap_or(LogicalLevel::None)
     }
 
     pub(crate) fn title_class() -> (LogicalLevel, &'static str) {
@@ -163,7 +198,8 @@ impl DocumentState {
             }
             _ => (),
         }
-        provide!(counters; f())
+        provide_context(counters);
+        f()
     }
 
     pub(crate) fn update_counters<R>(f: impl FnOnce(&mut SectionCounters) -> R) -> R {

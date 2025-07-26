@@ -17,7 +17,7 @@ pub struct Solutions(Box<[SolutionData]>);
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum SolutionData {
     Solution {
@@ -30,7 +30,7 @@ pub enum SolutionData {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ChoiceBlock {
     pub multiple: bool,
@@ -42,7 +42,7 @@ pub struct ChoiceBlock {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Choice {
     pub correct: bool,
@@ -52,7 +52,7 @@ pub struct Choice {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FillInSol {
     pub width: Option<f32>,
@@ -61,7 +61,7 @@ pub struct FillInSol {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum FillInSolOption {
     Exact {

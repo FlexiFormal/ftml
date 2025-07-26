@@ -11,14 +11,16 @@ pub mod components;
 pub mod config;
 pub mod utils;
 
-use ftml_dom::{FtmlViews, markers::SectionInfo};
+use std::marker::PhantomData;
+
+use ftml_dom::{FtmlViews, markers::SectionInfo, utils::local_cache::SendBackend};
 use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
 
-use crate::config::HighlightStyle;
+use crate::config::FtmlConfig;
 
-pub struct Views;
-impl FtmlViews for Views {
+pub struct Views<B: SendBackend>(PhantomData<B>);
+impl<B: SendBackend> FtmlViews for Views<B> {
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + 'static + Send) -> impl IntoView {
         use utils::theming::Themer;
         ftml_dom::global_setup(|| {
@@ -33,24 +35,7 @@ impl FtmlViews for Views {
                     display:contents;
                 ">
                     {
-                        if with_context::<RwSignal<HighlightStyle>,_>(|_| ()).is_none() {
-                            #[cfg(not(any(feature = "csr", feature = "hydrate")))]
-                            let style = RwSignal::new(HighlightStyle::Colored);
-                            #[cfg(any(feature = "csr", feature = "hydrate"))]
-                            let style = {
-                                let r = <gloo_storage::LocalStorage as gloo_storage::Storage>::get("highlight_option")
-                                    .map_or(HighlightStyle::Colored, |e| e);
-                                let r = RwSignal::new(r);
-                                Effect::new(move || {
-                                    let r = r.get();
-                                    let _ =
-                                        <gloo_storage::LocalStorage as gloo_storage::Storage>::set("highlight_option", r);
-                                });
-                                r
-                            };
-                            tracing::info!("initializing highlight style");
-                            provide_context(style);
-                        }
+                        FtmlConfig::init();
                         then()
                     }
                     //{Self::cont(node)}
@@ -73,32 +58,38 @@ impl FtmlViews for Views {
     }
 
     #[inline]
-    fn symbol_reference<V: IntoView>(
+    fn symbol_reference<V: IntoView + 'static>(
         uri: ftml_uris::SymbolUri,
         _notation: Option<ftml_uris::UriName>,
         is_math: bool,
-        then: impl FnOnce() -> V,
+        then: impl FnOnce() -> V + Clone + Send + 'static,
     ) -> impl IntoView {
         use leptos::either::Either::{Left, Right};
         if is_math {
-            Left(components::terms::oms(uri, true, then))
+            Left(components::terms::oms::<B, _>(uri, false, then))
         } else {
-            Right(components::terms::symbol_reference(uri, then))
+            Right(components::terms::symbol_reference::<B, _>(uri, then))
         }
     }
 
     #[inline]
     fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
-        components::terms::comp(then)
+        components::terms::comp::<B, _>(then)
+    }
+
+    #[inline]
+    fn inputref(info: ftml_dom::markers::InputrefInfo) -> impl IntoView {
+        components::inputref::inputref::<B>(info)
     }
 }
 
 /// Activate FTML viewer on the entire body of the page
 #[cfg(feature = "csr")]
 #[allow(clippy::semicolon_if_nothing_returned)]
-pub fn iterate_body() {
-    leptos_posthoc::hydrate_body(|orig| {
+pub fn iterate_body<B: SendBackend>() {
+    leptos_posthoc::hydrate_body(move |orig| {
         use ftml_uris::DocumentUri;
+
         let mut meta = ftml_dom::DocumentMeta::get();
         if let Ok(scripts) = leptos::tachys::dom::document().query_selector_all("head script") {
             let mut i = 0;
@@ -128,6 +119,6 @@ pub fn iterate_body() {
         }
         let uri = meta.uri.unwrap_or_else(|| DocumentUri::no_doc().clone());
 
-        Views::top(|| ftml_dom::setup_document(uri, || Views::cont(orig)))
+        Views::<B>::top(|| ftml_dom::setup_document(uri, || Views::<B>::cont(orig)))
     })
 }

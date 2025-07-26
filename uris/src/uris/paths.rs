@@ -205,7 +205,7 @@ impl PathUri {
     ///
     /// This method handles the common parsing logic for path URIs and
     /// URI types that extend path URIs (like module URIs).
-    pub(super) fn pre_parse<R>(
+    pub(crate) fn pre_parse<R>(
         s: &str,
         uri_kind: UriKind,
         f: impl FnOnce(Self, Option<&str>, std::str::Split<char>) -> Result<R, UriParseError>,

@@ -18,7 +18,7 @@ serde = ["dep:serde", "ftml-uris/serde", "ftml-ontology/serde"]
 typescript = [
     "serde",
     "dep:wasm-bindgen",
-    "dep:tsify-next",
+    "dep:tsify",
     "ftml-ontology/typescript",
 ]
 ## Adds support for RDF triple extraction
@@ -69,4 +69,4 @@ serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 
 wasm-bindgen = { workspace = true, optional = true }
-tsify-next = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }

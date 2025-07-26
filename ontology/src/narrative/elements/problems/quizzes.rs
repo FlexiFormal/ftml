@@ -6,7 +6,7 @@ use ftml_uris::{DocumentElementUri, SymbolUri};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Quiz {
     pub css: Box<[Css]>,
@@ -18,7 +18,7 @@ pub struct Quiz {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum QuizElement {
@@ -34,7 +34,7 @@ pub enum QuizElement {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct QuizProblem {
     pub html: Box<str>,

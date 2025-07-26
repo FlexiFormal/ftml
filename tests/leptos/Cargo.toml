@@ -8,12 +8,14 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 hydrate = [
+    "ftml-backend/wasm",
     "leptos/hydrate",
     "ftml-leptos/hydrate",
     "thaw/hydrate",
     "dep:tracing-wasm",
 ]
 ssr = [
+    "ftml-backend/reqwest",
     "dep:axum",
     "dep:tokio",
     "dep:tower",
@@ -27,6 +29,13 @@ ssr = [
 ]
 
 [dependencies]
+
+ftml-leptos = { path = "../../leptos" }
+ftml-dom = { path = "../../dom" }
+ftml-uris = { path = "../../uris" }
+ftml-ontology = { path = "../../ontology" }
+ftml-backend = { path = "../../backend", features = ["cached", "server_fn"] }
+
 console_error_panic_hook = "0.1"
 leptos = { version = "0.8" }
 leptos_meta = { version = "0.8" }
@@ -44,9 +53,6 @@ tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 tower = { version = "0.5", optional = true }
 tower-http = { version = "0.6", features = ["fs"], optional = true }
 
-ftml-leptos = { path = "../../leptos" }
-ftml-dom = { path = "../../dom" }
-ftml-uris = { path = "../../uris" }
 thaw = "0.5.0-beta"
 
 

@@ -12,18 +12,20 @@ workspace = true
 [features]
 ## provides adapters for leptos server functions
 server_fn = ["dep:server_fn"]
-## webassembly support
+## webassembly support via reqwasm
 wasm = [
     "dep:wasm-bindgen",
     "ftml-ontology/wasm",
     "dep:reqwasm",
     "dep:send_wrapper",
 ]
+## reqwest
+reqwest = ["dep:reqwest"]
 ## cached
 cached = ["dep:dashmap", "dep:parking_lot", "dep:kanal"]
 ## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
 ## bound to `string`, but naming still allows to make intentions in APIs explicit.
-typescript = ["wasm", "dep:tsify-next", "ftml-ontology/typescript"]
+typescript = ["wasm", "dep:tsify", "ftml-ontology/typescript"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -60,9 +62,10 @@ serde_json = { workspace = true }
 ftml-uris = { workspace = true, features = ["serde", "components"] }
 ftml-ontology = { workspace = true, features = ["serde"] }
 
+reqwest = { workspace = true, optional = true, features = ["json"] }
 server_fn = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
-tsify-next = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
 reqwasm = { workspace = true, optional = true }
 send_wrapper = { workspace = true, optional = true }
 dashmap = { workspace = true, optional = true }

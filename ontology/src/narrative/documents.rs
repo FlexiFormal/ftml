@@ -11,7 +11,7 @@ use crate::narrative::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentData {
     pub uri: DocumentUri,
@@ -53,7 +53,7 @@ impl std::ops::Deref for Document {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentStyles {
     pub counters: Box<[DocumentCounter]>,
@@ -62,7 +62,7 @@ pub struct DocumentStyles {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentCounter {
     pub name: Id,
@@ -71,7 +71,7 @@ pub struct DocumentCounter {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentStyle {
     pub kind: ParagraphKind,

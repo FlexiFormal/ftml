@@ -1,5 +1,6 @@
 use crate::{
     document::{CurrentTOC, DocumentState},
+    extractor::DomExtractor,
     toc::TOCElem,
 };
 use ftml_ontology::narrative::elements::{paragraphs::ParagraphKind, sections::SectionLevel};
@@ -8,7 +9,7 @@ use leptos::prelude::*;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[serde(tag = "type")]
 pub enum LogicalLevel {
@@ -16,6 +17,48 @@ pub enum LogicalLevel {
     Section(SectionLevel),
     Paragraph,
     BeamerSlide,
+}
+
+#[cfg(feature = "typescript")]
+impl wasm_bindgen::convert::TryFromJsValue for LogicalLevel {
+    type Error = wasm_bindgen::JsValue;
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        let Some(jstr) = value.as_string() else {
+            return SectionLevel::try_from_js_value(value).map(Self::Section);
+        };
+        Ok(match jstr.as_str() {
+            "None" => Self::None,
+            "Paragraph" => Self::Paragraph,
+            "BeamerSlide" => Self::BeamerSlide,
+            _ => return Err(value),
+        })
+    }
+}
+
+impl Ord for LogicalLevel {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering::{Equal, Greater, Less};
+        if self == other {
+            return Equal;
+        }
+        #[allow(clippy::match_same_arms)]
+        match (self, other) {
+            (Self::None, _) => Greater,
+            (_, Self::None) => Less,
+            (Self::Section(s1), Self::Section(s2)) => s1.cmp(s2),
+            (Self::Section(_), _) => Greater,
+            (_, Self::Section(_)) => Less,
+            (Self::Paragraph, Self::BeamerSlide) => Greater,
+            _ // (Self::BeamerSlide, Self::Paragraph)
+                => Less,
+        }
+    }
+}
+impl PartialOrd for LogicalLevel {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -367,7 +410,10 @@ impl SectionCounters {
         let mut counters = Vec::default();
         let mut resets = Vec::<(SectionLevel, Vec<Id>)>::default();
         let mut for_paras = Vec::default();
-        DocumentState::with_styles_untracked(|ctrs, styles| {
+        let styles = expect_context::<RwSignal<DomExtractor>>();
+        styles.with_untracked(|e| {
+            let ctrs = &e.state.counters;
+            let styles = &e.state.styles;
             for c in ctrs {
                 tracing::trace!("Doing {c:?}");
                 counters.push((c.name.clone(), SmartCounter::default()));

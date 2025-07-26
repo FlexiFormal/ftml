@@ -22,7 +22,7 @@ typescript = [
     "serde",
     "wasm",
     "dep:wasm-bindgen",
-    "dep:tsify-next",
+    "dep:tsify",
     "ftml-uris/typescript",
 ]
 ## Enables OpenMath (de)serialization for FTML expressions
@@ -76,7 +76,7 @@ serde_with = { workspace = true, optional = true }
 bincode = { workspace = true, optional = true }
 
 wasm-bindgen = { workspace = true, optional = true }
-tsify-next = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
 js-regexp = { workspace = true, optional = true }
 
 openmath = { workspace = true, optional = true }

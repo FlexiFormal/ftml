@@ -8,6 +8,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=wasm"]
 
+[tasks.test-reqwest]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=reqwest"]
+
 [tasks.test-typescript]
 command = "cargo"
 install_crate = false
@@ -32,6 +37,7 @@ args = ["+nightly", "test", "--all-features"]
 dependencies = [
     "test-no-features",
     "test-wasm",
+    "test-reqwest",
     "test-typescript",
     "test-server_fn",
     "test-cached",

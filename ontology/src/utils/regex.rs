@@ -1,12 +1,12 @@
 #[cfg(all(target_family = "wasm", feature = "wasm"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Regex(String);
 
 #[cfg(not(all(target_family = "wasm", feature = "wasm")))]
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Regex(regex::Regex);
 
@@ -36,7 +36,7 @@ impl Regex {
         switch!({
             self.0.is_match(text)
         }{
-            JRegex::new(&self.0, js_regexp::flags!("")).expect("illegal regex")
+            js_regexp::RegExp::new(&self.0, js_regexp::flags!("")).expect("illegal regex")
                 .exec(text)
                 .is_some()
         })
@@ -52,9 +52,9 @@ impl Regex {
             ::regex::Regex::new(s).map(Self).map_err(|_| InvalidRegex)
         }{
             // https://docs.rs/js-regexp/0.2.1/js_regexp/struct.FlagSets.html
-            JRegex::new(s, js_regexp::flags!(""))
+            js_regexp::RegExp::new(s, js_regexp::flags!(""))
                 .map(|_| Self(s.to_string()))
-                .map_err(|_| "Invalid Regular Expression".to_string())
+                .map_err(|_| InvalidRegex)
         })
     }
 }

@@ -6,7 +6,7 @@ use ftml_core::{
     },
 };
 use ftml_ontology::narrative::DocumentRange;
-use ftml_uris::DocumentUri;
+use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::wasm_bindgen::{JsCast, JsValue};
 use leptos::web_sys::{Element, js_sys::JsString};
 
@@ -14,12 +14,14 @@ use crate::{extractor, markers::Marker};
 
 pub struct DomExtractor {
     pub(crate) state: ExtractorState,
+    pub(crate) context: NarrativeUri,
 }
 impl DomExtractor {
     #[inline]
-    pub fn new(uri: DocumentUri) -> Self {
+    pub fn new(uri: DocumentUri, context: NarrativeUri) -> Self {
         Self {
             state: ExtractorState::new(uri, false),
+            context,
         }
     }
 }

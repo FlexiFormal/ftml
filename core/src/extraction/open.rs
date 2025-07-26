@@ -5,11 +5,8 @@ use ftml_ontology::{
         documents::{DocumentCounter, DocumentStyle},
         elements::{DocumentElement, sections::SectionLevel},
     },
-    terms::{Term, Variable},
 };
-use ftml_uris::{DocumentElementUri, Language, ModuleUri, SymbolUri, UriName};
-
-use crate::extraction::FtmlExtractor;
+use ftml_uris::{DocumentElementUri, DocumentUri, Language, ModuleUri, SymbolUri, UriName};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OpenFtmlElement {
@@ -35,6 +32,10 @@ pub enum OpenFtmlElement {
         uri: SymbolUri,
         notation: Option<UriName>,
         in_term: bool,
+    },
+    InputRef {
+        target: DocumentUri,
+        uri: DocumentElementUri,
     },
 }
 
@@ -88,6 +89,10 @@ pub enum OpenNarrativeElement {
 pub enum MetaDatum {
     Style(DocumentStyle),
     Counter(DocumentCounter),
+    InputRef {
+        target: DocumentUri,
+        uri: DocumentElementUri,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -117,6 +122,7 @@ impl std::fmt::Display for PreVar {
 }
 
 impl PreVar {
+    /*
     fn resolve<State: FtmlExtractor>(self, state: &State) -> Term {
         Term::Var(match self {
             Self::Resolved(declaration) => Variable::Ref {
@@ -127,6 +133,7 @@ impl PreVar {
             Self::Unresolved(name) => state.resolve_variable_name(name),
         })
     }
+     */
     #[inline]
     #[must_use]
     pub const fn name(&self) -> &UriName {
@@ -187,6 +194,13 @@ impl OpenFtmlElement {
                 }),
                 narrative: None,
             },
+            Self::InputRef {
+                target: uri,
+                uri: id,
+            } => Split::Meta(MetaDatum::InputRef {
+                target: uri,
+                uri: id,
+            }),
             Self::Style(s) => Split::Meta(MetaDatum::Style(s)),
             Self::Counter(c) => Split::Meta(MetaDatum::Counter(c)),
             Self::SetSectionLevel(_)

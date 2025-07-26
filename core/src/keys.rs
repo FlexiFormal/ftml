@@ -266,7 +266,7 @@ do_keys! {
 
     ImportModule                = "import" := todo
     UseModule                   = "usemodule" := todo
-    InputRef                    = "inputref" := todo
+    InputRef                    = "inputref" := inputref
 
     SetSectionLevel             = "sectionlevel" := setsectionlevel
     SkipSection                 = "skipsection" := skipsection

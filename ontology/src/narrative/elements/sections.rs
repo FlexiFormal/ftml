@@ -7,7 +7,7 @@ use crate::narrative::{
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Section {
     pub range: DocumentRange,
@@ -63,7 +63,7 @@ impl IsDocumentElement for Section {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum SectionLevel {
@@ -75,12 +75,31 @@ pub enum SectionLevel {
     Paragraph,
     Subparagraph,
 }
+#[cfg(feature = "typescript")]
+impl wasm_bindgen::convert::TryFromJsValue for SectionLevel {
+    type Error = wasm_bindgen::JsValue;
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        let Some(jstr) = value.as_string() else {
+            return Err(value);
+        };
+        Ok(match jstr.as_str() {
+            "Part" => Self::Part,
+            "Chapter" => Self::Chapter,
+            "Section" => Self::Section,
+            "Subsection" => Self::Subsection,
+            "Subsubsection" => Self::Subsubsection,
+            "Paragraph" => Self::Paragraph,
+            "Subparagraph" => Self::Subparagraph,
+            _ => return Err(value),
+        })
+    }
+}
 impl Ord for SectionLevel {
     #[inline]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let su: u8 = (*self).into();
         let ou: u8 = (*other).into();
-        su.cmp(&ou)
+        ou.cmp(&su)
     }
 }
 impl PartialOrd for SectionLevel {

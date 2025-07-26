@@ -11,7 +11,13 @@ workspace = true
 
 [features]
 ## Pure client-side rendering
-csr = ["leptos-posthoc/csr", "dep:wasm-bindgen", "dep:web-sys", "leptos/csr"]
+csr = [
+    "leptos-posthoc/csr",
+    "dep:wasm-bindgen",
+    "dep:web-sys",
+    "leptos/csr",
+    # "ftml-backend/wasm",
+]
 ## Client-side in compbination with ssr
 hydrate = [
     "leptos-posthoc/hydrate",
@@ -22,7 +28,7 @@ hydrate = [
 ## Server-side rendering
 ssr = ["leptos/ssr"]
 ## generate typescript bindings
-typescript = ["csr", "dep:tsify-next", "ftml-core/typescript"]
+typescript = ["csr", "dep:tsify", "ftml-core/typescript"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -52,6 +58,7 @@ document-features = { workspace = true }
 ftml-core = { workspace = true, features = ["serde"] }
 ftml-uris = { workspace = true, features = ["serde"] }
 ftml-ontology = { workspace = true, features = ["serde"] }
+ftml-backend = { workspace = true }
 
 leptos-posthoc = { workspace = true }
 serde = { workspace = true }
@@ -61,9 +68,12 @@ tracing = { workspace = true }
 smallvec = { workspace = true }
 serde_json = { workspace = true }
 rustc-hash = { workspace = true }
+dashmap = { workspace = true }
 parking_lot = { workspace = true }
+thiserror = { workspace = true }
+either = { workspace = true }
 
-tsify-next = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = [
     "Window",

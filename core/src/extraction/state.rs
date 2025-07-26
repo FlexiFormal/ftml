@@ -218,6 +218,9 @@ impl ExtractorState {
             Split::Meta(m) => match m {
                 MetaDatum::Style(s) => self.styles.push(s),
                 MetaDatum::Counter(c) => self.counters.push(c),
+                MetaDatum::InputRef { target, uri } => {
+                    self.push_elem(DocumentElement::DocumentReference { uri, target });
+                }
             },
             Split::None => (),
         }
@@ -361,7 +364,7 @@ impl ExtractorState {
         range: DocumentRange,
     ) -> super::Result<()> {
         if in_term {
-            todo!()
+            crate::TODO!()
         } else {
             self.push_elem(DocumentElement::SymbolReference {
                 range,

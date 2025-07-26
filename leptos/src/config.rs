@@ -1,6 +1,8 @@
-use ftml_dom::DocumentState;
+use std::collections::hash_map::Entry;
+
+use ftml_dom::{DocumentState, counters::LogicalLevel};
 use ftml_ontology::narrative::elements::SectionLevel;
-use ftml_uris::{DocumentElementUri, DocumentUri, NarrativeUri};
+use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri};
 use leptos::context::Provider;
 use leptos::prelude::*;
 
@@ -8,12 +10,16 @@ use crate::callbacks::{OnSectionTitle, SectionWrap};
 
 #[derive(Clone, Default)]
 #[cfg_attr(feature = "csr", derive(serde::Serialize, serde::Deserialize))]
-//#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+//#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 //#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(default))]
     #[cfg_attr(feature = "csr", serde(rename = "allowHovers"))]
     pub allow_hovers: Option<bool>,
+
+    #[cfg_attr(feature = "csr", serde(default))]
+    #[cfg_attr(feature = "csr", serde(rename = "allowNotationChanges"))]
+    pub allow_notation_changes: Option<bool>,
 
     #[cfg_attr(feature = "csr", serde(default))]
     #[cfg_attr(feature = "csr", serde(rename = "documentUri"))]
@@ -23,12 +29,34 @@ pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(rename = "highlightStyle"))]
     pub highlight_style: Option<HighlightStyle>,
 
+    #[cfg_attr(feature = "csr", serde(default))]
+    #[cfg_attr(feature = "csr", serde(rename = "autoexpandLimit"))]
+    pub autoexpand_limit: Option<LogicalLevel>,
+
     #[cfg_attr(feature = "csr", serde(skip))]
     pub section_wrap: Option<SectionWrap>,
 
     #[cfg_attr(feature = "csr", serde(skip))]
     pub on_section_title: Option<OnSectionTitle>,
 }
+
+#[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum HighlightStyle {
+    Colored,
+    Subtle,
+    Off,
+    None,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct AllowHovers(pub bool);
+
+#[derive(Copy, Clone)]
+pub struct AutoexpandLimit(pub LogicalLevel);
+
+#[derive(Copy, Clone)]
+pub struct AllowNotationChanges(bool);
 
 #[cfg(feature = "typescript")]
 #[derive(thiserror::Error, Debug)]
@@ -114,6 +142,7 @@ impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
         }
 
         get!(v @ "allowHovers" = ALLOW_HOVERS as_bool { config.allow_hovers = Some(v)});
+        get!(v @ "allowNotationChanges" = ALLOW_NOTATION_CHANGES as_bool { config.allow_notation_changes = Some(v)} );
         get!(v @ "documentUri" = DOCUMENT_URI as_string {
             match v.parse() {
                 Ok(url) => config.document_uri = Some(url),
@@ -125,8 +154,18 @@ impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
             e => FtmlConfigParseError::InvalidValue("highlightStyle", leptos_react::utils::JsDisplay(e));
             {config.highlight_style = Some(v)}
         );
+        get!(v @ "autoexpandLimit" = AUTOEXPAND_LIMIT ?
+            j => LogicalLevel::try_from_js_value(j);
+            e => FtmlConfigParseError::InvalidValue("autoexpandLimit", leptos_react::utils::JsDisplay(e));
+            {config.autoexpand_limit = Some(v)}
+        );
         get!(v @ "sectionWrap" = SECTION_WRAP ?F { config.section_wrap = Some(v) });
         get!(v @ "onSectionTitle" = ON_SECTION_TITLE ?F { config.on_section_title = Some(v) });
+        /*
+        #[cfg_attr(feature = "csr", serde(rename = "autoexpandLimit"))]
+        pub autoexpand_limit: Option<LogicalLevel>,
+
+        */
         // more
 
         if errors.is_empty() {
@@ -143,6 +182,9 @@ impl FtmlConfig {
         if let Some(b) = self.allow_hovers {
             provide_context(AllowHovers(b));
         }
+        if let Some(b) = self.allow_notation_changes {
+            provide_context(AllowNotationChanges(b));
+        }
         if let Some(b) = self.section_wrap {
             provide_context(Some(b));
         }
@@ -150,24 +192,55 @@ impl FtmlConfig {
             provide_context(Some(b));
         }
         if let Some(h) = self.highlight_style {
-            tracing::info!("initializing highlight style from config");
             provide_context(RwSignal::new(h));
+        }
+        if let Some(limit) = self.autoexpand_limit {
+            provide_context(RwSignal::new(AutoexpandLimit(limit)));
         }
         self.document_uri
     }
+
+    pub fn init() {
+        if with_context::<RwSignal<HighlightStyle>, _>(|_| ()).is_none() {
+            #[cfg(not(any(feature = "csr", feature = "hydrate")))]
+            let style = RwSignal::new(HighlightStyle::Colored);
+            #[cfg(any(feature = "csr", feature = "hydrate"))]
+            let style = {
+                let r =
+                    <gloo_storage::LocalStorage as gloo_storage::Storage>::get("highlight_option")
+                        .map_or(HighlightStyle::Colored, |e| e);
+                let r = RwSignal::new(r);
+                Effect::new(move || {
+                    let r = r.get();
+                    let _ = <gloo_storage::LocalStorage as gloo_storage::Storage>::set(
+                        "highlight_option",
+                        r,
+                    );
+                });
+                r
+            };
+            provide_context(style);
+        }
+        if with_context::<RwSignal<AutoexpandLimit>, _>(|_| ()).is_none() {
+            provide_context(RwSignal::new(AutoexpandLimit(LogicalLevel::Section(
+                SectionLevel::Section,
+            ))));
+        }
+        if with_context::<NotationStore, _>(|_| ()).is_none() {
+            let owner = Owner::new();
+            provide_context(StoredValue::new(NotationStore {
+                map: rustc_hash::FxHashMap::default(),
+                owner,
+            }));
+        }
+    }
 }
 
-#[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum HighlightStyle {
-    Colored,
-    Subtle,
-    Off,
-    None,
+#[derive(Clone)]
+struct NotationStore {
+    map: rustc_hash::FxHashMap<LeafUri, RwSignal<Option<DocumentElementUri>>>,
+    owner: Owner,
 }
-
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub(crate) struct AllowHovers(pub bool);
 
 pub struct FtmlConfigState;
 impl FtmlConfigState {
@@ -177,10 +250,72 @@ impl FtmlConfigState {
         use_context::<AllowHovers>().is_none_or(|b| b.0)
     }
 
+    /// ### Panics
+    #[must_use]
+    pub fn notation_preference(uri: &LeafUri) -> ReadSignal<Option<DocumentElementUri>> {
+        with_context::<StoredValue<NotationStore>, _>(|s| {
+            if let Some(v) = s.with_value(|store| store.map.get(uri).copied()) {
+                return v;
+            }
+            let value = {
+                #[cfg(any(feature = "csr", feature = "hydrate"))]
+                {
+                    use gloo_storage::Storage;
+                    gloo_storage::LocalStorage::get(format!("notation_{uri}")).ok()
+                }
+                #[cfg(not(any(feature = "csr", feature = "hydrate")))]
+                {
+                    None
+                }
+            };
+            let ret = s.with_value(move |store| {
+                store.owner.with(move || {
+                    let r = RwSignal::new(value);
+                    #[cfg(any(feature = "csr", feature = "hydrate"))]
+                    {
+                        let uri = uri.clone();
+                        Effect::new(move || {
+                            r.with(|s| {
+                                use gloo_storage::Storage;
+                                if let Some(s) = s.as_ref() {
+                                    let _ = gloo_storage::LocalStorage::set(
+                                        format!("notation_{uri}"),
+                                        s,
+                                    );
+                                } else {
+                                    gloo_storage::LocalStorage::delete(format!("notation_{uri}"));
+                                }
+                            });
+                        });
+                    }
+                    r
+                })
+            });
+            s.update_value(|s| {
+                s.map.insert(uri.clone(), ret);
+            });
+            ret
+        })
+        .expect("Not in an ftml context")
+        .read_only()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn allow_notation_changes() -> bool {
+        use_context::<AllowNotationChanges>().is_none_or(|b| b.0)
+    }
+
     #[inline]
     #[must_use]
     pub fn highlight_style() -> ReadSignal<HighlightStyle> {
         expect_context::<RwSignal<HighlightStyle>>().read_only()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn autoexpand_limit() -> ReadSignal<AutoexpandLimit> {
+        expect_context::<RwSignal<AutoexpandLimit>>().read_only()
     }
 
     #[inline]

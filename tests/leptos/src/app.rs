@@ -1,3 +1,5 @@
+use ftml_ontology::utils::Css;
+use ftml_uris::DocumentUri;
 use leptos::prelude::*;
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
 
@@ -26,8 +28,6 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 
 #[component]
 pub fn App() -> impl IntoView {
-    use ftml_dom::FtmlViews;
-    use ftml_leptos::Views;
     use thaw::Scrollbar;
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
@@ -62,14 +62,55 @@ fn HomePage() -> impl IntoView {
     }
 }
 
+macro_rules! backend {
+    ($num:literal:[$($name:literal),*]) => {
+
+        ftml_backend::new_global!(GlobalBackend = Cached(RemoteFlams [
+            $(
+                concat!("http://mathhub.info?a=FTML/meta&p=tests&d=",$name,"&l=en")
+                => concat!("http://localhost:3000/api/get?d=",$name,".en")
+            ),*
+        ;$num]));
+
+        #[server(
+          prefix="/api",
+          endpoint="get",
+          input=server_fn::codec::GetUrl,
+          output=server_fn::codec::Json
+        )]
+        async fn get(d: String) -> Result<(DocumentUri, Vec<Css>, String), ServerFnError<String>> {
+            fn go(uri: &str, s: &str) -> Result<(DocumentUri, Vec<Css>, String), ServerFnError<String>> {
+                let i = s.find("<body").expect("exists");
+                let s = &s[i + "<body".len()..];
+                let i = s.rfind("/body>").expect("exists");
+                let s = &s[..i];
+                Ok((
+                    format!("http://mathhub.info?a=FTML/meta&p=tests&d={uri}&l=en")
+                        .parse()
+                        .expect("is valid"),
+                    Vec::new(),
+                    format!("<div{s}/div>"),
+                ))
+            }
+            match d.as_str() {
+                $(
+                    concat!($name,".en") => go($name,include_str!(concat!("../public/",$name,".en.html"))),
+                )*
+                _ => Err("nope".to_string().into()),
+            }
+        }
+    };
+}
+backend!( 2: ["sections","para"]);
+
+type Views = ftml_leptos::Views<GlobalBackend>;
+
 #[component]
 fn Ftml() -> impl IntoView {
     use ftml_dom::FtmlViews;
-    let uri: ftml_uris::DocumentUri = "https://mathhub.info?a=Papers/25-CICM-FLAMS&d=paper&l=en"
+    let uri: ftml_uris::DocumentUri = "http://mathhub.info?a=FTML/meta&p=tests&d=all&l=en"
         .parse()
         .unwrap();
-    const HTML: &str = include_str!("test.html");
-    ftml_leptos::Views::top(|| {
-        ftml_dom::setup_document(uri, || ftml_leptos::Views::render_ftml(HTML.to_string()))
-    })
+    const HTML: &str = include_str!("../public/all.en.html");
+    Views::top(|| ftml_dom::setup_document(uri, || Views::render_ftml(HTML.to_string())))
 }

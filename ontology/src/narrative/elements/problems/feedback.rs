@@ -15,7 +15,7 @@ pub struct ProblemFeedback {
 }
 
 #[cfg(feature = "typescript")]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, tsify_next::Tsify)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, tsify::Tsify)]
 #[tsify(from_wasm_abi, into_wasm_abi)]
 pub struct ProblemFeedbackJson {
     pub correct: bool,
@@ -80,7 +80,7 @@ impl ProblemFeedback {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct BlockFeedback {
     pub is_correct: bool,
@@ -90,7 +90,7 @@ pub struct BlockFeedback {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FillinFeedback {
     pub is_correct: bool,
@@ -100,7 +100,7 @@ pub struct FillinFeedback {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum FillinFeedbackKind {
     Exact(String),
@@ -110,7 +110,7 @@ pub enum FillinFeedbackKind {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum CheckedResult {
@@ -135,7 +135,7 @@ pub enum CheckedResult {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ProblemResponse {
     pub uri: DocumentElementUri,
@@ -145,7 +145,7 @@ pub struct ProblemResponse {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 /// Either a list of booleans (multiple choice), a single integer (single choice),

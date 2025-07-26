@@ -11,7 +11,14 @@ workspace = true
 
 [features]
 ## Pure client-side rendering
-csr = ["leptos/csr", "ftml-dom/csr", "thaw/csr", "dep:gloo-storage"]
+csr = [
+    "leptos/csr",
+    "ftml-dom/csr",
+    "thaw/csr",
+    "dep:gloo-storage",
+    "ftml-backend/wasm",
+    "ftml-backend/cached",
+]
 ## Client-side in compbination with ssr
 hydrate = [
     "leptos/hydrate",
@@ -25,7 +32,7 @@ ssr = ["leptos/ssr", "thaw/ssr"]
 typescript = [
     "csr",
     "ftml-dom/typescript",
-    "dep:tsify-next",
+    "dep:tsify",
     "dep:wasm-bindgen",
     "dep:leptos-react",
 ]
@@ -59,7 +66,9 @@ ftml-dom = { workspace = true }
 ftml-uris = { workspace = true }
 ftml-ontology = { workspace = true }
 ftml-core = { workspace = true }
+ftml-backend = { workspace = true }
 
+rustc-hash = { workspace = true }
 leptos = { workspace = true }
 leptos-posthoc = { workspace = true }
 thaw = { workspace = true }
@@ -67,9 +76,10 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+send_wrapper = { workspace = true }
 
 gloo-storage = { workspace = true, optional = true }
 
-tsify-next = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 leptos-react = { workspace = true, optional = true }

@@ -14,12 +14,14 @@ pub mod markers;
 pub mod mathml;
 pub mod toc;
 pub mod utils {
+    pub mod actions;
     pub mod css;
+    pub mod local_cache;
 }
 
 use crate::{
     extractor::FtmlDomElement,
-    markers::{Marker, SectionInfo},
+    markers::{InputrefInfo, Marker, SectionInfo},
 };
 pub use document::{DocumentMeta, DocumentState, setup_document};
 use ftml_core::extraction::FtmlExtractor;
@@ -73,7 +75,7 @@ pub trait FtmlViews: 'static {
     }
     #[inline]
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
-        then()
+        global_setup(then)
     }
 
     #[inline]
@@ -82,11 +84,11 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
-    fn symbol_reference<V: IntoView>(
+    fn symbol_reference<V: IntoView + 'static>(
         _uri: SymbolUri,
         _notation: Option<UriName>,
         _is_math: bool,
-        then: impl FnOnce() -> V,
+        then: impl FnOnce() -> V + Clone + Send + 'static,
     ) -> impl IntoView {
         then()
     }
@@ -99,6 +101,8 @@ pub trait FtmlViews: 'static {
     ) -> impl IntoView {
         then()
     }
+
+    fn inputref(_info: InputrefInfo) -> impl IntoView {}
 
     #[inline]
     fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
@@ -126,10 +130,10 @@ fn iterate<Views: FtmlViews + ?Sized>(
     }
     tracing::debug!("Has ftml attributes");
     let sig = expect_context::<RwSignal<DomExtractor>>();
-    let (markers, close) = sig.update_untracked(|extractor| {
+    let (mut markers, close) = sig.update_untracked(|extractor| {
         let mut attrs = NodeAttrs::new(e);
         let rules = attrs.keys();
-        let mut markers = smallvec::SmallVec::<_, 2>::new();
+        let mut markers = smallvec::SmallVec::<_, 4>::new();
         let mut close = smallvec::SmallVec::<_, 2>::new();
         for r in rules.apply(extractor, &mut attrs) {
             match r {
@@ -156,6 +160,7 @@ fn iterate<Views: FtmlViews + ?Sized>(
         tracing::debug!("got elements: {markers:?}");
         let e: OriginalNode = e.clone().into();
         Some(move || {
+            markers.reverse();
             Marker::apply::<Views>(markers, mathml::is(&e.tag_name()).is_some(), e).into_any()
         })
     };

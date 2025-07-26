@@ -1,9 +1,11 @@
 use ftml_ontology::narrative::elements::paragraphs::ParagraphKind;
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri};
-use leptos::prelude::*;
+use leptos::{prelude::*, tachys::reactive_graph::OwnedView};
+
+use crate::utils::actions::{OneShot, SetOneShotDone};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-#[cfg_attr(feature = "typescript", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[serde(tag = "type")]
 /// An entry in a table of contents. Either:
@@ -38,17 +40,19 @@ pub enum TOCElem {
 }
 
 pub struct NavElems {
-    pub initialized: RwSignal<bool>,
-    pub ids: rustc_hash::FxHashMap<String, SectionOrInputref>,
-    pub titles: rustc_hash::FxHashMap<DocumentUri, RwSignal<String>>,
-    id_prefix: String,
+    initialized: RwSignal<bool>,
+    ids: rustc_hash::FxHashMap<String, SectionOrInputref>,
+    titles: rustc_hash::FxHashMap<DocumentUri, RwSignal<String>>,
 }
 
 #[derive(Debug, Clone)]
 pub enum SectionOrInputref {
     Section,
-    Inputref(RwSignal<bool>, RwSignal<bool>),
+    Inputref(OneShot),
 }
+
+#[derive(Clone)]
+pub(crate) struct CurrentId(pub String);
 
 impl NavElems {
     pub(crate) fn new() -> Self {
@@ -56,31 +60,59 @@ impl NavElems {
             ids: std::collections::HashMap::default(),
             titles: std::collections::HashMap::default(),
             initialized: RwSignal::new(false),
-            id_prefix: String::new(),
         }
+    }
+
+    pub(crate) fn update_untracked<R>(f: impl FnOnce(&mut Self) -> R) -> R {
+        expect_context::<RwSignal<Self>>().update_untracked(f)
+    }
+
+    pub(crate) fn new_inpuref(id: &str) -> (String, OneShot, SetOneShotDone) {
+        let (os, done) = OneShot::new();
+        let id = Self::update_untracked(|ne| {
+            let id = Self::new_id(id);
+            ne.ids.insert(id.clone(), SectionOrInputref::Inputref(os));
+            id
+        });
+        (id, os, done)
     }
     pub(crate) fn new_section(id: &str) -> String {
         Self::update_untracked(|ne| {
-            let id = ne.new_id(id);
+            let id = Self::new_id(id);
             ne.ids.insert(id.clone(), SectionOrInputref::Section);
             id
         })
     }
-    fn new_id(&self, s: &str) -> String {
-        if self.id_prefix.is_empty() {
-            s.to_string()
-        } else {
-            format!("{}/{s}", self.id_prefix)
-        }
+    /*
+    pub(crate) fn in_id<V: IntoView>(id: String, then: impl FnOnce() -> V) -> impl IntoView {
+        let owner = Owner::current()
+            .expect("no current reactive Owner found")
+            .child();
+        let children = owner.with(move || {
+            provide_context(CurrentId(id));
+            then()
+        });
+        OwnedView::new_with_owner(children, owner)
     }
-    pub fn get_title(&mut self, uri: DocumentUri) -> RwSignal<String> {
-        match self.titles.entry(uri) {
+     */
+    fn new_id(s: &str) -> String {
+        with_context::<CurrentId, _>(|id| {
+            if id.0.is_empty() {
+                s.to_string()
+            } else {
+                format!("{}/{s}", id.0)
+            }
+        })
+        .unwrap_or_else(|| s.to_string())
+    }
+    pub fn get_title(uri: DocumentUri) -> RwSignal<String> {
+        Self::update_untracked(|slf| match slf.titles.entry(uri) {
             std::collections::hash_map::Entry::Occupied(e) => *e.get(),
             std::collections::hash_map::Entry::Vacant(e) => {
                 let name = e.key().document_name().to_string();
                 *e.insert(RwSignal::new(name))
             }
-        }
+        })
     }
     pub fn set_title(&mut self, uri: DocumentUri, title: String) {
         match self.titles.entry(uri) {
@@ -113,10 +145,10 @@ impl NavElems {
                         }
                         return;
                     }
-                    Some(SectionOrInputref::Inputref(s1, s2)) => {
-                        if !s2.get_untracked() {
-                            s1.set(true);
-                            if s2.get() {
+                    Some(SectionOrInputref::Inputref(a)) => {
+                        if !a.is_done_untracked() {
+                            a.activate();
+                            if a.is_done() {
                                 return self.navigate_to(id);
                             }
                         }
@@ -131,9 +163,6 @@ impl NavElems {
         }
     }
 
-    pub(crate) fn update_untracked<R>(f: impl FnOnce(&mut Self) -> R) -> R {
-        expect_context::<RwSignal<Self>>().update_untracked(f)
-    }
     /*
     pub(crate) fn with_untracked<R>(f: impl FnOnce(&Self) -> R) -> R {
         expect_context::<RwSignal<Self>>()

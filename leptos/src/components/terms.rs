@@ -1,22 +1,78 @@
 #![allow(clippy::must_use_candidate)]
 
-use ftml_dom::{DocumentState, VarOrSym, utils::css::inject_css};
-use ftml_uris::SymbolUri;
-use leptos::{prelude::*, tachys::reactive_graph::OwnedView};
+use ftml_backend::FtmlBackend;
+use ftml_dom::{
+    DocumentState, FtmlViews, VarOrSym,
+    utils::{
+        css::{CssExt, inject_css},
+        local_cache::LocalCache,
+    },
+};
+use ftml_ontology::terms::Variable;
+use ftml_uris::{DocumentElementUri, LeafUri, SymbolUri, UriName};
+use leptos::prelude::*;
+use send_wrapper::SendWrapper;
 
-use crate::config::{FtmlConfigState, HighlightStyle};
+use crate::{
+    SendBackend,
+    config::{FtmlConfigState, HighlightStyle},
+    utils::LocalCacheExt,
+};
 
-macro_rules! provide {
-    ($value:expr; $ret:expr) => {{
-        let owner = Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(move || {
-            provide_context($value);
-            $ret
-        });
-        OwnedView::new_with_owner(children, owner)
-    }};
+#[derive(Clone)]
+pub(crate) struct ReactiveTerm {
+    head: LeafUri,
+    arguments: Vec<ReadSignal<Option<TermFn>>>,
+    done: ReadSignal<bool>,
+}
+impl ReactiveTerm {
+    pub fn with_new<V: IntoView>(
+        head: LeafUri,
+        f: impl FnOnce() -> V + Clone + 'static,
+    ) -> impl IntoView {
+        let done = RwSignal::new(false);
+        let tm = Self {
+            head,
+            arguments: Vec::new(),
+            done: done.read_only(),
+        };
+        provide_context(tm);
+
+        let arg = with_context::<Argument, _>(|arg| arg.0);
+        if let Some(arg) = arg {
+            if arg.update_untracked(|a| a.is_none()) {
+                let f = f.clone();
+                arg.set(Some(TermFn(SendWrapper::new(Box::new(move || {
+                    f().into_any()
+                })))));
+            }
+        }
+        let r = f();
+        done.set(true);
+        r
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Argument(WriteSignal<Option<TermFn>>);
+
+pub(crate) struct TermFn(send_wrapper::SendWrapper<Box<dyn FnOnce() -> AnyView>>);
+impl std::fmt::Debug for TermFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[TermFn]")
+    }
+}
+pub(crate) trait TermFnTrait {
+    fn call(&self) -> AnyView;
+}
+impl<F, V: IntoView> TermFnTrait for F
+where
+    F: FnOnce() -> V + Clone + 'static,
+{
+    fn call(&self) -> AnyView {
+        let s = self.clone();
+        s().into_any()
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -24,25 +80,33 @@ struct InTerm {
     hovered: RwSignal<bool>,
 }
 
-pub fn symbol_reference<V: IntoView>(
-    uri: SymbolUri,
+pub fn symbol_reference<B: SendBackend, V: IntoView>(
+    _uri: SymbolUri,
     children: impl FnOnce() -> V,
 ) -> impl IntoView {
-    provide!(
-        InTerm {
-            hovered: RwSignal::new(false)
-        };
-        children()
-    )
+    provide_context(InTerm {
+        hovered: RwSignal::new(false),
+    });
+    children()
 }
 
-pub fn oms<V: IntoView>(
+pub fn oms<B: SendBackend, V: IntoView + 'static>(
     uri: SymbolUri,
-    is_math: bool,
-    children: impl FnOnce() -> V,
+    in_term: bool,
+    children: impl FnOnce() -> V + Clone + Send + 'static,
 ) -> impl IntoView {
-    ftml_core::TODO!();
-    ()
+    use leptos::either::Either::{Left, Right};
+    provide_context(InTerm {
+        hovered: RwSignal::new(false),
+    });
+    if FtmlConfigState::allow_notation_changes() {
+        let head: LeafUri = uri.into();
+        Left(ReactiveTerm::with_new(head.clone(), move || {
+            super::notations::has_notation::<B, _, _>(head, children)
+        }))
+    } else {
+        Right(children())
+    }
 }
 
 const fn comp_class(
@@ -68,7 +132,7 @@ const fn comp_class(
     }
 }
 
-pub fn comp<V: IntoView + 'static>(children: impl FnOnce() -> V) -> impl IntoView {
+pub fn comp<B: SendBackend, V: IntoView + 'static>(children: impl FnOnce() -> V) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     use thaw::{Popover, PopoverSize, PopoverTrigger};
     if !FtmlConfigState::allow_hovers() {
@@ -106,29 +170,61 @@ pub fn comp<V: IntoView + 'static>(children: impl FnOnce() -> V) -> impl IntoVie
             <PopoverTrigger slot>{
             children.add_any_attr(leptos::tachys::html::class::class(move || class))
             }</PopoverTrigger>
-            <SymbolPopover head/>
+            {symbol_popover::<B>(head)}
         </Popover>
     })
 }
 
-#[component]
-pub fn SymbolPopover(head: VarOrSym) -> impl IntoView {
-    /*
+//#[component]
+pub fn symbol_popover<BE: SendBackend>(head: VarOrSym) -> impl IntoView {
+    use leptos::either::EitherOf3::{A, B, C};
     match head {
-        VarOrSym::V(v) => EitherOf3::A(do_var_hover(v)),
-        VarOrSym::S(DomainUri::Symbol(s)) => {
-            EitherOf3::B(crate::remote::get!(definition(s.clone()) = (css,s) => {
-              for c in css { do_css(c); }
-              Some(view!(
-                <div style="color:black;background-color:white;padding:3px;max-width:600px;">
-                  <FTMLString html=s/>
-                </div>
-              ))
-            }))
-        }
-        VarOrSym::S(DomainUri::Module(m)) => {
-            EitherOf3::C(view! {<div>"Module" {m.module_name().last().to_string()}</div>})
-        }
+        VarOrSym::V(Variable::Name(n)) => A(unresolved_var(n)),
+        VarOrSym::V(Variable::Ref {
+            declaration,
+            is_sequence,
+        }) => B(resolved_var(declaration, is_sequence.unwrap_or_default())),
+        VarOrSym::S(uri) => C(symbol::<BE>(uri)),
     }
-     */
+}
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn unresolved_var(name: UriName) -> impl IntoView {
+    view! {
+        <div>
+            "Variable: " {name.to_string()}
+        </div>
+    }
+}
+
+pub fn resolved_var(uri: DocumentElementUri, is_sequence: bool) -> impl IntoView {
+    use thaw::Tooltip;
+    let title = if is_sequence {
+        "Variable Sequenc: "
+    } else {
+        "Variable: "
+    };
+    view! {
+        <Tooltip content = uri.to_string()>
+            {title}{uri.name().to_string()}
+        </Tooltip>
+    }
+}
+
+pub fn symbol<B: SendBackend>(uri: SymbolUri) -> impl IntoView {
+    inject_css("ftml-symbol-popup", include_str!("popup.css"));
+    let context = DocumentState::context_uri();
+    LocalCache::with::<B, _, _, _>(
+        |b| b.get_definition(uri, Some(context)),
+        |(html, css)| {
+            for c in css {
+                c.inject();
+            }
+            view! {
+              <div class="ftml-symbol-popup">
+                {crate::Views::<B>::render_ftml(html)}
+              </div>
+            }
+        },
+    )
 }

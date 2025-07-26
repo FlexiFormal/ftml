@@ -66,7 +66,7 @@ pub mod prelude {
     pub use super::language::Language;
     pub use super::paths::{PathUri, UriPath};
     pub use super::symbol::SymbolUri;
-    pub use super::{DomainUri, NarrativeUri, Uri};
+    pub use super::{DomainUri, LeafUri, NarrativeUri, Uri};
     pub use crate::aux::Id;
     pub use crate::doc_element::DocumentElementUri;
     pub use crate::document::{DocumentUri, SimpleUriName};
@@ -299,6 +299,38 @@ crate::ts!(NarrativeUri);
 crate::debugdisplay!(NarrativeUri);
 impl crate::sealed::Sealed for NarrativeUri {}
 
+/// Enum ranging over [`DocumentElementUri`] and [`SymbolUri`]); e.g. symbols or variables.
+///
+/// # Examples
+///
+/// ```
+/// # use ftml_uris::prelude::*;
+/// # use std::str::FromStr;
+/// let elem_uri = DocumentElementUri::from_str("http://example.com?a=archive&d=document&l=en&e=element").unwrap();
+/// let leaf_uri: LeafUri = elem_uri.into();
+///
+/// match leaf_uri {
+///     LeafUri::Element(d) => {
+///         assert_eq!(d.document_name().as_ref(), "document");
+///     }
+///     LeafUri::Symbol(e) => unreachable!()
+/// }
+/// ```
+#[derive(Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+)]
+pub enum LeafUri {
+    /// A symbol URI identifying a specific concept.
+    Symbol(SymbolUri),
+    /// A document element URI identifying a named part of a document.
+    Element(DocumentElementUri),
+}
+crate::ts!(LeafUri);
+crate::debugdisplay!(LeafUri);
+impl crate::sealed::Sealed for LeafUri {}
+
 // parsing -----------------------------------------------------------------------------------
 
 fn parse_domain(
@@ -497,6 +529,111 @@ impl FromStr for NarrativeUri {
                         }))
                     },
                 )
+        })
+    }
+}
+
+impl FromStr for LeafUri {
+    type Err = errors::UriParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        PathUri::pre_parse(s, UriKind::Path, |path, next, mut split| {
+            let Some(m) = next.or_else(|| split.next()) else {
+                return Err(UriParseError::MissingPartFor {
+                    uri_kind: UriKind::Symbol,
+                    part: UriComponentKind::m,
+                });
+            };
+            if let Some(name) = m.strip_prefix(concatcp!(ModuleUri::SEPARATOR, "=")) {
+                let module = ModuleUri {
+                    path,
+                    name: name.parse()?,
+                };
+                let Some(s) = split.next() else {
+                    return Err(UriParseError::MissingPartFor {
+                        uri_kind: UriKind::Symbol,
+                        part: UriComponentKind::s,
+                    });
+                };
+                s.strip_prefix(concatcp!(SymbolUri::SEPARATOR, "="))
+                    .map_or_else(
+                        || {
+                            Err(UriParseError::MissingPartFor {
+                                uri_kind: UriKind::Symbol,
+                                part: UriComponentKind::s,
+                            })
+                        },
+                        |name| {
+                            let ret = SymbolUri {
+                                module,
+                                name: name.parse()?,
+                            };
+                            if split.next().is_some() {
+                                Err(UriParseError::TooManyPartsFor {
+                                    uri_kind: UriKind::Symbol,
+                                })
+                            } else {
+                                Ok(Self::Symbol(ret))
+                            }
+                        },
+                    )
+            } else if let Some(name) = m.strip_prefix(concatcp!(DocumentUri::SEPARATOR, "=")) {
+                let Some(l) = split.next() else {
+                    return Err(UriParseError::MissingPartFor {
+                        uri_kind: UriKind::DocumentElement,
+                        part: UriComponentKind::l,
+                    });
+                };
+                l.strip_prefix(concatcp!(Language::SEPARATOR, "="))
+                    .map_or_else(
+                        || {
+                            Err(UriParseError::MissingPartFor {
+                                uri_kind: UriKind::DocumentElement,
+                                part: UriComponentKind::l,
+                            })
+                        },
+                        |lang| {
+                            let language = lang
+                                .parse()
+                                .map_or_else(|_| Err(UriParseError::InvalidLanguage), Ok)?;
+                            let document = DocumentUri {
+                                path,
+                                name: name.parse()?,
+                                language,
+                            };
+                            let Some(s) = split.next() else {
+                                return Err(UriParseError::MissingPartFor {
+                                    uri_kind: UriKind::DocumentElement,
+                                    part: UriComponentKind::e,
+                                });
+                            };
+                            s.strip_prefix(concatcp!(DocumentElementUri::SEPARATOR, "="))
+                                .map_or_else(
+                                    || {
+                                        Err(UriParseError::MissingPartFor {
+                                            uri_kind: UriKind::DocumentElement,
+                                            part: UriComponentKind::e,
+                                        })
+                                    },
+                                    |name| {
+                                        if split.next().is_some() {
+                                            return Err(UriParseError::TooManyPartsFor {
+                                                uri_kind: UriKind::DocumentElement,
+                                            });
+                                        }
+                                        Ok(Self::Element(DocumentElementUri {
+                                            document,
+                                            name: name.parse()?,
+                                        }))
+                                    },
+                                )
+                        },
+                    )
+            } else {
+                Err(UriParseError::MissingPartFor {
+                    uri_kind: UriKind::Symbol,
+                    part: UriComponentKind::m,
+                })
+            }
         })
     }
 }
@@ -1113,6 +1250,130 @@ impl NamedUri for NarrativeUri {
         match self {
             Self::Document(d) => d.name(),
             Self::Element(e) => e.name(),
+        }
+    }
+}
+
+impl std::fmt::Display for LeafUri {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Element(m) => m.fmt(f),
+            Self::Symbol(s) => s.fmt(f),
+        }
+    }
+}
+impl FtmlUri for LeafUri {
+    fn url_encoded(&self) -> impl std::fmt::Display {
+        match self {
+            Self::Element(m) => either::Left(m.url_encoded()),
+            Self::Symbol(s) => either::Right(s.url_encoded()),
+        }
+    }
+    #[inline]
+    fn base(&self) -> &BaseUri {
+        match self {
+            Self::Element(m) => m.base(),
+            Self::Symbol(s) => s.base(),
+        }
+    }
+
+    fn as_uri(&self) -> UriRef<'_> {
+        match self {
+            Self::Element(m) => UriRef::DocumentElement(m),
+            Self::Symbol(s) => UriRef::Symbol(s),
+        }
+    }
+
+    fn could_be(maybe_uri: &str) -> bool {
+        if maybe_uri.contains("&s") {
+            SymbolUri::could_be(maybe_uri)
+        } else {
+            DocumentElementUri::could_be(maybe_uri)
+        }
+    }
+}
+impl From<LeafUri> for Uri {
+    #[inline]
+    fn from(value: LeafUri) -> Self {
+        match value {
+            LeafUri::Element(e) => Self::DocumentElement(e),
+            LeafUri::Symbol(s) => Self::Symbol(s),
+        }
+    }
+}
+
+impl PartialEq<str> for LeafUri {
+    fn eq(&self, other: &str) -> bool {
+        match self {
+            Self::Element(m) => *m == *other,
+            Self::Symbol(s) => *s == *other,
+        }
+    }
+}
+impl From<LeafUri> for BaseUri {
+    #[inline]
+    fn from(value: LeafUri) -> Self {
+        match value {
+            LeafUri::Element(m) => m.into(),
+            LeafUri::Symbol(s) => s.into(),
+        }
+    }
+}
+impl UriWithArchive for LeafUri {
+    #[inline]
+    fn archive_uri(&self) -> &ArchiveUri {
+        match self {
+            Self::Element(m) => m.archive_uri(),
+            Self::Symbol(s) => s.archive_uri(),
+        }
+    }
+}
+impl From<LeafUri> for ArchiveUri {
+    #[inline]
+    fn from(value: LeafUri) -> Self {
+        match value {
+            LeafUri::Element(m) => m.into(),
+            LeafUri::Symbol(s) => s.into(),
+        }
+    }
+}
+impl UriWithPath for LeafUri {
+    #[inline]
+    fn path_uri(&self) -> &PathUri {
+        match self {
+            Self::Element(m) => m.path_uri(),
+            Self::Symbol(s) => s.path_uri(),
+        }
+    }
+}
+impl From<LeafUri> for PathUri {
+    #[inline]
+    fn from(value: LeafUri) -> Self {
+        match value {
+            LeafUri::Element(m) => m.into(),
+            LeafUri::Symbol(s) => s.into(),
+        }
+    }
+}
+impl From<DocumentElementUri> for LeafUri {
+    #[inline]
+    fn from(value: DocumentElementUri) -> Self {
+        Self::Element(value)
+    }
+}
+impl From<SymbolUri> for LeafUri {
+    #[inline]
+    fn from(value: SymbolUri) -> Self {
+        Self::Symbol(value)
+    }
+}
+impl NamedUri for LeafUri {
+    #[inline]
+    fn name(&self) -> &UriName {
+        match self {
+            Self::Element(m) => m.name(),
+            Self::Symbol(s) => s.name(),
         }
     }
 }
