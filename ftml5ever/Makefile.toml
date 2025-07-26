@@ -1,0 +1,17 @@
+[tasks.test-no-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--no-default-features"]
+
+[tasks.test-rdf]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=rdf"]
+
+[tasks.all-tests]
+dependencies = ["test-no-features", "test-rdf", "test-typescript"]
+
+[tasks.doc]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "doc", "--no-deps", "--all-features"]
