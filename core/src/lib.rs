@@ -12,7 +12,9 @@ pub mod extraction;
 
 #[macro_export]
 macro_rules! TODO {
-    () => {
-        todo!()
+    ($($t:tt)*) => {
+        todo!($($t)*)
     }; //() => { TODO };
 }
+
+pub type NodePath = smallvec::SmallVec<u32, 4>;

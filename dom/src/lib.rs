@@ -12,6 +12,7 @@ mod document;
 pub mod extractor;
 pub mod markers;
 pub mod mathml;
+pub mod terms;
 pub mod toc;
 pub mod utils {
     pub mod actions;
@@ -24,7 +25,7 @@ use crate::{
     markers::{InputrefInfo, Marker, SectionInfo},
 };
 pub use document::{DocumentMeta, DocumentState, setup_document};
-use ftml_core::extraction::FtmlExtractor;
+use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, VarOrSym};
 use ftml_ontology::{narrative::elements::SectionLevel, terms::Variable};
 use ftml_uris::{SymbolUri, UriName};
 use leptos::prelude::*;
@@ -35,12 +36,6 @@ pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
     #[cfg(feature = "ssr")]
     provide_context(utils::css::CssIds::default());
     f()
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum VarOrSym {
-    S(SymbolUri),
-    V(Variable),
 }
 
 pub trait FtmlViews: 'static {
@@ -88,10 +83,31 @@ pub trait FtmlViews: 'static {
         _uri: SymbolUri,
         _notation: Option<UriName>,
         _is_math: bool,
+        _in_term: bool,
         then: impl FnOnce() -> V + Clone + Send + 'static,
     ) -> impl IntoView {
         then()
     }
+
+    #[inline]
+    fn application<V: IntoView + 'static>(
+        _head: VarOrSym,
+        _notation: Option<UriName>,
+        _is_math: bool,
+        then: impl FnOnce() -> V + Clone + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+    /*
+    #[inline]
+    fn argument<V: IntoView + 'static>(
+        _position: ArgumentPosition,
+        _is_math: bool,
+        then: impl FnOnce() -> V + Clone + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+     */
 
     #[inline]
     fn section_title<V: IntoView>(
@@ -130,12 +146,13 @@ fn iterate<Views: FtmlViews + ?Sized>(
     }
     tracing::debug!("Has ftml attributes");
     let sig = expect_context::<RwSignal<DomExtractor>>();
-    let (mut markers, close) = sig.update_untracked(|extractor| {
+    let n = FtmlDomElement::new(e.clone());
+    let (mut markers, invisible, close) = sig.update_untracked(|extractor| {
         let mut attrs = NodeAttrs::new(e);
         let rules = attrs.keys();
         let mut markers = smallvec::SmallVec::<_, 4>::new();
         let mut close = smallvec::SmallVec::<_, 2>::new();
-        for r in rules.apply(extractor, &mut attrs) {
+        for r in rules.apply(extractor, &mut attrs, &n) {
             match r {
                 Ok((m, c)) => {
                     if let Some(m) = m {
@@ -151,9 +168,12 @@ fn iterate<Views: FtmlViews + ?Sized>(
                 }
             }
         }
-        (markers, close)
+        (markers, extractor.invisible(), close)
     });
-    let rview = if markers.is_empty() {
+    let rview = if invisible {
+        tracing::debug!("invisible");
+        None
+    } else if markers.is_empty() {
         tracing::debug!("No markers");
         None
     } else {
@@ -171,7 +191,6 @@ fn iterate<Views: FtmlViews + ?Sized>(
         Some(move || {
             tracing::debug!("closing element: {close:?}");
             sig.update_untracked(move |extractor| {
-                let n = FtmlDomElement(&e);
                 for c in close.into_iter().rev() {
                     if let Err(e) = extractor.close(c, &n) {
                         tracing::error!("{e}");

@@ -5,6 +5,7 @@ use crate::{
     counters::{LogicalLevel, SectionCounters},
     extractor::DomExtractor,
     markers::{InputrefInfo, SectionInfo},
+    terms::{OpenApp, ReactiveApplication, ReactiveTerm},
     toc::{CurrentId, NavElems, TOCElem},
 };
 use ftml_core::extraction::{FtmlExtractor, OpenDomainElement};
@@ -77,14 +78,35 @@ impl DocumentState {
             .expect("Not in a document context")
     }
 
+    /// ### Panics
+    pub fn in_term() -> bool {
+        with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(DomExtractor::in_term))
+            .expect("Not in a document context")
+    }
+
+    pub fn track_oma<V: IntoView>(
+        head: VarOrSym,
+        children: impl FnOnce(ReadSignal<ReactiveApplication>) -> V,
+    ) -> impl IntoView {
+        let sig = RwSignal::new(ReactiveApplication::Open(OpenApp {
+            head,
+            arguments: Vec::new(),
+        }));
+        provide_context(ReactiveTerm::Application(sig));
+        children(sig.read_only())
+    }
+
     pub fn current_term_head() -> Option<VarOrSym> {
         with_context::<RwSignal<DomExtractor>, _>(|s| {
             s.with_untracked(|e| match e.iterate_domain().next() {
                 Some(OpenDomainElement::SymbolReference { uri, .. }) => {
                     Some(VarOrSym::S(uri.clone()))
                 }
+                Some(OpenDomainElement::OMA { head, .. }) => Some(head.clone()),
                 Some(
-                    OpenDomainElement::Module { .. } | OpenDomainElement::SymbolDeclaration { .. },
+                    OpenDomainElement::Module { .. }
+                    | OpenDomainElement::SymbolDeclaration { .. }
+                    | OpenDomainElement::Argument { .. },
                 )
                 | None => None,
             })

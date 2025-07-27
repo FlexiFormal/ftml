@@ -215,7 +215,7 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                                 .collect();
                             if !rules.is_empty() {
                                 let mut closes = SmallVec::<_, 2>::new();
-                                for r in rules.apply(&mut *extractor, &mut *attributes) {
+                                for r in rules.apply(&mut *extractor, &mut *attributes, &child) {
                                     match r {
                                         Ok(((), c)) => {
                                             if let Some(c) = c {

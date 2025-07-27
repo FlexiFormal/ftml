@@ -1,8 +1,8 @@
-use ftml_core::extraction::OpenFtmlElement;
+use ftml_core::extraction::{ArgumentPosition, OpenFtmlElement, VarOrSym};
 use ftml_uris::{DocumentElementUri, DocumentUri, SymbolUri, UriName};
 use leptos::{
     IntoView,
-    prelude::{IntoAny, Memo, RwSignal},
+    prelude::{IntoAny, Memo, RwSignal, UpdateUntracked, provide_context, with_context},
 };
 use leptos_posthoc::OriginalNode;
 
@@ -10,6 +10,7 @@ use crate::{
     FtmlViews,
     counters::LogicalLevel,
     document::DocumentState,
+    terms::{OpenApp, ReactiveApplication, ReactiveTerm},
     utils::actions::{OneShot, SetOneShotDone},
 };
 
@@ -17,9 +18,9 @@ use crate::{
 pub enum Marker {
     Section(DocumentElementUri),
     SymbolReference {
+        in_term: bool,
         uri: SymbolUri,
         notation: Option<UriName>,
-        in_term: bool,
     },
     InputRef {
         target: DocumentUri,
@@ -28,6 +29,12 @@ pub enum Marker {
     SkipSection,
     SectionTitle,
     Comp,
+    OMA {
+        uri: Option<DocumentElementUri>,
+        head: VarOrSym,
+        notation: Option<UriName>,
+    },
+    Argument(ArgumentPosition),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -68,7 +75,7 @@ impl Marker {
         mut orig: OriginalNode,
     ) -> impl IntoView {
         #[allow(clippy::enum_glob_use)]
-        use leptos::either::EitherOf8::*;
+        use leptos::either::EitherOf10::*;
         let Some(m) = markers.pop() else {
             return A(leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
                 orig,
@@ -107,9 +114,19 @@ impl Marker {
             Self::SymbolReference {
                 uri,
                 notation,
-                in_term: false,
-            } => H(owned!(Views::symbol_reference(
-                uri,
+                in_term,
+            } => H(owned!({
+                //provide_context(ReactiveTerm::Symbol(uri.clone()));
+                Views::symbol_reference(uri, notation, is_math, in_term, move || {
+                    // makes sure the "current orig" gets actually used / hydrated first
+                    // just in case it has, like, listeners or something
+                    let clone = orig.deep_clone();
+                    Self::apply::<Views>(markers, is_math, std::mem::replace(&mut orig, clone))
+                        .into_any()
+                })
+            })),
+            Self::OMA { head, notation, .. } => I(owned!(Views::application(
+                head,
                 notation,
                 is_math,
                 move || {
@@ -120,7 +137,35 @@ impl Marker {
                         .into_any()
                 }
             ))),
-            Self::SymbolReference { uri, notation, .. } => ftml_core::TODO!(),
+            Self::Argument(pos) => J(owned!({
+                #[allow(clippy::branches_sharing_code)]
+                if with_context::<ReactiveTerm, _>(|_| ()).is_some() {
+                    // TODO
+                    Self::apply::<Views>(markers, is_math, orig).into_any()
+                } else {
+                    Self::apply::<Views>(markers, is_math, orig).into_any()
+                }
+                /*
+                let v = Views::argument(pos, is_math, move || {
+                    // makes sure the "current orig" gets actually used / hydrated first
+                    // just in case it has, like, listeners or something
+                    let clone = orig.deep_clone();
+                    Self::apply::<Views>(markers, is_math, std::mem::replace(&mut orig, clone))
+                        .into_any()
+                });
+                with_context::<ReactiveTerm, _>(|c| match c {
+                    ReactiveTerm::Symbol(_) | ReactiveTerm::Variable(_) => {
+                        tracing::error!("Invalid argument position; this is a bug");
+                    }
+                    ReactiveTerm::Application(s) => s.update_untracked(|app| match app {
+                        ReactiveApplication::Closed(_) => {
+                            tracing::error!("term already closed; this is a bug");
+                        }
+                        ReactiveApplication::Open(OpenApp { arguments, .. }) => ftml_core::TODO!(),
+                    }),
+                });
+                v*/
+            })),
         }
     }
 
@@ -148,15 +193,21 @@ impl Marker {
             OpenFtmlElement::SkipSection => Some(Self::SkipSection),
             OpenFtmlElement::SectionTitle => Some(Self::SectionTitle),
             OpenFtmlElement::Section(uri) => Some(Self::Section(uri.clone())),
-            OpenFtmlElement::SymbolReference {
-                uri,
-                notation,
-                in_term,
-            } => Some(Self::SymbolReference {
+            OpenFtmlElement::SymbolReference { uri, notation } => Some(Self::SymbolReference {
                 uri: uri.clone(),
                 notation: notation.clone(),
-                in_term: *in_term,
+                in_term: DocumentState::in_term(),
             }),
+            OpenFtmlElement::OMA {
+                head,
+                notation,
+                uri,
+            } => Some(Self::OMA {
+                head: head.clone(),
+                notation: notation.clone(),
+                uri: uri.clone(),
+            }),
+            OpenFtmlElement::Argument(pos) => Some(Self::Argument(*pos)),
             OpenFtmlElement::Counter(_)
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::None

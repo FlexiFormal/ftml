@@ -167,7 +167,7 @@ macro_rules! do_keys {
             }
         }
     };
-    (@fun $self:ident todo) => { |e,a,k| crate::extraction::rules::todo(Self::$self,e,a,k) };
+    (@fun $self:ident todo) => { |e,a,k,n| crate::extraction::rules::todo(Self::$self,e,a,k,n) };
     (@fun $self:ident $fun:ident) => { crate::extraction::rules::$fun };
     (@u8 $slf:ident {$($p:ident)*}) => {0};
     (@u8 $slf:ident {$($p:ident)*} $n:ident $($r:ident)*) => {

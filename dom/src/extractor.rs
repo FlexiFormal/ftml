@@ -1,3 +1,5 @@
+use crate::{extractor, markers::Marker};
+use either::Either;
 use ftml_core::{
     FtmlKey,
     extraction::{
@@ -9,11 +11,12 @@ use ftml_ontology::narrative::DocumentRange;
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::wasm_bindgen::{JsCast, JsValue};
 use leptos::web_sys::{Element, js_sys::JsString};
-
-use crate::{extractor, markers::Marker};
+use send_wrapper::SendWrapper;
+use std::borrow::Cow;
+use web_sys::NodeList;
 
 pub struct DomExtractor {
-    pub(crate) state: ExtractorState,
+    pub(crate) state: ExtractorState<FtmlDomElement>,
     pub(crate) context: NarrativeUri,
 }
 impl DomExtractor {
@@ -31,15 +34,15 @@ static RULES: FtmlRuleSet<DomExtractor> = FtmlRuleSet::new();
 impl FtmlStateExtractor for DomExtractor {
     type Attributes<'a> = NodeAttrs;
     type Return = Option<Marker>;
-    type Node<'n> = FtmlDomElement<'n>;
+    type Node = FtmlDomElement;
     const RULES: &'static FtmlRuleSet<Self> = &RULES;
     const DO_RDF: bool = false;
     #[inline]
-    fn state(&self) -> &ExtractorState {
+    fn state(&self) -> &ExtractorState<Self::Node> {
         &self.state
     }
     #[inline]
-    fn state_mut(&mut self) -> &mut ExtractorState {
+    fn state_mut(&mut self) -> &mut ExtractorState<Self::Node> {
         &mut self.state
     }
     #[inline]
@@ -53,8 +56,14 @@ impl FtmlStateExtractor for DomExtractor {
 }
 
 #[derive(Clone)]
-pub struct FtmlDomElement<'n>(pub(crate) &'n Element);
-impl FtmlNode for FtmlDomElement<'_> {
+pub struct FtmlDomElement(pub(crate) SendWrapper<Element>);
+impl FtmlDomElement {
+    #[inline]
+    pub fn new(e: Element) -> Self {
+        Self(SendWrapper::new(e))
+    }
+}
+impl FtmlNode for FtmlDomElement {
     #[inline]
     fn delete(&self) {
         self.0.remove();
@@ -66,6 +75,69 @@ impl FtmlNode for FtmlDomElement<'_> {
     #[inline]
     fn inner_range(&self) -> DocumentRange {
         DocumentRange::default()
+    }
+    fn path_from(&self, ancestor: &Self) -> smallvec::SmallVec<u32, 4> {
+        fn path_from_i(slf: &Element, ancestor: &Element) -> smallvec::SmallVec<u32, 4> {
+            if slf == ancestor {
+                return smallvec::SmallVec::new();
+            }
+            let p = slf.parent_element().expect("element has no parent??");
+            let mut index = None;
+            let mut i = 0;
+            while let Some(e) = p.child_nodes().get(i) {
+                if e == **slf {
+                    index = Some(i);
+                    break;
+                }
+                i += 1;
+            }
+            let index = index.expect("wut??");
+            let mut ret = path_from_i(&p, ancestor);
+            ret.push(index);
+            ret
+        }
+        path_from_i(&self.0, &ancestor.0)
+    }
+    fn children(&self) -> impl Iterator<Item = Option<either::Either<Self, String>>> {
+        struct NodeIter(NodeList, u32);
+        impl Iterator for NodeIter {
+            type Item = Option<Either<FtmlDomElement, String>>;
+            fn next(&mut self) -> Option<Self::Item> {
+                self.0.get(self.1).map(|n| {
+                    self.1 += 1;
+                    match n.dyn_into() {
+                        Ok(e) => Some(Either::Left(FtmlDomElement(SendWrapper::new(e)))),
+                        Err(n) => n.text_content().map(Either::Right),
+                    }
+                })
+            }
+        }
+        NodeIter(self.0.child_nodes(), 0)
+    }
+    #[inline]
+    fn tag_name(&self) -> Result<Cow<'_, str>, String> {
+        Ok(Cow::Owned(self.0.tag_name()))
+    }
+    fn iter_attributes(&self) -> impl Iterator<Item = Result<(Cow<'_, str>, String), String>> {
+        struct AttrIter<'a>(web_sys::js_sys::Array, &'a Element, u32);
+        impl<'a> Iterator for AttrIter<'a> {
+            type Item = Result<(Cow<'a, str>, String), String>;
+            fn next(&mut self) -> Option<Self::Item> {
+                let next = self.0.get(self.2);
+                if next.is_undefined() {
+                    return None;
+                }
+                self.2 += 1;
+                let Some(key) = next.as_string() else {
+                    return Some(Err("invalid attribute".to_string()));
+                };
+                let Some(value) = self.1.get_attribute(key.as_ref()) else {
+                    return Some(Err("invalid attribute".to_string()));
+                };
+                Some(Ok((Cow::Owned(key), value)))
+            }
+        }
+        AttrIter(self.0.get_attribute_names(), &self.0, 0)
     }
 }
 

@@ -68,7 +68,7 @@ fn do_css(css: Css) {
                         return;
                     }
                     Ok(None) => (),
-                };
+                }
                 let Ok(style) = document().create_element("link") else {
                     leptos::logging::log!("ERROR: error creating style element");
                     return;

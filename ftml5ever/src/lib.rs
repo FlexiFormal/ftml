@@ -21,14 +21,14 @@ pub struct HtmlExtractor {
     title: Option<Box<str>>,
     //document:UncheckedDocument,
     //backend: &'a AnyBackend,
-    state: ExtractorState,
+    state: ExtractorState<ever::NodeRef>,
 }
 
 static RULES: ftml_core::extraction::FtmlRuleSet<HtmlExtractor> =
     ftml_core::extraction::FtmlRuleSet::new();
 impl FtmlStateExtractor for HtmlExtractor {
     type Attributes<'a> = ever::Attributes;
-    type Node<'n> = ever::NodeRef;
+    type Node = ever::NodeRef;
     type Return = ();
     const RULES: &'static ftml_core::extraction::FtmlRuleSet<Self> = &RULES;
     #[cfg(feature = "rdf")]
@@ -37,11 +37,11 @@ impl FtmlStateExtractor for HtmlExtractor {
     const DO_RDF: bool = false;
 
     #[inline]
-    fn state_mut(&mut self) -> &mut ExtractorState {
+    fn state_mut(&mut self) -> &mut ExtractorState<ever::NodeRef> {
         &mut self.state
     }
     #[inline]
-    fn state(&self) -> &ExtractorState {
+    fn state(&self) -> &ExtractorState<ever::NodeRef> {
         &self.state
     }
     /// ### Errors

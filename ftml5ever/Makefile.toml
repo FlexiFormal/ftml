@@ -8,8 +8,13 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=rdf"]
 
+[tasks.test-all-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--all-features"]
+
 [tasks.all-tests]
-dependencies = ["test-no-features", "test-rdf", "test-typescript"]
+dependencies = ["test-no-features", "test-rdf", "test-all-features"]
 
 [tasks.doc]
 command = "cargo"

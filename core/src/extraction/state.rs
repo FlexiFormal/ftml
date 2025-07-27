@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use crate::{
     FtmlKey,
     extraction::{
-        CloseFtmlElement, FtmlExtractionError, MetaDatum, OpenDomainElement, OpenFtmlElement,
-        OpenNarrativeElement, Split, nodes::FtmlNode,
+        ArgumentPosition, CloseFtmlElement, FtmlExtractionError, MetaDatum, OpenArgument,
+        OpenDomainElement, OpenFtmlElement, OpenNarrativeElement, Split, VarOrSym, nodes::FtmlNode,
     },
 };
 use ftml_ontology::{
@@ -20,6 +20,7 @@ use ftml_ontology::{
         documents::{DocumentCounter, DocumentStyle},
         elements::{DocumentElement, Section},
     },
+    terms::{Argument, ArgumentMode, BoundArgument, Term, Variable},
 };
 #[cfg(feature = "rdf")]
 use ftml_uris::FtmlUri;
@@ -102,13 +103,13 @@ impl<T> StackVec<T> {
     }
 }
 
-pub struct ExtractorState {
+pub struct ExtractorState<N: FtmlNode> {
     pub document: DocumentUri,
     pub top: Vec<DocumentElement>,
     pub modules: Vec<ModuleData>,
     pub counters: Vec<DocumentCounter>,
     pub styles: Vec<DocumentStyle>,
-    domain: StackVec<OpenDomainElement>,
+    domain: StackVec<OpenDomainElement<N>>,
     narrative: StackVec<OpenNarrativeElement>,
     ids: IdCounter,
     #[allow(dead_code)]
@@ -158,7 +159,7 @@ macro_rules! add_triples {
 }
 
 #[allow(unused_variables)]
-impl ExtractorState {
+impl<N: FtmlNode> ExtractorState<N> {
     #[inline]
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
@@ -196,7 +197,7 @@ impl ExtractorState {
         &self.document
     }
     #[inline]
-    pub fn domain(&self) -> impl Iterator<Item = &OpenDomainElement> {
+    pub fn domain(&self) -> impl Iterator<Item = &OpenDomainElement<N>> {
         self.domain.iter()
     }
     #[inline]
@@ -205,8 +206,8 @@ impl ExtractorState {
     }
 
     /// ### Errors
-    pub fn add(&mut self, e: OpenFtmlElement) {
-        match e.split() {
+    pub fn add(&mut self, e: OpenFtmlElement, node: &N) {
+        match e.split(node) {
             Split::Open { domain, narrative } => {
                 if let Some(dom) = domain {
                     self.domain.push(dom);
@@ -227,7 +228,7 @@ impl ExtractorState {
     }
 
     /// ### Errors
-    pub fn close<N: FtmlNode>(&mut self, elem: CloseFtmlElement, node: &N) -> super::Result<()> {
+    pub fn close(&mut self, elem: CloseFtmlElement, node: &N) -> super::Result<()> {
         match elem {
             CloseFtmlElement::Module => match self.domain.pop() {
                 Some(OpenDomainElement::Module {
@@ -279,12 +280,30 @@ impl ExtractorState {
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::SkipSection)),
             },
             CloseFtmlElement::SymbolReference => match self.domain.pop() {
-                Some(OpenDomainElement::SymbolReference {
-                    uri,
-                    notation,
-                    in_term,
-                }) => self.close_oms(uri, notation, in_term, node.range()),
+                Some(OpenDomainElement::SymbolReference { uri, notation }) => {
+                    self.close_oms(uri, notation, node)
+                }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term)),
+            },
+            CloseFtmlElement::OMA => match self.domain.pop() {
+                Some(OpenDomainElement::OMA {
+                    head,
+                    notation: _,
+                    arguments,
+                    uri,
+                }) => self.close_oma(head, uri, arguments, node),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Symdecl)),
+            },
+            CloseFtmlElement::Argument => match self.domain.pop() {
+                Some(OpenDomainElement::Argument {
+                    position,
+                    terms,
+                    node: n,
+                }) => {
+                    //debug_assert_eq!(node,n);
+                    self.close_argument(position, terms, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg)),
             },
             CloseFtmlElement::SectionTitle => self.close_title(node),
             CloseFtmlElement::Invisible => {
@@ -303,22 +322,9 @@ impl ExtractorState {
             ) => {
                 children.push(e);
             }
+            Some(OpenNarrativeElement::Invisible) => (),
             None => self.top.push(e),
         }
-        /*
-         #[allow(clippy::never_loop)]
-         for p in self.narrative.iter_mut().rev() {
-             match p {
-                 OpenNarrativeElement::Module { children, .. }
-                 | OpenNarrativeElement::Section { children, .. }
-                 | OpenNarrativeElement::SkipSection { children } => {
-                     children.push(e);
-                     return;
-                 }
-             }
-         }
-        self.top.push(e);
-        */
     }
 
     fn close_section(
@@ -337,7 +343,7 @@ impl ExtractorState {
         self.push_elem(DocumentElement::Section(sec));
     }
 
-    fn close_title<N: FtmlNode>(&mut self, node: &N) -> super::Result<()> {
+    fn close_title(&mut self, node: &N) -> super::Result<()> {
         for e in self.narrative.iter_mut() {
             match e {
                 OpenNarrativeElement::Section { title, .. } if title.is_none() => {
@@ -350,29 +356,129 @@ impl ExtractorState {
                 OpenNarrativeElement::SkipSection { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
-                OpenNarrativeElement::Module { .. } => (),
+                OpenNarrativeElement::Module { .. } | OpenNarrativeElement::Invisible => (),
             }
         }
         Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title))
+    }
+
+    fn close_argument(
+        &mut self,
+        position: ArgumentPosition,
+        mut terms: Vec<(Term, crate::NodePath)>,
+        node: &N,
+    ) -> super::Result<()> {
+        let term = if terms.len() == 1 {
+            match terms.first() {
+                Some((_, path)) if path.is_empty() =>
+                // SAFETY: len == 1
+                unsafe { terms.pop().unwrap_unchecked().0 },
+                _ => node.as_term(terms)?,
+            }
+        } else {
+            node.as_term(terms)?
+        };
+        match self.domain.last_mut() {
+            Some(OpenDomainElement::OMA { arguments, .. }) => {
+                OpenArgument::set(arguments, position, term)
+            }
+            None
+            | Some(
+                OpenDomainElement::Argument { .. }
+                | OpenDomainElement::Module { .. }
+                | OpenDomainElement::SymbolDeclaration { .. }
+                | OpenDomainElement::SymbolReference { .. },
+            ) => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg)),
+        }
+    }
+
+    fn close_oma(
+        &mut self,
+        head: VarOrSym,
+        uri: Option<DocumentElementUri>,
+        arguments: Vec<OpenArgument>,
+        node: &N,
+    ) -> super::Result<()> {
+        let mut args = Vec::with_capacity(arguments.len());
+        for (i, a) in arguments.into_iter().enumerate() {
+            if let Some(a) = a.close() {
+                args.push(a);
+            } else {
+                return Err(FtmlExtractionError::MissingArgument(i + 1));
+            }
+        }
+        let term = Term::Application {
+            head: Box::new(match head {
+                VarOrSym::S(s) => Term::Symbol(s),
+                VarOrSym::V(v) => Term::Var(v),
+            }),
+            arguments: args.into_boxed_slice(),
+        }
+        .simplify();
+
+        match &mut self.domain.last {
+            Some(OpenDomainElement::Module { .. }) | None => (),
+            Some(OpenDomainElement::Argument {
+                terms,
+                node: ancestor,
+                ..
+            }) => {
+                terms.push((term, node.path_from(ancestor)));
+                return Ok(());
+            }
+            Some(
+                OpenDomainElement::OMA { .. }
+                | OpenDomainElement::SymbolDeclaration { .. }
+                | OpenDomainElement::SymbolReference { .. },
+            ) => {
+                return Err(FtmlExtractionError::InvalidIn(
+                    FtmlKey::Term,
+                    "declarations or terms outside of an argument",
+                ));
+            }
+        }
+        uri.map_or(
+            Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term)),
+            |uri| {
+                self.push_elem(DocumentElement::Term { uri, term });
+                Ok(())
+            },
+        )
     }
 
     fn close_oms(
         &mut self,
         uri: SymbolUri,
         notation: Option<UriName>,
-        in_term: bool,
-        range: DocumentRange,
+        node: &N,
     ) -> super::Result<()> {
-        if in_term {
-            crate::TODO!()
-        } else {
-            self.push_elem(DocumentElement::SymbolReference {
-                range,
-                uri,
-                notation,
-            });
-            Ok(())
+        match &mut self.domain.last {
+            Some(OpenDomainElement::Argument {
+                terms,
+                node: ancestor,
+                ..
+            }) => {
+                terms.push((Term::Symbol(uri), node.path_from(ancestor)));
+                return Ok(());
+            }
+            Some(
+                OpenDomainElement::OMA { .. }
+                | OpenDomainElement::SymbolDeclaration { .. }
+                | OpenDomainElement::SymbolReference { .. },
+            ) => {
+                return Err(FtmlExtractionError::InvalidIn(
+                    FtmlKey::Term,
+                    "declarations or terms outside of an argument",
+                ));
+            }
+            Some(OpenDomainElement::Module { .. }) | None => (),
         }
+        self.push_elem(DocumentElement::SymbolReference {
+            range: node.range(),
+            uri,
+            notation,
+        });
+        Ok(())
     }
 
     fn close_module(

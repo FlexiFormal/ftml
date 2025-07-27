@@ -45,3 +45,4 @@ ftml-core = { workspace = true }
 
 html5ever = { workspace = true }
 smallvec = { workspace = true }
+either = { workspace = true }
