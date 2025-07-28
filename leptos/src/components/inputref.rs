@@ -1,4 +1,4 @@
-use ftml_backend::FtmlBackend;
+use crate::{config::FtmlConfigState, utils::LocalCacheExt};
 use ftml_dom::{
     DocumentState, FtmlViews,
     markers::InputrefInfo,
@@ -10,8 +10,6 @@ use ftml_dom::{
 };
 use ftml_uris::{DocumentElementUri, DocumentUri};
 use leptos::prelude::*;
-
-use crate::{config::FtmlConfigState, utils::LocalCacheExt};
 
 #[must_use]
 pub fn inputref<B: SendBackend>(info: InputrefInfo) -> impl IntoView {
@@ -26,6 +24,7 @@ pub fn inputref<B: SendBackend>(info: InputrefInfo) -> impl IntoView {
     } = info;
     let lvl = DocumentState::current_section_level();
     let limit = FtmlConfigState::autoexpand_limit();
+    tracing::debug!("inputref {uri} at level {lvl:?}");
     let expand = Memo::new(move |_| lvl <= limit.get().0 || replacing_done.was_clicked());
     move || {
         if expand.get() {
@@ -56,6 +55,7 @@ fn do_replace<B: SendBackend>(
 ) -> impl IntoView {
     let context = DocumentState::context_uri();
     let uri2 = uri.clone();
+    tracing::debug!("expanding inputref {inputref}");
     LocalCache::with::<B, _, _, _>(
         |b| b.get_document_html(uri2, Some(context)),
         move |(html, css)| {

@@ -13,6 +13,7 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
         lvl,
         uri,
     } = info;
+    tracing::debug!("section {id} at level {lvl:?}");
     view! {
         <div id=id style=style class=class>
           {
@@ -30,6 +31,7 @@ pub fn section_title<V: IntoView>(
     class: &'static str,
     children: impl FnOnce() -> V,
 ) -> impl IntoView {
+    tracing::debug!("section title at level {lvl:?}");
     view! {
       <div class=class>{children()}</div>
       {

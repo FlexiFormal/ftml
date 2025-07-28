@@ -3,7 +3,7 @@ use std::fmt::Write;
 use super::opaque::Opaque;
 use super::{BoundArgument, arguments::Argument, variables::Variable};
 use crate::utils::TreeIter;
-use ftml_uris::{ModuleUri, SymbolUri, UriName};
+use ftml_uris::{Id, SymbolUri, UriName};
 
 /// The type of FTML expressions.
 ///
@@ -54,10 +54,10 @@ pub enum Term {
     /// An opaque/informal expression; may contain formal islands, which are collected in
     /// `expressions`.
     Opaque {
-        tag: String,
-        attributes: Box<[(Box<str>, Box<str>)]>,
+        tag: Id,
+        attributes: Box<[(Id, Box<str>)]>,
         children: Box<[Opaque]>,
-        expressions: Box<[Term]>,
+        terms: Box<[Term]>,
     },
 }
 impl Term {
@@ -84,6 +84,33 @@ impl Term {
                 None
             }
         })
+    }
+
+    #[must_use]
+    pub fn simplify(self) -> Self {
+        const IGNORE_ATTRS: [&str; 4] = [
+            "data-ftml-arg",
+            "data-ftml-argmode",
+            "data-ftml-type",
+            "data-ftml-definiens",
+        ];
+        match self {
+            Self::Opaque {
+                tag,
+                attributes,
+                children,
+                terms,
+            } if tag.as_ref() == "mrow"
+                && terms.len() == 1
+                && *children == [Opaque::Term(0)]
+                && attributes
+                    .iter()
+                    .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
+            {
+                terms[0].clone()
+            }
+            _ => self,
+        }
     }
 }
 
@@ -117,11 +144,12 @@ impl crate::utils::RefTree for Term {
             Self::Label { df: Some(t), .. } | Self::Label { tp: Some(t), .. } => {
                 ExprChildrenIter::One(t)
             }
-            Self::Opaque { expressions, .. } => ExprChildrenIter::Slice(expressions.iter()),
+            Self::Opaque { terms, .. } => ExprChildrenIter::Slice(terms.iter()),
         }
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match e {
         Term::Symbol(s) if LONG => write!(f, "Sym({s})"),
@@ -191,7 +219,43 @@ fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             .field("", name)
             .field(":=", &df.debug_short())
             .finish(),
-        _ => f.write_str("(opaque)"), // TODO
+        Term::Application { head, arguments } => f
+            .debug_struct("OMA")
+            .field("head", head)
+            .field("arguments", arguments)
+            .finish(),
+        Term::Bound {
+            head,
+            arguments,
+            body,
+        } => f
+            .debug_struct("OMBIND")
+            .field("head", head)
+            .field("arguments", arguments)
+            .field("body", body)
+            .finish(),
+        Term::Opaque {
+            tag,
+            attributes,
+            children,
+            terms,
+        } => {
+            write!(f, "<{tag}")?;
+            for (k, v) in attributes {
+                write!(f, " {k}=\"{v}\"")?;
+            }
+            f.write_str(">\n")?;
+            for t in children {
+                writeln!(f, "{t}")?;
+            }
+            f.write_str("<terms>\n")?;
+            for t in terms {
+                fmt::<LONG>(t, f)?;
+                f.write_char('\n')?;
+            }
+            write!(f, "</{tag}>")
+        }
+        _ => write!(f, "TODO"),
     }
 }
 impl std::fmt::Debug for Term {

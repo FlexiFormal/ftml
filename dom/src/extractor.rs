@@ -7,17 +7,26 @@ use ftml_core::{
         nodes::FtmlNode, state::ExtractorState,
     },
 };
-use ftml_ontology::narrative::DocumentRange;
+use ftml_ontology::narrative::{
+    DocumentRange,
+    documents::{DocumentData, DocumentStyles},
+};
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::wasm_bindgen::{JsCast, JsValue};
-use leptos::web_sys::{Element, js_sys::JsString};
+use leptos::web_sys::{Element, NodeList, js_sys::JsString};
 use send_wrapper::SendWrapper;
 use std::borrow::Cow;
-use web_sys::NodeList;
+
+pub enum ExtractorMode {
+    Pending,
+    Extracting,
+    Done,
+}
 
 pub struct DomExtractor {
-    pub(crate) state: ExtractorState<FtmlDomElement>,
-    pub(crate) context: NarrativeUri,
+    pub state: ExtractorState<FtmlDomElement>,
+    pub context: NarrativeUri,
+    pub mode: ExtractorMode,
 }
 impl DomExtractor {
     #[inline]
@@ -25,6 +34,30 @@ impl DomExtractor {
         Self {
             state: ExtractorState::new(uri, false),
             context,
+            mode: ExtractorMode::Pending,
+        }
+    }
+
+    pub fn finish(&mut self) {
+        self.mode = ExtractorMode::Done;
+        if self.state.document != *DocumentUri::no_doc() {
+            let doc = DocumentData {
+                uri: self.state.document.clone(),
+                title: None, // todo
+                elements: std::mem::take(&mut self.state.top).into_boxed_slice(),
+                styles: DocumentStyles {
+                    counters: std::mem::take(&mut self.state.counters).into_boxed_slice(),
+                    styles: std::mem::take(&mut self.state.styles).into_boxed_slice(),
+                },
+            }
+            .close();
+            tracing::info!("Finished document {doc:?}");
+            crate::utils::local_cache::LOCAL_CACHE.documents.insert(doc);
+            for m in std::mem::take(&mut self.state.modules) {
+                let m = m.close();
+                tracing::info!("Found module {m:?}");
+                crate::utils::local_cache::LOCAL_CACHE.modules.insert(m);
+            }
         }
     }
 }
@@ -50,13 +83,13 @@ impl FtmlStateExtractor for DomExtractor {
         &mut self,
         elem: &ftml_core::extraction::OpenFtmlElement,
     ) -> Result<Self::Return, FtmlExtractionError> {
-        Ok(Marker::from(elem))
+        Ok(Marker::from(self, elem))
     }
     //type Node = ;
 }
 
-#[derive(Clone)]
-pub struct FtmlDomElement(pub(crate) SendWrapper<Element>);
+#[derive(Clone, Debug)]
+pub struct FtmlDomElement(pub SendWrapper<Element>);
 impl FtmlDomElement {
     #[inline]
     pub fn new(e: Element) -> Self {
@@ -119,7 +152,7 @@ impl FtmlNode for FtmlDomElement {
         Ok(Cow::Owned(self.0.tag_name()))
     }
     fn iter_attributes(&self) -> impl Iterator<Item = Result<(Cow<'_, str>, String), String>> {
-        struct AttrIter<'a>(web_sys::js_sys::Array, &'a Element, u32);
+        struct AttrIter<'a>(leptos::web_sys::js_sys::Array, &'a Element, u32);
         impl<'a> Iterator for AttrIter<'a> {
             type Item = Result<(Cow<'a, str>, String), String>;
             fn next(&mut self) -> Option<Self::Item> {

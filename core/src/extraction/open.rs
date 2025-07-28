@@ -1,12 +1,14 @@
+use std::{hint::unreachable_unchecked, num::NonZeroU8};
+
+use either::Either::{self, Left, Right};
 use ftml_ontology::{
-    Ftml,
     domain::declarations::{AnyDeclaration, symbols::SymbolData},
     narrative::{
         DocumentRange,
         documents::{DocumentCounter, DocumentStyle},
         elements::{DocumentElement, sections::SectionLevel},
     },
-    terms::{Argument, ArgumentMode, Term, Variable},
+    terms::{Argument, ArgumentMode, BoundArgument, Term, Variable},
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Language, ModuleUri, SymbolUri, UriName};
 
@@ -36,6 +38,10 @@ pub enum OpenFtmlElement {
         uri: SymbolUri,
         notation: Option<UriName>,
     },
+    VariableReference {
+        var: Variable,
+        notation: Option<UriName>,
+    },
     InputRef {
         target: DocumentUri,
         uri: DocumentElementUri,
@@ -45,7 +51,14 @@ pub enum OpenFtmlElement {
         notation: Option<UriName>,
         uri: Option<DocumentElementUri>,
     },
+    OMBIND {
+        head: VarOrSym,
+        notation: Option<UriName>,
+        uri: Option<DocumentElementUri>,
+    },
     Argument(ArgumentPosition),
+    Type,
+    Definiens,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -57,8 +70,12 @@ pub enum CloseFtmlElement {
     SectionTitle,
     SkipSection,
     SymbolReference,
+    VariableReference,
     OMA,
+    OMBIND,
     Argument,
+    Type,
+    Definiens,
 }
 
 #[derive(Debug, Clone)]
@@ -77,14 +94,32 @@ pub enum OpenDomainElement<N: FtmlNode> {
         uri: SymbolUri,
         notation: Option<UriName>,
     },
+    VariableReference {
+        var: Variable,
+        notation: Option<UriName>,
+    },
     OMA {
         head: VarOrSym,
         notation: Option<UriName>,
         uri: Option<DocumentElementUri>,
         arguments: Vec<OpenArgument>,
     },
+    OMBIND {
+        head: VarOrSym,
+        notation: Option<UriName>,
+        uri: Option<DocumentElementUri>,
+        arguments: Vec<OpenBoundArgument>,
+    },
     Argument {
         position: ArgumentPosition,
+        terms: Vec<(Term, crate::NodePath)>,
+        node: N,
+    },
+    Type {
+        terms: Vec<(Term, crate::NodePath)>,
+        node: N,
+    },
+    Definiens {
         terms: Vec<(Term, crate::NodePath)>,
         node: N,
     },
@@ -137,17 +172,47 @@ pub enum VarOrSym {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum OpenArgument {
     None,
-    Simple(Argument),
-    Sequence(Vec<Option<Term>>),
+    Simple(Term),
+    Sequence(Either<Term, Vec<Option<Term>>>),
 }
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum OpenBoundArgument {
+    None,
+    Simple {
+        term: Term,
+        should_be_var: bool,
+    },
+    Sequence {
+        terms: Either<Term, Vec<Option<Term>>>,
+        should_be_var: bool,
+    },
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum ArgumentPosition {
+    Simple(NonZeroU8, ArgumentMode),
+    Sequence {
+        argument_number: NonZeroU8,
+        sequence_index: NonZeroU8,
+        mode: ArgumentMode,
+    },
+}
+
 impl OpenArgument {
     pub fn close(self) -> Option<Argument> {
         use either::Either::Right;
         match self {
-            Self::Simple(a) => Some(a),
-            Self::Sequence(v) if v.iter().all(Option::is_some) => {
-                Some(Argument::Sequence(Right(v.into_iter().flatten().collect())))
+            Self::Simple(a) => Some(Argument::Simple(a)),
+            Self::Sequence(Right(v)) if v.iter().all(Option::is_some) => {
+                Some(Argument::Sequence(Right(
+                    v.into_iter()
+                        .flatten()
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                )))
             }
+            Self::Sequence(Left(t)) => Some(Argument::Sequence(Left(t))),
             Self::None | Self::Sequence(_) => None,
         }
     }
@@ -159,6 +224,7 @@ impl OpenArgument {
         term: Term,
     ) -> Result<(), FtmlExtractionError> {
         use either::Either::Left;
+        tracing::trace!("Setting {position:?} in {args:?} to {term:?}");
         let idx = position.index() as usize;
         while args.len() <= idx {
             args.push(Self::None);
@@ -166,20 +232,20 @@ impl OpenArgument {
         let arg = &mut args[idx];
         match (arg, position) {
             (r @ Self::None, ArgumentPosition::Simple(_, m)) => match m {
-                ArgumentMode::Simple => *r = Self::Simple(Argument::Simple(term)),
-                ArgumentMode::Sequence => *r = Self::Simple(Argument::Sequence(Left(term))),
+                ArgumentMode::Simple => *r = Self::Simple(term),
+                ArgumentMode::Sequence => *r = Self::Sequence(Left(term)),
                 m => return Err(FtmlExtractionError::MismatchedArgument(m)),
             },
             (r @ Self::None, ArgumentPosition::Sequence { sequence_index, .. }) => {
-                let mut v = (0..sequence_index as usize)
+                let mut v = (0..(sequence_index.get() - 1) as usize)
                     .map(|_| None)
                     .collect::<Vec<_>>();
                 v.push(Some(term));
-                *r = Self::Sequence(v);
+                *r = Self::Sequence(Right(v));
             }
-            (Self::Sequence(v), ArgumentPosition::Sequence { sequence_index, .. }) => {
-                let idx = sequence_index as usize;
-                while v.len() <= idx + 1 {
+            (Self::Sequence(Right(v)), ArgumentPosition::Sequence { sequence_index, .. }) => {
+                let idx = (sequence_index.get() - 1) as usize;
+                while v.len() <= idx {
                     v.push(None);
                 }
                 if v[idx].is_some() {
@@ -193,15 +259,133 @@ impl OpenArgument {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ArgumentPosition {
-    Simple(u8, ArgumentMode),
-    Sequence {
-        argument_number: u8,
-        sequence_index: u8,
-        mode: ArgumentMode,
-    },
+impl OpenBoundArgument {
+    pub fn close(self) -> Option<BoundArgument> {
+        use either::Either::Right;
+        match self {
+            Self::Simple {
+                term: Term::Var(v),
+                should_be_var: true,
+            } => Some(BoundArgument::Bound(v)),
+            Self::Simple { term, .. } => Some(BoundArgument::Simple(term)),
+            Self::Sequence {
+                terms: Left(Term::Var(v)),
+                should_be_var: true,
+            } => Some(BoundArgument::BoundSeq(Left(v))),
+            Self::Sequence {
+                terms: Right(v),
+                should_be_var: true,
+            } if v.iter().all(|t| matches!(t, Some(Term::Var(_)))) => {
+                Some(BoundArgument::BoundSeq(Right(
+                    v.into_iter()
+                        .map(|v| {
+                            let Some(Term::Var(v)) = v else {
+                                // SAFETY: iter.all() matches above
+                                unsafe { unreachable_unchecked() }
+                            };
+                            v
+                        })
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                )))
+            }
+            Self::Sequence {
+                terms: Right(v), ..
+            } if v.iter().all(Option::is_some) => Some(BoundArgument::Sequence(Right(
+                v.into_iter().flatten().collect(),
+            ))),
+            Self::Sequence { terms: Left(a), .. } => Some(BoundArgument::Sequence(Left(a))),
+            Self::None | Self::Sequence { .. } => None,
+        }
+    }
+
+    /// ### Errors
+    pub fn set(
+        args: &mut Vec<Self>,
+        position: ArgumentPosition,
+        term: Term,
+    ) -> Result<(), FtmlExtractionError> {
+        use either::Either::Left;
+        tracing::trace!("Setting {position:?} in {args:?} to {term:?}");
+        let idx = position.index() as usize;
+        while args.len() <= idx {
+            args.push(Self::None);
+        }
+        let arg = &mut args[idx];
+        match (arg, position) {
+            (r @ Self::None, ArgumentPosition::Simple(_, m)) => match m {
+                ArgumentMode::Simple => {
+                    *r = Self::Simple {
+                        term,
+                        should_be_var: false,
+                    }
+                }
+                ArgumentMode::Sequence => {
+                    *r = Self::Sequence {
+                        terms: Left(term),
+                        should_be_var: false,
+                    }
+                }
+                ArgumentMode::BoundVariable => {
+                    *r = Self::Simple {
+                        term,
+                        should_be_var: true,
+                    }
+                }
+                ArgumentMode::BoundVariableSequence => {
+                    *r = Self::Sequence {
+                        terms: Left(term),
+                        should_be_var: true,
+                    }
+                }
+            },
+            (
+                r @ Self::None,
+                ArgumentPosition::Sequence {
+                    sequence_index,
+                    mode,
+                    ..
+                },
+            ) => {
+                let mut v = (0..(sequence_index.get() - 1) as usize)
+                    .map(|_| None)
+                    .collect::<Vec<_>>();
+                v.push(Some(term));
+                let should_be_var = matches!(
+                    mode,
+                    ArgumentMode::BoundVariable | ArgumentMode::BoundVariableSequence
+                );
+                *r = Self::Sequence {
+                    terms: Right(v),
+                    should_be_var,
+                };
+            }
+            (
+                Self::Sequence {
+                    terms: Right(v),
+                    should_be_var: _,
+                },
+                ArgumentPosition::Sequence {
+                    sequence_index,
+                    mode: ArgumentMode::Sequence | ArgumentMode::BoundVariableSequence,
+                    ..
+                },
+            ) => {
+                let idx = (sequence_index.get() - 1) as usize;
+                while v.len() <= idx {
+                    v.push(None);
+                }
+                if v[idx].is_some() {
+                    return Err(FtmlExtractionError::MismatchedArgument(position.mode()));
+                }
+                v[idx] = Some(term);
+            }
+            _ => return Err(FtmlExtractionError::MismatchedArgument(position.mode())),
+        }
+        Ok(())
+    }
 }
+
 impl ArgumentPosition {
     #[inline]
     #[must_use]
@@ -215,10 +399,10 @@ impl ArgumentPosition {
     #[must_use]
     pub const fn index(&self) -> u8 {
         match self {
-            Self::Simple(u, _) => *u,
+            Self::Simple(u, _) => u.get() - 1,
             Self::Sequence {
                 argument_number, ..
-            } => *argument_number,
+            } => argument_number.get() - 1,
         }
     }
     #[allow(clippy::cast_possible_truncation)]
@@ -234,7 +418,9 @@ impl ArgumentPosition {
                 .to_digit(10);
             let b = u32::from_str(&idx[1..]).ok();
             match (a, b) {
-                (Some(a), Some(b)) if a < 256 && b < 256 => Right((a as u8, b as u8)),
+                (Some(a), Some(b)) if a < 256 && b < 256 => {
+                    Right(((a as u8).try_into().ok()?, (b as u8).try_into().ok()?))
+                }
                 _ => return None,
             }
         } else if idx.len() == 1 {
@@ -244,7 +430,7 @@ impl ArgumentPosition {
                 .unwrap_or_else(|| unreachable!())
                 .to_digit(10)?;
             if a < 256 {
-                Left(a as u8)
+                Left((a as u8).try_into().ok()?)
             } else {
                 return None;
             }
@@ -317,6 +503,7 @@ impl PreVar {
 
 impl OpenFtmlElement {
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn split<N: FtmlNode>(self, node: &N) -> Split<N> {
         match self {
             Self::Module {
@@ -357,12 +544,29 @@ impl OpenFtmlElement {
                 domain: Some(OpenDomainElement::SymbolReference { uri, notation }),
                 narrative: None,
             },
+            Self::VariableReference { var, notation } => Split::Open {
+                domain: Some(OpenDomainElement::VariableReference { var, notation }),
+                narrative: None,
+            },
             Self::OMA {
                 head,
                 notation,
                 uri,
             } => Split::Open {
                 domain: Some(OpenDomainElement::OMA {
+                    head,
+                    notation,
+                    uri,
+                    arguments: Vec::new(),
+                }),
+                narrative: None,
+            },
+            Self::OMBIND {
+                head,
+                notation,
+                uri,
+            } => Split::Open {
+                domain: Some(OpenDomainElement::OMBIND {
                     head,
                     notation,
                     uri,
@@ -377,6 +581,20 @@ impl OpenFtmlElement {
             Self::Argument(a) => Split::Open {
                 domain: Some(OpenDomainElement::Argument {
                     position: a,
+                    terms: Vec::new(),
+                    node: node.clone(),
+                }),
+                narrative: None,
+            },
+            Self::Type => Split::Open {
+                domain: Some(OpenDomainElement::Type {
+                    terms: Vec::new(),
+                    node: node.clone(),
+                }),
+                narrative: None,
+            },
+            Self::Definiens => Split::Open {
+                domain: Some(OpenDomainElement::Definiens {
                     terms: Vec::new(),
                     node: node.clone(),
                 }),

@@ -227,6 +227,30 @@ pub fn symdecl<E: FtmlExtractor>(
     } + SymbolDeclaration)
 }
 
+pub fn type_component<E: FtmlExtractor>(
+    ext: &mut E,
+    _attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    if ext.in_term() {
+        return Err(FtmlExtractionError::InvalidIn(FtmlKey::Type, "terms"));
+    }
+    ret!(ext,node <- Type + Type)
+}
+
+pub fn definiens<E: FtmlExtractor>(
+    ext: &mut E,
+    _attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    if ext.in_term() {
+        return Err(FtmlExtractionError::InvalidIn(FtmlKey::Definiens, "terms"));
+    }
+    ret!(ext,node <- Definiens + Definiens)
+}
+
 pub fn style<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
@@ -289,6 +313,7 @@ pub fn term<E: FtmlExtractor>(
     node: &E::Node,
 ) -> Result<E> {
     #[derive(Debug)]
+    #[allow(clippy::upper_case_acronyms)]
     enum OpenTermKind {
         OMS,
         //OMMOD,
@@ -351,29 +376,33 @@ pub fn term<E: FtmlExtractor>(
         (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::S(uri)) => {
             ret!(ext,node <- SymbolReference{uri,notation} + SymbolReference)
         }
+        (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::V(var)) => {
+            ret!(ext,node <- VariableReference{var,notation} + VariableReference)
+        }
         (OpenTermKind::OMA, head) => {
             let uri = if ext.in_term() {
-                Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
-            } else {
                 None
+            } else {
+                Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
             };
             ret!(ext,node <- OMA{head,notation,uri} + OMA)
+        }
+        (OpenTermKind::OMBIND, head) => {
+            let uri = if ext.in_term() {
+                None
+            } else {
+                Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
+            };
+            ret!(ext,node <- OMBIND{head,notation,uri} + OMBIND)
         }
         (k, _) => crate::TODO!("{k:?}"),
     }
 
     /*
     let term = match (kind, head) {
-        (OpenTermKind::OMID | OpenTermKind::OMV, VarOrSym::V(name)) => {
-            OpenTerm::Varref { name, notation }
-        }
         (OpenTermKind::OML, VarOrSym::V(PreVar::Unresolved(name))) => {
             extractor.open_decl();
             OpenTerm::OML { name } //, tp: None, df: None }
-        }
-        (OpenTermKind::OMA, head) => {
-            extractor.open_args();
-            OpenTerm::OMA { head, notation } //, args: SmallVec::new() }
         }
         (OpenTermKind::Complex, head) => {
             extractor.open_complex_term();
@@ -415,6 +444,10 @@ pub fn arg<E: FtmlExtractor>(
     if ext.in_term() {
         ret!(ext,node <- Argument(argument) + Argument)
     } else {
+        /* tracing::debug!("Error: Argument: {argument:?}: {:?}", {
+            ext.iterate_domain().collect::<Vec<_>>()
+        });*/
+
         Err(FtmlExtractionError::NotIn(FtmlKey::Arg, "open term"))
     }
 }
@@ -434,12 +467,19 @@ pub fn comp<E: FtmlExtractor>(
     node: &E::Node,
 ) -> Result<E> {
     match ext.iterate_domain().next() {
-        Some(OpenDomainElement::SymbolReference { .. } | OpenDomainElement::OMA { .. }) => (),
+        Some(
+            OpenDomainElement::SymbolReference { .. }
+            | OpenDomainElement::OMA { .. }
+            | OpenDomainElement::OMBIND { .. }
+            | OpenDomainElement::VariableReference { .. },
+        ) => (),
         None
         | Some(
             OpenDomainElement::Module { .. }
             | OpenDomainElement::SymbolDeclaration { .. }
-            | OpenDomainElement::Argument { .. },
+            | OpenDomainElement::Argument { .. }
+            | OpenDomainElement::Type { .. }
+            | OpenDomainElement::Definiens { .. },
         ) => {
             return Err(FtmlExtractionError::NotIn(FtmlKey::Comp, "a term"));
         }
@@ -455,6 +495,8 @@ pub fn maincomp<E: FtmlExtractor>(
 ) -> Result<E> {
     crate::TODO!()
 }
+
+/*
 
 pub fn defcomp<E: FtmlExtractor>(
     ext: &mut E,
@@ -808,22 +850,6 @@ pub fn definiendum<E: FtmlExtractor>(
     crate::TODO!()
 }
 
-pub fn type_component<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn definiens<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
 pub fn conclusion<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
@@ -831,3 +857,5 @@ pub fn conclusion<E: FtmlExtractor>(
 ) -> Result<E> {
     crate::TODO!()
 }
+
+ */

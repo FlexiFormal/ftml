@@ -1,11 +1,8 @@
-use std::str::FromStr;
-
 use crate::{
     VarOrSym,
     counters::{LogicalLevel, SectionCounters},
     extractor::DomExtractor,
     markers::{InputrefInfo, SectionInfo},
-    terms::{OpenApp, ReactiveApplication, ReactiveTerm},
     toc::{CurrentId, NavElems, TOCElem},
 };
 use ftml_core::extraction::{FtmlExtractor, OpenDomainElement};
@@ -13,6 +10,7 @@ use ftml_ontology::narrative::elements::SectionLevel;
 use ftml_uris::{DocumentElementUri, DocumentUri, Language, NarrativeUri};
 use leptos::prelude::*;
 use smallvec::SmallVec;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
@@ -54,6 +52,21 @@ pub fn setup_document<Ch: IntoView + 'static>(
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct InInputref(bool);
 
+/*
+macro_rules! owned {
+    (!$e:expr) => {
+        $e
+    };
+    ($e:expr) => {{
+        let owner = leptos::prelude::Owner::current()
+            .expect("no current reactive Owner found")
+            .child();
+        let children = owner.with(move || $e);
+        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
+    }};
+}
+ */
+
 pub struct DocumentState;
 impl DocumentState {
     /// ### Panics
@@ -84,29 +97,24 @@ impl DocumentState {
             .expect("Not in a document context")
     }
 
-    pub fn track_oma<V: IntoView>(
-        head: VarOrSym,
-        children: impl FnOnce(ReadSignal<ReactiveApplication>) -> V,
-    ) -> impl IntoView {
-        let sig = RwSignal::new(ReactiveApplication::Open(OpenApp {
-            head,
-            arguments: Vec::new(),
-        }));
-        provide_context(ReactiveTerm::Application(sig));
-        children(sig.read_only())
-    }
-
     pub fn current_term_head() -> Option<VarOrSym> {
         with_context::<RwSignal<DomExtractor>, _>(|s| {
             s.with_untracked(|e| match e.iterate_domain().next() {
                 Some(OpenDomainElement::SymbolReference { uri, .. }) => {
                     Some(VarOrSym::S(uri.clone()))
                 }
-                Some(OpenDomainElement::OMA { head, .. }) => Some(head.clone()),
+                Some(OpenDomainElement::VariableReference { var, .. }) => {
+                    Some(VarOrSym::V(var.clone()))
+                }
+                Some(
+                    OpenDomainElement::OMA { head, .. } | OpenDomainElement::OMBIND { head, .. },
+                ) => Some(head.clone()),
                 Some(
                     OpenDomainElement::Module { .. }
                     | OpenDomainElement::SymbolDeclaration { .. }
-                    | OpenDomainElement::Argument { .. },
+                    | OpenDomainElement::Argument { .. }
+                    | OpenDomainElement::Type { .. }
+                    | OpenDomainElement::Definiens { .. },
                 )
                 | None => None,
             })
@@ -158,7 +166,15 @@ impl DocumentState {
         f: F,
     ) -> impl IntoView + use<V, F> {
         let context = Self::context_uri() & uri.name();
-        provide_context(DomExtractor::new(target, context.into()));
+        provide_context(RwSignal::new(DomExtractor::new(target, context.into())));
+        f()
+    }
+
+    pub fn no_document<V: IntoView, F: FnOnce() -> V>(f: F) -> impl IntoView + use<V, F> {
+        provide_context(RwSignal::new(DomExtractor::new(
+            DocumentUri::no_doc().clone(),
+            DocumentUri::no_doc().clone().into(),
+        )));
         f()
     }
 

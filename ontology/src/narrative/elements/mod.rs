@@ -95,7 +95,7 @@ pub enum DocumentElement {
         uri: DocumentElementUri,
         notation: Option<UriName>,
     },
-    Expr {
+    Term {
         uri: DocumentElementUri,
         term: Term,
     },
@@ -124,7 +124,7 @@ impl super::Narrative for DocumentElement {
             | Self::VariableReference { .. }
             | Self::Notation { .. }
             | Self::VariableNotation { .. }
-            | Self::Expr { .. } => A(std::iter::empty()),
+            | Self::Term { .. } => A(std::iter::empty()),
             Self::Module { children, .. }
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
@@ -189,7 +189,7 @@ impl Ftml for DocumentElement {
                     .into_iter(),
                 )
             }
-            Self::Expr { uri, term } => {
+            Self::Term { uri, term } => {
                 let iri = uri.to_iri();
                 let iri2 = iri.clone();
                 RdfIterator::Term(
@@ -403,7 +403,7 @@ impl DocumentElement {
             | Self::DocumentReference { .. }
             | Self::Notation { .. }
             | Self::VariableNotation { .. }
-            | Self::Expr { .. } => &[],
+            | Self::Term { .. } => &[],
             Self::Module { children, .. }
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
@@ -434,7 +434,7 @@ impl DocumentElement {
             | Self::DocumentReference { uri, .. }
             | Self::Notation { uri, .. }
             | Self::VariableNotation { uri, .. }
-            | Self::Expr { uri, .. } => uri,
+            | Self::Term { uri, .. } => uri,
         })
     }
     #[allow(clippy::too_many_lines)]
@@ -539,7 +539,7 @@ impl DocumentElement {
                 uri,
                 notation: notation.as_ref(),
             },
-            Self::Expr { uri, term } => DocumentElementRef::Expr { uri, term },
+            Self::Term { uri, term } => DocumentElementRef::Expr { uri, term },
         }
     }
 }

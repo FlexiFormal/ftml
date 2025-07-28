@@ -1,8 +1,9 @@
 #![allow(clippy::must_use_candidate)]
 
-use ftml_backend::FtmlBackend;
+use ftml_core::extraction::VarOrSym;
 use ftml_dom::{
-    DocumentState, FtmlViews, VarOrSym,
+    DocumentState, FtmlViews,
+    terms::{ClosedApp, ReactiveApplication},
     utils::{
         css::{CssExt, inject_css},
         local_cache::LocalCache,
@@ -11,7 +12,6 @@ use ftml_dom::{
 use ftml_ontology::terms::Variable;
 use ftml_uris::{DocumentElementUri, LeafUri, SymbolUri, UriName};
 use leptos::prelude::*;
-use send_wrapper::SendWrapper;
 
 use crate::{
     SendBackend,
@@ -19,71 +19,17 @@ use crate::{
     utils::LocalCacheExt,
 };
 
-#[derive(Clone)]
-pub(crate) struct ReactiveTerm {
-    head: LeafUri,
-    arguments: Vec<ReadSignal<Option<TermFn>>>,
-    done: ReadSignal<bool>,
-}
-impl ReactiveTerm {
-    pub fn with_new<V: IntoView>(
-        head: LeafUri,
-        f: impl FnOnce() -> V + Clone + 'static,
-    ) -> impl IntoView {
-        let done = RwSignal::new(false);
-        let tm = Self {
-            head,
-            arguments: Vec::new(),
-            done: done.read_only(),
-        };
-        provide_context(tm);
-
-        let arg = with_context::<Argument, _>(|arg| arg.0);
-        if let Some(arg) = arg {
-            if arg.update_untracked(|a| a.is_none()) {
-                let f = f.clone();
-                arg.set(Some(TermFn(SendWrapper::new(Box::new(move || {
-                    f().into_any()
-                })))));
-            }
-        }
-        let r = f();
-        done.set(true);
-        r
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Argument(WriteSignal<Option<TermFn>>);
-
-pub(crate) struct TermFn(send_wrapper::SendWrapper<Box<dyn FnOnce() -> AnyView>>);
-impl std::fmt::Debug for TermFn {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("[TermFn]")
-    }
-}
-pub(crate) trait TermFnTrait {
-    fn call(&self) -> AnyView;
-}
-impl<F, V: IntoView> TermFnTrait for F
-where
-    F: FnOnce() -> V + Clone + 'static,
-{
-    fn call(&self) -> AnyView {
-        let s = self.clone();
-        s().into_any()
-    }
-}
-
 #[derive(Copy, Clone)]
 struct InTerm {
     hovered: RwSignal<bool>,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn symbol_reference<B: SendBackend, V: IntoView>(
-    _uri: SymbolUri,
+    uri: SymbolUri,
     children: impl FnOnce() -> V,
 ) -> impl IntoView {
+    tracing::trace!("symbol reference {uri}");
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
@@ -92,21 +38,101 @@ pub fn symbol_reference<B: SendBackend, V: IntoView>(
 
 pub fn oms<B: SendBackend, V: IntoView + 'static>(
     uri: SymbolUri,
-    in_term: bool,
+    _in_term: bool,
     children: impl FnOnce() -> V + Clone + Send + 'static,
 ) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
+    tracing::trace!("OMS({uri})");
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
     if FtmlConfigState::allow_notation_changes() {
         let head: LeafUri = uri.into();
-        Left(ReactiveTerm::with_new(head.clone(), move || {
-            super::notations::has_notation::<B, _, _>(head, children)
-        }))
+        Left(super::notations::has_notation::<B, _, _>(head, children))
     } else {
         Right(children())
     }
+}
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn variable_reference<B: SendBackend, V: IntoView>(
+    var: Variable,
+    children: impl FnOnce() -> V,
+) -> impl IntoView {
+    tracing::trace!("variable reference {var}");
+    provide_context(InTerm {
+        hovered: RwSignal::new(false),
+    });
+    children()
+}
+
+pub fn omv<B: SendBackend, V: IntoView + 'static>(
+    var: Variable,
+    _in_term: bool,
+    children: impl FnOnce() -> V + Clone + Send + 'static,
+) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
+    tracing::trace!("OMV({var})");
+    provide_context(InTerm {
+        hovered: RwSignal::new(false),
+    });
+    if FtmlConfigState::allow_notation_changes() {
+        match var {
+            Variable::Name(_) => Right(children()),
+            Variable::Ref { declaration, .. } => Left(super::notations::has_notation::<B, _, _>(
+                declaration.into(),
+                children,
+            )),
+        }
+    } else {
+        Right(children())
+    }
+}
+
+pub fn oma<B: SendBackend, V: IntoView + 'static, F: FnOnce() -> V + Clone + Send + 'static>(
+    head: ReadSignal<ReactiveApplication>,
+    is_math: bool,
+    children: F,
+) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
+    tracing::trace!("OMA|OMBIND({head:?},...)");
+    provide_context(InTerm {
+        hovered: RwSignal::new(false),
+    });
+    if !FtmlConfigState::allow_notation_changes() {
+        tracing::trace!("No notation changes");
+        return Right(children());
+    }
+
+    let uri: Option<LeafUri> = head.with_untracked(|h| match h.head() {
+        VarOrSym::S(s) => Some(s.clone().into()),
+        VarOrSym::V(Variable::Ref { declaration, .. }) => Some(declaration.clone().into()),
+        VarOrSym::V(_) => None,
+    });
+    if !is_math {
+        tracing::trace!("Not in math");
+        return Right(children());
+    }
+    let ret = move |children: F| {
+        if let Some(uri) = &uri {
+            Left(super::notations::has_notation::<B, _, _>(
+                uri.clone(),
+                children,
+            ))
+        } else {
+            Right(children())
+        }
+    };
+    let memo = Memo::new(move |_| {
+        head.with(|a| match a {
+            ReactiveApplication::Open(_) => "No term yet".to_string(),
+            ReactiveApplication::Closed(ClosedApp { term, .. }) => {
+                tracing::debug!("New term arrived: {:?}", term.debug_short());
+                format!("{:?}", term.debug_short())
+            }
+        })
+    });
+    Left(ret(children).add_any_attr(leptos::tachys::html::attribute::title(memo)))
 }
 
 const fn comp_class(
@@ -135,10 +161,13 @@ const fn comp_class(
 pub fn comp<B: SendBackend, V: IntoView + 'static>(children: impl FnOnce() -> V) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     use thaw::{Popover, PopoverSize, PopoverTrigger};
+    tracing::trace!("doing comp");
     if !FtmlConfigState::allow_hovers() {
+        tracing::trace!("hovers disabled");
         return Left(children());
     }
     let Some(head) = DocumentState::current_term_head() else {
+        tracing::trace!("no current head");
         return Left(children());
     };
 
@@ -170,26 +199,29 @@ pub fn comp<B: SendBackend, V: IntoView + 'static>(children: impl FnOnce() -> V)
             <PopoverTrigger slot>{
             children.add_any_attr(leptos::tachys::html::class::class(move || class))
             }</PopoverTrigger>
-            {symbol_popover::<B>(head)}
+            {term_popover::<B>(head)}
         </Popover>
     })
 }
 
 //#[component]
-pub fn symbol_popover<BE: SendBackend>(head: VarOrSym) -> impl IntoView {
+pub fn term_popover<BE: SendBackend>(head: VarOrSym) -> impl IntoView {
     use leptos::either::EitherOf3::{A, B, C};
     match head {
-        VarOrSym::V(Variable::Name(n)) => A(unresolved_var(n)),
+        VarOrSym::V(Variable::Name(n)) => A(unresolved_var_popover(n)),
         VarOrSym::V(Variable::Ref {
             declaration,
             is_sequence,
-        }) => B(resolved_var(declaration, is_sequence.unwrap_or_default())),
-        VarOrSym::S(uri) => C(symbol::<BE>(uri)),
+        }) => B(resolved_var_popover(
+            declaration,
+            is_sequence.unwrap_or_default(),
+        )),
+        VarOrSym::S(uri) => C(symbol_popover::<BE>(uri)),
     }
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn unresolved_var(name: UriName) -> impl IntoView {
+pub fn unresolved_var_popover(name: UriName) -> impl IntoView {
     view! {
         <div>
             "Variable: " {name.to_string()}
@@ -197,7 +229,7 @@ pub fn unresolved_var(name: UriName) -> impl IntoView {
     }
 }
 
-pub fn resolved_var(uri: DocumentElementUri, is_sequence: bool) -> impl IntoView {
+pub fn resolved_var_popover(uri: DocumentElementUri, is_sequence: bool) -> impl IntoView {
     use thaw::Tooltip;
     let title = if is_sequence {
         "Variable Sequenc: "
@@ -211,7 +243,7 @@ pub fn resolved_var(uri: DocumentElementUri, is_sequence: bool) -> impl IntoView
     }
 }
 
-pub fn symbol<B: SendBackend>(uri: SymbolUri) -> impl IntoView {
+pub fn symbol_popover<B: SendBackend>(uri: SymbolUri) -> impl IntoView {
     inject_css("ftml-symbol-popup", include_str!("popup.css"));
     let context = DocumentState::context_uri();
     LocalCache::with::<B, _, _, _>(
@@ -222,7 +254,11 @@ pub fn symbol<B: SendBackend>(uri: SymbolUri) -> impl IntoView {
             }
             view! {
               <div class="ftml-symbol-popup">
-                {crate::Views::<B>::render_ftml(html)}
+                {
+                    DocumentState::no_document(
+                        || crate::Views::<B>::render_ftml(html)
+                    )
+                }
               </div>
             }
         },

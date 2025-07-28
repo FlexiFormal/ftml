@@ -94,7 +94,7 @@ macro_rules! do_keys {
         #[repr(u8)]
         pub enum FtmlKey {
             $(
-                #[doc = do_keys!(@DOC "FTMLKey::" $tag
+                #[doc = do_keys!(@DOC "FtmlKey::" $tag
                     $(-? $otp)?
                     $(@ $tp)?
                     = $val
@@ -251,7 +251,7 @@ do_keys! {
     NotationOpComp              = "notationopcomp" := todo
     Definiendum                 = "definiendum"         <= Definition, Paragraph, Assertion; := todo
 
-    Type                        = "type" := todo
+    Type                        = "type" := type_component
     Conclusion                  = "conclusion" := todo
     Definiens                   = "definiens"           <= Definition, Paragraph, Assertion; := todo
     Rule                        = "rule" := todo
@@ -261,7 +261,7 @@ do_keys! {
     ArgMapSep                   = "argmap-sep" := todo
 
     Term                        = "term" := term
-    Arg                         = "arg" := todo
+    Arg                         = "arg" := arg
     HeadTerm                    = "headterm" := todo
 
     ImportModule                = "import" := todo

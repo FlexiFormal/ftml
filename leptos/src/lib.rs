@@ -11,77 +11,10 @@ pub mod components;
 pub mod config;
 pub mod utils;
 
+use ftml_dom::{FtmlViews, utils::local_cache::SendBackend};
 use std::marker::PhantomData;
 
-use ftml_dom::{FtmlViews, markers::SectionInfo, utils::local_cache::SendBackend};
-use ftml_ontology::narrative::elements::SectionLevel;
-use leptos::prelude::*;
-
-use crate::config::FtmlConfig;
-
 pub struct Views<B: SendBackend>(PhantomData<B>);
-impl<B: SendBackend> FtmlViews for Views<B> {
-    fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + 'static + Send) -> impl IntoView {
-        use utils::theming::Themer;
-        ftml_dom::global_setup(|| {
-            view!(
-                <Themer attr:style="\
-                    font-family:inherit;\
-                    font-size:inherit;\
-                    font-weight:inherit;\
-                    line-height:inherit;\
-                    background-color:inherit;\
-                    color:inherit;\
-                    display:contents;
-                ">
-                    {
-                        FtmlConfig::init();
-                        then()
-                    }
-                    //{Self::cont(node)}
-                </Themer>
-            )
-        })
-    }
-
-    #[inline]
-    fn section<V: IntoView>(info: SectionInfo, then: impl FnOnce() -> V) -> impl IntoView {
-        components::sections::section(info, then)
-    }
-    #[inline]
-    fn section_title<V: IntoView>(
-        lvl: SectionLevel,
-        class: &'static str,
-        then: impl FnOnce() -> V,
-    ) -> impl IntoView {
-        components::sections::section_title(lvl, class, then)
-    }
-
-    #[inline]
-    fn symbol_reference<V: IntoView + 'static>(
-        uri: ftml_uris::SymbolUri,
-        _notation: Option<ftml_uris::UriName>,
-        is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        use leptos::either::Either::{Left, Right};
-        if is_math {
-            Left(components::terms::oms::<B, _>(uri, false, then))
-        } else {
-            Right(components::terms::symbol_reference::<B, _>(uri, then))
-        }
-    }
-
-    #[inline]
-    fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
-        components::terms::comp::<B, _>(then)
-    }
-
-    #[inline]
-    fn inputref(info: ftml_dom::markers::InputrefInfo) -> impl IntoView {
-        components::inputref::inputref::<B>(info)
-    }
-}
 
 /// Activate FTML viewer on the entire body of the page
 #[cfg(feature = "csr")]

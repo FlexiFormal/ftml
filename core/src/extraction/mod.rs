@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
+use either::Either::{Left, Right};
 use ftml_ontology::{
     narrative::elements::{DocumentElement, VariableDeclaration},
-    terms::{Argument, ArgumentMode, Term, Variable},
+    terms::{ArgumentMode, Term, Variable},
 };
 use ftml_uris::{
     DocumentUri, Id, ModuleUri, NarrativeUriRef, UriName,
@@ -32,6 +33,9 @@ pub trait FtmlExtractor: 'static + Sized {
     fn in_document(&self) -> &DocumentUri;
     fn iterate_domain(&self) -> impl Iterator<Item = &OpenDomainElement<Self::Node>>;
     fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement>;
+    fn iterate_dones(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &DocumentElement> + DoubleEndedIterator;
     /// ### Errors
     fn add_element(&mut self, elem: OpenFtmlElement, node: &Self::Node) -> Result<Self::Return>;
     /// ### Errors
@@ -45,8 +49,12 @@ pub trait FtmlExtractor: 'static + Sized {
             Some(
                 OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
+                | OpenDomainElement::VariableReference { .. }
                 | OpenDomainElement::OMA { .. }
-                | OpenDomainElement::Argument { .. },
+                | OpenDomainElement::OMBIND { .. }
+                | OpenDomainElement::Argument { .. }
+                | OpenDomainElement::Type { .. }
+                | OpenDomainElement::Definiens { .. },
             )
             | None => Err(FtmlExtractionError::NotIn(
                 in_elem,
@@ -57,7 +65,9 @@ pub trait FtmlExtractor: 'static + Sized {
 
     fn get_narrative_uri(&self) -> NarrativeUriRef<'_> {
         for d in self.iterate_domain() {
-            if let OpenDomainElement::OMA { uri: Some(uri), .. } = d {
+            if let OpenDomainElement::OMA { uri: Some(uri), .. }
+            | OpenDomainElement::OMBIND { uri: Some(uri), .. } = d
+            {
                 return NarrativeUriRef::Element(uri);
             }
         }
@@ -81,7 +91,11 @@ pub trait FtmlExtractor: 'static + Sized {
                     return false;
                 }
                 OpenDomainElement::SymbolReference { .. }
+                | OpenDomainElement::VariableReference { .. }
                 | OpenDomainElement::OMA { .. }
+                | OpenDomainElement::OMBIND { .. }
+                | OpenDomainElement::Type { .. }
+                | OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::Argument { .. } => (),
             }
         }
@@ -97,8 +111,12 @@ pub trait FtmlExtractor: 'static + Sized {
                 ) => false,
                 Some(
                     OpenDomainElement::SymbolReference { .. }
+                    | OpenDomainElement::VariableReference { .. }
                     | OpenDomainElement::OMA { .. }
-                    | OpenDomainElement::Argument { .. },
+                    | OpenDomainElement::OMBIND { .. }
+                    | OpenDomainElement::Argument { .. }
+                    | OpenDomainElement::Type { .. }
+                    | OpenDomainElement::Definiens { .. },
                 ) => true,
             }
     }
@@ -142,32 +160,84 @@ pub trait FtmlExtractor: 'static + Sized {
         Variable::Name(name)
     }
 
+    fn last_term(&self) -> Option<&Term> {
+        for e in self.iterate_narrative() {
+            match e {
+                OpenNarrativeElement::Invisible => (),
+                OpenNarrativeElement::Module { children, .. }
+                | OpenNarrativeElement::Section { children, .. }
+                | OpenNarrativeElement::SkipSection { children } => match children.last() {
+                    Some(DocumentElement::Term { term, .. }) => return Some(term),
+                    _ => break,
+                },
+            }
+        }
+        if let Some(DocumentElement::Term { term, .. }) = self.iterate_dones().next_back() {
+            return Some(term);
+        }
+        self.iterate_domain().next().and_then(|d| match d {
+            OpenDomainElement::Argument { terms, .. }
+            | OpenDomainElement::Type { terms, .. }
+            | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
+            OpenDomainElement::Module { .. }
+            | OpenDomainElement::OMA { .. }
+            | OpenDomainElement::OMBIND { .. }
+            | OpenDomainElement::SymbolDeclaration { .. }
+            | OpenDomainElement::SymbolReference { .. }
+            | OpenDomainElement::VariableReference { .. } => None,
+        })
+    }
+
     fn term_at(&self, pos: ArgumentPosition) -> Option<&Term> {
         self.iterate_domain().next().and_then(|e| match e {
             OpenDomainElement::OMA { arguments, .. } => match pos {
-                ArgumentPosition::Simple(i, _) => match &arguments[i as usize] {
-                    OpenArgument::Simple(Argument::Simple(t)) => Some(t),
+                ArgumentPosition::Simple(i, _) => match &arguments[(i.get() - 1) as usize] {
+                    OpenArgument::Simple(t) | OpenArgument::Sequence(Left(t)) => Some(t),
                     _ => None,
                 },
                 ArgumentPosition::Sequence {
                     argument_number,
                     sequence_index,
                     ..
-                } => match &arguments[argument_number as usize] {
-                    OpenArgument::Sequence(s) => s[sequence_index as usize].as_ref(),
+                } => match &arguments[(argument_number.get() - 1) as usize] {
+                    OpenArgument::Sequence(Right(s)) => {
+                        s[(sequence_index.get() - 1) as usize].as_ref()
+                    }
+                    _ => None,
+                },
+            },
+            OpenDomainElement::OMBIND { arguments, .. } => match pos {
+                ArgumentPosition::Simple(i, _) => match &arguments[(i.get() - 1) as usize] {
+                    OpenBoundArgument::Simple { term, .. }
+                    | OpenBoundArgument::Sequence {
+                        terms: Left(term), ..
+                    } => Some(term),
+                    _ => None,
+                },
+                ArgumentPosition::Sequence {
+                    argument_number,
+                    sequence_index,
+                    ..
+                } => match &arguments[(argument_number.get() - 1) as usize] {
+                    OpenBoundArgument::Sequence {
+                        terms: Right(s), ..
+                    } => s[(sequence_index.get() - 1) as usize].as_ref(),
                     _ => None,
                 },
             },
             OpenDomainElement::Argument { .. }
+            | OpenDomainElement::Type { .. }
+            | OpenDomainElement::Definiens { .. }
             | OpenDomainElement::Module { .. }
             | OpenDomainElement::SymbolDeclaration { .. }
-            | OpenDomainElement::SymbolReference { .. } => None,
+            | OpenDomainElement::SymbolReference { .. }
+            | OpenDomainElement::VariableReference { .. } => None,
         })
     }
 }
 pub trait FtmlStateExtractor: 'static + Sized {
     type Attributes<'a>: attributes::Attributes<Ext = Self>;
-    type Node: FtmlNode;
+    type Node: FtmlNode + std::fmt::Debug;
     const RULES: &'static FtmlRuleSet<Self>;
     const DO_RDF: bool;
     type Return;
@@ -191,6 +261,11 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
     #[inline]
     fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement> {
         self.state().narrative()
+    }
+    fn iterate_dones(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &DocumentElement> + DoubleEndedIterator {
+        self.state().top.iter()
     }
     #[inline]
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id> {

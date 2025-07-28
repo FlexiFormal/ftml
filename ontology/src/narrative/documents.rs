@@ -19,6 +19,13 @@ pub struct DocumentData {
     pub elements: Box<[DocumentElement]>,
     pub styles: DocumentStyles,
 }
+impl DocumentData {
+    #[must_use]
+    #[inline]
+    pub fn close(self) -> Document {
+        Document(triomphe::Arc::new(self))
+    }
+}
 
 impl crate::__private::Sealed for DocumentData {}
 impl crate::Ftml for DocumentData {
@@ -41,7 +48,7 @@ impl Narrative for DocumentData {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub struct Document(triomphe::Arc<DocumentData>);
 impl std::ops::Deref for Document {
     type Target = DocumentData;

@@ -3,7 +3,7 @@
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Opaque {
-    Expr(u8),
+    Term(u32),
     Node {
         tag: ftml_uris::Id,
         attributes: Box<[(ftml_uris::Id, Box<str>)]>,
@@ -16,7 +16,7 @@ impl Opaque {
     #[must_use]
     pub fn iter_opt(&self) -> Option<impl Iterator<Item = &Self>> {
         match self {
-            Self::Expr(_) | Self::Text(_) => None,
+            Self::Term(_) | Self::Text(_) => None,
             Self::Node { children, .. } => Some(OpaqueIter {
                 curr: children.iter(),
                 stack: smallvec::SmallVec::new(),
@@ -26,7 +26,7 @@ impl Opaque {
     #[must_use]
     pub fn iter_mut_opt(&mut self) -> Option<impl Iterator<Item = &mut Self>> {
         match self {
-            Self::Expr(_) | Self::Text(_) => None,
+            Self::Term(_) | Self::Text(_) => None,
             Self::Node { children, .. } => Some(OpaqueIterMut {
                 curr: children.iter_mut(),
                 stack: smallvec::SmallVec::new(),
@@ -70,6 +70,30 @@ impl<'a> Iterator for OpaqueIterMut<'a> {
                     .push(std::mem::replace(&mut self.curr, children.iter_mut()));
             } else {
                 return r;
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for Opaque {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text(t) => write!(f, "\"{t}\""),
+            Self::Term(t) => write!(f, "<term {t}/>"),
+            Self::Node {
+                tag,
+                attributes,
+                children,
+            } => {
+                write!(f, "<{tag}")?;
+                for (k, v) in attributes {
+                    write!(f, " {k}=\"{v}\"")?;
+                }
+                f.write_str(">\n")?;
+                for t in children {
+                    writeln!(f, "{t}")?;
+                }
+                write!(f, "</{tag}>")
             }
         }
     }

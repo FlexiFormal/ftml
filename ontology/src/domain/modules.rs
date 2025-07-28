@@ -16,8 +16,15 @@ pub struct ModuleData {
     pub declarations: Box<[AnyDeclaration]>,
 }
 impl crate::__private::Sealed for ModuleData {}
+impl ModuleData {
+    #[inline]
+    #[must_use]
+    pub fn close(self) -> Module {
+        Module(triomphe::Arc::new(self))
+    }
+}
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub struct Module(triomphe::Arc<ModuleData>);
 impl std::ops::Deref for Module {
     type Target = ModuleData;

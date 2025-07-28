@@ -9,7 +9,7 @@
 
 pub mod counters;
 mod document;
-pub mod extractor;
+pub(crate) mod extractor;
 pub mod markers;
 pub mod mathml;
 pub mod terms;
@@ -19,17 +19,18 @@ pub mod utils {
     pub mod css;
     pub mod local_cache;
 }
+mod views;
 
 use crate::{
-    extractor::FtmlDomElement,
-    markers::{InputrefInfo, Marker, SectionInfo},
+    extractor::{ExtractorMode, FtmlDomElement},
+    markers::Marker,
+    terms::ReactiveApplication,
 };
 pub use document::{DocumentMeta, DocumentState, setup_document};
-use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, VarOrSym};
-use ftml_ontology::{narrative::elements::SectionLevel, terms::Variable};
-use ftml_uris::{SymbolUri, UriName};
+use ftml_core::extraction::{CloseFtmlElement, FtmlExtractor, VarOrSym};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
+pub use views::*;
 
 #[inline]
 pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
@@ -38,91 +39,14 @@ pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
     f()
 }
 
-pub trait FtmlViews: 'static {
-    fn render_ftml(html: String) -> impl IntoView {
-        use leptos_posthoc::{DomStringCont, DomStringContProps};
-        DomStringCont(DomStringContProps {
-            html,
-            cont: iterate::<Self>,
-            on_load: None,
-            class: None::<String>.into(),
-            style: None::<String>.into(),
-        })
-    }
-    fn render_math_ftml(html: String) -> impl IntoView {
-        use leptos_posthoc::{DomStringContMath, DomStringContMathProps};
-        DomStringContMath(DomStringContMathProps {
-            html,
-            cont: iterate::<Self>,
-            on_load: None,
-            class: None::<String>.into(),
-            style: None::<String>.into(),
-        })
-    }
+pub(crate) static OWNER_IDS: std::sync::LazyLock<std::sync::Arc<std::sync::atomic::AtomicU64>> =
+    std::sync::LazyLock::new(|| std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)));
 
-    #[inline]
-    fn cont(node: OriginalNode) -> impl IntoView {
-        use leptos_posthoc::{DomChildrenCont, DomChildrenContProps};
-        DomChildrenCont(DomChildrenContProps {
-            orig: node,
-            cont: iterate::<Self>,
-        })
-    }
-    #[inline]
-    fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
-        global_setup(then)
-    }
-
-    #[inline]
-    fn section<V: IntoView>(_info: SectionInfo, then: impl FnOnce() -> V) -> impl IntoView {
-        then()
-    }
-
-    #[inline]
-    fn symbol_reference<V: IntoView + 'static>(
-        _uri: SymbolUri,
-        _notation: Option<UriName>,
-        _is_math: bool,
-        _in_term: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        then()
-    }
-
-    #[inline]
-    fn application<V: IntoView + 'static>(
-        _head: VarOrSym,
-        _notation: Option<UriName>,
-        _is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        then()
-    }
-    /*
-    #[inline]
-    fn argument<V: IntoView + 'static>(
-        _position: ArgumentPosition,
-        _is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        then()
-    }
-     */
-
-    #[inline]
-    fn section_title<V: IntoView>(
-        _lvl: SectionLevel,
-        _class: &'static str,
-        then: impl FnOnce() -> V,
-    ) -> impl IntoView {
-        then()
-    }
-
-    fn inputref(_info: InputrefInfo) -> impl IntoView {}
-
-    #[inline]
-    fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
-        then()
+#[derive(Clone)]
+pub(crate) struct OwnerId(pub u64);
+impl OwnerId {
+    pub fn new() -> Self {
+        Self(OWNER_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
     }
 }
 
@@ -135,18 +59,28 @@ fn iterate<Views: FtmlViews + ?Sized>(
     use extractor::DomExtractor;
     use extractor::NodeAttrs;
 
+    provide_context(OwnerId::new());
+    let sig = expect_context::<RwSignal<DomExtractor>>();
+    let finish = sig.update_untracked(|ext| {
+        matches!(ext.mode, ExtractorMode::Pending) && {
+            ext.mode = ExtractorMode::Extracting;
+            tracing::info!("Starting extracting {}", ext.state.document);
+            true
+        }
+    });
+
     tracing::trace!("iterating {}", e.outer_html());
     #[cfg(any(feature = "csr", feature = "hydrate"))]
     {
         client::init();
-        if !client::has_ftml_attribute(e) {
+        if !client::has_ftml_attribute(e) && !finish {
             tracing::trace!("No attributes");
             return (None, None);
         }
     }
-    tracing::debug!("Has ftml attributes");
-    let sig = expect_context::<RwSignal<DomExtractor>>();
     let n = FtmlDomElement::new(e.clone());
+
+    tracing::trace!("Has ftml attributes");
     let (mut markers, invisible, close) = sig.update_untracked(|extractor| {
         let mut attrs = NodeAttrs::new(e);
         let rules = attrs.keys();
@@ -170,33 +104,50 @@ fn iterate<Views: FtmlViews + ?Sized>(
         }
         (markers, extractor.invisible(), close)
     });
-    let rview = if invisible {
-        tracing::debug!("invisible");
-        None
-    } else if markers.is_empty() {
-        tracing::debug!("No markers");
+    let rview = if markers.is_empty() {
+        tracing::trace!("No markers");
         None
     } else {
         tracing::debug!("got elements: {markers:?}");
         let e: OriginalNode = e.clone().into();
         Some(move || {
             markers.reverse();
-            Marker::apply::<Views>(markers, mathml::is(&e.tag_name()).is_some(), e).into_any()
+            provide_context(sig);
+            Marker::apply::<Views>(markers, invisible, mathml::is(&e.tag_name()).is_some(), e)
+                .into_any()
         })
     };
-    let and_then = if close.is_empty() {
+
+    let and_then = if close.is_empty() && !finish {
         None
     } else {
-        let e = e.clone();
         Some(move || {
-            tracing::debug!("closing element: {close:?}");
+            let mut closes = close.clone();
+            closes.reverse();
+            tracing::trace!("closing element: {close:?}");
             sig.update_untracked(move |extractor| {
                 for c in close.into_iter().rev() {
                     if let Err(e) = extractor.close(c, &n) {
                         tracing::error!("{e}");
+                        leptos::web_sys::console::log_1(&n.0);
                     }
                 }
             });
+            if !invisible {
+                for c in closes {
+                    #[allow(clippy::enum_glob_use)]
+                    use CloseFtmlElement::*;
+                    match c {
+                        OMA | OMBIND => ReactiveApplication::close(),
+                        Module | SymbolDeclaration | Invisible | Section | SectionTitle
+                        | SkipSection | SymbolReference | VariableReference | Argument | Type
+                        | Definiens => (),
+                    }
+                }
+            }
+            if finish {
+                sig.update_untracked(DomExtractor::finish);
+            }
         })
     };
     (rview, and_then)

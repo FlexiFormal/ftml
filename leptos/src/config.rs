@@ -1,5 +1,3 @@
-use std::collections::hash_map::Entry;
-
 use ftml_dom::{DocumentState, counters::LogicalLevel};
 use ftml_ontology::narrative::elements::SectionLevel;
 use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri};

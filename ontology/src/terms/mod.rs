@@ -3,7 +3,7 @@ pub use term::Term;
 mod variables;
 pub use variables::Variable;
 mod arguments;
-mod opaque;
+pub mod opaque;
 pub use arguments::{Argument, ArgumentMode, BoundArgument};
 #[cfg(feature = "openmath")]
 pub mod om;

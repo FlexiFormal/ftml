@@ -1,7 +1,11 @@
 use std::marker::PhantomData;
 
 use ftml_backend::{BackendError, FtmlBackend, GlobalBackend};
-use ftml_ontology::{narrative::elements::Notation, utils::Css};
+use ftml_ontology::{
+    domain::modules::Module,
+    narrative::{documents::Document, elements::Notation},
+    utils::Css,
+};
 use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri, SymbolUri};
 
 pub trait SendBackend:
@@ -13,14 +17,21 @@ impl<G: GlobalBackend> SendBackend for G where
 {
 }
 
+type Map<A, B> = dashmap::DashMap<A, B, rustc_hash::FxBuildHasher>;
+type Set<A> = dashmap::DashSet<A, rustc_hash::FxBuildHasher>;
+
 pub struct LocalCache {
-    notations:
-        dashmap::DashMap<LeafUri, Vec<(DocumentElementUri, Notation)>, rustc_hash::FxBuildHasher>,
+    pub(crate) notations: Map<LeafUri, Vec<(DocumentElementUri, Notation)>>,
+    pub(crate) documents: Set<Document>,
+    pub(crate) modules: Set<Module>,
 }
 
-static LOCAL_CACHE: std::sync::LazyLock<LocalCache> = std::sync::LazyLock::new(|| LocalCache {
-    notations: dashmap::DashMap::default(),
-});
+pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
+    std::sync::LazyLock::new(|| LocalCache {
+        notations: Map::default(),
+        documents: Set::default(),
+        modules: Set::default(),
+    });
 
 pub struct WithLocalCache<B: SendBackend>(PhantomData<B>);
 impl<B: SendBackend> Default for WithLocalCache<B> {

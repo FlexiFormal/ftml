@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::extraction::FtmlExtractionError;
+use crate::{FtmlKey, extraction::FtmlExtractionError};
 use either::Either::{Left, Right};
 use ftml_ontology::{
     narrative::DocumentRange,
@@ -8,7 +8,7 @@ use ftml_ontology::{
 };
 use ftml_uris::Id;
 
-pub trait FtmlNode: Clone {
+pub trait FtmlNode: Clone + std::fmt::Debug {
     //type Ancestors<'a>: Iterator<Item = Self> where Self: 'a;
     //fn ancestors(&self) -> Self::Ancestors<'_>;
     //fn with_elements<R>(&mut self, f: impl FnMut(Option<&mut FTMLElements>) -> R) -> R;
@@ -31,9 +31,10 @@ pub trait FtmlNode: Clone {
 
     /// ### Errors
     #[allow(clippy::type_complexity)]
+    #[allow(clippy::too_many_lines)]
     fn as_term(
         &self,
-        termpairs: Vec<(Term, crate::NodePath)>,
+        mut termpairs: Vec<(Term, crate::NodePath)>,
     ) -> Result<Term, FtmlExtractionError> {
         fn rec<N: FtmlNode>(
             path: &mut crate::NodePath,
@@ -98,6 +99,38 @@ pub trait FtmlNode: Clone {
                 children.into_boxed_slice(),
             ))
         }
+
+        // moved to Term::simplify
+        /*
+        if termpairs.len() == 1 {
+            const IGNORE_ATTRS: [&str; 3] = [
+                FtmlKey::Arg.attr_name(),
+                FtmlKey::ArgMode.attr_name(),
+                FtmlKey::Type.attr_name(),
+            ];
+            match termpairs.first() {
+                Some((_, path)) if path.is_empty() =>
+                // SAFETY: len == 1
+                unsafe { return Ok(termpairs.pop().unwrap_unchecked().0) },
+                Some((_, path)) if path.len() == 1 && path.first().is_some_and(|v| *v == 0) => {
+                    if self.tag_name().map_err(|e| {
+                        FtmlExtractionError::InvalidInformal(format!("invalid attribute: {e}"))
+                    })? == "mrow"
+                        && self
+                            .iter_attributes()
+                            .all(|p| p.is_ok_and(|(k, _)| IGNORE_ATTRS.contains(&&*k)))
+                    {
+                        // SAFETY: len == 1
+                        unsafe {
+                            return Ok(termpairs.pop().unwrap_unchecked().0);
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+         */
+
         let mut paths = Vec::with_capacity(termpairs.len());
         let terms = termpairs
             .into_iter()
