@@ -1,5 +1,17 @@
 pub mod app;
 
+pub fn filter() -> tracing_subscriber::filter::Targets {
+    tracing_subscriber::filter::Targets::new()
+        .with_target("ftml_dom", tracing::Level::INFO)
+        .with_target("ftml_leptos", tracing::Level::DEBUG)
+        .with_target("ftml_core", tracing::Level::INFO)
+        .with_target("ssr_example", tracing::Level::INFO)
+        .with_target(
+            "leptos_posthoc",
+            tracing_subscriber::filter::LevelFilter::ERROR,
+        )
+}
+
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
@@ -10,14 +22,7 @@ pub fn hydrate() {
     //tracing_wasm::set_as_global_default_with_config(config.build());
     //
     use tracing_subscriber::prelude::*;
-    let filter = tracing_subscriber::filter::Targets::new()
-        .with_target("ftml_dom", tracing::Level::DEBUG)
-        .with_target("ftml_leptos", tracing::Level::TRACE)
-        .with_target("ftml_core", tracing::Level::INFO)
-        .with_target(
-            "leptos_posthoc",
-            tracing_subscriber::filter::LevelFilter::OFF,
-        );
+    let filter = filter();
     tracing_subscriber::registry()
         .with(tracing_wasm::WASMLayer::default())
         .with(filter)

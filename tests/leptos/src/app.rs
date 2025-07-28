@@ -62,6 +62,23 @@ fn HomePage() -> impl IntoView {
     }
 }
 
+fn extract_body_as_div(s: &str) -> String {
+    let i = s.find("<body").expect("exists");
+    let s = &s[i + "<body".len()..];
+    let i = s.rfind("/body>").expect("exists");
+    let s = &s[..i];
+    format!("<div{s}/div>")
+}
+fn extract_body(s: &str) -> String {
+    let i = s.find("<body").expect("exists");
+    let s = &s[i + "<body".len()..];
+    let i = s.find('>').expect("exists");
+    let s = &s[i + 1..];
+    let i = s.rfind("</body>").expect("exists");
+    let s = &s[..i];
+    s.to_string()
+}
+
 macro_rules! backend {
     ($num:literal:[$($name:literal),*]) => {
 
@@ -80,16 +97,13 @@ macro_rules! backend {
         )]
         async fn get(d: String) -> Result<(DocumentUri, Vec<Css>, String), ServerFnError<String>> {
             fn go(uri: &str, s: &str) -> Result<(DocumentUri, Vec<Css>, String), ServerFnError<String>> {
-                let i = s.find("<body").expect("exists");
-                let s = &s[i + "<body".len()..];
-                let i = s.rfind("/body>").expect("exists");
-                let s = &s[..i];
+
                 Ok((
                     format!("http://mathhub.info?a=FTML/meta&p=tests&d={uri}&l=en")
                         .parse()
                         .expect("is valid"),
                     Vec::new(),
-                    format!("<div{s}/div>"),
+                    extract_body(s),
                 ))
             }
             match d.as_str() {
@@ -101,7 +115,7 @@ macro_rules! backend {
         }
     };
 }
-backend!( 2: ["sections","para"]);
+backend!( 3: ["sections","para","symbolsmodules"]);
 
 type Views = ftml_leptos::Views<GlobalBackend>;
 
@@ -112,5 +126,7 @@ fn Ftml() -> impl IntoView {
         .parse()
         .unwrap();
     const HTML: &str = include_str!("../public/all.en.html");
-    Views::top(|| ftml_dom::setup_document(uri, || Views::render_ftml(HTML.to_string())))
+    let html = extract_body_as_div(HTML);
+    tracing::info!("Here");
+    Views::top(|| ftml_dom::setup_document(uri, || Views::render_ftml(html)))
 }

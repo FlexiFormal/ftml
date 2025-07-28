@@ -7,19 +7,11 @@ async fn main() {
     use ssr_example::app::*;
     use tracing_subscriber::prelude::*;
 
-    let filter = tracing_subscriber::filter::Targets::new()
-        .with_target("ftml_dom", tracing::Level::DEBUG)
-        .with_target("ftml_leptos", tracing::Level::TRACE)
-        .with_target("ftml_core", tracing::Level::INFO)
-        .with_target(
-            "leptos_posthoc",
-            tracing_subscriber::filter::LevelFilter::OFF,
-        );
+    let filter = ssr_example::filter();
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(filter)
         .init();
-
 
     let conf = get_configuration(None).unwrap();
     let addr = conf.leptos_options.site_addr;

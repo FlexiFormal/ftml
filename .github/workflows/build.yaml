@@ -43,6 +43,16 @@ jobs:
         run: cd dom && cargo make all-tests
       - name: dom doc
         run: cd dom && cargo make doc
+      # backend
+      - name: ftml-backend tests
+        run: cd backend && cargo make all-tests
+      - name: backend doc
+        run: cd backend && cargo make doc
+      # ftml5ever
+      - name: ftml5ever tests
+        run: cd ftml5ever && cargo make all-tests
+      - name: ftml5ever doc
+        run: cd ftml5ever && cargo make doc
       # leptos
       - name: ftml-leptos tests
         run: cd leptos && cargo make all-tests
