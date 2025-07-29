@@ -285,9 +285,13 @@ impl Marker {
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::Module { .. }
             | OpenFtmlElement::Style(_)
+            | OpenFtmlElement::NotationArg(_)
             | OpenFtmlElement::Type
             | OpenFtmlElement::Definiens
+            | OpenFtmlElement::Notation { .. }
             | OpenFtmlElement::SymbolDeclaration { .. }
+            | OpenFtmlElement::NotationComp
+            | OpenFtmlElement::ArgSep
             | OpenFtmlElement::None => None,
         }
     }

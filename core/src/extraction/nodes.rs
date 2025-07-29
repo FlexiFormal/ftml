@@ -1,9 +1,12 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, hint::unreachable_unchecked};
 
 use crate::{FtmlKey, extraction::FtmlExtractionError};
 use either::Either::{Left, Right};
 use ftml_ontology::{
-    narrative::DocumentRange,
+    narrative::{
+        DocumentRange,
+        elements::notations::{NodeOrText, NotationComponent, NotationNode},
+    },
     terms::{Term, opaque::Opaque},
 };
 use ftml_uris::Id;
@@ -30,11 +33,115 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
     fn iter_attributes(&self) -> impl Iterator<Item = Result<(Cow<'_, str>, String), String>>;
 
     /// ### Errors
+    fn tag_id(&self) -> Result<Id, String> {
+        self.tag_name()?
+            .parse()
+            .map_err(|e| format!("invalid attribute: {e}"))
+    }
+
+    /// ### Errors
+    fn collect_attributes(&self) -> Result<Vec<(Id, Box<str>)>, String> {
+        self.iter_attributes()
+            .map(|e| {
+                e.map_or_else::<Result<_, String>, _, _>(Err, |(k, v)| {
+                    let k = k
+                        .parse::<Id>()
+                        .map_err(|e| format!("invalid attribute: {e}"))?;
+                    let v = v.into_boxed_str();
+                    Ok((k, v))
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()
+    }
+
+    /// ### Errors
+    fn as_notation(
+        &self,
+        comppairs: Vec<(NotationComponent, crate::NodePath)>,
+    ) -> Result<NotationComponent, FtmlExtractionError> {
+        fn rec<N: FtmlNode>(
+            path: &mut crate::NodePath,
+            paths: &[crate::NodePath],
+            comps: &mut Vec<Option<NotationComponent>>,
+            node: &N,
+        ) -> Result<NotationComponent, FtmlExtractionError> {
+            let tag = node
+                .tag_id()
+                .map_err(FtmlExtractionError::InvalidInformal)?;
+            let attributes = node
+                .collect_attributes()
+                .map_err(FtmlExtractionError::InvalidInformal)?;
+            let mut children = Vec::new();
+            for (i, c) in node.children().enumerate() {
+                #[allow(clippy::cast_possible_truncation)]
+                if let Some((j, _)) = paths.iter().enumerate().find(|(_, p)| {
+                    p.len() == path.len() + 1
+                        && p.starts_with(path)
+                        && p.last().is_some_and(|j| *j == i as u32)
+                }) {
+                    children.push(
+                        comps
+                            .get_mut(j)
+                            .ok_or(FtmlExtractionError::InvalidValue(FtmlKey::NotationComp))?
+                            .take()
+                            .ok_or(FtmlExtractionError::InvalidValue(FtmlKey::NotationComp))?,
+                    );
+                    continue;
+                }
+                match c {
+                    Some(Right(s)) if !s.as_bytes().iter().all(u8::is_ascii_whitespace) => {
+                        children.push(NotationComponent::Text(s.into_boxed_str()));
+                    }
+                    Some(Left(n)) => {
+                        #[allow(clippy::cast_possible_truncation)]
+                        path.push(i as u32);
+                        children.push(rec(path, paths, comps, &n)?);
+                        path.pop();
+                    }
+                    None | Some(Right(_)) => (),
+                }
+            }
+            if attributes.is_empty() && children.len() == 1 && TRANSPARENT.contains(&tag.as_ref()) {
+                // SAFETY len == 1
+                return Ok(unsafe { children.pop().unwrap_unchecked() });
+            }
+            Ok(NotationComponent::Node {
+                tag,
+                attributes: attributes.into_boxed_slice(),
+                children: children.into_boxed_slice(),
+            })
+        }
+
+        // ------------------------------
+        let mut paths = Vec::with_capacity(comppairs.len());
+        let mut comps = comppairs
+            .into_iter()
+            .map(|(t, p)| {
+                paths.push(p);
+                Some(t)
+            })
+            .collect();
+        let mut path = crate::NodePath::new();
+        rec(&mut path, &paths, &mut comps, self)
+        /*
+        let (tag, attributes, mut children) = rec(&mut path, &paths, &mut comps, self)?;
+        if attributes.is_empty() && children.len() == 1 && TRANSPARENT.contains(&tag.as_ref()) {
+            // SAFETY len == 1
+            return Ok(unsafe { children.pop().unwrap_unchecked() });
+        }
+        Ok(NotationComponent::Node {
+            tag,
+            attributes,
+            children: children.into_boxed_slice(),
+        })
+         */
+    }
+
+    /// ### Errors
     #[allow(clippy::type_complexity)]
-    #[allow(clippy::too_many_lines)]
     fn as_term(
         &self,
-        mut termpairs: Vec<(Term, crate::NodePath)>,
+        termpairs: Vec<(Term, crate::NodePath)>,
     ) -> Result<Term, FtmlExtractionError> {
         fn rec<N: FtmlNode>(
             path: &mut crate::NodePath,
@@ -42,29 +149,11 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
             node: &N,
         ) -> Result<(Id, Box<[(Id, Box<str>)]>, Box<[Opaque]>), FtmlExtractionError> {
             let tag = node
-                .tag_name()
-                .map_err(FtmlExtractionError::InvalidInformal)?
-                .parse()
-                .map_err(|e| {
-                    FtmlExtractionError::InvalidInformal(format!("invalid attribute: {e}"))
-                })?;
+                .tag_id()
+                .map_err(FtmlExtractionError::InvalidInformal)?;
             let attributes = node
-                .iter_attributes()
-                .map(|e| {
-                    e.map_or_else::<Result<_, FtmlExtractionError>, _, _>(
-                        |e| Err(FtmlExtractionError::InvalidInformal(e)),
-                        |(k, v)| {
-                            let k = k.parse::<Id>().map_err(|e| {
-                                FtmlExtractionError::InvalidInformal(format!(
-                                    "invalid attribute: {e}"
-                                ))
-                            })?;
-                            let v = v.into_boxed_str();
-                            Ok((k, v))
-                        },
-                    )
-                })
-                .collect::<Result<Vec<_>, FtmlExtractionError>>()?;
+                .collect_attributes()
+                .map_err(FtmlExtractionError::InvalidInformal)?;
             let mut children = Vec::new();
             for (i, c) in node.children().enumerate() {
                 #[allow(clippy::cast_possible_truncation)]
@@ -100,37 +189,6 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
             ))
         }
 
-        // moved to Term::simplify
-        /*
-        if termpairs.len() == 1 {
-            const IGNORE_ATTRS: [&str; 3] = [
-                FtmlKey::Arg.attr_name(),
-                FtmlKey::ArgMode.attr_name(),
-                FtmlKey::Type.attr_name(),
-            ];
-            match termpairs.first() {
-                Some((_, path)) if path.is_empty() =>
-                // SAFETY: len == 1
-                unsafe { return Ok(termpairs.pop().unwrap_unchecked().0) },
-                Some((_, path)) if path.len() == 1 && path.first().is_some_and(|v| *v == 0) => {
-                    if self.tag_name().map_err(|e| {
-                        FtmlExtractionError::InvalidInformal(format!("invalid attribute: {e}"))
-                    })? == "mrow"
-                        && self
-                            .iter_attributes()
-                            .all(|p| p.is_ok_and(|(k, _)| IGNORE_ATTRS.contains(&&*k)))
-                    {
-                        // SAFETY: len == 1
-                        unsafe {
-                            return Ok(termpairs.pop().unwrap_unchecked().0);
-                        }
-                    }
-                }
-                _ => (),
-            }
-        }
-         */
-
         let mut paths = Vec::with_capacity(termpairs.len());
         let terms = termpairs
             .into_iter()
@@ -148,4 +206,44 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
             children,
         })
     }
+
+    /// ### Errors
+    fn as_component(&self) -> Result<NotationNode, FtmlExtractionError> {
+        let tag = self
+            .tag_id()
+            .map_err(FtmlExtractionError::InvalidNotationComponent)?;
+        let attributes = self
+            .collect_attributes()
+            .map_err(FtmlExtractionError::InvalidNotationComponent)?;
+        let mut children = Vec::new();
+        for c in self.children() {
+            match c {
+                Some(Left(n)) => children.push(NodeOrText::Node(n.as_component()?)),
+                Some(Right(t)) if !t.as_bytes().iter().all(u8::is_ascii_whitespace) => {
+                    children.push(NodeOrText::Text(t.into_boxed_str()));
+                }
+                None | Some(Right(_)) => (),
+            }
+        }
+        if attributes.is_empty()
+            && children.len() == 1
+            && TRANSPARENT.contains(&tag.as_ref())
+            && matches!(children.first(), Some(NodeOrText::Node(_)))
+        {
+            // SAFETY len == 1 && matches!(...)
+            unsafe {
+                let Some(NodeOrText::Node(n)) = children.pop() else {
+                    unreachable_unchecked()
+                };
+                return Ok(n);
+            }
+        }
+        Ok(NotationNode {
+            tag,
+            attributes: attributes.into_boxed_slice(),
+            children: children.into_boxed_slice(),
+        })
+    }
 }
+
+const TRANSPARENT: [&str; 1] = ["mrow"];

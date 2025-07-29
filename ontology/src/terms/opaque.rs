@@ -6,7 +6,9 @@ pub enum Opaque {
     Term(u32),
     Node {
         tag: ftml_uris::Id,
+        #[cfg_attr(feature = "serde", serde(default))]
         attributes: Box<[(ftml_uris::Id, Box<str>)]>,
+        #[cfg_attr(feature = "serde", serde(default))]
         children: Box<[Opaque]>,
     },
     Text(Box<str>),

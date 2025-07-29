@@ -1,11 +1,12 @@
 use std::{borrow::Cow, str::FromStr};
 
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri};
+use ftml_ontology::terms::Variable;
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, Uri};
 
 use super::Result;
 use crate::{
     FtmlKey,
-    extraction::{FtmlExtractionError, FtmlExtractor},
+    extraction::{FtmlExtractionError, FtmlExtractor, VarOrSym},
 };
 
 pub trait Attributes {
@@ -121,6 +122,40 @@ pub trait Attributes {
     #[inline]
     fn take_symbol_uri(&mut self, key: FtmlKey) -> Result<SymbolUri> {
         self.take_typed(key, SymbolUri::from_str)
+    }
+
+    /// ### Errors
+    fn get_symbol_or_var(
+        &mut self,
+        key: FtmlKey,
+        ext: &mut impl FtmlExtractor,
+    ) -> Result<VarOrSym> {
+        let Some(headv) = self.get(key) else {
+            return Err(FtmlExtractionError::MissingKey(key));
+        };
+        let head = headv.as_ref().trim();
+        if head.contains('?') {
+            let uri = head.parse::<Uri>().map_err(|e| (key, e))?;
+            match uri {
+                Uri::Symbol(s) => Ok(VarOrSym::S(s)),
+                Uri::Module(m) => {
+                    let Some(s) = m.into_symbol() else {
+                        return Err(FtmlExtractionError::InvalidValue(key));
+                    };
+                    Ok(VarOrSym::S(s))
+                }
+                //Uri::Module(_) => VarOrSym::S(m.into()) ???
+                Uri::DocumentElement(e) => Ok(VarOrSym::V(Variable::Ref {
+                    declaration: e,
+                    is_sequence: None,
+                })),
+                _ => return Err(FtmlExtractionError::InvalidValue(key)),
+            }
+        } else {
+            Ok(VarOrSym::V(ext.resolve_variable_name(
+                head.parse().map_err(|e| (key, e))?,
+            )))
+        }
     }
 
     /// #### Errors
@@ -247,32 +282,4 @@ pub trait Attributes {
 
         Ok(curr_uri & &id)
     }
-
-    /*
-
-    /// #### Errors
-    fn get_section_level(&self, key: FtmlKey) -> Result<SectionLevel> {
-        use std::str::FromStr;
-        let Some(v) = self.get(key) else {
-            return Err(FtmlExtractionError::MissingKey(key));
-        };
-        let Ok(u) = u8::from_str(v.as_ref()) else {
-            return Err(FTMLError::InvalidKeyFor(key.as_str(), Some(v.into())));
-        };
-        SectionLevel::try_from(u)
-            .map_err(|()| FTMLError::InvalidKeyFor(key.as_str(), Some(v.into())))
-    }
-
-    /// #### Errors
-    fn take_section_level(&mut self, key: FTMLKey) -> Result<SectionLevel, FTMLError> {
-        use std::str::FromStr;
-        let Some(v) = self.remove(key) else {
-            return Err(FtmlExtractionError::MissingKey(key));
-        };
-        let Ok(u) = u8::from_str(v.as_ref()) else {
-            return Err(FTMLError::InvalidKeyFor(key.as_str(), Some(v)));
-        };
-        SectionLevel::try_from(u).map_err(|()| FTMLError::InvalidKeyFor(key.as_str(), Some(v)))
-    }
-     */
 }

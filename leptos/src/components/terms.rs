@@ -1,5 +1,10 @@
 #![allow(clippy::must_use_candidate)]
 
+use crate::{
+    SendBackend,
+    config::{FtmlConfigState, HighlightStyle},
+    utils::LocalCacheExt,
+};
 use ftml_core::extraction::VarOrSym;
 use ftml_dom::{
     DocumentState, FtmlViews,
@@ -10,14 +15,8 @@ use ftml_dom::{
     },
 };
 use ftml_ontology::terms::Variable;
-use ftml_uris::{DocumentElementUri, LeafUri, SymbolUri, UriName};
+use ftml_uris::{DocumentElementUri, Id, LeafUri, SymbolUri};
 use leptos::prelude::*;
-
-use crate::{
-    SendBackend,
-    config::{FtmlConfigState, HighlightStyle},
-    utils::LocalCacheExt,
-};
 
 #[derive(Copy, Clone)]
 struct InTerm {
@@ -78,7 +77,7 @@ pub fn omv<B: SendBackend, V: IntoView + 'static>(
     });
     if FtmlConfigState::allow_notation_changes() {
         match var {
-            Variable::Name(_) => Right(children()),
+            Variable::Name { .. } => Right(children()),
             Variable::Ref { declaration, .. } => Left(super::notations::has_notation::<B, _, _>(
                 declaration.into(),
                 children,
@@ -208,7 +207,7 @@ pub fn comp<B: SendBackend, V: IntoView + 'static>(children: impl FnOnce() -> V)
 pub fn term_popover<BE: SendBackend>(head: VarOrSym) -> impl IntoView {
     use leptos::either::EitherOf3::{A, B, C};
     match head {
-        VarOrSym::V(Variable::Name(n)) => A(unresolved_var_popover(n)),
+        VarOrSym::V(Variable::Name { name, notated }) => A(unresolved_var_popover(name, notated)),
         VarOrSym::V(Variable::Ref {
             declaration,
             is_sequence,
@@ -221,7 +220,7 @@ pub fn term_popover<BE: SendBackend>(head: VarOrSym) -> impl IntoView {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn unresolved_var_popover(name: UriName) -> impl IntoView {
+pub fn unresolved_var_popover(name: Id, _notated: Option<Id>) -> impl IntoView {
     view! {
         <div>
             "Variable: " {name.to_string()}

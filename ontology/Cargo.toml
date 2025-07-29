@@ -68,6 +68,7 @@ thiserror = { workspace = true }
 rustc-hash = { workspace = true }
 smallvec = { workspace = true }
 regex = { workspace = true }
+phf = { workspace = true, features = ["macros"] }
 
 # syntree = { workspace = true }
 

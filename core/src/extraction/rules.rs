@@ -16,7 +16,8 @@ use ftml_ontology::{
     terms::{ArgumentMode, Variable},
 };
 use ftml_uris::{Id, IsNarrativeUri, Uri, errors::SegmentParseError};
-use std::{borrow::Cow, str::FromStr};
+use smallvec::SmallVec;
+use std::{borrow::Cow, num::NonZeroU8, str::FromStr};
 
 type Result<E> = super::Result<(<E as FtmlExtractor>::Return, Option<CloseFtmlElement>)>;
 
@@ -149,7 +150,13 @@ pub fn title<E: FtmlExtractor>(
                 drop(iter);
                 return ret!(ext,node <- SectionTitle + SectionTitle);
             }
-            OpenNarrativeElement::SkipSection { .. } => break,
+            OpenNarrativeElement::SkipSection { .. }
+            | OpenNarrativeElement::Notation { .. }
+            | OpenNarrativeElement::NotationComp { .. }
+            | OpenNarrativeElement::ArgSep { .. }
+            | OpenNarrativeElement::NotationArg(_) => {
+                break;
+            }
             OpenNarrativeElement::Module { .. } | OpenNarrativeElement::Invisible => (),
         }
     }
@@ -338,39 +345,18 @@ pub fn term<E: FtmlExtractor>(
         }
     }
 
+    del!(keys - NotationId, Head);
     if ext.in_notation() {
+        attrs.remove(FtmlKey::NotationId);
+        attrs.remove(FtmlKey::Head);
+        attrs.remove(FtmlKey::Term);
         return ret!(ext, node);
     }
 
-    let Some(headv) = attrs.get(FtmlKey::Head) else {
-        return Err(FtmlExtractionError::MissingKey(FtmlKey::Head));
-    };
-    let head = headv.as_ref().trim();
-    let head = if head.contains('?') {
-        let uri = head.parse::<Uri>().map_err(|e| (FtmlKey::Term, e))?;
-        match uri {
-            Uri::Symbol(s) => VarOrSym::S(s),
-            Uri::Module(m) => {
-                let Some(s) = m.into_symbol() else {
-                    return Err(FtmlExtractionError::InvalidValue(FtmlKey::Head));
-                };
-                VarOrSym::S(s)
-            }
-            //Uri::Module(_) => VarOrSym::S(m.into()) ???
-            Uri::DocumentElement(e) => VarOrSym::V(Variable::Ref {
-                declaration: e,
-                is_sequence: None,
-            }),
-            _ => return Err(FtmlExtractionError::InvalidValue(FtmlKey::Head)),
-        }
-    } else {
-        VarOrSym::V(ext.resolve_variable_name(head.parse().map_err(|e| (FtmlKey::Term, e))?))
-    };
-    drop(headv);
+    let head = attrs.get_symbol_or_var(FtmlKey::Head, ext)?;
 
     let kind: OpenTermKind = attrs.get_typed(FtmlKey::Term, str::parse)?;
     let notation = opt!(attrs.get_typed(FtmlKey::NotationId, str::parse));
-    del!(keys - NotationId, Head, Term);
 
     match (kind, head) {
         (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::S(uri)) => {
@@ -443,11 +429,9 @@ pub fn arg<E: FtmlExtractor>(
     del!(keys - Arg, ArgMode);
     if ext.in_term() {
         ret!(ext,node <- Argument(argument) + Argument)
+    } else if ext.in_notation() {
+        ret!(ext,node <- NotationArg(argument) + NotationArg)
     } else {
-        /* tracing::debug!("Error: Argument: {argument:?}: {:?}", {
-            ext.iterate_domain().collect::<Vec<_>>()
-        });*/
-
         Err(FtmlExtractionError::NotIn(FtmlKey::Arg, "open term"))
     }
 }
@@ -460,12 +444,7 @@ pub fn headterm<E: FtmlExtractor>(
     crate::TODO!()
 }
 
-pub fn comp<E: FtmlExtractor>(
-    ext: &mut E,
-    _attrs: &mut E::Attributes<'_>,
-    _keys: &mut KeyList,
-    node: &E::Node,
-) -> Result<E> {
+fn do_comp<E: FtmlExtractor>(ext: &mut E, node: &E::Node) -> Result<E> {
     match ext.iterate_domain().next() {
         Some(
             OpenDomainElement::SymbolReference { .. }
@@ -487,7 +466,197 @@ pub fn comp<E: FtmlExtractor>(
     ret!(ext,node <- Comp)
 }
 
+pub fn comp<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    if ext.in_notation() {
+        del!(keys - Comp, Term, Head, NotationId, Invisible);
+        attrs.remove(FtmlKey::Comp);
+        attrs.remove(FtmlKey::Term);
+        attrs.remove(FtmlKey::Head);
+        attrs.remove(FtmlKey::NotationId);
+        attrs.remove(FtmlKey::Invisible);
+        return ret!(ext,node <- None + CompInNotation);
+    }
+    do_comp(ext, node)
+}
+
 pub fn maincomp<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    if ext.in_notation() {
+        del!(keys - MainComp, Term, Head, NotationId, Invisible);
+        attrs.remove(FtmlKey::MainComp);
+        attrs.remove(FtmlKey::Term);
+        attrs.remove(FtmlKey::Head);
+        attrs.remove(FtmlKey::NotationId);
+        attrs.remove(FtmlKey::Invisible);
+        return ret!(ext,node <- None + MainCompInNotation);
+    }
+    do_comp(ext, node)
+}
+
+pub fn notation<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    let head = attrs.get_symbol_or_var(FtmlKey::Notation, ext)?;
+
+    let mut fragment = attrs
+        .get(FtmlKey::NotationFragment)
+        .map(Into::<String>::into);
+    if fragment.as_ref().is_some_and(String::is_empty) {
+        fragment = None;
+    }
+    let id = if let Some(id) = fragment {
+        Some(
+            id.parse()
+                .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::NotationFragment))?,
+        )
+    } else {
+        None
+    };
+    let uri = if let Some(id) = &id {
+        ext.get_narrative_uri() & id
+    } else {
+        let name = ext.new_id(FtmlKey::NotationFragment, Cow::Borrowed("notation"))?;
+        ext.get_narrative_uri() & &name
+    };
+
+    let prec = if let Some(v) = attrs.get(FtmlKey::Precedence) {
+        if let Ok(v) = isize::from_str(v.as_ref()) {
+            v
+        } else {
+            return Err(FtmlExtractionError::InvalidValue(FtmlKey::Precedence));
+        }
+    } else {
+        0
+    };
+
+    let mut argprecs = SmallVec::default();
+    if let Some(s) = attrs.get(FtmlKey::Argprecs) {
+        for s in s.as_ref().split(',') {
+            if s.is_empty() {
+                continue;
+            }
+            if let Ok(v) = isize::from_str(s.trim()) {
+                argprecs.push(v);
+            } else {
+                return Err(FtmlExtractionError::InvalidValue(FtmlKey::Argprecs));
+            }
+        }
+    }
+
+    del!(keys - NotationFragment, Precedence, Argprecs);
+    ret!(ext,node <- Notation{id,uri,head,prec,argprecs} + Notation)
+
+    /*
+    extractor.open_notation();
+    Some(OpenFTMLElement::Notation {
+        id,
+        symbol,
+        precedence: prec,
+        argprecs,
+    })
+     */
+}
+
+pub fn notation_comp<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    if !ext.in_notation() {
+        return Err(FtmlExtractionError::InvalidIn(
+            FtmlKey::NotationComp,
+            "ouside of a notation",
+        ));
+    }
+    del!(keys - NotationComp, Term, Head, NotationId, Invisible);
+    attrs.remove(FtmlKey::NotationComp);
+    attrs.remove(FtmlKey::Term);
+    attrs.remove(FtmlKey::Head);
+    attrs.remove(FtmlKey::NotationId);
+    attrs.remove(FtmlKey::Invisible);
+    ret!(ext,node <- NotationComp + NotationComp)
+}
+
+pub fn notation_op_comp<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    del!(keys - NotationOpComp, Term, Head, NotationId, Invisible);
+    attrs.remove(FtmlKey::NotationOpComp);
+    attrs.remove(FtmlKey::Term);
+    attrs.remove(FtmlKey::Head);
+    attrs.remove(FtmlKey::NotationId);
+    attrs.remove(FtmlKey::Invisible);
+    ret!(ext,node <- None + NotationOpComp)
+}
+
+pub fn argsep<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    del!(keys - ArgSep, Term, Head, NotationId, Invisible);
+    attrs.remove(FtmlKey::Term);
+    attrs.remove(FtmlKey::ArgSep);
+    attrs.remove(FtmlKey::Head);
+    attrs.remove(FtmlKey::NotationId);
+    attrs.remove(FtmlKey::Invisible);
+    ret!(ext,node <- ArgSep + ArgSep)
+}
+
+pub fn argnum<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    let index = attrs.get_typed(FtmlKey::ArgNum, |s| {
+        let u = u8::from_str(s).map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::ArgNum))?;
+        NonZeroU8::new(u).ok_or(FtmlExtractionError::InvalidValue(FtmlKey::ArgNum))
+    })?;
+    let argument = ArgumentPosition::Simple(index, ArgumentMode::Simple);
+    let fits = if let Some(OpenNarrativeElement::NotationArg(pos)) = ext.iterate_narrative().next()
+        && pos.index() == argument.index()
+    {
+        true
+    } else {
+        false
+    };
+    if fits {
+        ret!(ext, node)
+    } else if ext.in_notation() {
+        ret!(ext,node <- NotationArg(argument) + NotationArg)
+    } else {
+        Err(FtmlExtractionError::NotIn(FtmlKey::ArgNum, "notations"))
+    }
+}
+
+pub fn argmap<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    crate::TODO!()
+}
+
+pub fn argmapsep<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
     keys: &mut KeyList,
@@ -787,54 +956,6 @@ pub fn vardecl<E: FtmlExtractor>(
 }
 
 pub fn varseq<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn notation<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn notationcomp<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn notationopcomp<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn argsep<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn argmap<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn argmapsep<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
     keys: &mut KeyList,

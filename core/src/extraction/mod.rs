@@ -32,7 +32,7 @@ pub trait FtmlExtractor: 'static + Sized {
     type Return;
     fn in_document(&self) -> &DocumentUri;
     fn iterate_domain(&self) -> impl Iterator<Item = &OpenDomainElement<Self::Node>>;
-    fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement>;
+    fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement<Self::Node>>;
     fn iterate_dones(
         &self,
     ) -> impl ExactSizeIterator<Item = &DocumentElement> + DoubleEndedIterator;
@@ -75,8 +75,12 @@ pub trait FtmlExtractor: 'static + Sized {
             .find_map(|e| match e {
                 OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::SkipSection { .. }
-                | OpenNarrativeElement::Invisible => None,
-                OpenNarrativeElement::Section { uri, .. } => Some(uri),
+                | OpenNarrativeElement::Invisible
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_) => None,
+                OpenNarrativeElement::Section { uri, .. }
+                | OpenNarrativeElement::Notation { uri, .. } => Some(uri),
             })
             .map_or_else(
                 || NarrativeUriRef::Document(self.in_document()),
@@ -85,18 +89,16 @@ pub trait FtmlExtractor: 'static + Sized {
     }
 
     fn in_notation(&self) -> bool {
-        for d in self.iterate_domain() {
+        for d in self.iterate_narrative() {
             match d {
-                OpenDomainElement::Module { .. } | OpenDomainElement::SymbolDeclaration { .. } => {
-                    return false;
-                }
-                OpenDomainElement::SymbolReference { .. }
-                | OpenDomainElement::VariableReference { .. }
-                | OpenDomainElement::OMA { .. }
-                | OpenDomainElement::OMBIND { .. }
-                | OpenDomainElement::Type { .. }
-                | OpenDomainElement::Definiens { .. }
-                | OpenDomainElement::Argument { .. } => (),
+                OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_) => return true,
+                OpenNarrativeElement::Invisible => (),
+                OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::SkipSection { .. } => return false,
             }
         }
         false
@@ -126,10 +128,10 @@ pub trait FtmlExtractor: 'static + Sized {
             .any(|e| matches!(e, OpenNarrativeElement::Invisible))
     }
 
-    fn resolve_variable_name(&self, name: UriName) -> Variable {
-        fn ew(a: &UriName, b: &UriName) -> bool {
+    fn resolve_variable_name(&self, name: Id) -> Variable {
+        fn ew(a: &UriName, b: &Id) -> bool {
             let mut steps = a.steps().rev();
-            for s in b.steps().rev() {
+            for s in b.as_ref().split('/').rev() {
                 if steps.next() != Some(s) {
                     return false;
                 }
@@ -141,7 +143,11 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => children,
-                OpenNarrativeElement::Invisible => continue, // Narrative::Notation(_) => continue,
+                OpenNarrativeElement::Invisible
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::ArgSep { .. } => continue, // Narrative::Notation(_) => continue,
             };
             for c in ch.iter().rev() {
                 match c {
@@ -157,7 +163,10 @@ pub trait FtmlExtractor: 'static + Sized {
                 }
             }
         }
-        Variable::Name(name)
+        Variable::Name {
+            name,
+            notated: None,
+        }
     }
 
     fn last_term(&self) -> Option<&Term> {
@@ -170,6 +179,10 @@ pub trait FtmlExtractor: 'static + Sized {
                     Some(DocumentElement::Term { term, .. }) => return Some(term),
                     _ => break,
                 },
+                OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_) => break,
             }
         }
         if let Some(DocumentElement::Term { term, .. }) = self.iterate_dones().next_back() {
@@ -259,7 +272,7 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
         self.state().domain()
     }
     #[inline]
-    fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement> {
+    fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement<Self::Node>> {
         self.state().narrative()
     }
     fn iterate_dones(
@@ -395,6 +408,10 @@ pub enum FtmlExtractionError {
     MismatchedArgument(ArgumentMode),
     #[error("invalid informal term: {0}")]
     InvalidInformal(String),
+    #[error("invalid notation component: {0}")]
+    InvalidNotationComponent(String),
+    #[error("error encoding data for {0}: {1}")]
+    EncodingError(FtmlKey, String),
 }
 impl From<(FtmlKey, Self)> for FtmlExtractionError {
     #[inline]

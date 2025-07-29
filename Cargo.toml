@@ -65,6 +65,7 @@ oxrdf = "0.2.3"
 reqwasm = { version = "0.5" }
 send_wrapper = "0.6.0"
 html5ever = "0.35"
+phf = "0.12"
 lightningcss = { version = "1.0.0-alpha.67", default-features = false }
 
 

@@ -141,7 +141,8 @@ fn iterate<Views: FtmlViews + ?Sized>(
                         OMA | OMBIND => ReactiveApplication::close(),
                         Module | SymbolDeclaration | Invisible | Section | SectionTitle
                         | SkipSection | SymbolReference | VariableReference | Argument | Type
-                        | Definiens => (),
+                        | Definiens | Notation | CompInNotation | NotationOpComp | NotationComp
+                        | ArgSep | MainCompInNotation | NotationArg => (),
                     }
                 }
             }

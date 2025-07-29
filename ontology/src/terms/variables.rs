@@ -1,13 +1,16 @@
 use std::fmt::{Debug, Display, Formatter};
 
-use ftml_uris::{DocumentElementUri, UriName};
+use ftml_uris::{DocumentElementUri, Id};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Variable {
-    Name(UriName),
+    Name {
+        name: Id,
+        notated: Option<Id>,
+    },
     Ref {
         declaration: DocumentElementUri,
         is_sequence: Option<bool>,
@@ -17,7 +20,10 @@ pub enum Variable {
 impl Display for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Name(n) => Display::fmt(n, f),
+            Self::Name {
+                notated: Some(n), ..
+            } => Display::fmt(n, f),
+            Self::Name { name, .. } => Display::fmt(name, f),
             Self::Ref { declaration, .. } => Display::fmt(declaration.name().last(), f),
         }
     }
@@ -25,7 +31,10 @@ impl Display for Variable {
 impl Debug for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Name(n) => Debug::fmt(n, f),
+            Self::Name {
+                notated: Some(n), ..
+            } => Debug::fmt(n, f),
+            Self::Name { name, .. } => Debug::fmt(name, f),
             Self::Ref { declaration, .. } => Debug::fmt(declaration, f),
         }
     }

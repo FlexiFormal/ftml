@@ -140,7 +140,8 @@ impl FtmlNode for FtmlDomElement {
                     self.1 += 1;
                     match n.dyn_into() {
                         Ok(e) => Some(Either::Left(FtmlDomElement(SendWrapper::new(e)))),
-                        Err(n) => n.text_content().map(Either::Right),
+                        Err(n) if n.node_type() == 3 => n.text_content().map(Either::Right),
+                        _ => None,
                     }
                 })
             }

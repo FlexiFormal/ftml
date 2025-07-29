@@ -246,9 +246,9 @@ do_keys! {
     Vardef                      = "vardef" := todo
     Varseq                      = "varseq" := todo
 
-    Notation                    = "notation" := todo
-    NotationComp                = "notationcomp" := todo
-    NotationOpComp              = "notationopcomp" := todo
+    Notation                    = "notation" := notation
+    NotationComp                = "notationcomp" := notation_comp
+    NotationOpComp              = "notationopcomp" := notation_op_comp
     Definiendum                 = "definiendum"         <= Definition, Paragraph, Assertion; := todo
 
     Type                        = "type" := type_component
@@ -256,9 +256,9 @@ do_keys! {
     Definiens                   = "definiens"           <= Definition, Paragraph, Assertion; := todo
     Rule                        = "rule" := todo
 
-    ArgSep                      = "argsep" := todo
-    ArgMap                      = "argmap" := todo
-    ArgMapSep                   = "argmap-sep" := todo
+    ArgSep                      = "argsep" := argsep
+    ArgMap                      = "argmap" := argmap
+    ArgMapSep                   = "argmap-sep" := argmapsep
 
     Term                        = "term" := term
     Arg                         = "arg" := arg
@@ -332,7 +332,7 @@ do_keys! {
 
     AssocType                   = "assoctype" := todo
     ArgumentReordering          = "reorderargs" := todo
-    ArgNum                      = "argnum" := todo
+    ArgNum                      = "argnum" := argnum
     Bind                        = "bind" := todo
     MorphismDomain              = "domain" := todo
     MorphismTotal               = "total" := todo

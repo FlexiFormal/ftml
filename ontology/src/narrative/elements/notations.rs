@@ -1,26 +1,23 @@
-use crate::terms::ArgumentMode;
+use crate::{terms::ArgumentMode, utils::RefTree};
+use ftml_uris::Id;
 use smallvec::SmallVec;
 
-#[deprecated(note = "TODO")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Notation {
-    pub is_text: bool,
     pub precedence: isize,
-    pub attribute_index: u8,
-    pub inner_index: u16,
-    pub id: Box<str>,
+    pub id: Option<Id>,
     pub argprecs: SmallVec<isize, 9>,
-    pub components: Box<[NotationComponent]>,
-    pub op: Option<OpNotation>,
+    pub component: NotationComponent,
+    pub op: Option<NotationNode>,
 }
 impl Notation {
     #[must_use]
     pub fn is_op(&self) -> bool {
         self.op.is_some()
-            || !self.components.iter().any(|c| {
+            || !self.component.dfs().any(|c| {
                 matches!(
                     c,
                     NotationComponent::Argument { .. }
@@ -31,24 +28,19 @@ impl Notation {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub struct OpNotation {
-    pub attribute_index: u8,
-    pub is_text: bool,
-    pub inner_index: u16,
-    pub text: Box<str>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum NotationComponent {
-    Text(Box<str>),
+    Node {
+        tag: ftml_uris::Id,
+        #[cfg_attr(feature = "serde", serde(default))]
+        attributes: Box<[(ftml_uris::Id, Box<str>)]>,
+        #[cfg_attr(feature = "serde", serde(default))]
+        children: Box<[NotationComponent]>,
+    },
     Argument {
         index: u8,
         mode: ArgumentMode,
@@ -56,18 +48,160 @@ pub enum NotationComponent {
     ArgSep {
         index: u8,
         mode: ArgumentMode,
+        #[cfg_attr(feature = "serde", serde(default))]
         sep: Box<[NotationComponent]>,
     },
     ArgMap {
         index: u8,
+        #[cfg_attr(feature = "serde", serde(default))]
         segments: Box<[NotationComponent]>,
     },
-    MainComp(Box<str>),
-    Comp(Box<str>),
+    MainComp(NotationNode),
+    Comp(NotationNode),
+    #[cfg_attr(feature = "serde", serde(untagged))]
+    Text(Box<str>),
 }
 
+impl crate::utils::RefTree for NotationComponent {
+    type Child<'a>
+        = &'a Self
+    where
+        Self: 'a;
+    fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
+        match self {
+            Self::Comp(_) | Self::Text(_) | Self::MainComp(_) | Self::Argument { .. } => {
+                either::Left(std::iter::empty())
+            }
+            Self::Node { children, .. }
+            | Self::ArgSep { sep: children, .. }
+            | Self::ArgMap {
+                segments: children, ..
+            } => either::Right(children.iter()),
+        }
+    }
+}
+
+impl std::fmt::Debug for NotationComponent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text(t) => write!(f, "\"{t}\""),
+            Self::Argument { index, mode } => write!(f, "<arg {index}@{mode:?}/>"),
+            Self::Node {
+                tag,
+                attributes,
+                children,
+            } => {
+                write!(f, "<{tag}")?;
+                for (k, v) in attributes {
+                    write!(f, " {k}=\"{v}\"")?;
+                }
+                f.write_str(">\n")?;
+                for t in children {
+                    writeln!(f, "{t:?}")?;
+                }
+                write!(f, "</{tag}>")
+            }
+            Self::ArgMap { index, segments } => {
+                write!(f, "<argmap {index}>")?;
+                for s in segments {
+                    s.fmt(f)?;
+                }
+                write!(f, "<argmap/>")
+            }
+            Self::ArgSep { index, mode, sep } => {
+                write!(f, "<argsep {index}@{mode:?}>")?;
+                for s in sep {
+                    s.fmt(f)?;
+                }
+                write!(f, "<argsep/>")
+            }
+            Self::MainComp(c) => {
+                write!(f, "<{} data-ftml-maincomp", c.tag)?;
+                for (k, v) in &c.attributes {
+                    write!(f, " {k}=\"{v}\"")?;
+                }
+                f.write_str(">\n")?;
+                for t in &c.children {
+                    writeln!(f, "{t:?}")?;
+                }
+                write!(f, "</{}>", c.tag)
+            }
+            Self::Comp(c) => {
+                write!(f, "<{} data-ftml-comp", c.tag)?;
+                for (k, v) in &c.attributes {
+                    write!(f, " {k}=\"{v}\"")?;
+                }
+                f.write_str(">\n")?;
+                for t in &c.children {
+                    writeln!(f, "{t:?}")?;
+                }
+                write!(f, "</{}>", c.tag)
+            }
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct NotationNode {
+    pub tag: ftml_uris::Id,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub attributes: Box<[(ftml_uris::Id, Box<str>)]>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub children: Box<[NodeOrText]>,
+}
+
+impl std::fmt::Debug for NotationNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<{}", self.tag)?;
+        for (k, v) in &self.attributes {
+            write!(f, " {k}=\"{v}\"")?;
+        }
+        f.write_str(">\n")?;
+        for t in &self.children {
+            writeln!(f, "{t:?}")?;
+        }
+        write!(f, "</{}>", self.tag)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+pub enum NodeOrText {
+    Node(NotationNode),
+    Text(Box<str>),
+}
+
+impl std::fmt::Debug for NodeOrText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text(t) => write!(f, "\"{t}\""),
+            Self::Node(NotationNode {
+                tag,
+                attributes,
+                children,
+            }) => {
+                write!(f, "<{tag}")?;
+                for (k, v) in attributes {
+                    write!(f, " {k}=\"{v}\"")?;
+                }
+                f.write_str(">\n")?;
+                for t in children {
+                    writeln!(f, "{t:?}")?;
+                }
+                write!(f, "</{tag}>")
+            }
+        }
+    }
+}
+
+/*
 impl OpNotation {
-    /*
     pub fn display_ftml<'a>(
         &'a self,
         as_variable: bool,
@@ -98,8 +232,8 @@ impl OpNotation {
             uri,
         }
     }
-     */
 }
+*/
 
 mod presentation {
     /*

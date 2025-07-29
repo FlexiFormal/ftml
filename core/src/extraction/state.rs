@@ -15,15 +15,19 @@ use ftml_ontology::{
         modules::{ModuleData, NestedModule},
     },
     narrative::{
-        DocumentRange,
+        DataBuffer, DocumentRange,
         documents::{DocumentCounter, DocumentStyle},
-        elements::{DocumentElement, Section},
+        elements::{
+            DocumentElement, Notation, Section,
+            notations::{NotationComponent, NotationNode},
+        },
     },
     terms::{Term, Variable},
 };
 #[cfg(feature = "rdf")]
 use ftml_uris::FtmlUri;
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, UriName};
+use smallvec::SmallVec;
 use std::borrow::Cow;
 
 #[derive(Clone, Debug)]
@@ -55,7 +59,7 @@ impl IdCounter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StackVec<T> {
     last: Option<T>,
     rest: Vec<T>,
@@ -110,8 +114,9 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     pub modules: Vec<ModuleData>,
     pub counters: Vec<DocumentCounter>,
     pub styles: Vec<DocumentStyle>,
+    pub buffer: DataBuffer,
     domain: StackVec<OpenDomainElement<N>>,
-    narrative: StackVec<OpenNarrativeElement>,
+    narrative: StackVec<OpenNarrativeElement<N>>,
     ids: IdCounter,
     #[allow(dead_code)]
     do_rdf: bool,
@@ -173,6 +178,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             ids: IdCounter::default(),
             counters: Vec::new(),
             styles: Vec::new(),
+            buffer: DataBuffer::default(),
             top: Vec::new(),
             modules: Vec::new(),
             domain: StackVec::default(),
@@ -202,7 +208,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         self.domain.iter()
     }
     #[inline]
-    pub fn narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement> {
+    pub fn narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement<N>> {
         self.narrative.iter()
     }
 
@@ -282,6 +288,37 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::SkipSection)),
             },
+            CloseFtmlElement::Notation => match self.narrative.pop() {
+                Some(OpenNarrativeElement::Notation {
+                    uri,
+                    id,
+                    head,
+                    prec,
+                    argprecs,
+                    component,
+                    op,
+                }) => self.close_notation(uri, id, head, prec, argprecs, component, op),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Notation)),
+            },
+            CloseFtmlElement::NotationComp => match self.narrative.pop() {
+                Some(OpenNarrativeElement::NotationComp { node, components }) => {
+                    self.close_notation_component(&node, components)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::NotationComp)),
+            },
+            CloseFtmlElement::ArgSep => match self.narrative.pop() {
+                Some(OpenNarrativeElement::ArgSep { node, components }) => {
+                    self.close_argsep(&node, components)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ArgSep)),
+            },
+            CloseFtmlElement::NotationArg => match self.narrative.pop() {
+                Some(OpenNarrativeElement::NotationArg(arg)) => self.close_notation_arg(&node, arg),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg)),
+            },
+            CloseFtmlElement::NotationOpComp => self.close_notation_op(node),
+            CloseFtmlElement::CompInNotation => self.close_comp_in_notation(node, false),
+            CloseFtmlElement::MainCompInNotation => self.close_comp_in_notation(node, true),
             CloseFtmlElement::SymbolReference => {
                 if let Some(OpenDomainElement::SymbolReference { uri, notation }) =
                     self.domain.pop()
@@ -376,7 +413,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     children.push(e);
                     return;
                 }
-                OpenNarrativeElement::Invisible => (),
+                OpenNarrativeElement::Invisible
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_) => (),
             }
         }
         self.top.push(e);
@@ -398,6 +439,178 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         self.push_elem(DocumentElement::Section(sec));
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn close_notation(
+        &mut self,
+        uri: DocumentElementUri,
+        id: Option<Id>,
+        head: VarOrSym,
+        prec: isize,
+        argprecs: SmallVec<isize, 9>,
+        component: Option<NotationComponent>,
+        op: Option<NotationNode>,
+    ) -> super::Result<()> {
+        let Some(component) = component else {
+            return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Notation));
+        };
+        let not = Notation {
+            id,
+            precedence: prec,
+            argprecs,
+            component,
+            op,
+        };
+        tracing::info!("New notation for {head:?}: {not:?}");
+        let notation = self
+            .buffer
+            .push(&not)
+            .map_err(|e| FtmlExtractionError::EncodingError(FtmlKey::Notation, e.to_string()))?;
+        let e = match head {
+            VarOrSym::S(s) => DocumentElement::Notation {
+                symbol: s,
+                uri,
+                notation,
+            },
+            VarOrSym::V(Variable::Ref { declaration, .. }) => DocumentElement::VariableNotation {
+                variable: declaration,
+                uri,
+                notation,
+            },
+            VarOrSym::V(_) => return Err(FtmlExtractionError::InvalidValue(FtmlKey::Notation)),
+        };
+        self.push_elem(e);
+        Ok(())
+    }
+
+    fn close_notation_component(
+        &mut self,
+        node: &N,
+        components: Vec<(NotationComponent, crate::NodePath)>,
+    ) -> super::Result<()> {
+        let not = node.as_notation(components)?;
+        if let Some(OpenNarrativeElement::Notation { component, .. }) = self.narrative.last_mut() {
+            *component = Some(not);
+            return Ok(());
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::NotationComp))
+    }
+
+    fn close_notation_arg(&mut self, node: &N, position: ArgumentPosition) -> super::Result<()> {
+        let mode = position.mode();
+        let index = position.index();
+        if let Some(
+            OpenNarrativeElement::NotationComp {
+                components,
+                node: ancestor,
+            }
+            | OpenNarrativeElement::ArgSep {
+                components,
+                node: ancestor,
+            },
+        ) = self.narrative.last_mut()
+        {
+            let path = node.path_from(ancestor);
+            components.push((NotationComponent::Argument { index, mode }, path));
+            Ok(())
+        } else {
+            Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg))
+        }
+    }
+
+    fn close_argsep(
+        &mut self,
+        node: &N,
+        components: Vec<(NotationComponent, crate::NodePath)>,
+    ) -> super::Result<()> {
+        let (index, mode, sep) = match node.as_notation(components)? {
+            NotationComponent::Node {
+                tag,
+                attributes,
+                children,
+            } => match children.first() {
+                Some(NotationComponent::Argument { index, mode }) => {
+                    let index = *index;
+                    let mode = *mode;
+                    let mut children = children.into_vec();
+                    children.remove(0);
+                    (index, mode, children.into_boxed_slice())
+                }
+                _ => return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ArgSep)),
+            },
+            _ => return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ArgSep)),
+        };
+        if let Some(
+            OpenNarrativeElement::NotationComp {
+                components,
+                node: ancestor,
+            }
+            | OpenNarrativeElement::ArgSep {
+                components,
+                node: ancestor,
+            },
+        ) = self.narrative.last_mut()
+        {
+            let path = node.path_from(ancestor);
+            components.push((NotationComponent::ArgSep { index, mode, sep }, path));
+            Ok(())
+        } else {
+            Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::NotationComp))
+        }
+    }
+
+    fn close_notation_op(&mut self, node: &N) -> super::Result<()> {
+        let component = node.as_component()?;
+        if let Some(OpenNarrativeElement::Notation { op, .. }) = self.narrative.last_mut() {
+            *op = Some(component);
+            return Ok(());
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(
+            FtmlKey::NotationOpComp,
+        ))
+    }
+
+    fn close_comp_in_notation(&mut self, node: &N, is_main: bool) -> super::Result<()> {
+        let component = node.as_component()?;
+        if is_main {
+            for e in self.narrative.iter_mut() {
+                match e {
+                    OpenNarrativeElement::Invisible
+                    | OpenNarrativeElement::NotationComp { .. }
+                    | OpenNarrativeElement::ArgSep { .. } => {}
+                    OpenNarrativeElement::Notation { op, .. } => {
+                        *op = Some(component.clone());
+                        break;
+                    }
+                    o => {
+                        return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Comp));
+                    }
+                }
+            }
+        }
+        match self.narrative.last_mut() {
+            Some(
+                OpenNarrativeElement::NotationComp {
+                    node: ancestor,
+                    components,
+                }
+                | OpenNarrativeElement::ArgSep {
+                    node: ancestor,
+                    components,
+                },
+            ) => {
+                let comp = if is_main {
+                    NotationComponent::MainComp(component)
+                } else {
+                    NotationComponent::Comp(component)
+                };
+                components.push((comp, node.path_from(ancestor)));
+                Ok(())
+            }
+            Some(OpenNarrativeElement::Notation { .. }) if is_main => Ok(()),
+            _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Comp)),
+        }
+    }
+
     fn close_title(&mut self, node: &N) -> super::Result<()> {
         for e in self.narrative.iter_mut() {
             match e {
@@ -408,7 +621,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenNarrativeElement::Section { title, .. } => {
                     return Err(FtmlExtractionError::DuplicateValue(FtmlKey::Title));
                 }
-                OpenNarrativeElement::SkipSection { .. } => {
+                OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
                 OpenNarrativeElement::Module { .. } | OpenNarrativeElement::Invisible => (),
@@ -729,7 +946,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             Some(OpenDomainElement::Module { .. }) | None => (),
         }
         let uri = match var {
-            Variable::Name(_) => return Ok(()),
+            Variable::Name { .. } => return Ok(()),
             Variable::Ref {
                 declaration,
                 is_sequence,

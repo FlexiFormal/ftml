@@ -1,6 +1,6 @@
 use super::Variable;
 use super::{Argument, BoundArgument, Term};
-use ftml_uris::{PathUri, UriName};
+use ftml_uris::{Id, PathUri, UriName};
 use openmath::ser::{AsOMS, Omv};
 use openmath::{OM, OMSerializable};
 use std::str::FromStr;
@@ -46,13 +46,13 @@ struct Var<'a>(&'a Variable);
 impl openmath::ser::BindVar for Var<'_> {
     fn name(&self) -> impl std::fmt::Display {
         match self.0 {
-            Variable::Name(n) => n,
-            Variable::Ref { declaration, .. } => declaration.name(),
+            Variable::Name { name, .. } => either::Left(name),
+            Variable::Ref { declaration, .. } => either::Right(declaration.name()),
         }
     }
     fn attrs(&self) -> impl ExactSizeIterator<Item: openmath::ser::OMAttr> {
         match self.0 {
-            Variable::Name(_) => either::Left(std::iter::empty()),
+            Variable::Name { .. } => either::Left(std::iter::empty()),
             Variable::Ref { declaration, .. } => either::Right(std::iter::once((
                 &*ftml_uris::metatheory::RESOLVED_VARIABLE_URI,
                 declaration,
@@ -152,7 +152,7 @@ impl openmath::ser::OMSerializable for Term {
     ) -> Result<S::Ok, S::Err> {
         match self {
             Self::Symbol(s) => s.as_oms().as_openmath(serializer),
-            Self::Var(Variable::Name(n)) => serializer.omv(n),
+            Self::Var(Variable::Name { name, .. }) => serializer.omv(name),
             Self::Var(Variable::Ref { declaration, .. }) => serializer.omattr(
                 std::iter::once((
                     &*ftml_uris::metatheory::RESOLVED_VARIABLE_URI,
@@ -196,7 +196,10 @@ impl openmath::de::OMDeserializable<'_> for Term {
                 let sym = path | UriName::from_str(&cd)? | UriName::from_str(&name)?;
                 Ok(Self::Symbol(sym))
             }
-            OM::OMV { name, .. } => Ok(Self::Var(Variable::Name(UriName::from_str(&name)?))),
+            OM::OMV { name, .. } => Ok(Self::Var(Variable::Name {
+                name: Id::from_str(&name)?,
+                notated: None,
+            })),
 
             o => Err(Error::Unsupported(o.kind())),
         }

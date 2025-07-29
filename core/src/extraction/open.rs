@@ -6,11 +6,16 @@ use ftml_ontology::{
     narrative::{
         DocumentRange,
         documents::{DocumentCounter, DocumentStyle},
-        elements::{DocumentElement, sections::SectionLevel},
+        elements::{
+            DocumentElement,
+            notations::{NotationComponent, NotationNode},
+            sections::SectionLevel,
+        },
     },
     terms::{Argument, ArgumentMode, BoundArgument, Term, Variable},
 };
-use ftml_uris::{DocumentElementUri, DocumentUri, Language, ModuleUri, SymbolUri, UriName};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, UriName};
+use smallvec::SmallVec;
 
 use crate::extraction::{FtmlExtractionError, nodes::FtmlNode};
 
@@ -56,9 +61,19 @@ pub enum OpenFtmlElement {
         notation: Option<UriName>,
         uri: Option<DocumentElementUri>,
     },
+    Notation {
+        uri: DocumentElementUri,
+        id: Option<Id>,
+        head: VarOrSym,
+        prec: isize,
+        argprecs: SmallVec<isize, 9>,
+    },
     Argument(ArgumentPosition),
+    NotationArg(ArgumentPosition),
     Type,
     Definiens,
+    NotationComp,
+    ArgSep,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,8 +89,15 @@ pub enum CloseFtmlElement {
     OMA,
     OMBIND,
     Argument,
+    NotationArg,
     Type,
     Definiens,
+    Notation,
+    CompInNotation,
+    MainCompInNotation,
+    NotationComp,
+    NotationOpComp,
+    ArgSep,
 }
 
 #[derive(Debug, Clone)]
@@ -126,7 +148,7 @@ pub enum OpenDomainElement<N: FtmlNode> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OpenNarrativeElement {
+pub enum OpenNarrativeElement<N: FtmlNode> {
     Module {
         uri: ModuleUri,
         children: Vec<DocumentElement>,
@@ -139,6 +161,24 @@ pub enum OpenNarrativeElement {
     SkipSection {
         children: Vec<DocumentElement>,
     },
+    Notation {
+        uri: DocumentElementUri,
+        id: Option<Id>,
+        head: VarOrSym,
+        prec: isize,
+        argprecs: SmallVec<isize, 9>,
+        component: Option<NotationComponent>,
+        op: Option<NotationNode>,
+    },
+    NotationComp {
+        node: N,
+        components: Vec<(NotationComponent, crate::NodePath)>,
+    },
+    ArgSep {
+        node: N,
+        components: Vec<(NotationComponent, crate::NodePath)>,
+    },
+    NotationArg(ArgumentPosition),
     Invisible,
 }
 
@@ -158,7 +198,7 @@ pub enum Split<N: FtmlNode> {
     Meta(MetaDatum),
     Open {
         domain: Option<OpenDomainElement<N>>,
-        narrative: Option<OpenNarrativeElement>,
+        narrative: Option<OpenNarrativeElement<N>>,
     },
     None,
 }
@@ -586,6 +626,10 @@ impl OpenFtmlElement {
                 }),
                 narrative: None,
             },
+            Self::NotationArg(a) => Split::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::NotationArg(a)),
+            },
             Self::Type => Split::Open {
                 domain: Some(OpenDomainElement::Type {
                     terms: Vec::new(),
@@ -599,6 +643,38 @@ impl OpenFtmlElement {
                     node: node.clone(),
                 }),
                 narrative: None,
+            },
+            Self::Notation {
+                id,
+                uri,
+                head,
+                prec,
+                argprecs,
+            } => Split::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::Notation {
+                    id,
+                    uri,
+                    head,
+                    prec,
+                    argprecs,
+                    component: None,
+                    op: None,
+                }),
+            },
+            Self::NotationComp => Split::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::NotationComp {
+                    node: node.clone(),
+                    components: Vec::new(),
+                }),
+            },
+            Self::ArgSep => Split::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ArgSep {
+                    node: node.clone(),
+                    components: Vec::new(),
+                }),
             },
             Self::InputRef {
                 target: uri,

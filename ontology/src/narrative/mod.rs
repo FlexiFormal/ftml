@@ -187,11 +187,41 @@ impl<T> std::hash::Hash for DataRef<T> {
         self.end.hash(state);
     }
 }
+
+#[cfg(feature = "serde")]
+pub use serde_impl::DataBuffer;
+
 #[cfg(feature = "serde")]
 mod serde_impl {
     use std::marker::PhantomData;
 
     use serde::ser::SerializeStruct;
+
+    use crate::narrative::DataRef;
+
+    #[derive(Debug, Default)]
+    pub struct DataBuffer(Vec<u8>);
+    impl DataBuffer {
+        /// ### Errors
+        pub fn push<T: serde::Serialize>(
+            &mut self,
+            t: &T,
+        ) -> Result<DataRef<T>, bincode::error::EncodeError> {
+            let curr = self.0.len();
+            bincode::serde::encode_into_std_write(t, &mut self.0, bincode::config::standard())?;
+            Ok(DataRef {
+                start: curr,
+                end: self.0.len(),
+                phantom_data: PhantomData,
+            })
+        }
+
+        #[inline]
+        #[must_use]
+        pub fn take(self) -> Box<[u8]> {
+            self.0.into_boxed_slice()
+        }
+    }
 
     impl<T> serde::Serialize for super::DataRef<T> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
