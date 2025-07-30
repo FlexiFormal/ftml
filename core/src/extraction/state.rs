@@ -12,11 +12,11 @@ use ftml_ontology::{
             AnyDeclaration,
             symbols::{Symbol, SymbolData},
         },
-        modules::{ModuleData, NestedModule},
+        modules::{Module, ModuleData, NestedModule},
     },
     narrative::{
         DataBuffer, DocumentRange,
-        documents::{DocumentCounter, DocumentStyle},
+        documents::{Document, DocumentCounter, DocumentData, DocumentStyle, DocumentStyles},
         elements::{
             DocumentElement, Notation, Section,
             notations::{NotationComponent, NotationNode},
@@ -26,7 +26,9 @@ use ftml_ontology::{
 };
 #[cfg(feature = "rdf")]
 use ftml_uris::FtmlUri;
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, UriName};
+use ftml_uris::{
+    DocumentElementUri, DocumentUri, Id, Language, LeafUri, ModuleUri, SymbolUri, UriName,
+};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 
@@ -60,7 +62,7 @@ impl IdCounter {
 }
 
 #[derive(Debug, Clone)]
-struct StackVec<T> {
+pub struct StackVec<T> {
     last: Option<T>,
     rest: Vec<T>,
 }
@@ -77,7 +79,7 @@ impl<T> StackVec<T> {
     const fn last_mut(&mut self) -> Option<&mut T> {
         self.last.as_mut()
     }
-    fn iter(&self) -> impl Iterator<Item = &T> {
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
         use either::Either::{Left, Right};
         self.last.as_ref().map_or_else(
             || Right(std::iter::empty()),
@@ -97,13 +99,13 @@ impl<T> StackVec<T> {
         self.last.is_none()
     }
 
-    fn push(&mut self, e: T) {
+    pub fn push(&mut self, e: T) {
         if let Some(e) = self.last.replace(e) {
             self.rest.push(e);
         }
     }
 
-    fn pop(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<T> {
         std::mem::replace(&mut self.last, self.rest.pop())
     }
 }
@@ -115,8 +117,10 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     pub counters: Vec<DocumentCounter>,
     pub styles: Vec<DocumentStyle>,
     pub buffer: DataBuffer,
-    domain: StackVec<OpenDomainElement<N>>,
-    narrative: StackVec<OpenNarrativeElement<N>>,
+    pub title: Option<Box<str>>,
+    pub notations: Vec<(LeafUri, DocumentElementUri, Notation)>,
+    pub domain: StackVec<OpenDomainElement<N>>,
+    pub narrative: StackVec<OpenNarrativeElement<N>>,
     ids: IdCounter,
     #[allow(dead_code)]
     do_rdf: bool,
@@ -164,6 +168,16 @@ macro_rules! add_triples {
     }
 }
 
+#[derive(Debug)]
+pub struct ExtractionResult {
+    pub document: Document,
+    pub modules: Vec<Module>,
+    pub data: Box<[u8]>,
+    #[cfg(feature = "rdf")]
+    pub triples: rustc_hash::FxHashSet<ulo::rdf_types::Triple>,
+    pub notations: Vec<(LeafUri, DocumentElementUri, Notation)>,
+}
+
 #[allow(unused_variables)]
 impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     #[inline]
@@ -175,9 +189,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             #[cfg(feature = "rdf")]
             iri: document.to_iri(),
             document,
+            title: None,
             ids: IdCounter::default(),
             counters: Vec::new(),
             styles: Vec::new(),
+            notations: Vec::new(),
             buffer: DataBuffer::default(),
             top: Vec::new(),
             modules: Vec::new(),
@@ -185,6 +201,39 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             narrative: StackVec::default(),
             #[cfg(feature = "rdf")]
             rdf: rustc_hash::FxHashSet::default(),
+        }
+    }
+
+    pub fn finish(&mut self) -> ExtractionResult {
+        use std::mem::take;
+        let document = DocumentData {
+            uri: self.document.clone(),
+            title: take(&mut self.title), // todo
+            elements: take(&mut self.top).into_boxed_slice(),
+            styles: DocumentStyles {
+                counters: take(&mut self.counters).into_boxed_slice(),
+                styles: take(&mut self.styles).into_boxed_slice(),
+            },
+        }
+        .close();
+        tracing::info!("Finished document {document:?}");
+        let modules = take(&mut self.modules)
+            .into_iter()
+            .map(|m| {
+                tracing::info!("Found module {m:?}");
+                m.close()
+            })
+            .collect();
+        let data = take(&mut self.buffer).take();
+        #[cfg(feature = "rdf")]
+        let triples = take(&mut self.rdf);
+        ExtractionResult {
+            document,
+            modules,
+            data,
+            #[cfg(feature = "rdf")]
+            triples,
+            notations: take(&mut self.notations),
         }
     }
 
@@ -213,7 +262,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     }
 
     /// ### Errors
-    pub fn add(&mut self, e: OpenFtmlElement, node: &N) {
+    pub fn add(&mut self, e: OpenFtmlElement, node: &N) -> Result<(), FtmlExtractionError> {
         match e.split(node) {
             Split::Open { domain, narrative } => {
                 if let Some(dom) = domain {
@@ -229,9 +278,19 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 MetaDatum::InputRef { target, uri } => {
                     self.push_elem(DocumentElement::DocumentReference { uri, target });
                 }
+                MetaDatum::SetSectionLevel(lvl) => {
+                    self.push_elem(DocumentElement::SetSectionLevel(lvl));
+                }
+                MetaDatum::UseModule(uri) => self.push_elem(DocumentElement::UseModule(uri)),
+                MetaDatum::ImportModule(uri) => {
+                    get_module!(parent,parent_uri <- self);
+                    parent.push(AnyDeclaration::Import(uri.clone()));
+                    self.push_elem(DocumentElement::ImportModule(uri));
+                }
             },
             Split::None => (),
         }
+        Ok(())
     }
 
     /// ### Errors
@@ -313,7 +372,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ArgSep)),
             },
             CloseFtmlElement::NotationArg => match self.narrative.pop() {
-                Some(OpenNarrativeElement::NotationArg(arg)) => self.close_notation_arg(&node, arg),
+                Some(OpenNarrativeElement::NotationArg(arg)) => self.close_notation_arg(node, arg),
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg)),
             },
             CloseFtmlElement::NotationOpComp => self.close_notation_op(node),
@@ -393,6 +452,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens)),
             },
             CloseFtmlElement::SectionTitle => self.close_title(node),
+            CloseFtmlElement::DocTitle => {
+                self.title = Some(node.inner_string().into_owned().into_boxed_str());
+                Ok(())
+            }
             CloseFtmlElement::Invisible => {
                 match self.narrative.pop() {
                     Some(OpenNarrativeElement::Invisible) => (),
@@ -465,19 +528,27 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             .buffer
             .push(&not)
             .map_err(|e| FtmlExtractionError::EncodingError(FtmlKey::Notation, e.to_string()))?;
-        let e = match head {
-            VarOrSym::S(s) => DocumentElement::Notation {
-                symbol: s,
-                uri,
-                notation,
-            },
-            VarOrSym::V(Variable::Ref { declaration, .. }) => DocumentElement::VariableNotation {
-                variable: declaration,
-                uri,
-                notation,
-            },
+
+        let (e, leaf) = match head {
+            VarOrSym::S(s) => (
+                DocumentElement::Notation {
+                    symbol: s.clone(),
+                    uri: uri.clone(),
+                    notation,
+                },
+                s.into(),
+            ),
+            VarOrSym::V(Variable::Ref { declaration, .. }) => (
+                DocumentElement::VariableNotation {
+                    variable: declaration.clone(),
+                    uri: uri.clone(),
+                    notation,
+                },
+                declaration.into(),
+            ),
             VarOrSym::V(_) => return Err(FtmlExtractionError::InvalidValue(FtmlKey::Notation)),
         };
+        self.notations.push((leaf, uri, not));
         self.push_elem(e);
         Ok(())
     }

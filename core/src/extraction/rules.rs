@@ -13,9 +13,9 @@ use ftml_ontology::{
         documents::{DocumentCounter, DocumentStyle},
         elements::sections::SectionLevel,
     },
-    terms::{ArgumentMode, Variable},
+    terms::ArgumentMode,
 };
-use ftml_uris::{Id, IsNarrativeUri, Uri, errors::SegmentParseError};
+use ftml_uris::{Id, IsNarrativeUri, errors::SegmentParseError};
 use smallvec::SmallVec;
 use std::{borrow::Cow, num::NonZeroU8, str::FromStr};
 
@@ -103,6 +103,15 @@ pub fn invisible<E: FtmlExtractor>(
     }
 }
 
+pub fn doctitle<E: FtmlExtractor>(
+    ext: &mut E,
+    _attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    ret!(ext, node <- None + DocTitle)
+}
+
 pub fn setsectionlevel<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
@@ -121,11 +130,23 @@ pub fn setsectionlevel<E: FtmlExtractor>(
 pub fn section<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
-    _keys: &mut KeyList,
+    keys: &mut KeyList,
     node: &E::Node,
 ) -> Result<E> {
     let uri = attrs.get_elem_uri_from_id(ext, "section")?;
+    del!(keys - Id);
     ret!(ext,node <- Section(uri) + Section)
+}
+
+pub fn currentsectionlevel<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    let cap = attrs.get_bool(FtmlKey::Capitalize);
+    del!(keys - Capitalize);
+    ret!(ext,node <- CurrentSectionLevel(cap))
 }
 
 pub fn skipsection<E: FtmlExtractor>(
@@ -287,7 +308,7 @@ pub fn counter_parent<E: FtmlExtractor>(
         }));
         lvl.map(|lvl| {
             lvl.try_into()
-                .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::SetSectionLevel))
+                .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::CounterParent))
         })
         .transpose()?
     };
@@ -311,6 +332,26 @@ pub fn module<E: FtmlExtractor>(
         meta,
         signature,
     } + Module)
+}
+
+pub fn usemodule<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    let uri = attrs.take_module_uri(FtmlKey::UseModule)?;
+    ret!(ext,node <- UseModule(uri))
+}
+
+pub fn importmodule<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    let uri = attrs.take_module_uri(FtmlKey::UseModule)?;
+    ret!(ext,node <- ImportModule(uri))
 }
 
 pub fn term<E: FtmlExtractor>(
@@ -676,24 +717,6 @@ pub fn defcomp<E: FtmlExtractor>(
     crate::TODO!()
 }
 
-pub fn importmodule<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-    node: &E::Node,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn usemodule<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-    node: &E::Node,
-) -> Result<E> {
-    crate::TODO!()
-}
-
 pub fn mathstructure<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
@@ -916,14 +939,6 @@ pub fn precondition<E: FtmlExtractor>(
 }
 
 pub fn objective<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn doctitle<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
     keys: &mut KeyList,

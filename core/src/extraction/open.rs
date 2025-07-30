@@ -14,7 +14,9 @@ use ftml_ontology::{
     },
     terms::{Argument, ArgumentMode, BoundArgument, Term, Variable},
 };
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, UriName};
+use ftml_uris::{
+    DocumentElementUri, DocumentUri, Id, Language, LeafUri, ModuleUri, SymbolUri, UriName,
+};
 use smallvec::SmallVec;
 
 use crate::extraction::{FtmlExtractionError, nodes::FtmlNode};
@@ -74,6 +76,9 @@ pub enum OpenFtmlElement {
     Definiens,
     NotationComp,
     ArgSep,
+    CurrentSectionLevel(bool),
+    ImportModule(ModuleUri),
+    UseModule(ModuleUri),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -98,6 +103,7 @@ pub enum CloseFtmlElement {
     NotationComp,
     NotationOpComp,
     ArgSep,
+    DocTitle,
 }
 
 #[derive(Debug, Clone)]
@@ -190,6 +196,9 @@ pub enum MetaDatum {
         target: DocumentUri,
         uri: DocumentElementUri,
     },
+    SetSectionLevel(SectionLevel),
+    ImportModule(ModuleUri),
+    UseModule(ModuleUri),
 }
 
 #[derive(Debug, Clone)]
@@ -207,6 +216,25 @@ pub enum Split<N: FtmlNode> {
 pub enum VarOrSym {
     S(SymbolUri),
     V(Variable),
+}
+impl std::fmt::Display for VarOrSym {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::S(s) => s.fmt(f),
+            Self::V(v) => v.fmt(f),
+        }
+    }
+}
+impl From<LeafUri> for VarOrSym {
+    fn from(value: LeafUri) -> Self {
+        match value {
+            LeafUri::Symbol(s) => Self::S(s),
+            LeafUri::Element(e) => Self::V(Variable::Ref {
+                declaration: e,
+                is_sequence: None,
+            }),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -685,7 +713,12 @@ impl OpenFtmlElement {
             }),
             Self::Style(s) => Split::Meta(MetaDatum::Style(s)),
             Self::Counter(c) => Split::Meta(MetaDatum::Counter(c)),
-            Self::SetSectionLevel(_) | Self::None | Self::SectionTitle | Self::Comp => Split::None,
+            Self::SetSectionLevel(lvl) => Split::Meta(MetaDatum::SetSectionLevel(lvl)),
+            Self::ImportModule(uri) => Split::Meta(MetaDatum::ImportModule(uri)),
+            Self::UseModule(uri) => Split::Meta(MetaDatum::UseModule(uri)),
+            Self::None | Self::SectionTitle | Self::Comp | Self::CurrentSectionLevel(_) => {
+                Split::None
+            }
         }
     }
 }

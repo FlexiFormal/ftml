@@ -16,8 +16,8 @@ pub enum BackendError<E: std::fmt::Debug> {
     ToDo(String),
 }
 
-impl<F: std::fmt::Debug> BackendError<F> {
-    pub fn from_other<I: std::fmt::Debug + From<F>>(self) -> BackendError<I> {
+impl<F: std::fmt::Display + std::fmt::Debug> BackendError<F> {
+    pub fn from_other<I: std::fmt::Display + std::fmt::Debug + From<F>>(self) -> BackendError<I> {
         match self {
             Self::HtmlNotFound => BackendError::HtmlNotFound,
             Self::NoDefinition => BackendError::NoDefinition,
@@ -29,7 +29,7 @@ impl<F: std::fmt::Debug> BackendError<F> {
         }
     }
 }
-impl<E: std::fmt::Debug> BackendError<E> {
+impl<E: std::fmt::Display + std::fmt::Debug> BackendError<E> {
     /// ### Errors
     pub fn from_prefix_value_pair(value: String, prefix_len: usize) -> Result<Self, String> {
         fn js<V: serde::de::DeserializeOwned>(
@@ -59,7 +59,7 @@ impl<E: std::fmt::Debug> BackendError<E> {
 }
 impl<E> std::str::FromStr for BackendError<E>
 where
-    E: std::fmt::Debug + std::str::FromStr,
+    E: std::fmt::Display + std::fmt::Debug + std::str::FromStr,
     E::Err: Into<Self>,
 {
     type Err = <E as std::str::FromStr>::Err;

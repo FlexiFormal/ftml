@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use ftml_backend::{BackendError, FtmlBackend, GlobalBackend};
+use ftml_backend::{BackendError, FtmlBackend, GlobalBackend, ParagraphOrProblemKind};
 use ftml_ontology::{
     domain::modules::Module,
     narrative::{documents::Document, elements::Notation},
@@ -9,10 +9,10 @@ use ftml_ontology::{
 use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri, SymbolUri};
 
 pub trait SendBackend:
-    GlobalBackend<Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone>
+    GlobalBackend<Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone> + Send
 {
 }
-impl<G: GlobalBackend> SendBackend for G where
+impl<G: GlobalBackend + Send> SendBackend for G where
     G::Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone
 {
 }
@@ -24,6 +24,7 @@ pub struct LocalCache {
     pub(crate) notations: Map<LeafUri, Vec<(DocumentElementUri, Notation)>>,
     pub(crate) documents: Set<Document>,
     pub(crate) modules: Set<Module>,
+    pub(crate) paragraphs: Set<(DocumentElementUri, ParagraphOrProblemKind)>,
 }
 
 pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
@@ -31,6 +32,7 @@ pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
         notations: Map::default(),
         documents: Set::default(),
         modules: Set::default(),
+        paragraphs: Set::default(),
     });
 
 pub struct WithLocalCache<B: SendBackend>(PhantomData<B>);
@@ -39,6 +41,12 @@ impl<B: SendBackend> Default for WithLocalCache<B> {
     fn default() -> Self {
         Self(PhantomData)
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GlobalLocal<T, E> {
+    pub global: Option<Result<T, E>>,
+    pub local: Option<T>,
 }
 
 impl<B: SendBackend> WithLocalCache<B> {
@@ -75,10 +83,29 @@ impl<B: SendBackend> WithLocalCache<B> {
     pub fn get_notations(
         &self,
         uri: LeafUri,
-    ) -> impl Future<Output = Result<Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>>
-    + Send
+    ) -> impl Future<
+        Output = GlobalLocal<Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
+    > + Send
     + use<B> {
-        B::get().get_notations(uri)
+        async move {
+            let local = LOCAL_CACHE.notations.get(&uri).as_deref().cloned();
+            let global = B::get().get_notations(uri).await;
+            GlobalLocal {
+                local,
+                global: Some(global),
+            }
+        }
+    }
+
+    pub fn get_paragraphs(
+        &self,
+        uri: SymbolUri,
+        problems: bool,
+    ) -> impl Future<
+        Output = Result<Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
+    > + Send
+    + use<B> {
+        B::get().get_logical_paragraphs(uri, problems)
     }
 
     pub fn get_notation(

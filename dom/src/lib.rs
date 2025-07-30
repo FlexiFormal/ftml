@@ -12,6 +12,7 @@ mod document;
 pub(crate) mod extractor;
 pub mod markers;
 pub mod mathml;
+pub mod notations;
 pub mod terms;
 pub mod toc;
 pub mod utils {
@@ -19,6 +20,8 @@ pub mod utils {
     pub mod css;
     pub mod local_cache;
 }
+mod clonable_views;
+pub use clonable_views::ClonableView;
 mod views;
 
 use crate::{
@@ -142,7 +145,7 @@ fn iterate<Views: FtmlViews + ?Sized>(
                         Module | SymbolDeclaration | Invisible | Section | SectionTitle
                         | SkipSection | SymbolReference | VariableReference | Argument | Type
                         | Definiens | Notation | CompInNotation | NotationOpComp | NotationComp
-                        | ArgSep | MainCompInNotation | NotationArg => (),
+                        | ArgSep | MainCompInNotation | NotationArg | DocTitle => (),
                     }
                 }
             }

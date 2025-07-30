@@ -4,7 +4,10 @@ use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri};
 use leptos::context::Provider;
 use leptos::prelude::*;
 
-use crate::callbacks::{OnSectionTitle, SectionWrap};
+use crate::{
+    callbacks::{OnSectionTitle, SectionWrap},
+    utils::ReactiveStore,
+};
 
 #[derive(Clone, Default)]
 #[cfg_attr(feature = "csr", derive(serde::Serialize, serde::Deserialize))]
@@ -224,20 +227,10 @@ impl FtmlConfig {
                 SectionLevel::Section,
             ))));
         }
-        if with_context::<NotationStore, _>(|_| ()).is_none() {
-            let owner = Owner::new();
-            provide_context(StoredValue::new(NotationStore {
-                map: rustc_hash::FxHashMap::default(),
-                owner,
-            }));
+        if with_context::<StoredValue<ReactiveStore>, _>(|_| ()).is_none() {
+            provide_context(StoredValue::new(ReactiveStore::new()));
         }
     }
-}
-
-#[derive(Clone)]
-struct NotationStore {
-    map: rustc_hash::FxHashMap<LeafUri, RwSignal<Option<DocumentElementUri>>>,
-    owner: Owner,
 }
 
 pub struct FtmlConfigState;
@@ -249,10 +242,28 @@ impl FtmlConfigState {
     }
 
     /// ### Panics
+    pub fn disable_hovers<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
+        let owner = leptos::prelude::Owner::current()
+            .expect("no current reactive Owner found")
+            .child();
+        let children = owner.with(move || {
+            provide_context(AllowHovers(false));
+            f()
+        });
+        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
+    }
+
+    /// ### Panics
     #[must_use]
     pub fn notation_preference(uri: &LeafUri) -> ReadSignal<Option<DocumentElementUri>> {
-        with_context::<StoredValue<NotationStore>, _>(|s| {
-            if let Some(v) = s.with_value(|store| store.map.get(uri).copied()) {
+        Self::notation_preference_signal(uri).read_only()
+    }
+
+    pub(crate) fn notation_preference_signal(
+        uri: &LeafUri,
+    ) -> RwSignal<Option<DocumentElementUri>> {
+        with_context::<StoredValue<ReactiveStore>, _>(|s| {
+            if let Some(v) = s.with_value(|store| store.notations.get(uri).copied()) {
                 return v;
             }
             let value = {
@@ -267,7 +278,7 @@ impl FtmlConfigState {
                 }
             };
             let ret = s.with_value(move |store| {
-                store.owner.with(move || {
+                store.with(move || {
                     let r = RwSignal::new(value);
                     #[cfg(any(feature = "csr", feature = "hydrate"))]
                     {
@@ -290,12 +301,11 @@ impl FtmlConfigState {
                 })
             });
             s.update_value(|s| {
-                s.map.insert(uri.clone(), ret);
+                s.notations.insert(uri.clone(), ret);
             });
             ret
         })
         .expect("Not in an ftml context")
-        .read_only()
     }
 
     #[inline]

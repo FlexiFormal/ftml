@@ -3,11 +3,11 @@
 use crate::{
     SendBackend,
     config::{FtmlConfigState, HighlightStyle},
-    utils::LocalCacheExt,
+    utils::{LocalCacheExt, ReactiveStore},
 };
 use ftml_core::extraction::VarOrSym;
 use ftml_dom::{
-    DocumentState, FtmlViews,
+    ClonableView, DocumentState, FtmlViews,
     terms::{ClosedApp, ReactiveApplication},
     utils::{
         css::{CssExt, inject_css},
@@ -24,21 +24,18 @@ struct InTerm {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn symbol_reference<B: SendBackend, V: IntoView>(
-    uri: SymbolUri,
-    children: impl FnOnce() -> V,
-) -> impl IntoView {
+pub fn symbol_reference<B: SendBackend>(uri: SymbolUri, children: ClonableView) -> impl IntoView {
     tracing::trace!("symbol reference {uri}");
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
-    children()
+    children.into_view::<crate::Views<B>>()
 }
 
-pub fn oms<B: SendBackend, V: IntoView + 'static>(
+pub fn oms<B: SendBackend>(
     uri: SymbolUri,
     _in_term: bool,
-    children: impl FnOnce() -> V + Clone + Send + 'static,
+    children: ClonableView,
 ) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     tracing::trace!("OMS({uri})");
@@ -47,29 +44,22 @@ pub fn oms<B: SendBackend, V: IntoView + 'static>(
     });
     if FtmlConfigState::allow_notation_changes() {
         let head: LeafUri = uri.into();
-        Left(super::notations::has_notation::<B, _, _>(head, children))
+        Left(super::notations::has_notation::<B>(head, children, None))
     } else {
-        Right(children())
+        Right(children.into_view::<crate::Views<B>>())
     }
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn variable_reference<B: SendBackend, V: IntoView>(
-    var: Variable,
-    children: impl FnOnce() -> V,
-) -> impl IntoView {
+pub fn variable_reference<B: SendBackend>(var: Variable, children: ClonableView) -> impl IntoView {
     tracing::trace!("variable reference {var}");
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
-    children()
+    children.into_view::<crate::Views<B>>()
 }
 
-pub fn omv<B: SendBackend, V: IntoView + 'static>(
-    var: Variable,
-    _in_term: bool,
-    children: impl FnOnce() -> V + Clone + Send + 'static,
-) -> impl IntoView {
+pub fn omv<B: SendBackend>(var: Variable, _in_term: bool, children: ClonableView) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     tracing::trace!("OMV({var})");
     provide_context(InTerm {
@@ -77,21 +67,21 @@ pub fn omv<B: SendBackend, V: IntoView + 'static>(
     });
     if FtmlConfigState::allow_notation_changes() {
         match var {
-            Variable::Name { .. } => Right(children()),
-            Variable::Ref { declaration, .. } => Left(super::notations::has_notation::<B, _, _>(
+            Variable::Name { .. } => Right(children.into_view::<crate::Views<B>>()),
+            Variable::Ref { declaration, .. } => Left(super::notations::has_notation::<B>(
                 declaration.into(),
                 children,
+                None,
             )),
         }
     } else {
-        Right(children())
+        Right(children.into_view::<crate::Views<B>>())
     }
 }
 
-pub fn oma<B: SendBackend, V: IntoView + 'static, F: FnOnce() -> V + Clone + Send + 'static>(
+pub fn oma<B: SendBackend>(
     head: ReadSignal<ReactiveApplication>,
-    is_math: bool,
-    children: F,
+    children: ClonableView,
 ) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     tracing::trace!("OMA|OMBIND({head:?},...)");
@@ -100,7 +90,7 @@ pub fn oma<B: SendBackend, V: IntoView + 'static, F: FnOnce() -> V + Clone + Sen
     });
     if !FtmlConfigState::allow_notation_changes() {
         tracing::trace!("No notation changes");
-        return Right(children());
+        return Right(children.into_view::<crate::Views<B>>());
     }
 
     let uri: Option<LeafUri> = head.with_untracked(|h| match h.head() {
@@ -108,18 +98,19 @@ pub fn oma<B: SendBackend, V: IntoView + 'static, F: FnOnce() -> V + Clone + Sen
         VarOrSym::V(Variable::Ref { declaration, .. }) => Some(declaration.clone().into()),
         VarOrSym::V(_) => None,
     });
-    if !is_math {
+    if !children.is_math() {
         tracing::trace!("Not in math");
-        return Right(children());
+        return Right(children.into_view::<crate::Views<B>>());
     }
-    let ret = move |children: F| {
+    let ret = move |children| {
         if let Some(uri) = &uri {
-            Left(super::notations::has_notation::<B, _, _>(
+            Left(super::notations::has_notation::<B>(
                 uri.clone(),
                 children,
+                Some(head),
             ))
         } else {
-            Right(children())
+            Right(children.into_view::<crate::Views<B>>())
         }
     };
     let memo = Memo::new(move |_| {
@@ -131,7 +122,7 @@ pub fn oma<B: SendBackend, V: IntoView + 'static, F: FnOnce() -> V + Clone + Sen
             }
         })
     });
-    Left(ret(children).add_any_attr(leptos::tachys::html::attribute::title(memo)))
+    Left(ret(children).attr("title", memo))
 }
 
 const fn comp_class(
@@ -157,17 +148,17 @@ const fn comp_class(
     }
 }
 
-pub fn comp<B: SendBackend, V: IntoView + 'static>(children: impl FnOnce() -> V) -> impl IntoView {
+pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     use thaw::{Popover, PopoverSize, PopoverTrigger};
     tracing::trace!("doing comp");
     if !FtmlConfigState::allow_hovers() {
         tracing::trace!("hovers disabled");
-        return Left(children());
+        return Left(children.into_view::<crate::Views<B>>());
     }
     let Some(head) = DocumentState::current_term_head() else {
         tracing::trace!("no current head");
-        return Left(children());
+        return Left(children.into_view::<crate::Views<B>>());
     };
 
     inject_css("ftml-comp", include_str!("comp.css"));
@@ -186,7 +177,8 @@ pub fn comp<B: SendBackend, V: IntoView + 'static>(children: impl FnOnce() -> V)
     });
     //let ocp = expect_context::<crate::config::FTMLConfig>().get_on_click(&s);
     //let none: Option<FragmentContinuation> = None;
-    let children = children();
+    let children = children.into_view::<crate::Views<B>>();
+    let on_click = ReactiveStore::get().write_value().on_click::<B>(&head);
     Right(view! {
         <Popover
             class=top_class
@@ -196,7 +188,11 @@ pub fn comp<B: SendBackend, V: IntoView + 'static>(children: impl FnOnce() -> V)
             //on_click_signal=ocp
         >
             <PopoverTrigger slot>{
-            children.add_any_attr(leptos::tachys::html::class::class(move || class))
+            children.attr("class",move || class)
+            .add_any_attr(leptos::ev::on(
+                leptos::ev::click,
+                Box::new(move |_| on_click.set(true)),
+            ))
             }</PopoverTrigger>
             {term_popover::<B>(head)}
         </Popover>
@@ -262,4 +258,49 @@ pub fn symbol_popover<B: SendBackend>(uri: SymbolUri) -> impl IntoView {
             }
         },
     )
+}
+
+pub(crate) fn do_onclick<Be: SendBackend>(vos: &VarOrSym) -> impl IntoView + use<Be> {
+    use leptos::either::Either::{Left as A, Right as B};
+    use leptos::prelude::*;
+    use thaw::{Divider, Skeleton, SkeletonItem, Spinner};
+    let s = match vos {
+        VarOrSym::V(Variable::Name {
+            notated: Some(n), ..
+        }) => {
+            return A(view! {<span>"Variable "{n.to_string()}</span>});
+        }
+        VarOrSym::V(Variable::Name { name, .. }) => {
+            return A(view! {<span>"Variable "{name.to_string()}</span>});
+        }
+        VarOrSym::V(Variable::Ref { declaration, .. }) => {
+            return A(view! {<span>"Variable "{declaration.name.last().to_string()}</span>});
+        }
+        VarOrSym::S(s) => s.clone(),
+    };
+    let name = s.name().last().to_string();
+    let uri_string = s.to_string();
+    let uri = s.clone();
+    let paras = LocalCache::resource::<Be, _, _>(move |b| b.get_paragraphs(s, false));
+    B(view! {
+        // paras
+        <div style="display:flex;flex-direction:row;">
+            <div style="font-weight:bold;" title=uri_string>{name}</div>
+            <div style="margin-left:auto;">{move || {
+                match paras.get() {
+                    Some(Ok(_)) => A("Here".to_string()),
+                    Some(Err(e)) => A(format!("error: {e}")),
+                    None => B(view!(<Spinner/>))
+                }
+            }}</div>
+        </div>
+        <div style="margin:5px;"><Divider/></div>
+
+        // defi
+        <Skeleton><SkeletonItem attr:style="height:150px;"/></Skeleton>
+        <div style="margin:5px;"><Divider/></div>
+
+        // notations
+        {super::notations::notation_selector::<Be>(uri.into())}
+    })
 }

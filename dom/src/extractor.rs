@@ -1,16 +1,16 @@
 use crate::{extractor, markers::Marker};
+use dashmap::Entry;
 use either::Either;
 use ftml_core::{
     FtmlKey,
     extraction::{
-        FtmlExtractionError, FtmlRuleSet, FtmlStateExtractor, KeyList, attributes::Attributes,
-        nodes::FtmlNode, state::ExtractorState,
+        FtmlExtractionError, FtmlRuleSet, FtmlStateExtractor, KeyList,
+        attributes::Attributes,
+        nodes::FtmlNode,
+        state::{ExtractionResult, ExtractorState},
     },
 };
-use ftml_ontology::narrative::{
-    DocumentRange,
-    documents::{DocumentData, DocumentStyles},
-};
+use ftml_ontology::narrative::DocumentRange;
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::wasm_bindgen::{JsCast, JsValue};
 use leptos::web_sys::{Element, NodeList, js_sys::JsString};
@@ -39,24 +39,33 @@ impl DomExtractor {
     }
 
     pub fn finish(&mut self) {
+        tracing::info!("Finishing extraction for {}", self.state.document);
         self.mode = ExtractorMode::Done;
         if self.state.document != *DocumentUri::no_doc() {
-            let doc = DocumentData {
-                uri: self.state.document.clone(),
-                title: None, // todo
-                elements: std::mem::take(&mut self.state.top).into_boxed_slice(),
-                styles: DocumentStyles {
-                    counters: std::mem::take(&mut self.state.counters).into_boxed_slice(),
-                    styles: std::mem::take(&mut self.state.styles).into_boxed_slice(),
-                },
-            }
-            .close();
-            tracing::info!("Finished document {doc:?}");
-            crate::utils::local_cache::LOCAL_CACHE.documents.insert(doc);
-            for m in std::mem::take(&mut self.state.modules) {
-                let m = m.close();
-                tracing::info!("Found module {m:?}");
+            let ExtractionResult {
+                document,
+                modules,
+                notations,
+                ..
+            } = self.state.finish();
+            crate::utils::local_cache::LOCAL_CACHE
+                .documents
+                .insert(document);
+            for m in modules {
                 crate::utils::local_cache::LOCAL_CACHE.modules.insert(m);
+            }
+            for (sym, uri, not) in notations {
+                match crate::utils::local_cache::LOCAL_CACHE.notations.entry(sym) {
+                    Entry::Vacant(v) => {
+                        v.insert(vec![(uri, not)]);
+                    }
+                    Entry::Occupied(mut v) => {
+                        let v = v.get_mut();
+                        if !v.iter().any(|(u, _)| *u == uri) {
+                            v.push((uri, not));
+                        }
+                    }
+                }
             }
         }
     }
@@ -108,6 +117,14 @@ impl FtmlNode for FtmlDomElement {
     #[inline]
     fn inner_range(&self) -> DocumentRange {
         DocumentRange::default()
+    }
+    #[inline]
+    fn string(&self) -> Cow<'_, str> {
+        self.0.outer_html().into()
+    }
+    #[inline]
+    fn inner_string(&self) -> Cow<'_, str> {
+        self.0.inner_html().into()
     }
     fn path_from(&self, ancestor: &Self) -> smallvec::SmallVec<u32, 4> {
         fn path_from_i(slf: &Element, ancestor: &Element) -> smallvec::SmallVec<u32, 4> {

@@ -1,13 +1,9 @@
-use ftml_core::{
-    NodePath,
-    extraction::{CloseFtmlElement, FtmlExtractionError, nodes::FtmlNode},
-};
-use ftml_ontology::{
-    narrative::DocumentRange,
-    terms::{Term, opaque::Opaque},
-};
+use ftml_core::extraction::{CloseFtmlElement, nodes::FtmlNode};
+use ftml_ontology::narrative::DocumentRange;
 use html5ever::{
-    LocalName, Namespace, QualName, interface::QuirksMode, serialize::TraversalScope,
+    LocalName, Namespace, QualName,
+    interface::QuirksMode,
+    serialize::{SerializeOpts, TraversalScope},
     tendril::StrTendril,
 };
 use smallvec::SmallVec;
@@ -166,6 +162,31 @@ impl FtmlNode for NodeRef {
         self.detach();
     }
 
+    fn string(&self) -> Cow<'_, str> {
+        let mut html = Vec::new();
+        let _ = html5ever::serialize(
+            &mut html,
+            self,
+            SerializeOpts {
+                traversal_scope: TraversalScope::IncludeNode,
+                ..Default::default()
+            },
+        );
+        String::from_utf8_lossy(&html).into_owned().into() //from_utf8_lossy_owned(html)
+    }
+    fn inner_string(&self) -> Cow<'_, str> {
+        let mut html = Vec::new();
+        let _ = html5ever::serialize(
+            &mut html,
+            self,
+            SerializeOpts {
+                traversal_scope: TraversalScope::ChildrenOnly(None),
+                ..Default::default()
+            },
+        );
+        String::from_utf8_lossy(&html).into_owned().into()
+    }
+
     fn range(&self) -> DocumentRange {
         self.as_element()
             .map_or(DocumentRange { start: 0, end: 0 }, |elem| {
@@ -234,108 +255,6 @@ impl FtmlNode for NodeRef {
                 )
             },
         )
-    }
-
-    fn as_term(
-        &self,
-        termpairs: Vec<(ftml_ontology::terms::Term, ftml_core::NodePath)>,
-    ) -> Result<ftml_ontology::terms::Term, FtmlExtractionError> {
-        #[allow(clippy::cast_possible_truncation)]
-        fn rec(
-            path: &mut ftml_core::NodePath,
-            paths: &[NodePath],
-            children: &mut Vec<Opaque>,
-            nodes: Siblings,
-        ) -> Result<(), FtmlExtractionError> {
-            for (i, n) in nodes.enumerate() {
-                if let Some((j, _)) = paths.iter().enumerate().find(|(_, p)| {
-                    p.len() == path.len() + 1
-                        && p.starts_with(path)
-                        && p.last().is_some_and(|j| *j == i as u32)
-                }) {
-                    children.push(Opaque::Term(j as u32));
-                    continue;
-                }
-                if let Some(e) = n.as_element() {
-                    let tag = e.name.local.parse().map_err(|e| {
-                        FtmlExtractionError::InvalidInformal(format!("invalid tag: {e}"))
-                    })?;
-                    let attributes = e
-                        .attributes
-                        .borrow()
-                        .0
-                        .iter()
-                        .map(|(n, t)| {
-                            Ok((
-                                n.local.parse().map_err(|e| {
-                                    FtmlExtractionError::InvalidInformal(format!(
-                                        "invalid tag: {e}"
-                                    ))
-                                })?,
-                                t.to_string().into_boxed_str(),
-                            ))
-                        })
-                        .collect::<Result<Vec<_>, FtmlExtractionError>>()?
-                        .into_boxed_slice();
-                    let mut nchildren = Vec::new();
-                    {
-                        path.push(i as u32);
-                        rec(path, paths, &mut nchildren, n.children())?;
-                        path.pop();
-                    }
-                    children.push(Opaque::Node {
-                        tag,
-                        attributes,
-                        children: nchildren.into_boxed_slice(),
-                    });
-                } else if let Some(t) = n.as_text() {
-                    children.push(Opaque::Text(t.borrow().to_string().into_boxed_str()));
-                }
-            }
-            Ok(())
-        }
-
-        // SAFETY: only elements can end up here
-        let element = unsafe { self.as_element().unwrap_unchecked() };
-        let tag = element
-            .name
-            .local
-            .parse()
-            .map_err(|e| FtmlExtractionError::InvalidInformal(format!("invalid tag: {e}")))?;
-        let attributes = element
-            .attributes
-            .borrow()
-            .0
-            .iter()
-            .map(|(n, t)| {
-                Ok((
-                    n.local.parse().map_err(|e| {
-                        FtmlExtractionError::InvalidInformal(format!("invalid attribute: {e}"))
-                    })?,
-                    t.to_string().into_boxed_str(),
-                ))
-            })
-            .collect::<Result<Vec<_>, FtmlExtractionError>>()?
-            .into_boxed_slice();
-        let mut paths = Vec::with_capacity(termpairs.len());
-        let terms = termpairs
-            .into_iter()
-            .map(|(t, p)| {
-                paths.push(p);
-                t
-            })
-            .collect();
-        let mut path = ftml_core::NodePath::new();
-        let mut children = Vec::new();
-
-        rec(&mut path, &paths, &mut children, self.children())?;
-
-        Ok(Term::Opaque {
-            tag,
-            attributes,
-            terms,
-            children: children.into_boxed_slice(),
-        })
     }
 }
 

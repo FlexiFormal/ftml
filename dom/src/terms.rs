@@ -1,10 +1,8 @@
-use either::Either::{self, Left, Right};
+use crate::{ClonableView, FtmlViews, extractor::DomExtractor};
 use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, VarOrSym};
 use ftml_ontology::terms::{ArgumentMode, Term};
+use leptos::either::Either::{self, Left, Right};
 use leptos::prelude::*;
-use send_wrapper::SendWrapper;
-
-use crate::extractor::DomExtractor;
 
 #[derive(Clone)]
 pub(crate) enum ReactiveTerm {
@@ -18,15 +16,16 @@ pub enum ReactiveApplication {
     Closed(ClosedApp),
 }
 
+#[warn(clippy::type_complexity)]
 pub struct OpenApp {
     pub head: VarOrSym,
-    pub(crate) arguments: Vec<Option<Either<Term, Vec<Option<Term>>>>>,
+    pub(crate) arguments: Vec<Option<Either<ClonableView, Vec<Option<ClonableView>>>>>,
 }
 
 pub struct ClosedApp {
     pub head: VarOrSym,
     pub term: Term,
-    //pub arguments: Vec<Either<TermFn, Vec<TermFn>>>,
+    pub arguments: Vec<Either<ClonableView, Vec<ClonableView>>>,
 }
 
 impl ReactiveApplication {
@@ -61,8 +60,18 @@ impl ReactiveApplication {
             sig.update(move |app| match app {
                 Self::Open(OpenApp { head, arguments }) => {
                     let head = head.clone();
+                    let arguments = std::mem::take(arguments);
                     tracing::trace!("Closing {head:?} as {:?}", t.debug_short());
-                    *app = Self::Closed(ClosedApp { head, term: t });
+                    *app = Self::Closed(ClosedApp {
+                        head,
+                        term: t,
+                        arguments: arguments
+                            .into_iter()
+                            .filter_map(|e| {
+                                e.map(|o| o.map_right(|r| r.into_iter().flatten().collect()))
+                            })
+                            .collect(),
+                    });
                 }
                 Self::Closed(_) => {
                     tracing::warn!("Tracked term is already closed");
@@ -88,22 +97,27 @@ impl ReactiveApplication {
         children(sig.read_only())
     }
 
-    pub(crate) fn add_argument<V: IntoView>(
+    pub(crate) fn add_argument<Views: FtmlViews + ?Sized>(
         slf: RwSignal<Self>,
         position: ArgumentPosition,
-        children: impl FnOnce() -> V,
+        children: ClonableView,
     ) -> impl IntoView {
+        /*
         let t = with_context::<RwSignal<DomExtractor>, _>(|s| {
             s.with_untracked(|s| s.term_at(position).cloned())
         })
         .flatten();
         if let Some(t) = t {
-            slf.update_untracked(move |app| app.set(position, t));
+            let ch = children.clone();
+            slf.update_untracked(move |app| app.set(position, t, ch));
         }
-        children()
+         */
+        let ch = children.clone();
+        slf.update_untracked(move |app| app.set(position, ch));
+        children.into_view::<Views>()
     }
 
-    pub(crate) fn set(&mut self, position: ArgumentPosition, term: Term) {
+    pub(crate) fn set(&mut self, position: ArgumentPosition, vw: ClonableView) {
         if let Self::Open(app) = self {
             let index = position.index() as usize;
             while app.arguments.len() <= index + 1 {
@@ -114,12 +128,12 @@ impl ReactiveApplication {
                 (
                     r @ None,
                     ArgumentPosition::Simple(_, ArgumentMode::Simple | ArgumentMode::Sequence),
-                ) => *r = Some(Left(term)),
+                ) => *r = Some(Left(vw)),
                 (r @ None, ArgumentPosition::Sequence { sequence_index, .. }) => {
-                    let mut v = (0..(sequence_index.get() - 1) as usize)
+                    let mut v: Vec<Option<ClonableView>> = (0..(sequence_index.get() - 1) as usize)
                         .map(|_| None)
-                        .collect::<Vec<_>>();
-                    v.push(Some(term));
+                        .collect();
+                    v.push(Some(vw));
                     *r = Some(Right(v));
                 }
                 (Some(Right(v)), ArgumentPosition::Sequence { sequence_index, .. }) => {
@@ -130,47 +144,10 @@ impl ReactiveApplication {
                     if v[idx].is_some() {
                         return;
                     }
-                    v[idx] = Some(term);
+                    v[idx] = Some(vw);
                 }
                 _ => (),
             }
         }
     }
 }
-
-pub(crate) struct TermFn(SendWrapper<Box<dyn FnOnce() -> AnyView>>);
-impl std::fmt::Debug for TermFn {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("[TermFn]")
-    }
-}
-
-/*
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Argument(WriteSignal<Option<Either<TermFn, Vec<Option<TermFn>>>>>);
-
-
-impl ReactiveTerm {
-    pub fn with_new<V: IntoView>(
-        self,
-        f: impl FnOnce() -> V + Clone + 'static,
-    ) -> impl IntoView {
-        let tm = Self::Open {
-            head,
-            arguments: Vec::new(),
-        };
-        provide_context(tm);
-
-        let arg = with_context::<Argument, _>(|arg| arg.0);
-        if let Some(arg) = arg {
-            if arg.update_untracked(|a| a.is_none()) {
-                let f = f.clone();
-                arg.set(Some(Left(TermFn(SendWrapper::new(Box::new(move || {
-                    f().into_any()
-                }))))));
-            }
-        }
-        f()
-    }
-}
- */

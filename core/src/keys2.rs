@@ -1,3 +1,6 @@
+use crate::extraction::attributes::Attributes;
+use ftml_uris::DocumentElementUri;
+
 macro_rules! ftml {
     () => {
         "data-ftml-"
@@ -9,6 +12,18 @@ macro_rules! ftml {
 pub const PREFIX: &str = "data-ftml-";
 pub const NUM_KEYS: u8 = 2; //119;
 
+pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
+    pub(crate)  [fn(
+        &mut E,
+        &mut E::Attributes<'_>,
+        &mut crate::extraction::KeyList,
+        &E::Node,
+    ) -> Result<
+        (E::Return, Option<crate::extraction::CloseFtmlElement>),
+        crate::extraction::FtmlExtractionError,
+    >; NUM_KEYS as usize],
+);
+
 #[allow(clippy::unnecessary_wraps)]
 fn todo<E: crate::extraction::FtmlExtractor>(
     key: FtmlKey,
@@ -16,7 +31,10 @@ fn todo<E: crate::extraction::FtmlExtractor>(
     _: &mut E::Attributes<'_>,
     _: &mut crate::extraction::KeyList,
     node: &E::Node,
-) -> Result<(E::Return, Option<CloseFtmlElement>), crate::extraction::FtmlExtractionError> {
+) -> Result<
+    (E::Return, Option<crate::extraction::CloseFtmlElement>),
+    crate::extraction::FtmlExtractionError,
+> {
     tracing::warn!("Not yet implemented: {key}");
     Ok((
         ext.add_element(crate::extraction::OpenFtmlElement::None, node)?,
@@ -24,15 +42,40 @@ fn todo<E: crate::extraction::FtmlExtractor>(
     ))
 }
 
-struct CloseFtmlElement;
-trait FtmlRule<E: crate::extraction::FtmlExtractor> {
-    /// ### Errors
-    fn open(
-        ext: &mut E,
-        attrs: &mut E::Attributes<'_>,
-        keys: &mut crate::extraction::KeyList,
-        node: &E::Node,
-    ) -> Result<(E::Return, Option<CloseFtmlElement>), crate::extraction::FtmlExtractionError>;
+macro_rules! ret {
+    ($ext:ident,$node:ident) => {Ok(($ext.add_element(OpenFtmlElement::None,$node)?,None))};
+    (@I $ext:ident,$node:ident <- $id:ident{$($b:tt)*} + $r:expr) => {
+        Ok(($ext.add_element(OpenFtmlElement::$id{$($b)*},$node)?,$r))
+    };
+    (@I $ext:ident,$node:ident <- $id:ident($($a:expr),*) + $r:expr) => {
+        Ok(($ext.add_element(crate::extraction::OpenFtmlElement::$id( $($a),* ),$node)?,$r))
+    };
+    (@I $ext:ident,$node:ident <- $id:ident + $r:expr) => {
+        Ok(($ext.add_element(OpenFtmlElement::$id,$node)?,$r))
+    };
+    ($ext:ident,$node:ident <- $id:ident{$($b:tt)*} + $r:ident) => {
+        ret!(@I $ext,$node <- $id{$($b)*} + Some(CloseFtmlElement::$r))
+    };
+    ($ext:ident,$node:ident <- $id:ident( $($a:expr),* ) + $r:ident) => {
+        ret!(@I $ext,$node <- $id( $($a),*) + Some(crate::extraction::CloseFtmlElement::$r))
+    };
+    ($ext:ident,$node:ident <- $id:ident + $r:ident) => {
+        ret!(@I $ext,$node <- $id + Some(CloseFtmlElement::$r))
+    };
+    ($ext:ident,$node:ident <- $id:ident{$($b:tt)*}) => {
+        ret!(@I $ext,$node <- $id{$($b)*} + None)
+    };
+    ($ext:ident,$node:ident <- $id:ident( $($a:expr),* )) => {
+        ret!(@I $ext,$node <- $id( $($a),*) + None)
+    };
+    ($ext:ident,$node:ident <- $id:ident) => {
+        ret!(@I $ext,$node <- $id + None)
+    };
+}
+macro_rules! del {
+    ($keys:ident - $($k:ident),* $(,)?) => {
+        $keys.0.retain(|e| !matches!(e,$(FtmlKey::$k)|*))
+    }
 }
 
 macro_rules! do_keys {
@@ -101,7 +144,13 @@ macro_rules! do_keys {
     (@ENUM $(
         $(#[$meta:meta])*
         $tag:ident = $key:literal
-        {$($rest:tt)*}
+        {$($rest:tt)*} :=
+            $($todo:ident)?
+            $(
+                ($ext:ident,$attrs:ident,$keys:ident,$node:ident) => {$($impl:tt)+}
+                $(=> $open:ident $({$($f:ident:$ft:ty),*$(,)?})? $( ($($tn:ident:$t:ty),*) )? )?
+                $(+ $close:ident => $closeb:block   )?
+            )?
     ),* $(,)? ) => {
         #[derive(Copy,Clone,PartialEq, Eq,Hash)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -143,15 +192,58 @@ macro_rules! do_keys {
                     _ => None
                 }
             }
+
+            #[must_use]
+            pub const fn all_rules<E:crate::extraction::FtmlExtractor>() -> FtmlRuleSet<E> {
+                FtmlRuleSet([$(
+                    do_keys!(@fun $tag $($todo)? $(
+                        ($ext,$attrs,$keys,$node) => {$($impl)*}
+                        //$(=> $open $($b)? $( ($($t),*) )?     )?
+                    )? )
+                ),*])
+            }
+        }
+        pub enum OpenFtmlElement {
+            $($($(
+                $open $({$($f:$ft),*})? $( ( $($t),*) )? ,
+            )?)?)*
+        }
+        impl<N: crate::extraction::nodes::FtmlNode + std::fmt::Debug> crate::extraction::state::ExtractorState<N> {
+            pub fn add2(&mut self,e:OpenFtmlElement,node:&N) {
+                match e {
+                    $($($(
+                        OpenFtmlElement::$open $({$($f),*})? $( ( $($tn),*) )? => todo!() ,
+                    )?)?)*
+                }
+            }
         }
     };
+
+    (@fun $self:ident todo) => { |e,a,k,n| todo(Self::$self,e,a,k,n) };
+    (@fun $self:ident ($ext:ident,$attrs:ident,$keys:ident,$node:ident) => {$($impl:tt)+} ) => {
+        |$ext,$attrs,$keys,$node| { $($impl)*}
+    };
+
     ( $(
         $(#[$meta:meta])*
         $tag:ident = $key:literal
         { $($rest:tt)* }
-        := {$($impl:tt)+}
+        :=
+            $($todo:ident)?
+            $(
+                ($ext:ident,$attrs:ident,$keys:ident,$node:ident) => {$($impl:tt)+}
+                $(=> $open:ident $({$($f:ident:$ft:ty),*$(,)?})? $( ($($tn:ident:$t:ty),*) )? )?
+                $(+ $close:ident => $closeb:block   )?
+            )?
     ),* $(,)? ) => {
-        do_keys!{@ENUM $( $(#[$meta])* $tag = $key { $($rest)*}  ),*}
+        do_keys!{@ENUM $( $(#[$meta])* $tag = $key { $($rest)*} :=
+            $($todo)?
+            $(
+                ($ext,$attrs,$keys,$node) => {$($impl)*}
+                $(=> $open $({$($f:$ft),*})? $( ( $($tn:$t),*) )?     )?
+                $(+ $close => $closeb   )?
+            )?
+        ),*}
     };
 }
 
@@ -171,11 +263,16 @@ do_keys! {
     /// Denotes a new [Section]. The given [SectionLevel] is only a sanity check;
     /// the actual level is determined by the occurrence within a [Document].
     Section = "section"
-        { @(SectionLevel) + (Id) -!("in [LogicalParagraph]s, [Problem]s or [Slide]s") } := {todo}, // := section
+        { @(SectionLevel) + (Id) -!("in [LogicalParagraph]s, [Problem]s or [Slide]s") }
+        := (ext,attrs,keys,node) => {
+            let uri = attrs.get_elem_uri_from_id(ext, "section")?;
+            del!(keys - Id);
+            ret!(ext,node <- Section(uri) + Section)
+        } => Section(uri:DocumentElementUri), // := section
 
 
     // ------------------------------
 
     Id = "id"
-    {-(Section,Definition, Paragraph, Assertion, Example, Proof, SubProof, Problem, SubProblem, Slide)} := {todo}
+    {-(Section,Definition, Paragraph, Assertion, Example, Proof, SubProof, Problem, SubProblem, Slide)} := todo
 }

@@ -15,8 +15,8 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
     //type Ancestors<'a>: Iterator<Item = Self> where Self: 'a;
     //fn ancestors(&self) -> Self::Ancestors<'_>;
     //fn with_elements<R>(&mut self, f: impl FnMut(Option<&mut FTMLElements>) -> R) -> R;
-    //fn string(&self) -> Cow<'_, str>;
-    //fn inner_string(&self) -> Cow<'_, str>;
+    fn string(&self) -> Cow<'_, str>;
+    fn inner_string(&self) -> Cow<'_, str>;
     //fn as_notation(&self) -> Option<NotationSpec>;
     //fn as_op_notation(&self) -> Option<OpNotation>;
     //fn as_term(&self) -> Term;

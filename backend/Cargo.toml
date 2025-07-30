@@ -23,8 +23,7 @@ wasm = [
 reqwest = ["dep:reqwest"]
 ## cached
 cached = ["dep:dashmap", "dep:parking_lot", "dep:kanal"]
-## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
-## bound to `string`, but naming still allows to make intentions in APIs explicit.
+## Generates typescript exports for `wasm-pack`
 typescript = ["wasm", "dep:tsify", "ftml-ontology/typescript"]
 
 [package.metadata.docs.rs]
@@ -58,6 +57,7 @@ urlencoding = { workspace = true }
 futures-util = { workspace = true }
 either = { workspace = true }
 serde_json = { workspace = true }
+# tracing = { workspace = true }
 
 ftml-uris = { workspace = true, features = ["serde", "components"] }
 ftml-ontology = { workspace = true, features = ["serde"] }

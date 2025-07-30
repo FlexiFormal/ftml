@@ -1,7 +1,7 @@
-use crate::{BackendError, FtmlBackend};
+use crate::{BackendError, FtmlBackend, ParagraphOrProblemKind};
 use dashmap::Entry;
 use ftml_ontology::{narrative::elements::Notation, utils::Css};
-use ftml_uris::{DocumentElementUri, LeafUri, NarrativeUri, Uri};
+use ftml_uris::{DocumentElementUri, LeafUri, NarrativeUri, SymbolUri, Uri};
 use futures_util::TryFutureExt;
 use kanal::AsyncSender;
 use parking_lot::RwLock;
@@ -9,8 +9,6 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, thiserror::Error, serde::Deserialize, serde::Serialize)]
 pub enum CacheError<E: std::fmt::Debug> {
-    #[error("channel closer")]
-    Closed,
     #[error("channel sender closed")]
     SendClosed,
     #[error("channel receiver closed")]
@@ -19,7 +17,9 @@ pub enum CacheError<E: std::fmt::Debug> {
     Connection(E),
 }
 
-impl<E: std::fmt::Debug> From<CacheError<BackendError<E>>> for BackendError<CacheError<E>> {
+impl<E: std::fmt::Display + std::fmt::Debug> From<CacheError<BackendError<E>>>
+    for BackendError<CacheError<E>>
+{
     fn from(value: CacheError<BackendError<E>>) -> Self {
         match value {
             CacheError::Connection(c) => match c {
@@ -31,7 +31,6 @@ impl<E: std::fmt::Debug> From<CacheError<BackendError<E>>> for BackendError<Cach
                 BackendError::NotFound(n) => Self::NotFound(n),
                 BackendError::ToDo(s) => Self::ToDo(s),
             },
-            CacheError::Closed => Self::Connection(CacheError::Closed),
             CacheError::ReceiveClosed => Self::Connection(CacheError::ReceiveClosed),
             CacheError::SendClosed => Self::Connection(CacheError::SendClosed),
         }
@@ -45,8 +44,9 @@ where
     inner: B,
     #[allow(clippy::type_complexity)]
     fragment_cache: Cache<(Uri, Option<NarrativeUri>), (String, Vec<Css>), BackendError<B::Error>>,
-
     notations_cache: Cache<LeafUri, Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
+    paragraphs_cache:
+        Cache<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
 }
 
 impl<B: FtmlBackend> CachedBackend<B>
@@ -61,6 +61,9 @@ where
                 map: dashmap::DashMap::new(),
             },
             notations_cache: Cache {
+                map: dashmap::DashMap::new(),
+            },
+            paragraphs_cache: Cache {
                 map: dashmap::DashMap::new(),
             },
         }
@@ -90,6 +93,22 @@ where
     + Send {
         self.notations_cache
             .get(uri, |uri| self.inner.get_notations(uri))
+            .map_err(Into::into)
+    }
+    fn get_logical_paragraphs(
+        &self,
+        uri: SymbolUri,
+        problems: bool,
+    ) -> impl Future<
+        Output = Result<
+            Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        self.paragraphs_cache
+            .get(uri, move |uri| {
+                self.inner.get_logical_paragraphs(uri, problems)
+            })
             .map_err(Into::into)
     }
     fn get_notation(
@@ -127,7 +146,7 @@ impl<K, V, E> Cache<K, V, E>
 where
     K: std::hash::Hash + Clone + Eq,
     V: Clone + Send + Sync,
-    E: std::fmt::Debug + Clone + Send + Sync,
+    E: std::fmt::Debug + std::fmt::Display + Clone + Send + Sync,
 {
     fn get<Fut: Future<Output = Result<V, E>> + Send>(
         &self,
@@ -193,12 +212,12 @@ where
             .as_ref()
             .map(then)
             .map_err(|e| CacheError::Connection(e.clone()));
-        if sender.receiver_count() > 1 {
-            sender.send(r.clone()).await?;
-        }
         {
             let mut lock = receiver.write();
-            *lock = MaybeValue::Done(r);
+            *lock = MaybeValue::Done(r.clone());
+        }
+        while sender.receiver_count() > 0 {
+            let _ = sender.send(r.clone()).await;
         }
         drop(sender);
         ret
@@ -214,8 +233,8 @@ where
             let mut lock = receiver.write();
             *lock = MaybeValue::Done(r.clone());
         }
-        if sender.receiver_count() > 1 {
-            sender.send(r.clone()).await?;
+        while sender.receiver_count() > 0 {
+            let _ = sender.send(r.clone()).await;
         }
         drop(sender);
         r.map_err(CacheError::Connection)
@@ -227,7 +246,10 @@ where
         then: impl FnOnce(&V) -> R,
     ) -> Result<R, CacheError<E>> {
         match k.recv().await {
-            Ok(r) => r.map(|e| then(&e)).map_err(CacheError::Connection),
+            Ok(r) => {
+                drop(k);
+                r.map(|e| then(&e)).map_err(CacheError::Connection)
+            }
             Err(e) => Err(e.into()),
         }
     }
@@ -235,27 +257,30 @@ where
     #[inline]
     async fn recv(k: kanal::AsyncReceiver<Result<V, E>>) -> Result<V, CacheError<E>> {
         match k.recv().await {
-            Ok(r) => r.map_err(CacheError::Connection),
+            Ok(r) => {
+                drop(k);
+                r.map_err(CacheError::Connection)
+            }
             Err(e) => Err(e.into()),
         }
     }
 }
 
-impl<E: std::fmt::Debug> From<kanal::SendError> for CacheError<E> {
+impl<E: std::fmt::Debug + std::fmt::Display> From<kanal::SendError> for CacheError<E> {
     #[inline]
     fn from(value: kanal::SendError) -> Self {
         match value {
-            kanal::SendError::Closed => Self::Closed,
+            kanal::SendError::Closed => Self::SendClosed,
             kanal::SendError::ReceiveClosed => Self::ReceiveClosed,
         }
     }
 }
 
-impl<E: std::fmt::Debug> From<kanal::ReceiveError> for CacheError<E> {
+impl<E: std::fmt::Debug + std::fmt::Display> From<kanal::ReceiveError> for CacheError<E> {
     #[inline]
     fn from(value: kanal::ReceiveError) -> Self {
         match value {
-            kanal::ReceiveError::Closed => Self::Closed,
+            kanal::ReceiveError::Closed => Self::ReceiveClosed,
             kanal::ReceiveError::SendClosed => Self::SendClosed,
         }
     }

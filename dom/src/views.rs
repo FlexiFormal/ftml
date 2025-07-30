@@ -1,4 +1,5 @@
 use crate::{
+    ClonableView,
     markers::{InputrefInfo, SectionInfo},
     terms::ReactiveApplication,
 };
@@ -44,50 +45,65 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
-    fn section<V: IntoView>(_info: SectionInfo, then: impl FnOnce() -> V) -> impl IntoView {
+    fn section<V: IntoView>(
+        _info: SectionInfo,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
         then()
     }
 
     #[inline]
-    fn symbol_reference<V: IntoView + 'static>(
+    fn section_title<V: IntoView>(
+        _lvl: SectionLevel,
+        _class: &'static str,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    fn inputref(_info: InputrefInfo) -> impl IntoView {}
+
+    #[inline]
+    fn symbol_reference(
         _uri: SymbolUri,
         _notation: Option<UriName>,
-        _is_math: bool,
         _in_term: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
+        then: ClonableView,
     ) -> impl IntoView {
-        then()
+        then.into_view::<Self>()
     }
 
     #[inline]
-    fn variable_reference<V: IntoView + 'static>(
+    fn variable_reference(
         _var: Variable,
         _notation: Option<UriName>,
-        _is_math: bool,
         _in_term: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
+        then: ClonableView,
     ) -> impl IntoView {
-        then()
+        then.into_view::<Self>()
     }
 
     #[inline]
-    fn application<V: IntoView + 'static>(
+    fn application(
         _head: VarOrSym,
         _notation: Option<UriName>,
-        _is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
+        then: ClonableView,
     ) -> impl IntoView {
-        then()
+        then.into_view::<Self>()
     }
 
     #[inline]
-    fn binder_application<V: IntoView + 'static>(
+    fn binder_application(
         _head: VarOrSym,
         _notation: Option<UriName>,
-        _is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
+        then: ClonableView,
     ) -> impl IntoView {
-        then()
+        then.into_view::<Self>()
+    }
+
+    #[inline]
+    fn comp(then: ClonableView) -> impl IntoView {
+        then.into_view::<Self>()
     }
     /*
     #[inline]
@@ -99,22 +115,6 @@ pub trait FtmlViews: 'static {
         then()
     }
      */
-
-    #[inline]
-    fn section_title<V: IntoView>(
-        _lvl: SectionLevel,
-        _class: &'static str,
-        then: impl FnOnce() -> V,
-    ) -> impl IntoView {
-        then()
-    }
-
-    fn inputref(_info: InputrefInfo) -> impl IntoView {}
-
-    #[inline]
-    fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
-        then()
-    }
 }
 
 pub trait TermTrackedViews: 'static {
@@ -124,51 +124,18 @@ pub trait TermTrackedViews: 'static {
     }
 
     #[inline]
-    fn section<V: IntoView>(_info: SectionInfo, then: impl FnOnce() -> V) -> impl IntoView {
-        then()
-    }
-
-    #[inline]
-    fn symbol_reference<V: IntoView + 'static>(
-        _uri: SymbolUri,
-        _notation: Option<UriName>,
-        _is_math: bool,
-        _in_term: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
+    fn section<V: IntoView>(
+        _info: SectionInfo,
+        then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         then()
     }
-
-    #[inline]
-    fn variable_reference<V: IntoView + 'static>(
-        _var: Variable,
-        _notation: Option<UriName>,
-        _is_math: bool,
-        _in_term: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        then()
-    }
-
-    fn application<V: IntoView + 'static>(
-        head: ReadSignal<ReactiveApplication>,
-        notation: Option<UriName>,
-        is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView;
-
-    fn binder_application<V: IntoView + 'static>(
-        head: ReadSignal<ReactiveApplication>,
-        notation: Option<UriName>,
-        is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView;
 
     #[inline]
     fn section_title<V: IntoView>(
         _lvl: SectionLevel,
         _class: &'static str,
-        then: impl FnOnce() -> V,
+        then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         then()
     }
@@ -176,71 +143,61 @@ pub trait TermTrackedViews: 'static {
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
 
     #[inline]
-    fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
-        then()
+    fn symbol_reference(
+        _uri: SymbolUri,
+        _notation: Option<UriName>,
+        _in_term: bool,
+        then: ClonableView,
+    ) -> impl IntoView {
+        then.into_view::<Self>()
+    }
+
+    #[inline]
+    fn variable_reference(
+        _var: Variable,
+        _notation: Option<UriName>,
+        _in_term: bool,
+        then: ClonableView,
+    ) -> impl IntoView {
+        then.into_view::<Self>()
+    }
+
+    fn application(
+        head: ReadSignal<ReactiveApplication>,
+        notation: Option<UriName>,
+        then: ClonableView,
+    ) -> impl IntoView;
+
+    fn binder_application(
+        head: ReadSignal<ReactiveApplication>,
+        notation: Option<UriName>,
+        then: ClonableView,
+    ) -> impl IntoView;
+
+    #[inline]
+    fn comp(then: ClonableView) -> impl IntoView {
+        then.into_view::<Self>()
     }
 }
 
-impl<T: TermTrackedViews> FtmlViews for T {
+impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     #[inline]
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
         <T as TermTrackedViews>::top(then)
     }
     #[inline]
-    fn section<V: IntoView>(info: SectionInfo, then: impl FnOnce() -> V) -> impl IntoView {
+    fn section<V: IntoView>(
+        info: SectionInfo,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
         <T as TermTrackedViews>::section(info, then)
-    }
-    #[inline]
-    fn symbol_reference<V: IntoView + 'static>(
-        uri: SymbolUri,
-        notation: Option<UriName>,
-        is_math: bool,
-        in_term: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        <T as TermTrackedViews>::symbol_reference(uri, notation, is_math, in_term, then)
-    }
-
-    #[inline]
-    fn variable_reference<V: IntoView + 'static>(
-        var: Variable,
-        notation: Option<UriName>,
-        is_math: bool,
-        in_term: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        <T as TermTrackedViews>::variable_reference(var, notation, is_math, in_term, then)
-    }
-
-    #[inline]
-    fn application<V: IntoView + 'static>(
-        head: VarOrSym,
-        notation: Option<UriName>,
-        is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        ReactiveApplication::track(head, move |a| {
-            <T as TermTrackedViews>::application(a, notation, is_math, then)
-        })
-    }
-
-    #[inline]
-    fn binder_application<V: IntoView + 'static>(
-        head: VarOrSym,
-        notation: Option<UriName>,
-        is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        ReactiveApplication::track(head, move |a| {
-            <T as TermTrackedViews>::binder_application(a, notation, is_math, then)
-        })
     }
 
     #[inline]
     fn section_title<V: IntoView>(
         lvl: SectionLevel,
         class: &'static str,
-        then: impl FnOnce() -> V,
+        then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         <T as TermTrackedViews>::section_title(lvl, class, then)
     }
@@ -251,7 +208,45 @@ impl<T: TermTrackedViews> FtmlViews for T {
     }
 
     #[inline]
-    fn comp<V: IntoView + 'static>(then: impl FnOnce() -> V) -> impl IntoView {
+    fn symbol_reference(
+        uri: SymbolUri,
+        notation: Option<UriName>,
+        in_term: bool,
+        then: ClonableView,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::symbol_reference(uri, notation, in_term, then)
+    }
+
+    #[inline]
+    fn variable_reference(
+        var: Variable,
+        notation: Option<UriName>,
+        in_term: bool,
+        then: ClonableView,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::variable_reference(var, notation, in_term, then)
+    }
+
+    #[inline]
+    fn application(head: VarOrSym, notation: Option<UriName>, then: ClonableView) -> impl IntoView {
+        ReactiveApplication::track(head, move |a| {
+            <T as TermTrackedViews>::application(a, notation, then)
+        })
+    }
+
+    #[inline]
+    fn binder_application(
+        head: VarOrSym,
+        notation: Option<UriName>,
+        then: ClonableView,
+    ) -> impl IntoView {
+        ReactiveApplication::track(head, move |a| {
+            <T as TermTrackedViews>::binder_application(a, notation, then)
+        })
+    }
+
+    #[inline]
+    fn comp(then: ClonableView) -> impl IntoView {
         <T as TermTrackedViews>::comp(then)
     }
 }

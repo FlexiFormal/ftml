@@ -1,5 +1,6 @@
 use crate::{
     FtmlViews,
+    clonable_views::MarkedNode,
     counters::LogicalLevel,
     document::DocumentState,
     extractor::DomExtractor,
@@ -7,7 +8,7 @@ use crate::{
     utils::actions::{OneShot, SetOneShotDone},
 };
 use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, VarOrSym};
-use ftml_ontology::terms::Variable;
+use ftml_ontology::{narrative::elements::SectionLevel, terms::Variable};
 use ftml_uris::{DocumentElementUri, DocumentUri, SymbolUri, UriName};
 use leptos::{
     IntoView,
@@ -46,6 +47,7 @@ pub enum Marker {
         notation: Option<UriName>,
     },
     Argument(ArgumentPosition),
+    CurrentSectionLevel(bool),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -88,10 +90,10 @@ impl Marker {
         mut markers: MarkerList,
         invisible: bool,
         is_math: bool,
-        mut orig: OriginalNode,
+        orig: OriginalNode,
     ) -> impl IntoView {
         #[allow(clippy::enum_glob_use)]
-        use leptos::either::EitherOf13::*;
+        use leptos::either::EitherOf14::*;
         let Some(m) = markers.pop() else {
             return A(leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
                 orig,
@@ -131,100 +133,76 @@ impl Marker {
                     Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
                 })))
             }
-            Self::Comp => G(owned!(Views::comp(move || {
-                Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
-            }))),
             Self::InputRef { target, uri } => H(owned!(DocumentState::do_inputref(
                 target,
                 uri,
                 Views::inputref
             ))),
-            Self::SymbolReference {
-                uri,
-                notation,
-                in_term,
-            } => I(owned!({
-                //provide_context(ReactiveTerm::Symbol(uri.clone()));
-                Views::symbol_reference(uri, notation, is_math, in_term, move || {
-                    // makes sure the "current orig" gets actually used / hydrated first
-                    // just in case it has, like, listeners or something
-                    let clone = orig.deep_clone();
-                    Self::apply::<Views>(
-                        markers,
-                        invisible,
-                        is_math,
-                        std::mem::replace(&mut orig, clone),
-                    )
-                    .into_any()
-                })
-            })),
-            Self::VariableReference {
-                var,
-                notation,
-                in_term,
-            } => J(owned!({
-                //provide_context(ReactiveTerm::Symbol(uri.clone()));
-                Views::variable_reference(var, notation, is_math, in_term, move || {
-                    // makes sure the "current orig" gets actually used / hydrated first
-                    // just in case it has, like, listeners or something
-                    let clone = orig.deep_clone();
-                    Self::apply::<Views>(
-                        markers,
-                        invisible,
-                        is_math,
-                        std::mem::replace(&mut orig, clone),
-                    )
-                    .into_any()
-                })
-            })),
-            Self::OMA { head, notation, .. } => K(owned!(Views::application(
-                head,
-                notation,
-                is_math,
-                move || {
-                    // makes sure the "current orig" gets actually used / hydrated first
-                    // just in case it has, like, listeners or something
-                    let clone = orig.deep_clone();
-                    Self::apply::<Views>(
-                        markers,
-                        invisible,
-                        is_math,
-                        std::mem::replace(&mut orig, clone),
-                    )
-                    .into_any()
-                }
-            ))),
-            Self::OMBIND { head, notation, .. } => L(owned!(Views::binder_application(
-                head,
-                notation,
-                is_math,
-                move || {
-                    // makes sure the "current orig" gets actually used / hydrated first
-                    // just in case it has, like, listeners or something
-                    let clone = orig.deep_clone();
-                    Self::apply::<Views>(
-                        markers,
-                        invisible,
-                        is_math,
-                        std::mem::replace(&mut orig, clone),
-                    )
-                    .into_any()
-                }
-            ))),
             Self::Argument(pos) => {
                 if let Some(r) = with_context::<ReactiveTerm, _>(|t| match t {
                     ReactiveTerm::Application(s) => *s,
                 }) {
+                    let node = MarkedNode::new(markers, orig, is_math).into();
                     M(
                         //owned!(
-                        ReactiveApplication::add_argument(r, pos, move || {
-                            Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
-                        }), //)
+                        ReactiveApplication::add_argument::<Views>(r, pos, node), //)
                     )
                 } else {
                     B(Self::apply::<Views>(markers, invisible, is_math, orig).into_any())
                 }
             }
+            Self::CurrentSectionLevel(cap) => {
+                let lvl = DocumentState::current_section_level();
+                N(match (lvl, cap) {
+                    (LogicalLevel::None, true) => "Document",
+                    (LogicalLevel::None, _) => "document",
+                    (LogicalLevel::Section(SectionLevel::Part), true) => "Part",
+                    (LogicalLevel::Section(SectionLevel::Part), _) => "part",
+                    (LogicalLevel::Section(SectionLevel::Chapter), true) => "Chapter",
+                    (LogicalLevel::Section(SectionLevel::Chapter), _) => "chapter",
+                    (LogicalLevel::Section(SectionLevel::Section), true) => "Section",
+                    (LogicalLevel::Section(SectionLevel::Section), _) => "section",
+                    (LogicalLevel::Section(SectionLevel::Subsection), true) => "Subsection",
+                    (LogicalLevel::Section(SectionLevel::Subsection), _) => "subsection",
+                    (LogicalLevel::Section(SectionLevel::Subsubsection), true) => "Subsubsection",
+                    (LogicalLevel::Section(SectionLevel::Subsubsection), _) => "subsubsection",
+                    (LogicalLevel::BeamerSlide, true) => "Slide",
+                    (LogicalLevel::BeamerSlide, _) => "slide",
+                    (_, true) => "Paragraph",
+                    (_, _) => "paragraph",
+                })
+            }
+            Self::Comp => G(Views::comp(MarkedNode::new(markers, orig, is_math).into())),
+            Self::SymbolReference {
+                uri,
+                notation,
+                in_term,
+            } => I(Views::symbol_reference(
+                uri,
+                notation,
+                in_term,
+                MarkedNode::new(markers, orig, is_math).into(),
+            )),
+            Self::VariableReference {
+                var,
+                notation,
+                in_term,
+            } => J(Views::variable_reference(
+                var,
+                notation,
+                in_term,
+                MarkedNode::new(markers, orig, is_math).into(),
+            )),
+            Self::OMA { head, notation, .. } => K(Views::application(
+                head,
+                notation,
+                MarkedNode::new(markers, orig, is_math).into(),
+            )),
+            Self::OMBIND { head, notation, .. } => L(Views::binder_application(
+                head,
+                notation,
+                MarkedNode::new(markers, orig, is_math).into(),
+            )),
         }
     }
 
@@ -281,6 +259,7 @@ impl Marker {
                 uri: uri.clone(),
             }),
             OpenFtmlElement::Argument(pos) => Some(Self::Argument(*pos)),
+            OpenFtmlElement::CurrentSectionLevel(b) => Some(Self::CurrentSectionLevel(*b)),
             OpenFtmlElement::Counter(_)
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::Module { .. }
@@ -292,6 +271,8 @@ impl Marker {
             | OpenFtmlElement::SymbolDeclaration { .. }
             | OpenFtmlElement::NotationComp
             | OpenFtmlElement::ArgSep
+            | OpenFtmlElement::ImportModule(_)
+            | OpenFtmlElement::UseModule(_)
             | OpenFtmlElement::None => None,
         }
     }

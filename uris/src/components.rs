@@ -154,6 +154,24 @@ macro_rules! compfun {
         }
     };
 
+    (!! $(#[$meta:meta])* $vis:vis fn $ident:ident(&$self:ident,$components:ident:SymbolUri $(,$arg:ident:$argtp:ty)*) $(-> $ret:ty)? {$($body:tt)*}) => {
+        $(#[$meta])*
+        #[allow(clippy::too_many_arguments)]
+        $vis fn $ident(&$self,
+            uri:Option<$crate::SymbolUri>,
+            a:Option<$crate::ArchiveId>,
+            p:Option<std::string::String>,
+            m:Option<std::string::String>,
+            s:Option<std::string::String>
+            $(,$arg:$argtp)?
+        ) $(-> $ret)? {
+            let $components = $crate::components::SymbolUriComponentTuple {
+                uri,a,p,m,s
+            };
+            $($body)*
+        }
+    };
+
     ($(#[$meta:meta])* $vis:vis fn $ident:ident($components:ident:Uri$(,$arg:ident:$argtp:ty)*) $(-> $ret:ty)? {$($body:tt)*}) => {
         $(#[$meta])*
         #[allow(clippy::too_many_arguments)]
@@ -1021,6 +1039,39 @@ pub struct SymbolUriComponentTuple<S: AsRef<str> = String> {
     pub s: Option<S>,
 }
 impl<S: AsRef<str>> SymbolUriComponentTuple<S> {
+    pub fn as_query(&self) -> impl std::fmt::Display {
+        struct QueryPart<'s, S: AsRef<str>>(&'s SymbolUriComponentTuple<S>);
+        impl<S: AsRef<str>> std::fmt::Display for QueryPart<'_, S> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                if let Some(uri) = &self.0.uri {
+                    return write!(f, "?uri={}", uri.url_encoded());
+                }
+                if let Some(a) = &self.0.a {
+                    write!(f, "?a={}", urlencoding::Encoded(a.as_ref()))?;
+                } else {
+                    return Err(std::fmt::Error);
+                }
+
+                macro_rules! fmt {
+                    ($id:ident) => {
+                        if let Some($id) = &self.0.$id {
+                            write!(
+                                f,
+                                concat!("&", stringify!($id), "={}"),
+                                urlencoding::Encoded($id.as_ref())
+                            )?;
+                        }
+                    };
+                }
+                fmt!(p);
+                fmt!(m);
+                fmt!(s);
+                Ok(())
+            }
+        }
+
+        QueryPart(self)
+    }
     #[inline]
     pub fn apply<R>(self, f: SymbolUriComponentFun<S, R>) -> R {
         f(self.uri, self.a, self.p, self.m, self.s)

@@ -52,7 +52,6 @@ pub fn setup_document<Ch: IntoView + 'static>(
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct InInputref(bool);
 
-/*
 macro_rules! owned {
     (!$e:expr) => {
         $e
@@ -65,7 +64,9 @@ macro_rules! owned {
         leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
     }};
 }
- */
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct WithHead(pub Option<VarOrSym>);
 
 pub struct DocumentState;
 impl DocumentState {
@@ -97,7 +98,20 @@ impl DocumentState {
             .expect("Not in a document context")
     }
 
+    pub fn with_head<V: IntoView, F: FnOnce() -> V>(
+        head: VarOrSym,
+        then: F,
+    ) -> impl IntoView + use<V, F> {
+        owned!({
+            provide_context(WithHead(Some(head)));
+            then()
+        })
+    }
+
     pub fn current_term_head() -> Option<VarOrSym> {
+        if let Some(WithHead(Some(h))) = use_context() {
+            return Some(h);
+        }
         with_context::<RwSignal<DomExtractor>, _>(|s| {
             s.with_untracked(|e| match e.iterate_domain().next() {
                 Some(OpenDomainElement::SymbolReference { uri, .. }) => {

@@ -237,7 +237,7 @@ do_keys! {
     CounterParent               = "counter-parent" := counter_parent
     Counter                     = "counter" := counter_parent
 
-    DocTitle                    = "doctitle" := todo
+    DocTitle                    = "doctitle" := doctitle
     Title                       = "title" := title
     ProofTitle                  = "prooftitle" := todo
     SubproofTitle               = "subprooftitle" := todo
@@ -253,7 +253,7 @@ do_keys! {
 
     Type                        = "type" := type_component
     Conclusion                  = "conclusion" := todo
-    Definiens                   = "definiens"           <= Definition, Paragraph, Assertion; := todo
+    Definiens                   = "definiens"           <= Definition, Paragraph, Assertion; := definiens
     Rule                        = "rule" := todo
 
     ArgSep                      = "argsep" := argsep
@@ -264,8 +264,8 @@ do_keys! {
     Arg                         = "arg" := arg
     HeadTerm                    = "headterm" := todo
 
-    ImportModule                = "import" := todo
-    UseModule                   = "usemodule" := todo
+    ImportModule                = "import" := importmodule
+    UseModule                   = "usemodule" := usemodule
     InputRef                    = "inputref" := inputref
 
     SetSectionLevel             = "sectionlevel" := setsectionlevel
@@ -321,7 +321,7 @@ do_keys! {
     SRefIn                      = "srefin" := todo
     Slideshow                   = "slideshow" := todo
     SlideshowSlide              = "slideshow-slide"  := todo
-    CurrentSectionLevel         = "currentsectionlevel" := todo
+    CurrentSectionLevel         = "currentsectionlevel" := currentsectionlevel
     Capitalize                  = "capitalize" := todo
 
     Assign                      = "assign" := todo

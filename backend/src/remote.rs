@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 
 use ftml_ontology::utils::Css;
-use ftml_uris::{DocumentUri, FtmlUri, LeafUri, NarrativeUri, Uri};
+use ftml_uris::{DocumentUri, FtmlUri, LeafUri, NarrativeUri, SymbolUri, Uri};
 
 use crate::BackendError;
 
@@ -13,6 +13,14 @@ pub trait Redirects {
     }
     #[inline]
     fn for_notations<'s>(&'s self, _uri: &LeafUri) -> Option<impl std::fmt::Display + 's> {
+        None::<&str>
+    }
+    #[inline]
+    fn for_paragraphs<'s>(
+        &'s self,
+        _uri: &SymbolUri,
+        _problems: bool,
+    ) -> Option<impl std::fmt::Display + 's> {
         None::<&str>
     }
 }
@@ -26,12 +34,13 @@ impl<const LEN: usize, D: std::fmt::Display> Redirects for [(DocumentUri, D); LE
 }
 
 pub struct RemoteBackend<
-    E: std::fmt::Debug,
+    E: std::fmt::Display + std::fmt::Debug,
     Url: std::fmt::Display = &'static str,
     Re: Redirects = NoRedirects,
 > {
     pub fragment_url: Url,
     pub notations_url: Url,
+    pub paragraphs_url: Url,
     pub redirects: Re,
     __phantom: PhantomData<E>,
 }
@@ -47,12 +56,18 @@ pub enum RequestError {
 impl<Url, E, Re: Redirects> RemoteBackend<E, Url, Re>
 where
     Url: std::fmt::Display,
-    E: std::fmt::Debug + From<RequestError>,
+    E: std::fmt::Display + std::fmt::Debug + From<RequestError>,
 {
-    pub const fn new_with_redirects(fragment_url: Url, notations_url: Url, redirects: Re) -> Self {
+    pub const fn new_with_redirects(
+        fragment_url: Url,
+        notations_url: Url,
+        paragraphs_url: Url,
+        redirects: Re,
+    ) -> Self {
         Self {
             fragment_url,
             notations_url,
+            paragraphs_url,
             redirects,
             __phantom: PhantomData,
         }
@@ -62,12 +77,13 @@ where
 impl<Url, E> RemoteBackend<E, Url>
 where
     Url: std::fmt::Display,
-    E: std::fmt::Debug + From<RequestError>,
+    E: std::fmt::Display + std::fmt::Debug + From<RequestError>,
 {
-    pub const fn new(fragment_url: Url, notations_url: Url) -> Self {
+    pub const fn new(fragment_url: Url, notations_url: Url, paragraphs_url: Url) -> Self {
         Self {
             fragment_url,
             notations_url,
+            paragraphs_url,
             redirects: NoRedirects,
             __phantom: PhantomData,
         }
@@ -77,7 +93,7 @@ where
 impl<Url, E, Re: Redirects> RemoteBackend<E, Url, Re>
 where
     Url: std::fmt::Display,
-    E: std::fmt::Debug + From<RequestError> + std::str::FromStr,
+    E: std::fmt::Display + std::fmt::Debug + From<RequestError> + std::str::FromStr,
     E::Err: Into<BackendError<E>>,
 {
     fn make_url<D: std::fmt::Display>(
@@ -102,7 +118,7 @@ where
 impl<Url, E, Re: Redirects> super::FtmlBackend for RemoteBackend<E, Url, Re>
 where
     Url: std::fmt::Display,
-    E: std::fmt::Debug + From<RequestError> + std::str::FromStr,
+    E: std::fmt::Display + std::fmt::Debug + From<RequestError> + std::str::FromStr,
     E::Err: Into<BackendError<E>>,
 {
     type Error = E;
@@ -142,6 +158,24 @@ where
         );
         call(url)
     }
+
+    #[allow(clippy::similar_names)]
+    fn get_logical_paragraphs(
+        &self,
+        uri: SymbolUri,
+        problems: bool,
+    ) -> impl Future<
+        Output = Result<
+            Vec<(ftml_uris::DocumentElementUri, crate::ParagraphOrProblemKind)>,
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        let url = self.redirects.for_paragraphs(&uri, problems).map_or_else(
+            || Self::make_url(&self.paragraphs_url, &uri.into(), None),
+            |r| r.to_string(),
+        );
+        call(url)
+    }
 }
 
 #[cfg(feature = "server_fn")]
@@ -172,10 +206,14 @@ impl<Url: std::fmt::Display> RemoteFlamsBackend<Url> {
 
 #[cfg(feature = "server_fn")]
 mod server_fn {
-    use crate::{BackendError, FlamsBackend, Redirects, RemoteFlamsBackend};
+    use crate::{
+        BackendError, FlamsBackend, ParagraphOrProblemKind, Redirects, RemoteFlamsBackend,
+    };
     use ::server_fn::error::ServerFnErrorErr;
     use ftml_ontology::utils::Css;
-    use ftml_uris::{FtmlUri, LeafUri, NarrativeUri, Uri, components::UriComponentTuple};
+    use ftml_uris::{
+        DocumentElementUri, FtmlUri, LeafUri, NarrativeUri, Uri, components::UriComponentTuple,
+    };
     use futures_util::TryFutureExt;
 
     impl<Url: std::fmt::Display, Re: Redirects> FlamsBackend for RemoteFlamsBackend<Url, Re> {
@@ -238,7 +276,7 @@ mod server_fn {
                         leaf(&self.url,&self.redirects,&uri)
                     },
                     _ => format!(
-                        "{}/content/notations?uri={}",
+                        "{}/content/notations{}",
                         self.url,
                         uri.as_query(),
                     )
@@ -246,10 +284,45 @@ mod server_fn {
                 super::call::<_,SFnE>(url).map_err(BackendError::from_other)
             }
         }
+
+        ftml_uris::compfun! {!!
+            fn get_logical_paragraphs(
+                &self,
+                uri: SymbolUri,
+                problems: bool
+            ) -> impl Future<
+                Output = Result<
+                    Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
+                    BackendError<server_fn::error::ServerFnErrorErr>,
+                >,
+            > + Send {
+                let url = uri.uri.as_ref().map_or_else(
+                    || format!(
+                        "{}/content/los{}&problems={problems}",
+                        self.url,
+                        uri.as_query(),
+                    ),
+                    |s| self.redirects.for_paragraphs(s, problems).map_or_else(|| {
+                        format!(
+                            "{}/content/los{}&problems={problems}",
+                            self.url,
+                            uri.as_query(),
+                        )
+                    },|s| s.to_string())
+                );
+                super::call::<_,SFnE>(url).map_err(BackendError::from_other)
+            }
+        }
     }
 
     #[derive(Debug)]
     struct SFnE(ServerFnErrorErr);
+    impl std::fmt::Display for SFnE {
+        #[inline]
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
     impl From<SFnE> for ServerFnErrorErr {
         #[inline]
         fn from(value: SFnE) -> Self {
@@ -294,14 +367,14 @@ mod server_fn {
 fn call<R, E>(url: String) -> impl Future<Output = Result<R, BackendError<E>>>
 where
     R: serde::de::DeserializeOwned,
-    E: From<RequestError> + std::fmt::Debug + std::str::FromStr,
+    E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
     E::Err: Into<BackendError<E>>,
 {
     #[allow(clippy::future_not_send)]
     async fn call_i<R, E>(url: String) -> Result<R, BackendError<E>>
     where
         R: serde::de::DeserializeOwned,
-        E: From<RequestError> + std::fmt::Debug + std::str::FromStr,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
         E::Err: Into<BackendError<E>>,
     {
         let res = reqwasm::http::Request::get(&url)
@@ -330,7 +403,7 @@ where
 async fn call<R, E>(url: String) -> Result<R, BackendError<E>>
 where
     R: serde::de::DeserializeOwned,
-    E: From<RequestError> + std::fmt::Debug + std::str::FromStr,
+    E: From<RequestError> + std::fmt::Debug + std::fmt::Display + std::str::FromStr,
     E::Err: Into<BackendError<E>>,
 {
     let res = ::reqwest::get(&url)

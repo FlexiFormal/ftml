@@ -149,7 +149,7 @@ pub trait Attributes {
                     declaration: e,
                     is_sequence: None,
                 })),
-                _ => return Err(FtmlExtractionError::InvalidValue(key)),
+                _ => Err(FtmlExtractionError::InvalidValue(key)),
             }
         } else {
             Ok(VarOrSym::V(ext.resolve_variable_name(

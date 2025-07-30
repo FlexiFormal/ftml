@@ -21,7 +21,10 @@ pub use remote::*;
 pub mod errors;
 pub use errors::*;
 
-use ftml_ontology::{narrative::elements::Notation, utils::Css};
+use ftml_ontology::{
+    narrative::elements::{Notation, problems::CognitiveDimension},
+    utils::Css,
+};
 use ftml_uris::{
     ArchiveId, DocumentElementUri, DocumentUri, Language, LeafUri, NarrativeUri, SymbolUri, Uri,
 };
@@ -72,14 +75,25 @@ macro_rules! new_global {
     (@NEW Cached($($rest:tt)*) ) => { $crate::FtmlBackend::cached($crate::new_global!(@NEW $($rest)*)) };
 }
 
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[serde(tag = "type")]
+pub enum ParagraphOrProblemKind {
+    Definition,
+    Example,
+    Problem(CognitiveDimension),
+    SubProblem(CognitiveDimension),
+}
+
 pub trait GlobalBackend: 'static {
-    type Error: std::fmt::Debug;
+    type Error: std::fmt::Display + std::fmt::Debug;
     type Backend: FtmlBackend<Error = Self::Error>;
     fn get() -> &'static Self::Backend;
 }
 
 pub trait FtmlBackend {
-    type Error: std::fmt::Debug;
+    type Error: std::fmt::Display + std::fmt::Debug;
 
     #[cfg(feature = "cached")]
     #[inline]
@@ -96,6 +110,17 @@ pub trait FtmlBackend {
         uri: Uri,
         context: Option<NarrativeUri>,
     ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send;
+
+    fn get_logical_paragraphs(
+        &self,
+        uri: SymbolUri,
+        problems: bool,
+    ) -> impl Future<
+        Output = Result<
+            Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
+            BackendError<Self::Error>,
+        >,
+    > + Send;
 
     #[inline]
     fn get_definition(
@@ -154,6 +179,7 @@ pub trait FlamsBackend {
         Output = Result<(Uri, Vec<Css>, String), BackendError<server_fn::error::ServerFnErrorErr>>,
     > + Send;
 
+    #[allow(clippy::too_many_arguments)]
     fn get_notations(
         &self,
         uri: Option<Uri>,
@@ -168,6 +194,22 @@ pub trait FlamsBackend {
     ) -> impl Future<
         Output = Result<
             Vec<(DocumentElementUri, Notation)>,
+            BackendError<server_fn::error::ServerFnErrorErr>,
+        >,
+    > + Send;
+
+    #[allow(clippy::too_many_arguments)]
+    fn get_logical_paragraphs(
+        &self,
+        uri: Option<SymbolUri>,
+        a: Option<ArchiveId>,
+        p: Option<String>,
+        m: Option<String>,
+        s: Option<String>,
+        problems: bool,
+    ) -> impl Future<
+        Output = Result<
+            Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
     > + Send;
@@ -217,6 +259,27 @@ where
             None,
             None,
             None,
+        )
+    }
+
+    fn get_logical_paragraphs(
+        &self,
+        uri: SymbolUri,
+        problems: bool,
+    ) -> impl Future<
+        Output = Result<
+            Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        <Self as FlamsBackend>::get_logical_paragraphs(
+            self,
+            Some(uri),
+            None,
+            None,
+            None,
+            None,
+            problems,
         )
     }
 }

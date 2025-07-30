@@ -30,6 +30,7 @@ pub trait FtmlExtractor: 'static + Sized {
     const RULES: &'static FtmlRuleSet<Self>;
     const DO_RDF: bool;
     type Return;
+
     fn in_document(&self) -> &DocumentUri;
     fn iterate_domain(&self) -> impl Iterator<Item = &OpenDomainElement<Self::Node>>;
     fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement<Self::Node>>;
@@ -259,6 +260,13 @@ pub trait FtmlStateExtractor: 'static + Sized {
     fn state(&self) -> &ExtractorState<Self::Node>;
     /// ### Errors
     fn on_add(&mut self, elem: &OpenFtmlElement) -> Result<Self::Return>;
+
+    /// ### Errors
+    fn add_element(&mut self, elem: OpenFtmlElement, node: &Self::Node) -> Result<Self::Return> {
+        let r = self.on_add(&elem)?;
+        self.state_mut().add(elem, node)?;
+        Ok(r)
+    }
 }
 impl<E: FtmlStateExtractor> FtmlExtractor for E {
     type Attributes<'a> = <Self as FtmlStateExtractor>::Attributes<'a>;
@@ -288,10 +296,9 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
     fn in_document(&self) -> &DocumentUri {
         self.state().in_document()
     }
+    #[inline]
     fn add_element(&mut self, elem: OpenFtmlElement, node: &Self::Node) -> Result<Self::Return> {
-        let r = self.on_add(&elem)?;
-        self.state_mut().add(elem, node);
-        Ok(r)
+        <Self as FtmlStateExtractor>::add_element(self, elem, node)
     }
     #[inline]
     fn close(&mut self, elem: CloseFtmlElement, node: &Self::Node) -> Result<()> {
