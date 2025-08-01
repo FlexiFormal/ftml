@@ -9,7 +9,7 @@ use crate::{
 use ftml_ontology::{
     domain::{
         declarations::{
-            AnyDeclaration,
+            Declaration,
             symbols::{Symbol, SymbolData},
         },
         modules::{Module, ModuleData, NestedModule},
@@ -18,19 +18,18 @@ use ftml_ontology::{
         DataBuffer, DocumentRange,
         documents::{Document, DocumentCounter, DocumentData, DocumentStyle, DocumentStyles},
         elements::{
-            DocumentElement, Notation, Section,
+            DocumentElement, DocumentTerm, Notation, Section, VariableDeclaration,
             notations::{NotationComponent, NotationNode},
+            variables::VariableData,
         },
     },
     terms::{Term, Variable},
 };
 #[cfg(feature = "rdf")]
 use ftml_uris::FtmlUri;
-use ftml_uris::{
-    DocumentElementUri, DocumentUri, Id, Language, LeafUri, ModuleUri, SymbolUri, UriName,
-};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, LeafUri, ModuleUri, SymbolUri};
 use smallvec::SmallVec;
-use std::borrow::Cow;
+use std::{borrow::Cow, hint::unreachable_unchecked};
 
 #[derive(Clone, Debug)]
 pub struct IdCounter {
@@ -284,7 +283,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 MetaDatum::UseModule(uri) => self.push_elem(DocumentElement::UseModule(uri)),
                 MetaDatum::ImportModule(uri) => {
                     get_module!(parent,parent_uri <- self);
-                    parent.push(AnyDeclaration::Import(uri.clone()));
+                    parent.push(Declaration::Import(uri.clone()));
                     self.push_elem(DocumentElement::ImportModule(uri));
                 }
             },
@@ -323,11 +322,22 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Module)),
             },
+            CloseFtmlElement::Comp => match self.domain.pop() {
+                Some(OpenDomainElement::Comp) => Ok(()),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Comp)),
+            },
             CloseFtmlElement::SymbolDeclaration => match self.domain.pop() {
                 Some(OpenDomainElement::SymbolDeclaration { uri, data }) => {
                     self.close_symbol(uri, data)
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Symdecl)),
+            },
+            CloseFtmlElement::VariableDeclaration => match self.narrative.pop() {
+                Some(OpenNarrativeElement::VariableDeclaration { uri, data }) => {
+                    self.close_vardecl(uri, data);
+                    Ok(())
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Vardef)),
             },
             CloseFtmlElement::Section => match self.narrative.pop() {
                 Some(OpenNarrativeElement::Section {
@@ -480,6 +490,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::NotationArg(_) => (),
             }
         }
@@ -696,6 +707,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -727,6 +739,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Module { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
+                | OpenDomainElement::Comp
                 | OpenDomainElement::VariableReference { .. },
             ) => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg)),
         }
@@ -737,7 +750,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         match self.domain.last_mut() {
             Some(OpenDomainElement::SymbolDeclaration { uri, data }) if data.tp.is_none() => {
                 data.tp = Some(term);
-                Ok(())
+                return Ok(());
             }
             None
             | Some(
@@ -749,9 +762,31 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Module { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
+                | OpenDomainElement::Comp
                 | OpenDomainElement::VariableReference { .. },
-            ) => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg)),
+            ) => (),
         }
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::VariableDeclaration { uri, data } if data.tp.is_none() => {
+                    data.tp = Some(term);
+                    return Ok(());
+                }
+                OpenNarrativeElement::Invisible => (),
+
+                OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Module { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
+                }
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type))
     }
 
     fn close_definiens(
@@ -763,7 +798,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         match self.domain.last_mut() {
             Some(OpenDomainElement::SymbolDeclaration { uri, data }) if data.df.is_none() => {
                 data.df = Some(term);
-                Ok(())
+                return Ok(());
             }
             None
             | Some(
@@ -775,9 +810,97 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Module { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
+                | OpenDomainElement::Comp
                 | OpenDomainElement::VariableReference { .. },
-            ) => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg)),
+            ) => (),
         }
+
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::VariableDeclaration { uri, data } if data.df.is_none() => {
+                    data.df = Some(term);
+                    return Ok(());
+                }
+                OpenNarrativeElement::Invisible => (),
+
+                OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Module { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens));
+                }
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens))
+    }
+
+    fn close_term(
+        &mut self,
+        term: Term,
+        node: &N,
+        otherwise: impl FnOnce(&mut Self, Term) -> super::Result<()>,
+    ) -> super::Result<()> {
+        match &mut self.domain.last {
+            Some(
+                OpenDomainElement::Module { .. }
+                | OpenDomainElement::OMA { .. }
+                | OpenDomainElement::OMBIND { .. }
+                | OpenDomainElement::SymbolDeclaration { .. }
+                | OpenDomainElement::SymbolReference { .. }
+                | OpenDomainElement::VariableReference { .. },
+            )
+            | None => (),
+            Some(
+                OpenDomainElement::Argument {
+                    terms,
+                    node: ancestor,
+                    ..
+                }
+                | OpenDomainElement::Type {
+                    terms,
+                    node: ancestor,
+                }
+                | OpenDomainElement::Definiens {
+                    terms,
+                    node: ancestor,
+                },
+            ) => {
+                terms.push((term, node.path_from(ancestor)));
+                return Ok(());
+            }
+            Some(OpenDomainElement::Comp) => {
+                tracing::debug!("Error: {:?}", self.domain);
+                return Err(FtmlExtractionError::InvalidIn(
+                    FtmlKey::Term,
+                    "declarations or terms outside of an argument",
+                ));
+            }
+        }
+        otherwise(self, term)
+    }
+
+    fn close_app_term(
+        &mut self,
+        uri: Option<DocumentElementUri>,
+        term: Term,
+        node: &N,
+    ) -> super::Result<()> {
+        self.close_term(term, node, |slf, term| {
+            uri.map_or_else(
+                || {
+                    tracing::debug!("Error: 1");
+                    Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
+                },
+                |uri| {
+                    slf.push_elem(DocumentElement::Term(DocumentTerm { uri, term }));
+                    Ok(())
+                },
+            )
+        })
     }
 
     fn close_oma(
@@ -803,51 +926,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             arguments: args.into_boxed_slice(),
         }
         .simplify();
-
-        match &mut self.domain.last {
-            Some(OpenDomainElement::Module { .. }) | None => (),
-            Some(
-                OpenDomainElement::Argument {
-                    terms,
-                    node: ancestor,
-                    ..
-                }
-                | OpenDomainElement::Type {
-                    terms,
-                    node: ancestor,
-                }
-                | OpenDomainElement::Definiens {
-                    terms,
-                    node: ancestor,
-                },
-            ) => {
-                terms.push((term, node.path_from(ancestor)));
-                return Ok(());
-            }
-            Some(
-                OpenDomainElement::OMA { .. }
-                | OpenDomainElement::OMBIND { .. }
-                | OpenDomainElement::SymbolDeclaration { .. }
-                | OpenDomainElement::SymbolReference { .. }
-                | OpenDomainElement::VariableReference { .. },
-            ) => {
-                tracing::debug!("Error: {:?}", self.domain);
-                return Err(FtmlExtractionError::InvalidIn(
-                    FtmlKey::Term,
-                    "declarations or terms outside of an argument",
-                ));
-            }
-        }
-        uri.map_or_else(
-            || {
-                tracing::debug!("Error: 1");
-                Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
-            },
-            |uri| {
-                self.push_elem(DocumentElement::Term { uri, term });
-                Ok(())
-            },
-        )
+        self.close_app_term(uri, term, node)
     }
 
     fn close_ombind(
@@ -881,154 +960,44 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             arguments: args.into_boxed_slice(),
         }
         .simplify();
-
-        match &mut self.domain.last {
-            Some(OpenDomainElement::Module { .. }) | None => (),
-            Some(
-                OpenDomainElement::Argument {
-                    terms,
-                    node: ancestor,
-                    ..
-                }
-                | OpenDomainElement::Type {
-                    terms,
-                    node: ancestor,
-                }
-                | OpenDomainElement::Definiens {
-                    terms,
-                    node: ancestor,
-                },
-            ) => {
-                terms.push((term, node.path_from(ancestor)));
-                return Ok(());
-            }
-            Some(
-                OpenDomainElement::OMA { .. }
-                | OpenDomainElement::OMBIND { .. }
-                | OpenDomainElement::SymbolDeclaration { .. }
-                | OpenDomainElement::SymbolReference { .. }
-                | OpenDomainElement::VariableReference { .. },
-            ) => {
-                tracing::debug!("Error: {:?}", self.domain);
-                return Err(FtmlExtractionError::InvalidIn(
-                    FtmlKey::Term,
-                    "declarations or terms outside of an argument",
-                ));
-            }
-        }
-        uri.map_or_else(
-            || {
-                tracing::debug!("Error: 2");
-                Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
-            },
-            |uri| {
-                self.push_elem(DocumentElement::Term { uri, term });
-                Ok(())
-            },
-        )
+        self.close_app_term(uri, term, node)
     }
 
-    fn close_oms(
-        &mut self,
-        uri: SymbolUri,
-        notation: Option<UriName>,
-        node: &N,
-    ) -> super::Result<()> {
-        match &mut self.domain.last {
-            Some(
-                OpenDomainElement::Argument {
-                    terms,
-                    node: ancestor,
-                    ..
-                }
-                | OpenDomainElement::Type {
-                    terms,
-                    node: ancestor,
-                }
-                | OpenDomainElement::Definiens {
-                    terms,
-                    node: ancestor,
-                },
-            ) => {
-                terms.push((Term::Symbol(uri), node.path_from(ancestor)));
-                return Ok(());
-            }
-            Some(
-                OpenDomainElement::OMA { .. }
-                | OpenDomainElement::OMBIND { .. }
-                | OpenDomainElement::SymbolDeclaration { .. }
-                | OpenDomainElement::SymbolReference { .. }
-                | OpenDomainElement::VariableReference { .. },
-            ) => {
-                tracing::debug!("Error: {:?}", self.domain);
-                return Err(FtmlExtractionError::InvalidIn(
-                    FtmlKey::Term,
-                    "declarations or terms outside of an argument",
-                ));
-            }
-            Some(OpenDomainElement::Module { .. }) | None => (),
-        }
-        self.push_elem(DocumentElement::SymbolReference {
-            range: node.range(),
-            uri,
-            notation,
-        });
-        Ok(())
+    fn close_oms(&mut self, uri: SymbolUri, notation: Option<Id>, node: &N) -> super::Result<()> {
+        self.close_term(Term::Symbol(uri), node, |slf, term| {
+            let Term::Symbol(uri) = term else {
+                // SAFETY: close_term returns the same term
+                unsafe { unreachable_unchecked() }
+            };
+            slf.push_elem(DocumentElement::SymbolReference {
+                range: node.range(),
+                uri,
+                notation,
+            });
+            Ok(())
+        })
     }
 
-    fn close_omv(
-        &mut self,
-        var: Variable,
-        notation: Option<UriName>,
-        node: &N,
-    ) -> super::Result<()> {
-        match &mut self.domain.last {
-            Some(
-                OpenDomainElement::Argument {
-                    terms,
-                    node: ancestor,
-                    ..
-                }
-                | OpenDomainElement::Type {
-                    terms,
-                    node: ancestor,
-                }
-                | OpenDomainElement::Definiens {
-                    terms,
-                    node: ancestor,
-                },
-            ) => {
-                terms.push((Term::Var(var), node.path_from(ancestor)));
-                return Ok(());
-            }
-            Some(
-                OpenDomainElement::OMA { .. }
-                | OpenDomainElement::OMBIND { .. }
-                | OpenDomainElement::SymbolDeclaration { .. }
-                | OpenDomainElement::SymbolReference { .. }
-                | OpenDomainElement::VariableReference { .. },
-            ) => {
-                tracing::debug!("Error: {:?}", self.domain);
-                return Err(FtmlExtractionError::InvalidIn(
-                    FtmlKey::Term,
-                    "declarations or terms outside of an argument",
-                ));
-            }
-            Some(OpenDomainElement::Module { .. }) | None => (),
-        }
-        let uri = match var {
-            Variable::Name { .. } => return Ok(()),
-            Variable::Ref {
-                declaration,
-                is_sequence,
-            } => declaration,
-        };
-        self.push_elem(DocumentElement::VariableReference {
-            range: node.range(),
-            uri,
-            notation,
-        });
-        Ok(())
+    fn close_omv(&mut self, var: Variable, notation: Option<Id>, node: &N) -> super::Result<()> {
+        self.close_term(Term::Var(var), node, |slf, term| {
+            let Term::Var(var) = term else {
+                // SAFETY: close_term returns the same term
+                unsafe { unreachable_unchecked() }
+            };
+            let uri = match var {
+                Variable::Name { .. } => return Ok(()),
+                Variable::Ref {
+                    declaration,
+                    is_sequence,
+                } => declaration,
+            };
+            slf.push_elem(DocumentElement::VariableReference {
+                range: node.range(),
+                uri,
+                notation,
+            });
+            Ok(())
+        })
     }
 
     fn close_module(
@@ -1036,7 +1005,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         uri: ModuleUri,
         meta: Option<ModuleUri>,
         signature: Option<Language>,
-        children: Vec<AnyDeclaration>,
+        children: Vec<Declaration>,
     ) -> super::Result<()> {
         if !self.domain.is_empty() {
             return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Module));
@@ -1055,7 +1024,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     fn close_nested_module(
         &mut self,
         uri: ModuleUri,
-        children: Vec<AnyDeclaration>,
+        children: Vec<Declaration>,
     ) -> super::Result<()> {
         get_module!(parent,parent_uri <- self);
         let module = NestedModule {
@@ -1064,7 +1033,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             declarations: children.into_boxed_slice(),
         };
         add_triples!(DOM self,module -> parent_uri);
-        parent.push(AnyDeclaration::NestedModule(module));
+        parent.push(Declaration::NestedModule(module));
         Ok(())
     }
 
@@ -1073,7 +1042,15 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         let symbol = Symbol { uri, data };
         tracing::info!("New symbol {symbol:?}");
         add_triples!(DOM self,symbol -> parent_uri);
-        parent.push(AnyDeclaration::Symbol(symbol));
+        parent.push(Declaration::Symbol(symbol));
         Ok(())
+    }
+
+    fn close_vardecl(&mut self, uri: DocumentElementUri, data: Box<VariableData>) {
+        let var = VariableDeclaration { uri, data };
+        tracing::info!("New variable {var:?}");
+        self.push_elem(DocumentElement::VariableDeclaration(var));
+        //add_triples!(DOM self,symbol -> parent_uri);
+        //parent.push(Declaration::Symbol(symbol));
     }
 }

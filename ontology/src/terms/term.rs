@@ -89,12 +89,14 @@ impl Term {
     }
 
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn simplify(self) -> Self {
-        const IGNORE_ATTRS: [&str; 4] = [
+        const IGNORE_ATTRS: [&str; 5] = [
             "data-ftml-arg",
             "data-ftml-argmode",
             "data-ftml-type",
             "data-ftml-definiens",
+            "class",
         ];
         match self {
             Self::Opaque {
@@ -102,7 +104,7 @@ impl Term {
                 attributes,
                 children,
                 terms,
-            } if tag.as_ref() == "mrow"
+            } if (tag.as_ref() == "mrow" || tag.as_ref().eq_ignore_ascii_case("span"))
                 && terms.len() == 1
                 && *children == [Opaque::Term(0)]
                 && attributes
@@ -165,12 +167,37 @@ impl Term {
                 attributes,
                 children,
                 terms,
-            } if tag.as_ref() == "mrow"
+            } if (tag.as_ref() == "mrow" || tag.as_ref().eq_ignore_ascii_case("span"))
                 && matches!(*children, [Opaque::Node { .. }])
                 && attributes
                     .iter()
                     .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
             {
+                // SAFETY: matches above
+                unsafe {
+                    let Some(Opaque::Node {
+                        tag,
+                        attributes,
+                        children,
+                    }) = children.first().cloned()
+                    else {
+                        unreachable_unchecked()
+                    };
+                    Self::Opaque {
+                        tag,
+                        attributes,
+                        children,
+                        terms,
+                    }
+                    .simplify()
+                }
+            }
+            Self::Opaque {
+                tag,
+                children,
+                terms,
+                ..
+            } if tag.as_ref() == "math" && matches!(*children, [Opaque::Node { .. }]) => {
                 // SAFETY: matches above
                 unsafe {
                     let Some(Opaque::Node {

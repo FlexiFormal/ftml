@@ -1,13 +1,27 @@
+pub mod block;
+pub mod collapsible;
 pub mod theming;
 
+use crate::components::terms::OnClickData;
 use ftml_backend::FtmlBackend;
 use ftml_core::extraction::VarOrSym;
-use ftml_dom::utils::local_cache::{LocalCache, SendBackend, WithLocalCache};
+use ftml_dom::{
+    DocumentState,
+    utils::{
+        local_cache::{LocalCache, SendBackend, WithLocalCache},
+        owned,
+    },
+};
 use ftml_uris::{DocumentElementUri, LeafUri};
 use leptos::{
     IntoView,
     prelude::{Owner, RwSignal, StoredValue, expect_context},
 };
+
+#[leptos::prelude::slot]
+pub struct Header {
+    children: leptos::prelude::Children,
+}
 
 pub fn error_toast(msg: impl IntoView + std::fmt::Display + 'static) {
     use leptos::view;
@@ -33,13 +47,14 @@ type Map<A, B> = rustc_hash::FxHashMap<A, B>;
 #[derive(Clone)]
 pub struct ReactiveStore {
     pub(crate) notations: Map<LeafUri, RwSignal<Option<DocumentElementUri>>>,
-    pub(crate) on_clicks: Map<VarOrSym, RwSignal<bool>>,
+    pub(crate) on_clicks: Map<VarOrSym, OnClickData>,
     owner: Owner,
 }
 impl ReactiveStore {
     #[inline]
     pub(crate) fn new() -> Self {
         let owner = Owner::new();
+        owner.with(|| DocumentState::no_document(|| ()));
         Self {
             notations: Map::default(),
             on_clicks: Map::default(),
@@ -52,35 +67,49 @@ impl ReactiveStore {
     }
     #[inline]
     #[must_use]
-    pub fn get() -> StoredValue<Self> {
+    fn get() -> StoredValue<Self> {
         expect_context()
     }
-    pub fn on_click<Be: SendBackend>(&mut self, vos: &VarOrSym) -> RwSignal<bool> {
+    /// #### Panics
+    pub fn on_click<Be: SendBackend>(vos: &VarOrSym) -> OnClickData {
         use leptos::prelude::*;
         use thaw::{Dialog, DialogSurface};
-        if let Some(s) = self.on_clicks.get(vos) {
-            return *s;
-        }
+        let slf = Self::get();
+        let (owner, (data, on_clicked, uri, allow_formals)) = {
+            let mut slf = slf.write_value();
+            if let Some(d) = slf.on_clicks.get(vos) {
+                return *d;
+            }
+            let owner = slf.owner.clone();
+            let r = owner.with(OnClickData::new);
+            slf.on_clicks.insert(vos.clone(), r.0);
+            drop(slf);
+            (owner, r)
+        };
         let vos = vos.clone();
-        self.owner.clone().with(move || {
-            let signal = RwSignal::new(false);
-            self.on_clicks.insert(vos.clone(), signal);
-            let _ = view! {<Dialog open=signal><DialogSurface>{
-                crate::components::terms::do_onclick::<Be>(&vos)
-            }</DialogSurface></Dialog>};
-            signal
+        owner.with(move || {
+            let _ = {
+                view! {<Dialog open=on_clicked><DialogSurface>{
+                    owned(|| {
+                        provide_context(slf);
+                        crate::components::terms::do_onclick::<Be>(&vos,uri,allow_formals)
+                    })
+                }</DialogSurface></Dialog>}
+            };
+            data
         })
     }
 }
 
 pub trait LocalCacheExt {
+    #[allow(clippy::type_complexity)]
     fn resource<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-    ) -> leptos::prelude::Resource<
-        Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
+    ) -> leptos::prelude::ReadSignal<
+        Option<Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>>,
     >
     where
-        R: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + 'static + Clone,
+        R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
             > + Send
@@ -90,7 +119,7 @@ pub trait LocalCacheExt {
         view: impl FnOnce(R) -> V + Clone + Send + 'static,
     ) -> impl IntoView
     where
-        R: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + 'static + Clone,
+        R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
             > + Send
@@ -105,7 +134,7 @@ pub trait LocalCacheExt {
         + 'static,
     ) -> impl IntoView
     where
-        R: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + 'static + Clone,
+        R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
             > + Send
@@ -117,7 +146,7 @@ pub trait LocalCacheExt {
         error: impl FnOnce() -> V2 + Send + Clone + 'static,
     ) -> impl IntoView
     where
-        R: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + 'static + Clone,
+        R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
             > + Send
@@ -127,25 +156,30 @@ pub trait LocalCacheExt {
 impl LocalCacheExt for LocalCache {
     fn resource<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-    ) -> leptos::prelude::Resource<
-        Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
+    ) -> leptos::prelude::ReadSignal<
+        Option<Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>>,
     >
     where
-        R: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + 'static + Clone,
+        R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
             > + Send
             + 'static,
     {
         use leptos::prelude::*;
-        Resource::new(|| (), move |()| (f.clone())(WithLocalCache::default()))
+        let result = RwSignal::new(None);
+        leptos::task::spawn_local(async move {
+            let r = f(WithLocalCache::default()).await;
+            result.set(Some(r));
+        });
+        result.read_only()
     }
     fn with<B: SendBackend, R, Fut, V: IntoView + 'static>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> V + Clone + Send + 'static,
     ) -> impl IntoView
     where
-        R: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + 'static + Clone,
+        R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
             > + Send
@@ -162,7 +196,7 @@ impl LocalCacheExt for LocalCache {
         error: impl FnOnce() -> V2 + Send + Clone + 'static,
     ) -> impl IntoView
     where
-        R: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + 'static + Clone,
+        R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
             > + Send
@@ -199,7 +233,7 @@ impl LocalCacheExt for LocalCache {
         + 'static,
     ) -> impl IntoView
     where
-        R: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + 'static + Clone,
+        R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
             > + Send
@@ -210,14 +244,18 @@ impl LocalCacheExt for LocalCache {
             prelude::*,
         };
         use thaw::Spinner;
-        let r = Resource::new(|| (), move |()| (f.clone())(WithLocalCache::default()));
         view! {
-            <Suspense fallback = || view!(<Spinner/>)>{move ||
-                r.get().map(|r| match r {
-                    Ok(r) => Left((view.clone())(r)),
-                    Err(e) => Right((error.clone())(e))
+            <Suspense fallback = || view!(<Spinner/>)>{move || {
+                let v = view.clone();
+                let err = error.clone();
+                let fut = (f.clone())(WithLocalCache::default());
+                Suspend::new(async move {
+                    match fut.await {
+                        Ok(r) => Left(v(r)),
+                        Err(e) => Right(err(e))
+                    }
                 })
-            }</Suspense>
+            }}</Suspense>
         }
     }
 }

@@ -1,5 +1,6 @@
 pub mod inputref;
 pub mod notations;
+pub mod omdoc;
 pub mod sections;
 pub mod terms;
 
@@ -9,6 +10,7 @@ use ftml_dom::{
     utils::local_cache::SendBackend,
 };
 use ftml_ontology::narrative::elements::SectionLevel;
+use ftml_uris::{DocumentElementUri, Id};
 use leptos::prelude::*;
 
 impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
@@ -59,7 +61,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     #[inline]
     fn symbol_reference(
         uri: ftml_uris::SymbolUri,
-        _notation: Option<ftml_uris::UriName>,
+        _notation: Option<Id>,
         in_term: bool,
         then: ClonableView,
     ) -> impl IntoView {
@@ -72,7 +74,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     }
     fn variable_reference(
         var: ftml_ontology::terms::Variable,
-        _notation: Option<ftml_uris::UriName>,
+        _notation: Option<Id>,
         in_term: bool,
         then: ClonableView,
     ) -> impl IntoView {
@@ -92,7 +94,8 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     #[inline]
     fn application(
         head: ReadSignal<ReactiveApplication>,
-        _notation: Option<ftml_uris::UriName>,
+        _notation: Option<Id>,
+        _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView {
         terms::oma::<B>(head, then)
@@ -101,7 +104,8 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     #[inline]
     fn binder_application(
         head: ReadSignal<ReactiveApplication>,
-        _notation: Option<ftml_uris::UriName>,
+        _notation: Option<Id>,
+        _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView {
         terms::oma::<B>(head, then)

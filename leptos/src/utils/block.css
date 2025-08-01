@@ -1,0 +1,9 @@
+.ftml-block-card {
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    row-gap: 0;
+}
+.ftml-block-card-inner {
+    margin: 0 !important;
+}

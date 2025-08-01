@@ -12,11 +12,18 @@ use ftml_core::{
 };
 use ftml_ontology::narrative::DocumentRange;
 use ftml_uris::{DocumentUri, NarrativeUri};
-use leptos::wasm_bindgen::{JsCast, JsValue};
-use leptos::web_sys::{Element, NodeList, js_sys::JsString};
+use leptos::{
+    prelude::Set,
+    web_sys::{Element, NodeList, js_sys::JsString},
+};
+use leptos::{
+    prelude::{RwSignal, WriteSignal},
+    wasm_bindgen::{JsCast, JsValue},
+};
 use send_wrapper::SendWrapper;
 use std::borrow::Cow;
 
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ExtractorMode {
     Pending,
     Extracting,
@@ -27,6 +34,7 @@ pub struct DomExtractor {
     pub state: ExtractorState<FtmlDomElement>,
     pub context: NarrativeUri,
     pub mode: ExtractorMode,
+    pub is_done: RwSignal<bool>,
 }
 impl DomExtractor {
     #[inline]
@@ -35,39 +43,46 @@ impl DomExtractor {
             state: ExtractorState::new(uri, false),
             context,
             mode: ExtractorMode::Pending,
+            is_done: RwSignal::new(false),
         }
     }
 
-    pub fn finish(&mut self) {
+    pub fn finish(&mut self) -> Option<WriteSignal<bool>> {
         tracing::info!("Finishing extraction for {}", self.state.document);
-        self.mode = ExtractorMode::Done;
-        if self.state.document != *DocumentUri::no_doc() {
-            let ExtractionResult {
-                document,
-                modules,
-                notations,
-                ..
-            } = self.state.finish();
-            crate::utils::local_cache::LOCAL_CACHE
-                .documents
-                .insert(document);
-            for m in modules {
-                crate::utils::local_cache::LOCAL_CACHE.modules.insert(m);
-            }
-            for (sym, uri, not) in notations {
-                match crate::utils::local_cache::LOCAL_CACHE.notations.entry(sym) {
-                    Entry::Vacant(v) => {
-                        v.insert(vec![(uri, not)]);
-                    }
-                    Entry::Occupied(mut v) => {
-                        let v = v.get_mut();
-                        if !v.iter().any(|(u, _)| *u == uri) {
-                            v.push((uri, not));
-                        }
+        if self.state.document == *DocumentUri::no_doc() {
+            return if self.mode == ExtractorMode::Done {
+                None
+            } else {
+                Some(self.is_done.write_only())
+            };
+        }
+        let ExtractionResult {
+            document,
+            modules,
+            notations,
+            ..
+        } = self.state.finish();
+        crate::utils::local_cache::LOCAL_CACHE
+            .documents
+            .insert(document);
+        for m in modules {
+            crate::utils::local_cache::LOCAL_CACHE.modules.insert(m);
+        }
+        for (sym, uri, not) in notations {
+            match crate::utils::local_cache::LOCAL_CACHE.notations.entry(sym) {
+                Entry::Vacant(v) => {
+                    v.insert(vec![(uri, not)]);
+                }
+                Entry::Occupied(mut v) => {
+                    let v = v.get_mut();
+                    if !v.iter().any(|(u, _)| *u == uri) {
+                        v.push((uri, not));
                     }
                 }
             }
         }
+        self.mode = ExtractorMode::Done;
+        Some(self.is_done.write_only())
     }
 }
 
@@ -248,8 +263,8 @@ impl Attributes for NodeAttrs {
     fn value(&self, key: &str) -> Option<Self::Value<'_>> {
         self.elem.get_attribute(key)
     }
-    fn set(&mut self, key: &str, value: &str) {
-        let _ = self.elem.set_attribute(key, value);
+    fn set(&mut self, key: &str, value: impl std::fmt::Display) {
+        let _ = self.elem.set_attribute(key, &value.to_string());
     }
     fn take(&mut self, key: &str) -> Option<String> {
         let r = self.elem.get_attribute(key);

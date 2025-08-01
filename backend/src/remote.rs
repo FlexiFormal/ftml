@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 
 use ftml_ontology::utils::Css;
-use ftml_uris::{DocumentUri, FtmlUri, LeafUri, NarrativeUri, SymbolUri, Uri};
+use ftml_uris::{DocumentUri, FtmlUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri};
 
 use crate::BackendError;
 
@@ -23,6 +23,12 @@ pub trait Redirects {
     ) -> Option<impl std::fmt::Display + 's> {
         None::<&str>
     }
+    fn for_modules<'s>(&'s self, _uri: &ModuleUri) -> Option<impl std::fmt::Display + 's> {
+        None::<&str>
+    }
+    fn for_documents<'s>(&'s self, _uri: &DocumentUri) -> Option<impl std::fmt::Display + 's> {
+        None::<&str>
+    }
 }
 pub struct NoRedirects;
 impl Redirects for NoRedirects {}
@@ -41,6 +47,8 @@ pub struct RemoteBackend<
     pub fragment_url: Url,
     pub notations_url: Url,
     pub paragraphs_url: Url,
+    pub modules_url: Url,
+    pub documents_url: Url,
     pub redirects: Re,
     __phantom: PhantomData<E>,
 }
@@ -62,12 +70,16 @@ where
         fragment_url: Url,
         notations_url: Url,
         paragraphs_url: Url,
+        modules_url: Url,
+        documents_url: Url,
         redirects: Re,
     ) -> Self {
         Self {
             fragment_url,
             notations_url,
             paragraphs_url,
+            modules_url,
+            documents_url,
             redirects,
             __phantom: PhantomData,
         }
@@ -79,11 +91,19 @@ where
     Url: std::fmt::Display,
     E: std::fmt::Display + std::fmt::Debug + From<RequestError>,
 {
-    pub const fn new(fragment_url: Url, notations_url: Url, paragraphs_url: Url) -> Self {
+    pub const fn new(
+        fragment_url: Url,
+        notations_url: Url,
+        paragraphs_url: Url,
+        modules_url: Url,
+        documents_url: Url,
+    ) -> Self {
         Self {
             fragment_url,
             notations_url,
             paragraphs_url,
+            modules_url,
+            documents_url,
             redirects: NoRedirects,
             __phantom: PhantomData,
         }
@@ -136,6 +156,34 @@ where
         } else {
             Self::make_url(&self.fragment_url, &uri, context.as_ref())
         };
+        call(url)
+    }
+
+    #[allow(clippy::similar_names)]
+    fn get_module(
+        &self,
+        uri: ModuleUri,
+    ) -> impl Future<
+        Output = Result<ftml_ontology::domain::modules::Module, BackendError<Self::Error>>,
+    > + Send {
+        let url = self.redirects.for_modules(&uri).map_or_else(
+            || Self::make_url(&self.modules_url, &uri.into(), None),
+            |r| r.to_string(),
+        );
+        call(url)
+    }
+
+    #[allow(clippy::similar_names)]
+    fn get_document(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<
+        Output = Result<ftml_ontology::narrative::documents::Document, BackendError<Self::Error>>,
+    > + Send {
+        let url = self.redirects.for_documents(&uri).map_or_else(
+            || Self::make_url(&self.documents_url, &uri.into(), None),
+            |r| r.to_string(),
+        );
         call(url)
     }
 
@@ -248,6 +296,104 @@ mod server_fn {
                 };
                 super::call::<_,SFnE>(url).map_err(BackendError::from_other)
             }
+        }
+
+        #[allow(clippy::similar_names)]
+        fn get_module(
+            &self,
+            uri: Option<ftml_uris::ModuleUri>,
+            a: Option<ftml_uris::ArchiveId>,
+            p: Option<String>,
+            m: Option<String>,
+        ) -> impl Future<
+            Output = Result<
+                ftml_ontology::domain::modules::Module,
+                BackendError<server_fn::error::ServerFnErrorErr>,
+            >,
+        > + Send {
+            use std::fmt::Write;
+            if let Some(uri) = &uri {
+                if let Some(url) = self.redirects.for_modules(uri) {
+                    return super::call::<_, SFnE>(url.to_string())
+                        .map_err(BackendError::from_other);
+                }
+            }
+            let url = {
+                let mut s = String::with_capacity(64);
+                let _ = write!(&mut s, "{}/content/module", &self.url);
+                let mut sep = '?';
+                if let Some(uri) = uri {
+                    let _ = write!(&mut s, "?uri={}", uri.url_encoded());
+                    sep = '&';
+                }
+                if let Some(a) = a {
+                    let _ = write!(&mut s, "{sep}a={a}");
+                    sep = '&';
+                }
+                if let Some(p) = p {
+                    let _ = write!(&mut s, "{sep}p={p}");
+                    sep = '&';
+                }
+                if let Some(m) = m {
+                    let _ = write!(&mut s, "{sep}m={m}");
+                }
+                s
+            };
+            super::call::<_, SFnE>(url).map_err(BackendError::from_other)
+        }
+
+        #[allow(clippy::similar_names)]
+        #[allow(clippy::many_single_char_names)]
+        fn get_document(
+            &self,
+            uri: Option<ftml_uris::DocumentUri>,
+            rp: Option<String>,
+            a: Option<ftml_uris::ArchiveId>,
+            p: Option<String>,
+            d: Option<String>,
+            l: Option<ftml_uris::Language>,
+        ) -> impl Future<
+            Output = Result<
+                ftml_ontology::narrative::documents::Document,
+                BackendError<server_fn::error::ServerFnErrorErr>,
+            >,
+        > + Send {
+            use std::fmt::Write;
+            if let Some(uri) = &uri {
+                if let Some(url) = self.redirects.for_documents(uri) {
+                    return super::call::<_, SFnE>(url.to_string())
+                        .map_err(BackendError::from_other);
+                }
+            }
+            let url = {
+                let mut s = String::with_capacity(64);
+                let _ = write!(&mut s, "{}/content/document", &self.url);
+                let mut sep = '?';
+                if let Some(uri) = uri {
+                    let _ = write!(&mut s, "?uri={}", uri.url_encoded());
+                    sep = '&';
+                }
+                if let Some(rp) = rp {
+                    let _ = write!(&mut s, "{sep}rp={rp}");
+                    sep = '&';
+                }
+                if let Some(a) = a {
+                    let _ = write!(&mut s, "{sep}a={a}");
+                    sep = '&';
+                }
+                if let Some(p) = p {
+                    let _ = write!(&mut s, "{sep}p={p}");
+                    sep = '&';
+                }
+                if let Some(d) = d {
+                    let _ = write!(&mut s, "{sep}d={d}");
+                }
+                if let Some(l) = l {
+                    let _ = write!(&mut s, "{sep}l={l}");
+                }
+                s
+            };
+            super::call::<_, SFnE>(url).map_err(BackendError::from_other)
         }
 
         ftml_uris::compfun! {!!

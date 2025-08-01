@@ -4,6 +4,7 @@ use crate::{
     extractor::DomExtractor,
     markers::{InputrefInfo, SectionInfo},
     toc::{CurrentId, NavElems, TOCElem},
+    utils::owned,
 };
 use ftml_core::extraction::{FtmlExtractor, OpenDomainElement};
 use ftml_ontology::narrative::elements::SectionLevel;
@@ -52,19 +53,6 @@ pub fn setup_document<Ch: IntoView + 'static>(
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct InInputref(bool);
 
-macro_rules! owned {
-    (!$e:expr) => {
-        $e
-    };
-    ($e:expr) => {{
-        let owner = leptos::prelude::Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(move || $e);
-        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
-    }};
-}
-
 #[derive(Clone, PartialEq, Eq)]
 pub struct WithHead(pub Option<VarOrSym>);
 
@@ -101,11 +89,18 @@ impl DocumentState {
     pub fn with_head<V: IntoView, F: FnOnce() -> V>(
         head: VarOrSym,
         then: F,
-    ) -> impl IntoView + use<V, F> {
-        owned!({
+    ) -> leptos::tachys::reactive_graph::OwnedView<V> {
+        owned(|| {
             provide_context(WithHead(Some(head)));
             then()
         })
+    }
+
+    /// ### Panics
+    pub fn finished_parsing() -> ReadSignal<bool> {
+        with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(|e| e.is_done))
+            .expect("Not in a document context")
+            .read_only()
     }
 
     pub fn current_term_head() -> Option<VarOrSym> {
@@ -113,24 +108,26 @@ impl DocumentState {
             return Some(h);
         }
         with_context::<RwSignal<DomExtractor>, _>(|s| {
-            s.with_untracked(|e| match e.iterate_domain().next() {
-                Some(OpenDomainElement::SymbolReference { uri, .. }) => {
-                    Some(VarOrSym::S(uri.clone()))
+            s.with_untracked(|e| {
+                for e in e.iterate_domain() {
+                    match e {
+                        OpenDomainElement::SymbolReference { uri, .. } => {
+                            return Some(VarOrSym::S(uri.clone()));
+                        }
+                        OpenDomainElement::VariableReference { var, .. } => {
+                            return Some(VarOrSym::V(var.clone()));
+                        }
+                        OpenDomainElement::OMA { head, .. }
+                        | OpenDomainElement::OMBIND { head, .. } => return Some(head.clone()),
+                        OpenDomainElement::Module { .. }
+                        | OpenDomainElement::SymbolDeclaration { .. }
+                        | OpenDomainElement::Argument { .. }
+                        | OpenDomainElement::Type { .. }
+                        | OpenDomainElement::Definiens { .. } => return None,
+                        OpenDomainElement::Comp => (),
+                    }
                 }
-                Some(OpenDomainElement::VariableReference { var, .. }) => {
-                    Some(VarOrSym::V(var.clone()))
-                }
-                Some(
-                    OpenDomainElement::OMA { head, .. } | OpenDomainElement::OMBIND { head, .. },
-                ) => Some(head.clone()),
-                Some(
-                    OpenDomainElement::Module { .. }
-                    | OpenDomainElement::SymbolDeclaration { .. }
-                    | OpenDomainElement::Argument { .. }
-                    | OpenDomainElement::Type { .. }
-                    | OpenDomainElement::Definiens { .. },
-                )
-                | None => None,
+                None
             })
         })
         .flatten()

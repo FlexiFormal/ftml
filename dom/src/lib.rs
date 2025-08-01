@@ -19,6 +19,17 @@ pub mod utils {
     pub mod actions;
     pub mod css;
     pub mod local_cache;
+
+    /// ### Panics
+    pub fn owned<V: leptos::prelude::IntoView>(
+        f: impl FnOnce() -> V,
+    ) -> leptos::tachys::reactive_graph::OwnedView<V> {
+        let owner = leptos::prelude::Owner::current()
+            .expect("no current reactive Owner found")
+            .child();
+        let children = owner.with(f);
+        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
+    }
 }
 mod clonable_views;
 pub use clonable_views::ClonableView;
@@ -42,6 +53,7 @@ pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
     f()
 }
 
+/*
 pub(crate) static OWNER_IDS: std::sync::LazyLock<std::sync::Arc<std::sync::atomic::AtomicU64>> =
     std::sync::LazyLock::new(|| std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)));
 
@@ -52,6 +64,7 @@ impl OwnerId {
         Self(OWNER_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
     }
 }
+ */
 
 fn iterate<Views: FtmlViews + ?Sized>(
     e: &leptos::web_sys::Element,
@@ -62,10 +75,10 @@ fn iterate<Views: FtmlViews + ?Sized>(
     use extractor::DomExtractor;
     use extractor::NodeAttrs;
 
-    provide_context(OwnerId::new());
+    //provide_context(OwnerId::new());
     let sig = expect_context::<RwSignal<DomExtractor>>();
     let finish = sig.update_untracked(|ext| {
-        matches!(ext.mode, ExtractorMode::Pending) && {
+        ext.mode == ExtractorMode::Pending && {
             ext.mode = ExtractorMode::Extracting;
             tracing::info!("Starting extracting {}", ext.state.document);
             true
@@ -115,7 +128,7 @@ fn iterate<Views: FtmlViews + ?Sized>(
         let e: OriginalNode = e.clone().into();
         Some(move || {
             markers.reverse();
-            provide_context(sig);
+            //provide_context(sig);
             Marker::apply::<Views>(markers, invisible, mathml::is(&e.tag_name()).is_some(), e)
                 .into_any()
         })
@@ -145,12 +158,16 @@ fn iterate<Views: FtmlViews + ?Sized>(
                         Module | SymbolDeclaration | Invisible | Section | SectionTitle
                         | SkipSection | SymbolReference | VariableReference | Argument | Type
                         | Definiens | Notation | CompInNotation | NotationOpComp | NotationComp
-                        | ArgSep | MainCompInNotation | NotationArg | DocTitle => (),
+                        | ArgSep | MainCompInNotation | NotationArg | DocTitle
+                        | VariableDeclaration | Comp => (),
                     }
                 }
             }
             if finish {
-                sig.update_untracked(DomExtractor::finish);
+                let r = sig.update_untracked(DomExtractor::finish);
+                if let Some(r) = r {
+                    r.set(true);
+                }
             }
         })
     };

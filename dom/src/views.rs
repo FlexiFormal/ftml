@@ -1,11 +1,11 @@
 use crate::{
     ClonableView,
     markers::{InputrefInfo, SectionInfo},
-    terms::ReactiveApplication,
+    terms::{ReactiveApplication, TopTerm},
 };
 use ftml_core::extraction::VarOrSym;
 use ftml_ontology::{narrative::elements::SectionLevel, terms::Variable};
-use ftml_uris::{SymbolUri, UriName};
+use ftml_uris::{DocumentElementUri, Id, SymbolUri};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
@@ -66,7 +66,7 @@ pub trait FtmlViews: 'static {
     #[inline]
     fn symbol_reference(
         _uri: SymbolUri,
-        _notation: Option<UriName>,
+        _notation: Option<Id>,
         _in_term: bool,
         then: ClonableView,
     ) -> impl IntoView {
@@ -76,7 +76,7 @@ pub trait FtmlViews: 'static {
     #[inline]
     fn variable_reference(
         _var: Variable,
-        _notation: Option<UriName>,
+        _notation: Option<Id>,
         _in_term: bool,
         then: ClonableView,
     ) -> impl IntoView {
@@ -86,7 +86,8 @@ pub trait FtmlViews: 'static {
     #[inline]
     fn application(
         _head: VarOrSym,
-        _notation: Option<UriName>,
+        _notation: Option<Id>,
+        _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView {
         then.into_view::<Self>()
@@ -95,7 +96,8 @@ pub trait FtmlViews: 'static {
     #[inline]
     fn binder_application(
         _head: VarOrSym,
-        _notation: Option<UriName>,
+        _notation: Option<Id>,
+        _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView {
         then.into_view::<Self>()
@@ -105,19 +107,13 @@ pub trait FtmlViews: 'static {
     fn comp(then: ClonableView) -> impl IntoView {
         then.into_view::<Self>()
     }
-    /*
-    #[inline]
-    fn argument<V: IntoView + 'static>(
-        _position: ArgumentPosition,
-        _is_math: bool,
-        then: impl FnOnce() -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
-        then()
-    }
-     */
 }
 
 pub trait TermTrackedViews: 'static {
+    fn current_top_term() -> Option<DocumentElementUri> {
+        use_context::<TopTerm>().map(|t| t.uri)
+    }
+
     #[inline]
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
         super::global_setup(then)
@@ -145,7 +141,7 @@ pub trait TermTrackedViews: 'static {
     #[inline]
     fn symbol_reference(
         _uri: SymbolUri,
-        _notation: Option<UriName>,
+        _notation: Option<Id>,
         _in_term: bool,
         then: ClonableView,
     ) -> impl IntoView {
@@ -155,7 +151,7 @@ pub trait TermTrackedViews: 'static {
     #[inline]
     fn variable_reference(
         _var: Variable,
-        _notation: Option<UriName>,
+        _notation: Option<Id>,
         _in_term: bool,
         then: ClonableView,
     ) -> impl IntoView {
@@ -164,13 +160,15 @@ pub trait TermTrackedViews: 'static {
 
     fn application(
         head: ReadSignal<ReactiveApplication>,
-        notation: Option<UriName>,
+        notation: Option<Id>,
+        uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView;
 
     fn binder_application(
         head: ReadSignal<ReactiveApplication>,
-        notation: Option<UriName>,
+        notation: Option<Id>,
+        uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView;
 
@@ -210,7 +208,7 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     #[inline]
     fn symbol_reference(
         uri: SymbolUri,
-        notation: Option<UriName>,
+        notation: Option<Id>,
         in_term: bool,
         then: ClonableView,
     ) -> impl IntoView {
@@ -220,7 +218,7 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     #[inline]
     fn variable_reference(
         var: Variable,
-        notation: Option<UriName>,
+        notation: Option<Id>,
         in_term: bool,
         then: ClonableView,
     ) -> impl IntoView {
@@ -228,20 +226,26 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     }
 
     #[inline]
-    fn application(head: VarOrSym, notation: Option<UriName>, then: ClonableView) -> impl IntoView {
-        ReactiveApplication::track(head, move |a| {
-            <T as TermTrackedViews>::application(a, notation, then)
+    fn application(
+        head: VarOrSym,
+        notation: Option<Id>,
+        uri: Option<DocumentElementUri>,
+        then: ClonableView,
+    ) -> impl IntoView {
+        ReactiveApplication::track(head, uri.clone(), move |a| {
+            <T as TermTrackedViews>::application(a, notation, uri, then)
         })
     }
 
     #[inline]
     fn binder_application(
         head: VarOrSym,
-        notation: Option<UriName>,
+        notation: Option<Id>,
+        uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView {
-        ReactiveApplication::track(head, move |a| {
-            <T as TermTrackedViews>::binder_application(a, notation, then)
+        ReactiveApplication::track(head, uri.clone(), move |a| {
+            <T as TermTrackedViews>::binder_application(a, notation, uri, then)
         })
     }
 

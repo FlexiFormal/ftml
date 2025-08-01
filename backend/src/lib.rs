@@ -15,6 +15,7 @@ pub use cache::*;
 
 #[cfg(any(feature = "wasm", feature = "reqwest"))]
 mod remote;
+use either::Either;
 #[cfg(any(feature = "wasm", feature = "reqwest"))]
 pub use remote::*;
 
@@ -22,11 +23,17 @@ pub mod errors;
 pub use errors::*;
 
 use ftml_ontology::{
-    narrative::elements::{Notation, problems::CognitiveDimension},
+    domain::{SharedDeclaration, declarations::symbols::Symbol, modules::Module},
+    narrative::{
+        SharedDocumentElement,
+        documents::Document,
+        elements::{DocumentTerm, Notation, VariableDeclaration, problems::CognitiveDimension},
+    },
     utils::Css,
 };
 use ftml_uris::{
-    ArchiveId, DocumentElementUri, DocumentUri, Language, LeafUri, NarrativeUri, SymbolUri, Uri,
+    ArchiveId, DocumentElementUri, DocumentUri, Language, LeafUri, ModuleUri, NarrativeUri,
+    SymbolUri, Uri,
 };
 use futures_util::{FutureExt, TryFutureExt};
 
@@ -122,6 +129,70 @@ pub trait FtmlBackend {
         >,
     > + Send;
 
+    fn get_module(
+        &self,
+        uri: ModuleUri,
+    ) -> impl Future<Output = Result<Module, BackendError<Self::Error>>> + Send;
+
+    fn get_document(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send;
+
+    fn get_symbol(
+        &self,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<Either<Symbol, SharedDeclaration<Symbol>>, BackendError<Self::Error>>,
+    > + Send {
+        let name = uri.name;
+        self.get_module(uri.module).map(move |r| {
+            let m = r?;
+            m.get_as(&name).map_or_else(
+                || Err(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                |d| Ok(Either::Right(d)),
+            )
+        })
+    }
+
+    fn get_variable(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<VariableDeclaration, SharedDocumentElement<VariableDeclaration>>,
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        let name = uri.name;
+        self.get_document(uri.document).map(move |r| {
+            let m = r?;
+            m.get_as(&name).map_or_else(
+                || Err(BackendError::NotFound(ftml_uris::UriKind::DocumentElement)),
+                |d| Ok(Either::Right(d)),
+            )
+        })
+    }
+
+    fn get_document_term(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<DocumentTerm, SharedDocumentElement<DocumentTerm>>,
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        let name = uri.name;
+        self.get_document(uri.document).map(move |r| {
+            let m = r?;
+            m.get_as(&name).map_or_else(
+                || Err(BackendError::NotFound(ftml_uris::UriKind::DocumentElement)),
+                |d| Ok(Either::Right(d)),
+            )
+        })
+    }
+
     #[inline]
     fn get_definition(
         &self,
@@ -162,6 +233,7 @@ pub trait FtmlBackend {
 
 #[cfg(feature = "server_fn")]
 pub trait FlamsBackend {
+    /// `/content/fragment`
     #[allow(clippy::too_many_arguments)]
     fn get_fragment(
         &self,
@@ -179,6 +251,29 @@ pub trait FlamsBackend {
         Output = Result<(Uri, Vec<Css>, String), BackendError<server_fn::error::ServerFnErrorErr>>,
     > + Send;
 
+    /// `/content/module`
+    #[allow(clippy::too_many_arguments)]
+    fn get_module(
+        &self,
+        uri: Option<ModuleUri>,
+        a: Option<ArchiveId>,
+        p: Option<String>,
+        m: Option<String>,
+    ) -> impl Future<Output = Result<Module, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
+
+    /// `/content/document`
+    #[allow(clippy::too_many_arguments)]
+    fn get_document(
+        &self,
+        uri: Option<DocumentUri>,
+        rp: Option<String>,
+        a: Option<ArchiveId>,
+        p: Option<String>,
+        d: Option<String>,
+        l: Option<Language>,
+    ) -> impl Future<Output = Result<Document, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
+
+    /// `/content/notations`
     #[allow(clippy::too_many_arguments)]
     fn get_notations(
         &self,
@@ -198,6 +293,7 @@ pub trait FlamsBackend {
         >,
     > + Send;
 
+    /// `/content/los`
     #[allow(clippy::too_many_arguments)]
     fn get_logical_paragraphs(
         &self,
@@ -243,6 +339,23 @@ where
         .map(|r| r.map(|(_, css, s)| (s, css)))
     }
 
+    #[inline]
+    fn get_module(
+        &self,
+        uri: ModuleUri,
+    ) -> impl Future<Output = Result<Module, BackendError<Self::Error>>> + Send {
+        <Self as FlamsBackend>::get_module(self, Some(uri), None, None, None)
+    }
+
+    #[inline]
+    fn get_document(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send {
+        <Self as FlamsBackend>::get_document(self, Some(uri), None, None, None, None, None)
+    }
+
+    #[inline]
     fn get_notations(
         &self,
         uri: LeafUri,
@@ -262,6 +375,7 @@ where
         )
     }
 
+    #[inline]
     fn get_logical_paragraphs(
         &self,
         uri: SymbolUri,

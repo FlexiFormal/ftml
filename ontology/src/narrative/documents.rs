@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use ftml_uris::{DocumentUri, Id, NarrativeUriRef, errors::SegmentParseError};
 
 use crate::narrative::{
@@ -48,13 +50,25 @@ impl Narrative for DocumentData {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, Debug)]
-pub struct Document(triomphe::Arc<DocumentData>);
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Document(pub(crate) triomphe::Arc<DocumentData>);
 impl std::ops::Deref for Document {
     type Target = DocumentData;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+impl std::hash::Hash for Document {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uri.hash(state);
+    }
+}
+impl Borrow<DocumentUri> for Document {
+    #[inline]
+    fn borrow(&self) -> &DocumentUri {
+        &self.uri
     }
 }
 
@@ -112,5 +126,26 @@ impl std::str::FromStr for DocumentStyle {
             name: None,
             counter: None,
         })
+    }
+}
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use crate::narrative::documents::DocumentData;
+
+    impl serde::Serialize for super::Document {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+    impl<'de> serde::Deserialize<'de> for super::Document {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            DocumentData::deserialize(deserializer).map(|d| Self(triomphe::Arc::new(d)))
+        }
     }
 }

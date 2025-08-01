@@ -1,7 +1,13 @@
 use crate::{BackendError, FtmlBackend, ParagraphOrProblemKind};
 use dashmap::Entry;
-use ftml_ontology::{narrative::elements::Notation, utils::Css};
-use ftml_uris::{DocumentElementUri, LeafUri, NarrativeUri, SymbolUri, Uri};
+use ftml_ontology::{
+    domain::modules::Module,
+    narrative::{documents::Document, elements::Notation},
+    utils::Css,
+};
+use ftml_uris::{
+    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
+};
 use futures_util::TryFutureExt;
 use kanal::AsyncSender;
 use parking_lot::RwLock;
@@ -47,6 +53,8 @@ where
     notations_cache: Cache<LeafUri, Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
     paragraphs_cache:
         Cache<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
+    modules_cache: Cache<ModuleUri, Module, BackendError<B::Error>>,
+    documents_cache: Cache<DocumentUri, Document, BackendError<B::Error>>,
 }
 
 impl<B: FtmlBackend> CachedBackend<B>
@@ -64,6 +72,12 @@ where
                 map: dashmap::DashMap::new(),
             },
             paragraphs_cache: Cache {
+                map: dashmap::DashMap::new(),
+            },
+            modules_cache: Cache {
+                map: dashmap::DashMap::new(),
+            },
+            documents_cache: Cache {
                 map: dashmap::DashMap::new(),
             },
         }
@@ -84,6 +98,22 @@ where
             .get((uri, context), |(uri, context)| {
                 self.inner.get_fragment(uri, context)
             })
+            .map_err(Into::into)
+    }
+    fn get_module(
+        &self,
+        uri: ModuleUri,
+    ) -> impl Future<Output = Result<Module, BackendError<Self::Error>>> + Send {
+        self.modules_cache
+            .get(uri, |uri| self.inner.get_module(uri))
+            .map_err(Into::into)
+    }
+    fn get_document(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send {
+        self.documents_cache
+            .get(uri, |uri| self.inner.get_document(uri))
             .map_err(Into::into)
     }
     fn get_notations(

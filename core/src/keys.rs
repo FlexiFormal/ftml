@@ -243,8 +243,8 @@ do_keys! {
     SubproofTitle               = "subprooftitle" := todo
 
     Symdecl                     = "symdecl" := symdecl
-    Vardef                      = "vardef" := todo
-    Varseq                      = "varseq" := todo
+    Vardef                      = "vardef" := vardef
+    Varseq                      = "varseq" := varseq
 
     Notation                    = "notation" := notation
     NotationComp                = "notationcomp" := notation_comp

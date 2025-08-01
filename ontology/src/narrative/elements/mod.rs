@@ -9,7 +9,7 @@ use crate::{
     narrative::{DataRef, DocumentRange},
     terms::Term,
 };
-use ftml_uris::{DocumentElementUri, DocumentUri, ModuleUri, SymbolUri, UriName};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, ModuleUri, SymbolUri};
 pub use notations::Notation;
 pub use paragraphs::LogicalParagraph;
 pub use problems::Problem;
@@ -88,20 +88,76 @@ pub enum DocumentElement {
     SymbolReference {
         range: DocumentRange,
         uri: SymbolUri,
-        notation: Option<UriName>,
+        notation: Option<Id>,
     },
     VariableReference {
         range: DocumentRange,
         uri: DocumentElementUri,
-        notation: Option<UriName>,
+        notation: Option<Id>,
     },
-    Term {
-        uri: DocumentElementUri,
-        term: Term,
-    },
+    Term(DocumentTerm),
+}
+impl crate::__private::Sealed for DocumentElement {}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct DocumentTerm {
+    pub uri: DocumentElementUri,
+    pub term: Term,
+}
+impl crate::__private::Sealed for DocumentTerm {}
+impl crate::Ftml for DocumentTerm {
+    #[cfg(feature = "rdf")]
+    fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use ftml_uris::FtmlUri;
+        use ulo::triple;
+        macro_rules! syms {
+            ($iri:ident $e:expr) => {{
+                $e.symbols().collect::<rustc_hash::FxHashSet<_>>().into_iter()
+                    .map(move |s| triple!(<($iri.clone())> dc:hasPart <(s.to_iri())>))
+            }};
+        }
+        let iri = self.uri.to_iri();
+        let iri2 = iri.clone();
+        let term = &self.term;
+        syms!(iri term).chain(std::iter::once(triple!(<(iri2)>: ulo:term)))
+    }
+}
+impl IsDocumentElement for DocumentTerm {
+    #[inline]
+    fn as_ref(&self) -> DocumentElementRef<'_> {
+        DocumentElementRef::Term(self)
+    }
+    fn from_element(e: DocumentElementRef<'_>) -> Option<&Self>
+    where
+        Self: Sized,
+    {
+        if let DocumentElementRef::Term(t) = e {
+            Some(t)
+        } else {
+            None
+        }
+    }
+    #[inline]
+    fn element_uri(&self) -> Option<&DocumentElementUri> {
+        Some(&self.uri)
+    }
 }
 
-impl crate::__private::Sealed for DocumentElement {}
+impl super::Narrative for DocumentTerm {
+    #[inline]
+    fn narrative_uri(&self) -> Option<ftml_uris::NarrativeUriRef<'_>> {
+        Some(ftml_uris::NarrativeUriRef::Element(&self.uri))
+    }
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        std::iter::empty()
+    }
+}
+
 impl super::Narrative for DocumentElement {
     #[inline]
     fn narrative_uri(&self) -> Option<ftml_uris::NarrativeUriRef<'_>> {
@@ -189,13 +245,7 @@ impl Ftml for DocumentElement {
                     .into_iter(),
                 )
             }
-            Self::Term { uri, term } => {
-                let iri = uri.to_iri();
-                let iri2 = iri.clone();
-                RdfIterator::Term(
-                    syms!(iri term).chain(std::iter::once(triple!(<(iri2)>: ulo:term))),
-                )
-            }
+            Self::Term(t) => RdfIterator::Term(t.triples().into_iter()),
         }
     }
 }
@@ -262,17 +312,14 @@ pub enum DocumentElementRef<'d> {
     SymbolReference {
         range: DocumentRange,
         uri: &'d SymbolUri,
-        notation: Option<&'d UriName>,
+        notation: Option<&'d Id>,
     },
     VariableReference {
         range: DocumentRange,
         uri: &'d DocumentElementUri,
-        notation: Option<&'d UriName>,
+        notation: Option<&'d Id>,
     },
-    Expr {
-        uri: &'d DocumentElementUri,
-        term: &'d Term,
-    },
+    Term(&'d DocumentTerm),
 }
 
 impl<'r> DocumentElementRef<'r> {
@@ -294,7 +341,7 @@ impl<'r> DocumentElementRef<'r> {
             | Self::VariableReference { .. }
             | Self::Notation { .. }
             | Self::VariableNotation { .. }
-            | Self::Expr { .. } => A(std::iter::empty()),
+            | Self::Term { .. } => A(std::iter::empty()),
             Self::Module { children, .. }
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
@@ -326,12 +373,6 @@ impl crate::Ftml for DocumentElementRef<'_> {
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
         use ftml_uris::FtmlUri;
         use ulo::triple;
-        macro_rules! syms {
-            ($iri:ident $e:expr) => {{
-                $e.symbols().collect::<rustc_hash::FxHashSet<_>>().into_iter()
-                    .map(move |s| triple!(<($iri.clone())> dc:hasPart <(s.to_iri())>))
-            }};
-        }
         match self {
             Self::SetSectionLevel(_)
             | Self::UseModule(_)
@@ -373,13 +414,7 @@ impl crate::Ftml for DocumentElementRef<'_> {
                     .into_iter(),
                 )
             }
-            Self::Expr { uri, term } => {
-                let iri = uri.to_iri();
-                let iri2 = iri.clone();
-                RdfIterator::Term(
-                    syms!(iri term).chain(std::iter::once(triple!(<(iri2)>: ulo:term))),
-                )
-            }
+            Self::Term(t) => RdfIterator::Term(t.triples().into_iter()),
         }
     }
 }
@@ -434,7 +469,7 @@ impl DocumentElement {
             | Self::DocumentReference { uri, .. }
             | Self::Notation { uri, .. }
             | Self::VariableNotation { uri, .. }
-            | Self::Term { uri, .. } => uri,
+            | Self::Term(DocumentTerm { uri, .. }) => uri,
         })
     }
     #[allow(clippy::too_many_lines)]
@@ -539,7 +574,7 @@ impl DocumentElement {
                 uri,
                 notation: notation.as_ref(),
             },
-            Self::Term { uri, term } => DocumentElementRef::Expr { uri, term },
+            Self::Term(t) => DocumentElementRef::Term(t),
         }
     }
 }
@@ -566,7 +601,7 @@ impl<'e> DocumentElementRef<'e> {
             | Self::DocumentReference { .. }
             | Self::Notation { .. }
             | Self::VariableNotation { .. }
-            | Self::Expr { .. } => None,
+            | Self::Term { .. } => None,
             Self::Module { children, .. }
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
@@ -597,7 +632,7 @@ impl<'e> DocumentElementRef<'e> {
             | Self::DocumentReference { uri, .. }
             | Self::Notation { uri, .. }
             | Self::VariableNotation { uri, .. }
-            | Self::Expr { uri, .. } => uri,
+            | Self::Term(DocumentTerm { uri, .. }) => uri,
         })
     }
 }

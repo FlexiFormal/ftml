@@ -1,10 +1,33 @@
 pub mod documents;
 pub mod elements;
 
-use ftml_uris::{DocumentUri, NarrativeUriRef};
+use ftml_uris::{DocumentUri, NarrativeUriRef, UriName};
 use std::marker::PhantomData;
 
-use crate::narrative::elements::DocumentElementRef;
+use crate::{
+    narrative::{
+        documents::Document,
+        elements::{DocumentElementRef, DocumentTerm, IsDocumentElement},
+    },
+    utils::SharedArc,
+};
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct SharedDocumentElement<T: IsDocumentElement>(SharedArc<Document, T>);
+impl<T: IsDocumentElement> std::ops::Deref for SharedDocumentElement<T> {
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl Document {
+    pub fn get_as<T: IsDocumentElement>(&self, name: &UriName) -> Option<SharedDocumentElement<T>> {
+        SharedArc::opt_new(self, |m| &m.0, move |e| e.find(name.steps()).ok_or(()))
+            .ok()
+            .map(SharedDocumentElement)
+    }
+}
 
 pub trait Narrative: crate::Ftml {
     fn narrative_uri(&self) -> Option<NarrativeUriRef<'_>>;
@@ -71,17 +94,24 @@ pub trait Narrative: crate::Ftml {
                             find_e(c, steps)
                         };
                     }
-                    DocumentElementRef::Slide { uri, .. }
-                        if uri.name().last() == step && steps.peek().is_none() =>
-                    {
-                        return T::from_element(c);
+                    DocumentElementRef::Slide { uri, .. } if uri.name().last() == step => {
+                        return if steps.peek().is_none() {
+                            T::from_element(c)
+                        } else {
+                            find_e(c, steps)
+                        };
                     }
-                    DocumentElementRef::Module { .. }
-                    | DocumentElementRef::Morphism { .. }
-                    | DocumentElementRef::MathStructure { .. }
-                    | DocumentElementRef::Slide { .. }
-                    | DocumentElementRef::Extension { .. } => {
-                        return find_inner(iter, step, steps);
+                    DocumentElementRef::Module { children, .. }
+                    | DocumentElementRef::Morphism { children, .. }
+                    | DocumentElementRef::MathStructure { children, .. }
+                    | DocumentElementRef::Slide { children, .. }
+                    | DocumentElementRef::Extension { children, .. } => {
+                        return find_inner(
+                            Box::new(children.iter().map(|e| e.as_ref()).chain(iter))
+                                as Box<dyn Iterator<Item = DocumentElementRef<'_>>>,
+                            step,
+                            steps,
+                        );
                     }
                     DocumentElementRef::Notation { uri, .. }
                     | DocumentElementRef::VariableNotation { uri, .. }
@@ -89,7 +119,7 @@ pub trait Narrative: crate::Ftml {
                         uri,
                         ..
                     })
-                    | DocumentElementRef::Expr { uri, .. }
+                    | DocumentElementRef::Term(DocumentTerm { uri, .. })
                         if uri.name().last() == step =>
                     {
                         return if steps.peek().is_none() {
@@ -113,7 +143,7 @@ pub trait Narrative: crate::Ftml {
                     | DocumentElementRef::DocumentReference { .. }
                     | DocumentElementRef::Notation { .. }
                     | DocumentElementRef::VariableNotation { .. }
-                    | DocumentElementRef::Expr { .. } => (),
+                    | DocumentElementRef::Term { .. } => (),
                 }
             }
             None

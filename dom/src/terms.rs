@@ -1,14 +1,14 @@
 use crate::{ClonableView, FtmlViews, extractor::DomExtractor};
 use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, VarOrSym};
 use ftml_ontology::terms::{ArgumentMode, Term};
+use ftml_uris::DocumentElementUri;
 use leptos::either::Either::{self, Left, Right};
 use leptos::prelude::*;
 
 #[derive(Clone)]
-pub(crate) enum ReactiveTerm {
-    //Symbol(SymbolUri),
-    //Variable(Variable),
-    Application(RwSignal<ReactiveApplication>),
+pub(crate) struct ReactiveTerm {
+    pub uri: Option<DocumentElementUri>,
+    pub app: RwSignal<ReactiveApplication>,
 }
 
 pub enum ReactiveApplication {
@@ -24,8 +24,13 @@ pub struct OpenApp {
 
 pub struct ClosedApp {
     pub head: VarOrSym,
-    pub term: Term,
+    //pub term: Term,
     pub arguments: Vec<Either<ClonableView, Vec<ClonableView>>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct TopTerm {
+    pub uri: DocumentElementUri,
 }
 
 impl ReactiveApplication {
@@ -38,62 +43,61 @@ impl ReactiveApplication {
     }
     pub(crate) fn close() {
         tracing::trace!(
-            "Closing; current owner: {}",
-            expect_context::<crate::OwnerId>().0
+            "Closing",
+            //expect_context::<crate::OwnerId>().0
         );
-        let Some(sig) = with_context::<ReactiveTerm, _>(|s| {
-            if let ReactiveTerm::Application(a) = s {
-                Some(*a)
-            } else {
-                None
-            }
-        })
-        .flatten() else {
+        let Some(sig) =
+            with_context::<Option<ReactiveTerm>, _>(|s| s.as_ref().map(|s| s.app)).flatten()
+        else {
             return;
         };
 
-        let t = with_context::<RwSignal<DomExtractor>, _>(|s| {
+        /*let t = with_context::<RwSignal<DomExtractor>, _>(|s| {
             s.with_untracked(|s| s.last_term().cloned())
         })
         .flatten();
-        if let Some(t) = t {
-            sig.update(move |app| match app {
-                Self::Open(OpenApp { head, arguments }) => {
-                    let head = head.clone();
-                    let arguments = std::mem::take(arguments);
-                    tracing::trace!("Closing {head:?} as {:?}", t.debug_short());
-                    *app = Self::Closed(ClosedApp {
-                        head,
-                        term: t,
-                        arguments: arguments
-                            .into_iter()
-                            .filter_map(|e| {
-                                e.map(|o| o.map_right(|r| r.into_iter().flatten().collect()))
-                            })
-                            .collect(),
-                    });
-                }
-                Self::Closed(_) => {
-                    tracing::warn!("Tracked term is already closed");
-                }
-            });
-        } else {
+        if let Some(t) = t {*/
+        sig.update(move |app| match app {
+            Self::Open(OpenApp { head, arguments }) => {
+                let head = head.clone();
+                let arguments = std::mem::take(arguments);
+                //tracing::trace!("Closing {head:?} as {:?}", t.debug_short());
+                *app = Self::Closed(ClosedApp {
+                    head,
+                    //term: t,
+                    arguments: arguments
+                        .into_iter()
+                        .filter_map(|e| {
+                            e.map(|o| o.map_right(|r| r.into_iter().flatten().collect()))
+                        })
+                        .collect(),
+                });
+            }
+            Self::Closed(_) => {
+                tracing::warn!("Tracked term is already closed");
+            }
+        });
+        /*} else {
             tracing::warn!("Tracked term does not exist");
-        }
+        }*/
     }
     pub(crate) fn track<V: IntoView>(
         head: VarOrSym,
+        uri: Option<DocumentElementUri>,
         children: impl FnOnce(ReadSignal<Self>) -> V,
     ) -> impl IntoView {
         tracing::debug!(
-            "Tracking {head:?} current owner: {}",
-            expect_context::<crate::OwnerId>().0
+            "Tracking {head:?}",
+            //expect_context::<crate::OwnerId>().0
         );
         let sig = RwSignal::new(Self::Open(OpenApp {
             head,
             arguments: Vec::new(),
         }));
-        provide_context(ReactiveTerm::Application(sig));
+        if let Some(uri) = &uri {
+            provide_context(TopTerm { uri: uri.clone() });
+        }
+        provide_context(Some(ReactiveTerm { app: sig, uri }));
         children(sig.read_only())
     }
 
@@ -102,16 +106,6 @@ impl ReactiveApplication {
         position: ArgumentPosition,
         children: ClonableView,
     ) -> impl IntoView {
-        /*
-        let t = with_context::<RwSignal<DomExtractor>, _>(|s| {
-            s.with_untracked(|s| s.term_at(position).cloned())
-        })
-        .flatten();
-        if let Some(t) = t {
-            let ch = children.clone();
-            slf.update_untracked(move |app| app.set(position, t, ch));
-        }
-         */
         let ch = children.clone();
         slf.update_untracked(move |app| app.set(position, ch));
         children.into_view::<Views>()

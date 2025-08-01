@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use either::Either::{Left, Right};
 use ftml_ontology::{
-    narrative::elements::{DocumentElement, VariableDeclaration},
+    narrative::elements::{DocumentElement, DocumentTerm, VariableDeclaration},
     terms::{ArgumentMode, Term, Variable},
 };
 use ftml_uris::{
@@ -55,7 +55,8 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenDomainElement::OMBIND { .. }
                 | OpenDomainElement::Argument { .. }
                 | OpenDomainElement::Type { .. }
-                | OpenDomainElement::Definiens { .. },
+                | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::Comp,
             )
             | None => Err(FtmlExtractionError::NotIn(
                 in_elem,
@@ -81,7 +82,8 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::NotationArg(_) => None,
                 OpenNarrativeElement::Section { uri, .. }
-                | OpenNarrativeElement::Notation { uri, .. } => Some(uri),
+                | OpenNarrativeElement::Notation { uri, .. }
+                | OpenNarrativeElement::VariableDeclaration { uri, .. } => Some(uri),
             })
             .map_or_else(
                 || NarrativeUriRef::Document(self.in_document()),
@@ -99,6 +101,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Invisible => (),
                 OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::SkipSection { .. } => return false,
             }
         }
@@ -119,7 +122,8 @@ pub trait FtmlExtractor: 'static + Sized {
                     | OpenDomainElement::OMBIND { .. }
                     | OpenDomainElement::Argument { .. }
                     | OpenDomainElement::Type { .. }
-                    | OpenDomainElement::Definiens { .. },
+                    | OpenDomainElement::Definiens { .. }
+                    | OpenDomainElement::Comp,
                 ) => true,
             }
     }
@@ -147,6 +151,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Invisible
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::NotationArg(_)
                 | OpenNarrativeElement::ArgSep { .. } => continue, // Narrative::Notation(_) => continue,
             };
@@ -177,16 +182,19 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => match children.last() {
-                    Some(DocumentElement::Term { term, .. }) => return Some(term),
+                    Some(DocumentElement::Term(DocumentTerm { term, .. })) => return Some(term),
                     _ => break,
                 },
                 OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::NotationArg(_) => break,
             }
         }
-        if let Some(DocumentElement::Term { term, .. }) = self.iterate_dones().next_back() {
+        if let Some(DocumentElement::Term(DocumentTerm { term, .. })) =
+            self.iterate_dones().next_back()
+        {
             return Some(term);
         }
         self.iterate_domain().next().and_then(|d| match d {
@@ -198,6 +206,7 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::OMBIND { .. }
             | OpenDomainElement::SymbolDeclaration { .. }
             | OpenDomainElement::SymbolReference { .. }
+            | OpenDomainElement::Comp
             | OpenDomainElement::VariableReference { .. } => None,
         })
     }
@@ -245,6 +254,7 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::Module { .. }
             | OpenDomainElement::SymbolDeclaration { .. }
             | OpenDomainElement::SymbolReference { .. }
+            | OpenDomainElement::Comp
             | OpenDomainElement::VariableReference { .. } => None,
         })
     }

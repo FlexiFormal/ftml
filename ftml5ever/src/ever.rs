@@ -137,9 +137,9 @@ impl ftml_core::extraction::attributes::Attributes for Attributes {
             .find(|(k, _)| &k.local == key)
             .map(|(_, v)| &**v)
     }
-    fn set(&mut self, key: &str, value: &str) {
+    fn set(&mut self, key: &str, value: impl std::fmt::Display) {
         if let Some((_, v)) = self.0.iter_mut().find(|(k, _)| &k.local == key) {
-            *v = value.into();
+            *v = value.to_string().into();
         }
     }
     fn take(&mut self, key: &str) -> Option<String> {

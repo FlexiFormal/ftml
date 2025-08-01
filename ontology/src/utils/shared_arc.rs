@@ -8,6 +8,7 @@
 /// behind the [`Arc`](triomphe::Arc), an instance of which is owned by `o`.
 ///
 /// [`SharedArc`] conceptually is such a pair `(o,i)` which dereferences to `Inner`.
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SharedArc<Outer, Inner> {
     outer: Outer,
     elem: *const Inner,
@@ -30,11 +31,32 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
     pub fn new<Arced, Err>(
         outer: Outer,
         arc: fn(&Outer) -> &triomphe::Arc<Arced>,
-        get: fn(&Arced) -> Result<&Inner, Err>,
+        get: impl Fn(&Arced) -> Result<&Inner, Err>,
     ) -> Result<Self, Err> {
         let elem = get(arc(&outer))?;
         let elem = elem as *const Inner;
         Ok(Self { outer, elem })
+    }
+
+    /// Like [new](SharedArc::new) for clonable `Arced`s; only clones the arc if
+    /// `get` actually succeeds
+    ///
+    /// ## Errors
+    /// iff `get` errors.
+    pub fn opt_new<Arced, Err>(
+        outer: &Outer,
+        arc: fn(&Outer) -> &triomphe::Arc<Arced>,
+        get: impl Fn(&Arced) -> Result<&Inner, Err>,
+    ) -> Result<Self, Err>
+    where
+        Outer: Clone,
+    {
+        let elem = get(arc(outer))?;
+        let elem = elem as *const Inner;
+        Ok(Self {
+            outer: outer.clone(),
+            elem,
+        })
     }
 
     /// If a reference to an `Inner` allows to get at a `NewInner`, then we can safely turn this

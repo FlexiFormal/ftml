@@ -2,7 +2,7 @@ use ftml_uris::{DomainUriRef, ModuleUri, SymbolUri};
 
 use crate::domain::{
     HasDeclarations,
-    declarations::{AnyDeclaration, AnyDeclarationRef, IsDeclaration},
+    declarations::{Declaration, AnyDeclarationRef, IsDeclaration},
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -13,7 +13,7 @@ pub struct Morphism {
     pub uri: SymbolUri,
     pub domain: ModuleUri,
     pub total: bool,
-    pub elements: Box<[AnyDeclaration]>,
+    pub elements: Box<[Declaration]>,
 }
 
 impl crate::__private::Sealed for Morphism {}
@@ -54,7 +54,7 @@ impl HasDeclarations for Morphism {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
-        self.elements.iter().map(AnyDeclaration::as_ref)
+        self.elements.iter().map(Declaration::as_ref)
     }
     #[inline]
     fn domain_uri(&self) -> DomainUriRef<'_> {

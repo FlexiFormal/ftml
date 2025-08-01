@@ -1,8 +1,10 @@
+use std::borrow::Borrow;
+
 use ftml_uris::{Language, ModuleUri, SymbolUri};
 
 use crate::domain::{
     HasDeclarations,
-    declarations::{AnyDeclaration, AnyDeclarationRef, IsDeclaration},
+    declarations::{AnyDeclarationRef, Declaration, IsDeclaration},
 };
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -13,7 +15,7 @@ pub struct ModuleData {
     pub uri: ModuleUri,
     pub meta_module: Option<ModuleUri>,
     pub signature: Option<Language>,
-    pub declarations: Box<[AnyDeclaration]>,
+    pub declarations: Box<[Declaration]>,
 }
 impl crate::__private::Sealed for ModuleData {}
 impl ModuleData {
@@ -24,13 +26,25 @@ impl ModuleData {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, Debug)]
-pub struct Module(triomphe::Arc<ModuleData>);
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Module(pub(crate) triomphe::Arc<ModuleData>);
 impl std::ops::Deref for Module {
     type Target = ModuleData;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+impl std::hash::Hash for Module {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uri.hash(state);
+    }
+}
+impl Borrow<ModuleUri> for Module {
+    #[inline]
+    fn borrow(&self) -> &ModuleUri {
+        &self.uri
     }
 }
 
@@ -39,7 +53,7 @@ impl HasDeclarations for ModuleData {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
-        self.declarations.iter().map(AnyDeclaration::as_ref)
+        self.declarations.iter().map(Declaration::as_ref)
     }
     #[inline]
     fn domain_uri(&self) -> ftml_uris::DomainUriRef<'_> {
@@ -72,7 +86,7 @@ impl crate::Ftml for ModuleData {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct NestedModule {
     pub uri: SymbolUri,
-    pub declarations: Box<[AnyDeclaration]>,
+    pub declarations: Box<[Declaration]>,
 }
 impl crate::__private::Sealed for NestedModule {}
 impl crate::Ftml for NestedModule {
@@ -90,7 +104,7 @@ impl HasDeclarations for NestedModule {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
-        self.declarations.iter().map(AnyDeclaration::as_ref)
+        self.declarations.iter().map(Declaration::as_ref)
     }
     #[inline]
     fn domain_uri(&self) -> ftml_uris::DomainUriRef<'_> {
@@ -112,5 +126,27 @@ impl IsDeclaration for NestedModule {
     #[inline]
     fn as_ref(&self) -> AnyDeclarationRef<'_> {
         AnyDeclarationRef::NestedModule(self)
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use crate::domain::modules::ModuleData;
+
+    impl serde::Serialize for super::Module {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+    impl<'de> serde::Deserialize<'de> for super::Module {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            ModuleData::deserialize(deserializer).map(|d| Self(triomphe::Arc::new(d)))
+        }
     }
 }

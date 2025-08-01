@@ -1,12 +1,19 @@
 use std::marker::PhantomData;
 
+use either::Either;
 use ftml_backend::{BackendError, FtmlBackend, GlobalBackend, ParagraphOrProblemKind};
 use ftml_ontology::{
-    domain::modules::Module,
-    narrative::{documents::Document, elements::Notation},
+    domain::{SharedDeclaration, declarations::symbols::Symbol, modules::Module},
+    narrative::{
+        SharedDocumentElement,
+        documents::Document,
+        elements::{DocumentTerm, Notation, VariableDeclaration},
+    },
     utils::Css,
 };
-use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri, SymbolUri};
+use ftml_uris::{
+    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, UriKind,
+};
 
 pub trait SendBackend:
     GlobalBackend<Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone> + Send
@@ -68,6 +75,86 @@ impl<B: SendBackend> WithLocalCache<B> {
     ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<B::Error>>> + Send + use<B>
     {
         self.get_fragment(uri.into(), context)
+    }
+
+    pub fn get_module(
+        &self,
+        uri: ModuleUri,
+    ) -> impl Future<Output = Result<Module, BackendError<B::Error>>> + Send + use<B> {
+        if let Some(m) = LOCAL_CACHE.modules.get(&uri) {
+            return either::Either::Left(std::future::ready(Ok(m.clone())));
+        }
+        either::Either::Right(B::get().get_module(uri))
+    }
+
+    pub fn get_document(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<Document, BackendError<B::Error>>> + Send + use<B> {
+        if let Some(m) = LOCAL_CACHE.documents.get(&uri) {
+            return either::Either::Left(std::future::ready(Ok(m.clone())));
+        }
+        either::Either::Right(B::get().get_document(uri))
+    }
+
+    pub fn get_document_term(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<DocumentTerm, SharedDocumentElement<DocumentTerm>>,
+            BackendError<B::Error>,
+        >,
+    > + Send
+    + use<B> {
+        if let Some(m) = LOCAL_CACHE.documents.get(&uri.document) {
+            let r = m
+                .get_as::<DocumentTerm>(&uri.name)
+                .map_or(Err(BackendError::NotFound(UriKind::DocumentElement)), |d| {
+                    Ok(either::Either::Right(d))
+                });
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(B::get().get_document_term(uri))
+    }
+
+    pub fn get_symbol(
+        &self,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<Either<Symbol, SharedDeclaration<Symbol>>, BackendError<B::Error>>,
+    > + Send
+    + use<B> {
+        if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
+            let r = m
+                .get_as::<Symbol>(&uri.name)
+                .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
+                    Ok(either::Either::Right(d))
+                });
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(B::get().get_symbol(uri))
+    }
+
+    pub fn get_variable(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<VariableDeclaration, SharedDocumentElement<VariableDeclaration>>,
+            BackendError<B::Error>,
+        >,
+    > + Send
+    + use<B> {
+        if let Some(m) = LOCAL_CACHE.documents.get(&uri.document) {
+            let r = m
+                .get_as::<VariableDeclaration>(&uri.name)
+                .map_or(Err(BackendError::NotFound(UriKind::DocumentElement)), |d| {
+                    Ok(either::Either::Right(d))
+                });
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(B::get().get_variable(uri))
     }
 
     #[inline]

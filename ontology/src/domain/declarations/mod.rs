@@ -23,7 +23,7 @@ pub trait IsDeclaration: crate::Ftml {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
-pub enum AnyDeclaration {
+pub enum Declaration {
     NestedModule(NestedModule),
     Import(ModuleUri),
     Symbol(Symbol),
@@ -32,8 +32,8 @@ pub enum AnyDeclaration {
     Extension(StructureExtension),
 }
 
-impl crate::__private::Sealed for AnyDeclaration {}
-impl AnyDeclaration {
+impl crate::__private::Sealed for Declaration {}
+impl Declaration {
     #[inline]
     #[must_use]
     pub fn uri(&self) -> Option<&SymbolUri> {
@@ -60,7 +60,7 @@ impl AnyDeclaration {
         }
     }
 }
-impl crate::Ftml for AnyDeclaration {
+impl crate::Ftml for Declaration {
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
         #[allow(clippy::enum_glob_use)]

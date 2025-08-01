@@ -3,15 +3,17 @@
 use crate::{
     SendBackend,
     config::{FtmlConfigState, HighlightStyle},
-    utils::{LocalCacheExt, ReactiveStore},
+    utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
 };
 use ftml_core::extraction::VarOrSym;
 use ftml_dom::{
-    ClonableView, DocumentState, FtmlViews,
-    terms::{ClosedApp, ReactiveApplication},
+    ClonableView, DocumentState, FtmlViews, TermTrackedViews,
+    notations::TermExt,
+    terms::ReactiveApplication,
     utils::{
         css::{CssExt, inject_css},
         local_cache::LocalCache,
+        owned,
     },
 };
 use ftml_ontology::terms::Variable;
@@ -113,7 +115,7 @@ pub fn oma<B: SendBackend>(
             Right(children.into_view::<crate::Views<B>>())
         }
     };
-    let memo = Memo::new(move |_| {
+    /*let memo = Memo::new(move |_| {
         head.with(|a| match a {
             ReactiveApplication::Open(_) => "No term yet".to_string(),
             ReactiveApplication::Closed(ClosedApp { term, .. }) => {
@@ -121,8 +123,8 @@ pub fn oma<B: SendBackend>(
                 format!("{:?}", term.debug_short())
             }
         })
-    });
-    Left(ret(children).attr("title", memo))
+    });*/
+    Left(ret(children)) //.attr("title", memo))
 }
 
 const fn comp_class(
@@ -164,7 +166,10 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
     inject_css("ftml-comp", include_str!("comp.css"));
 
     let is_var = matches!(&head, VarOrSym::V(_));
-    let is_hovered = expect_context::<InTerm>().hovered;
+    let Some(is_hovered) = use_context::<InTerm>().map(|h| h.hovered) else {
+        tracing::warn!("InTerm is missing!");
+        return Left(children.into_view::<crate::Views<B>>());
+    };
     let style = FtmlConfigState::highlight_style();
     let class = Memo::new(move |_| comp_class(false, is_hovered.get(), is_var, style.get()));
     let top_class = Memo::new(move |_| {
@@ -178,7 +183,16 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
     //let ocp = expect_context::<crate::config::FTMLConfig>().get_on_click(&s);
     //let none: Option<FragmentContinuation> = None;
     let children = children.into_view::<crate::Views<B>>();
-    let on_click = ReactiveStore::get().write_value().on_click::<B>(&head);
+    let on_click = ReactiveStore::on_click::<B>(&head);
+    let allow_formals = FtmlConfigState::allow_formal_info();
+    let top_term = if allow_formals {
+        crate::Views::<B>::current_top_term()
+    } else {
+        None
+    };
+    let on_click = move |_| {
+        on_click.click(allow_formals, top_term.clone());
+    };
     Right(view! {
         <Popover
             class=top_class
@@ -191,7 +205,7 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
             children.attr("class",move || class)
             .add_any_attr(leptos::ev::on(
                 leptos::ev::click,
-                Box::new(move |_| on_click.set(true)),
+                Box::new(on_click)
             ))
             }</PopoverTrigger>
             {term_popover::<B>(head)}
@@ -260,7 +274,45 @@ pub fn symbol_popover<B: SendBackend>(uri: SymbolUri) -> impl IntoView {
     )
 }
 
-pub(crate) fn do_onclick<Be: SendBackend>(vos: &VarOrSym) -> impl IntoView + use<Be> {
+#[derive(Copy, Clone)]
+pub struct OnClickData {
+    is_clicked: WriteSignal<bool>,
+    top_term: WriteSignal<Option<DocumentElementUri>>,
+    allow_formals: WriteSignal<bool>,
+}
+impl OnClickData {
+    pub fn click(&self, allow_formals: bool, top_term: Option<DocumentElementUri>) {
+        self.allow_formals.set(allow_formals);
+        self.top_term.set(top_term);
+        self.is_clicked.set(true);
+    }
+    pub(crate) fn new() -> (
+        Self,
+        RwSignal<bool>,
+        ReadSignal<Option<DocumentElementUri>>,
+        ReadSignal<bool>,
+    ) {
+        let allow_formals = RwSignal::new(false);
+        let top_term = RwSignal::new(None);
+        let is_clicked = RwSignal::new(false);
+        (
+            Self {
+                is_clicked: is_clicked.write_only(),
+                top_term: top_term.write_only(),
+                allow_formals: allow_formals.write_only(),
+            },
+            is_clicked,
+            top_term.read_only(),
+            allow_formals.read_only(),
+        )
+    }
+}
+
+pub(crate) fn do_onclick<Be: SendBackend>(
+    vos: &VarOrSym,
+    top_term: ReadSignal<Option<DocumentElementUri>>,
+    allow_formals: ReadSignal<bool>,
+) -> impl IntoView + use<Be> {
     use leptos::either::Either::{Left as A, Right as B};
     use leptos::prelude::*;
     use thaw::{Divider, Skeleton, SkeletonItem, Spinner};
@@ -301,6 +353,47 @@ pub(crate) fn do_onclick<Be: SendBackend>(vos: &VarOrSym) -> impl IntoView + use
         <div style="margin:5px;"><Divider/></div>
 
         // notations
-        {super::notations::notation_selector::<Be>(uri.into())}
+        {super::notations::notation_selector::<Be>(uri.clone().into())}
+
+        // formals
+        {move || if allow_formals.get() {
+            let uri = uri.clone();
+            Some(owned(move || formals::<Be>(uri,top_term)))
+        } else {None} }
     })
+}
+
+fn formals<Be: SendBackend>(
+    symbol: SymbolUri,
+    uri: ReadSignal<Option<DocumentElementUri>>,
+) -> impl IntoView + use<Be> {
+    use super::omdoc::FtmlViewable;
+    use thaw::Divider;
+    view! {
+        <div style="margin:5px;"><Divider/></div>
+        {lazy_collapsible(Some(|| "Formal Details"), move || view!{
+            {
+                let symbol = symbol.clone();
+                LocalCache::with_or_toast::<Be,_,_,_,_>(
+                move |r| r.get_symbol(symbol),
+                |s| match s {
+                    ::either::Left(s) => s.as_view::<Be>(),
+                    ::either::Right(s) => s.as_view::<Be>()
+                },
+                || "error"
+            )}
+            {move || uri.with(|u| u.clone().map(|u| {
+                let uri = u.clone();
+               view!("In term "{owned(move || LocalCache::with_or_toast::<Be,_,_,_,_>(
+                   |r| r.get_document_term(u),
+                   |t|  match t {
+                       ::either::Left(t) => t.term.into_view::<crate::Views<Be>,Be>(false),
+                       ::either::Right(t) => t.term.clone().into_view::<crate::Views<Be>,Be>(false),
+                   },
+                   move || format!("error: {uri}")
+               ))})
+            }
+            ))}
+        })}
+    }
 }

@@ -87,19 +87,24 @@ impl MarkedNode {
                 var,
                 notation,
             } => Views::variable_reference(var, notation, in_term, child()).into_any(),
-            Marker::OMA { head, notation, .. } => {
-                Views::application(head, notation, child()).into_any()
+            Marker::OMA {
+                head,
+                notation,
+                uri,
+            } => Views::application(head, notation, uri, child()).into_any(),
+            Marker::OMBIND {
+                head,
+                notation,
+                uri,
+            } => Views::binder_application(head, notation, uri, child()).into_any(),
+            Marker::Argument(pos) if first_pass => {
+                with_context::<Option<ReactiveTerm>, _>(|t| t.as_ref().map(|t| t.app))
+                    .flatten()
+                    .map_or_else(
+                        || child().into_view::<Views>(),
+                        |r| ReactiveApplication::add_argument::<Views>(r, pos, child()).into_any(),
+                    )
             }
-            Marker::OMBIND { head, notation, .. } => {
-                Views::binder_application(head, notation, child()).into_any()
-            }
-            Marker::Argument(pos) if first_pass => with_context::<ReactiveTerm, _>(|t| match t {
-                ReactiveTerm::Application(s) => *s,
-            })
-            .map_or_else(
-                || child().into_view::<Views>(),
-                |r| ReactiveApplication::add_argument::<Views>(r, pos, child()).into_any(),
-            ),
             Marker::Argument(_) => child().into_view::<Views>().into_any(),
             Marker::Comp => Views::comp(child()).into_any(),
             _ => ftml_core::TODO!(),
@@ -162,12 +167,12 @@ impl MarkedNode {
             )
         };
         if set_state {
-            let sig = expect_context::<RwSignal<DomExtractor>>();
             let dom = state.last_domain.clone();
             let narr = state.last_narrative.clone();
             let has_dom = dom.is_some();
             let has_narr = narr.is_some();
             drop(state);
+            let sig = owner.with(|| expect_context::<RwSignal<DomExtractor>>());
             if has_dom || has_narr {
                 sig.update_untracked(|e| {
                     if let Some(dom) = dom {

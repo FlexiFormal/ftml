@@ -9,7 +9,7 @@ use crate::{
 };
 use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, VarOrSym};
 use ftml_ontology::{narrative::elements::SectionLevel, terms::Variable};
-use ftml_uris::{DocumentElementUri, DocumentUri, SymbolUri, UriName};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, SymbolUri};
 use leptos::{
     IntoView,
     prelude::{IntoAny, Memo, RwSignal, with_context},
@@ -22,12 +22,12 @@ pub enum Marker {
     SymbolReference {
         in_term: bool,
         uri: SymbolUri,
-        notation: Option<UriName>,
+        notation: Option<Id>,
     },
     VariableReference {
         in_term: bool,
         var: Variable,
-        notation: Option<UriName>,
+        notation: Option<Id>,
     },
     InputRef {
         target: DocumentUri,
@@ -39,12 +39,12 @@ pub enum Marker {
     OMA {
         uri: Option<DocumentElementUri>,
         head: VarOrSym,
-        notation: Option<UriName>,
+        notation: Option<Id>,
     },
     OMBIND {
         uri: Option<DocumentElementUri>,
         head: VarOrSym,
-        notation: Option<UriName>,
+        notation: Option<Id>,
     },
     Argument(ArgumentPosition),
     CurrentSectionLevel(bool),
@@ -70,19 +70,6 @@ pub struct InputrefInfo {
 }
 
 pub type MarkerList = smallvec::SmallVec<Marker, 4>;
-
-macro_rules! owned {
-    ($e:expr) => {
-        $e
-    };
-    (!$e:expr) => {{
-        let owner = leptos::prelude::Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(move || $e);
-        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
-    }};
-}
 
 impl Marker {
     #[allow(clippy::too_many_lines)]
@@ -116,32 +103,30 @@ impl Marker {
             {
                 B(Self::apply::<Views>(markers, invisible, is_math, orig).into_any())
             }
-            Self::Section(uri) => C(owned!(DocumentState::new_section(uri, move |info| {
+            Self::Section(uri) => C(DocumentState::new_section(uri, move |info| {
                 Views::section(info, move || {
                     Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
                 })
-            }))),
-            Self::SkipSection => D(owned!(DocumentState::skip_section(move || {
+            })),
+            Self::SkipSection => D(DocumentState::skip_section(move || {
                 Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
-            }))),
+            })),
             Self::SectionTitle => {
                 let (LogicalLevel::Section(lvl), cls) = DocumentState::title_class() else {
                     tracing::error!("Unexpected section title");
                     return E(Self::apply::<Views>(markers, invisible, is_math, orig).into_any());
                 };
-                F(owned!(Views::section_title(lvl, cls, move || {
+                F(Views::section_title(lvl, cls, move || {
                     Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
-                })))
+                }))
             }
-            Self::InputRef { target, uri } => H(owned!(DocumentState::do_inputref(
-                target,
-                uri,
-                Views::inputref
-            ))),
+            Self::InputRef { target, uri } => {
+                H(DocumentState::do_inputref(target, uri, Views::inputref))
+            }
             Self::Argument(pos) => {
-                if let Some(r) = with_context::<ReactiveTerm, _>(|t| match t {
-                    ReactiveTerm::Application(s) => *s,
-                }) {
+                if let Some(r) =
+                    with_context::<Option<ReactiveTerm>, _>(|t| t.as_ref().map(|t| t.app)).flatten()
+                {
                     let node = MarkedNode::new(markers, orig, is_math).into();
                     M(
                         //owned!(
@@ -193,14 +178,24 @@ impl Marker {
                 in_term,
                 MarkedNode::new(markers, orig, is_math).into(),
             )),
-            Self::OMA { head, notation, .. } => K(Views::application(
+            Self::OMA {
                 head,
                 notation,
+                uri,
+            } => K(Views::application(
+                head,
+                notation,
+                uri,
                 MarkedNode::new(markers, orig, is_math).into(),
             )),
-            Self::OMBIND { head, notation, .. } => L(Views::binder_application(
+            Self::OMBIND {
                 head,
                 notation,
+                uri,
+            } => L(Views::binder_application(
+                head,
+                notation,
+                uri,
                 MarkedNode::new(markers, orig, is_math).into(),
             )),
         }
@@ -273,6 +268,7 @@ impl Marker {
             | OpenFtmlElement::ArgSep
             | OpenFtmlElement::ImportModule(_)
             | OpenFtmlElement::UseModule(_)
+            | OpenFtmlElement::VariableDeclaration { .. }
             | OpenFtmlElement::None => None,
         }
     }

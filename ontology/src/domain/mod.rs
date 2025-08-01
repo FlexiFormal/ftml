@@ -1,15 +1,39 @@
-use ftml_uris::DomainUriRef;
+use ftml_uris::{DomainUriRef, UriName};
 
-use crate::domain::declarations::{AnyDeclarationRef, IsDeclaration};
+use crate::{
+    domain::{
+        declarations::{AnyDeclarationRef, IsDeclaration},
+        modules::Module,
+    },
+    utils::SharedArc,
+};
 
 pub mod declarations;
 pub mod modules;
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct SharedDeclaration<T: IsDeclaration>(SharedArc<Module, T>);
+impl<T: IsDeclaration> std::ops::Deref for SharedDeclaration<T> {
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl Module {
+    pub fn get_as<T: IsDeclaration>(&self, name: &UriName) -> Option<SharedDeclaration<T>> {
+        SharedArc::opt_new(self, |m| &m.0, move |e| e.find(name.steps()).ok_or(()))
+            .ok()
+            .map(SharedDeclaration)
+    }
+}
 
 pub trait HasDeclarations: crate::Ftml {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator;
     fn domain_uri(&self) -> DomainUriRef<'_>;
+
     fn find<'s, T: IsDeclaration>(&self, steps: impl IntoIterator<Item = &'s str>) -> Option<&T> {
         #[allow(clippy::enum_glob_use)]
         use either_of::EitherOf5::*;

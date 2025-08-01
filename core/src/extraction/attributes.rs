@@ -19,7 +19,7 @@ pub trait Attributes {
         Self: 'a;
     //fn keys(&self) -> Self::KeyIter<'_>;
     fn value(&self, key: &str) -> Option<Self::Value<'_>>;
-    fn set(&mut self, key: &str, value: &str);
+    fn set(&mut self, key: &str, value: impl std::fmt::Display);
     fn take(&mut self, key: &str) -> Option<String>;
 
     #[inline]

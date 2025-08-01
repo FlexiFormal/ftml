@@ -1,5 +1,14 @@
-use crate::FtmlViews;
+mod terms;
+use std::num::NonZeroU8;
+
+use ftml_core::extraction::ArgumentPosition;
+use leptos::math::mtext;
+pub use terms::*;
+
+use crate::terms::{ReactiveApplication, ReactiveTerm};
+use crate::utils::owned;
 use crate::{ClonableView, document::WithHead};
+use crate::{DocumentState, FtmlViews};
 use ftml_core::{FtmlKey, extraction::VarOrSym};
 use ftml_ontology::{
     narrative::elements::{
@@ -9,6 +18,27 @@ use ftml_ontology::{
     terms::ArgumentMode,
 };
 use leptos::{either::Either, prelude::*};
+
+pub trait NotationExt {
+    fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(
+        &self,
+        head: &VarOrSym,
+        args: &R,
+    ) -> impl IntoView + use<Self, Views, R>;
+    fn with_arguments_safe<Views: FtmlViews, R: ArgumentRender + ?Sized>(
+        &self,
+        head: &VarOrSym,
+        args: &R,
+    ) -> impl IntoView + use<Self, Views, R> {
+        DocumentState::with_head(head.clone(), move || {
+            self.with_arguments::<Views, R>(head, args)
+        })
+    }
+    fn as_view<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Self, Views>;
+    fn as_view_safe<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Self, Views> {
+        DocumentState::with_head(head.clone(), move || self.as_view::<Views>(head))
+    }
+}
 
 pub trait ArgumentRender {
     #[inline]
@@ -25,6 +55,11 @@ pub trait ArgumentRender {
     ) -> AnyView;
     fn length_at(&self, index: u8) -> usize;
 }
+
+fn error() -> AnyView {
+    mtext().style("color:red").child("ERROR").into_any()
+}
+
 impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
     #[inline]
     fn is_empty(&self) -> bool {
@@ -34,24 +69,61 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
     fn num_args(&self) -> usize {
         self.len()
     }
-    fn render_arg<Views: FtmlViews>(&self, index: u8, _mode: ArgumentMode) -> AnyView {
+    fn render_arg<Views: FtmlViews>(&self, index: u8, mode: ArgumentMode) -> AnyView {
+        tracing::trace!("rendering arg {index}@{mode:?} of {}", self.len());
         match self.get(index as usize) {
-            Some(Either::Left(v)) => v.clone().into_view::<Views>(),
-            _ => view!(<mtext style="color:red">ERROR</mtext>).into_any(),
+            Some(Either::Left(v)) => do_arg::<Views>(v.clone(), index, None, mode),
+            Some(Either::Right(v)) => {
+                let len = v.len();
+                if len == 0 {
+                    return ().into_any();
+                }
+                // SAFETY: len > 0
+                let first = || {
+                    do_arg::<Views>(
+                        unsafe { v.first().unwrap_unchecked() }.clone(),
+                        index,
+                        Some(0),
+                        mode,
+                    )
+                };
+                if len == 1 {
+                    return first();
+                }
+                view! {
+                    <mrow>
+                        {first()}
+                    {
+                        v.iter().enumerate().skip(1).map(|(i,v)| view!{
+                            {Views::comp(ClonableView::new(true,|| leptos::math::mo().child(",")))}
+                            {do_arg::<Views>(v.clone(), index, Some(i), mode)}
+                        }).collect_view()
+                    }
+                    </mrow>
+                }
+                .into_any()
+            }
+            _ => error(),
         }
     }
     fn render_arg_at<Views: FtmlViews>(
         &self,
         index: u8,
         seq_index: usize,
-        _mode: ArgumentMode,
+        mode: ArgumentMode,
     ) -> AnyView {
+        tracing::trace!(
+            "rendering arg sequence@{mode:?} {index}/{seq_index} of {}",
+            self.len()
+        );
         match self.get(index as usize) {
-            Some(Either::Right(v)) => v.get(seq_index).map_or_else(
-                || view!(<mtext style="color:red">ERROR</mtext>).into_any(),
-                |v| v.clone().into_view::<Views>(),
-            ),
-            _ => view!(<mtext style="color:red">ERROR</mtext>).into_any(),
+            Some(Either::Right(v)) => v.get(seq_index).map_or_else(error, |v| {
+                do_arg::<Views>(v.clone(), index, Some(seq_index), mode)
+            }),
+            Some(Either::Left(t)) if seq_index == 0 => {
+                do_arg::<Views>(t.clone(), index, Some(seq_index), mode)
+            }
+            _ => error(),
         }
     }
     fn length_at(&self, index: u8) -> usize {
@@ -60,13 +132,33 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
     }
 }
 
-pub trait NotationExt {
-    fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(
-        &self,
-        head: &VarOrSym,
-        args: &R,
-    ) -> impl IntoView + use<Self, Views, R>;
-    fn as_view<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Self, Views>;
+fn do_arg<Views: FtmlViews>(
+    v: ClonableView,
+    index: u8,
+    seq_index: Option<usize>,
+    mode: ArgumentMode,
+) -> AnyView {
+    if let Some(r) =
+        with_context::<Option<ReactiveTerm>, _>(|t| t.as_ref().map(|t| t.app)).flatten()
+    {
+        let position = seq_index.map_or_else(
+            || {
+                // SAFETY: +1 > 0
+                unsafe { ArgumentPosition::Simple(NonZeroU8::new_unchecked(index + 1), mode) }
+            },
+            |i| unsafe {
+                ArgumentPosition::Sequence {
+                    argument_number: NonZeroU8::new_unchecked(index + 1),
+                    #[allow(clippy::cast_possible_truncation)]
+                    sequence_index: NonZeroU8::new_unchecked((i + 1) as u8),
+                    mode,
+                }
+            },
+        );
+        ReactiveApplication::add_argument::<Views>(r, position, v).into_any()
+    } else {
+        v.into_view::<Views>()
+    }
 }
 
 impl NotationExt for Notation {
@@ -79,33 +171,25 @@ impl NotationExt for Notation {
         if args.is_empty() {
             return Left(self.as_view::<Views>(head));
         }
-        let owner = leptos::prelude::Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(move || {
+        Right(/*owned(move ||*/ {
             let h = head.to_string();
-            provide_context(WithHead(Some(head.clone())));
-            view_component_with_args::<Views>(&self.component, args)
+            //provide_context(WithHead(Some(head.clone())));
+            let r = view_component_with_args::<Views>(&self.component, args)
                 .attr(FtmlKey::Term.attr_name(), "OMID")
-                .attr(FtmlKey::Head.attr_name(), h)
-        });
-        Right(leptos::tachys::reactive_graph::OwnedView::new_with_owner(
-            children, owner,
-        ))
+                .attr(FtmlKey::Head.attr_name(), h);
+            ReactiveApplication::close();
+            r
+        }) //)
     }
 
     fn as_view<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Views> {
-        let owner = leptos::prelude::Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(move || {
-            let h = head.to_string();
-            provide_context(WithHead(Some(head.clone())));
-            view_component_with_args::<Views>(&self.component, &DummyRender)
-                .attr(FtmlKey::Term.attr_name(), "OMID")
-                .attr(FtmlKey::Head.attr_name(), h)
-        });
-        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
+        //owned(move || {
+        let h = head.to_string();
+        //provide_context(WithHead(Some(head.clone())));
+        view_component_with_args::<Views>(&self.component, &DummyRender)
+            .attr(FtmlKey::Term.attr_name(), "OMID")
+            .attr(FtmlKey::Head.attr_name(), h)
+        //})
     }
 }
 
@@ -150,7 +234,6 @@ fn view_component_with_args<Views: FtmlViews>(
                 <mrow>
                     {args.render_arg_at::<Views>(*index, 0, *mode)}
                 {
-
                     (1..len).map(|i| view!{
                         {sep.iter().map(|s| view_component_with_args::<Views>(s,args)).collect_view()}
                         {args.render_arg_at::<Views>(*index, i, *mode)}
@@ -228,7 +311,7 @@ fn node_or_text(n: &NodeOrText) -> AnyView {
     }
 }
 
-fn tachys_from_tag(id: &str, children: impl IntoView) -> AnyView {
+pub(crate) fn tachys_from_tag(id: &str, children: impl IntoView) -> AnyView {
     macro_rules! tags {
         ( $(  {$($name:ident $($actual:ident)? ),* $(,)? } )*) => {
             match id {
@@ -236,7 +319,7 @@ fn tachys_from_tag(id: &str, children: impl IntoView) -> AnyView {
                     stringify!($name) => view!(<$name>{children}</$name>)/* leptos::tachys::html::element::$name()
                         .child(children)*/.into_any(),//tags!(@NAME $name $($actual)?)::TAG,
                 )*  )*
-                _ => "".into_any()
+                _ => mtext().child("ERROR").into_any()
             }
         };
     }

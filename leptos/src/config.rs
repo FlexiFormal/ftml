@@ -19,6 +19,10 @@ pub struct FtmlConfig {
     pub allow_hovers: Option<bool>,
 
     #[cfg_attr(feature = "csr", serde(default))]
+    #[cfg_attr(feature = "csr", serde(rename = "allowFormalInfo"))]
+    pub allow_formals: Option<bool>,
+
+    #[cfg_attr(feature = "csr", serde(default))]
     #[cfg_attr(feature = "csr", serde(rename = "allowNotationChanges"))]
     pub allow_notation_changes: Option<bool>,
 
@@ -52,6 +56,9 @@ pub enum HighlightStyle {
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct AllowHovers(pub bool);
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct AllowFormals(pub bool);
 
 #[derive(Copy, Clone)]
 pub struct AutoexpandLimit(pub LogicalLevel);
@@ -143,6 +150,7 @@ impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
         }
 
         get!(v @ "allowHovers" = ALLOW_HOVERS as_bool { config.allow_hovers = Some(v)});
+        get!(v @ "allowFormalInfo" = ALLOW_FORMAL_INFO as_bool { config.allow_formals = Some(v)});
         get!(v @ "allowNotationChanges" = ALLOW_NOTATION_CHANGES as_bool { config.allow_notation_changes = Some(v)} );
         get!(v @ "documentUri" = DOCUMENT_URI as_string {
             match v.parse() {
@@ -182,6 +190,9 @@ impl FtmlConfig {
     pub fn apply(self) -> Option<DocumentUri> {
         if let Some(b) = self.allow_hovers {
             provide_context(AllowHovers(b));
+        }
+        if let Some(b) = self.allow_formals {
+            provide_context(AllowFormals(b));
         }
         if let Some(b) = self.allow_notation_changes {
             provide_context(AllowNotationChanges(b));
@@ -239,6 +250,12 @@ impl FtmlConfigState {
     #[must_use]
     pub fn allow_hovers() -> bool {
         use_context::<AllowHovers>().is_none_or(|b| b.0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn allow_formal_info() -> bool {
+        use_context::<AllowFormals>().is_none_or(|b| b.0)
     }
 
     /// ### Panics

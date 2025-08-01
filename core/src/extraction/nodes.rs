@@ -167,6 +167,7 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
                     continue;
                 }
                 match c {
+                    Some(Right(s)) if s.as_bytes().iter().all(u8::is_ascii_whitespace) => (),
                     Some(Right(s)) => children.push(Opaque::Text(s.into_boxed_str())),
                     Some(Left(n)) => {
                         #[allow(clippy::cast_possible_truncation)]
