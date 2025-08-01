@@ -1,13 +1,13 @@
 [workspace]
 members = [
     "uris",
-    "core",
     "ulo",
-    "dom",
     "ontology",
-    "leptos",
+    "core",
     "backend",
     "ftml5ever",
+    "dom",
+    "leptos",
 ]
 exclude = ["tests"]
 resolver = "3"
@@ -19,13 +19,14 @@ nursery = "deny"
 unwrap_used = "deny"
 
 [workspace.dependencies]
-ftml-ontology = { path = "ontology" }
 ftml-uris = { path = "uris" }
+ulo = { path = "ulo" }
+ftml-ontology = { path = "ontology" }
 ftml-core = { path = "core" }
+ftml-backend = { path = "backend" }
+ftml5ever = { path = "ftml5ever" }
 ftml-dom = { path = "dom" }
 ftml-leptos = { path = "leptos" }
-ftml-backend = { path = "backend" }
-ulo = { path = "ulo" }
 
 rustc_version = "0.4"
 

@@ -1,0 +1,15 @@
+[tasks.docidx-only]
+workspace = false
+command = "cargo"
+install_crate = false
+env = { "RUSTDOCFLAGS" = "--cfg docsrs -Zunstable-options --enable-index-page" }
+args = ["+nightly", "doc", "--no-deps", "--all-features"]
+
+[tasks.doc]
+
+[tasks.dodocs]
+workspace = false
+script = '''
+cargo make docidx-only
+cargo make doc
+'''

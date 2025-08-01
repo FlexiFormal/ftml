@@ -55,7 +55,7 @@ criterion = { workspace = true }
 [dependencies]
 document-features = { workspace = true }
 
-ftml-core = { workspace = true, features = ["serde"] }
+ftml-core = { workspace = true }
 ftml-uris = { workspace = true, features = ["serde"] }
 ftml-ontology = { workspace = true, features = ["serde"] }
 ftml-backend = { workspace = true }

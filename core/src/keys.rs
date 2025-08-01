@@ -88,8 +88,7 @@ macro_rules! do_keys {
     )*
     ) => {
 
-        #[derive(Copy,Clone,PartialEq, Eq,Hash)]
-        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Copy,Clone,PartialEq, Eq,Hash,serde::Serialize, serde::Deserialize)]
         #[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
         #[repr(u8)]
         pub enum FtmlKey {

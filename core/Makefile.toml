@@ -3,11 +3,6 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--no-default-features"]
 
-[tasks.test-serde]
-command = "cargo"
-install_crate = false
-args = ["+nightly", "test", "--features=serde"]
-
 [tasks.test-rdf]
 command = "cargo"
 install_crate = false
@@ -26,7 +21,6 @@ args = ["+nightly", "test", "--all-features"]
 [tasks.all-tests]
 dependencies = [
     "test-no-features",
-    "test-serde",
     "test-rdf",
     "test-typescript",
     "test-all-features",
