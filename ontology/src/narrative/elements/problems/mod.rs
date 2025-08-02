@@ -21,9 +21,12 @@ pub struct Problem {
     pub range: DocumentRange,
     pub autogradable: bool,
     pub points: Option<f32>,
+    #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
     pub solutions: DataRef<Solutions>, //State::Seq<SolutionData>,
+    #[cfg_attr(feature = "typescript", tsify(type = "DataRef[]"))]
     pub gnotes: Box<[DataRef<GradingNote>]>,
     pub hints: Box<[DocumentRange]>,
+    #[cfg_attr(feature = "typescript", tsify(type = "DataRef[]"))]
     pub notes: Box<[DataRef<Box<str>>]>,
     pub title: Option<DocumentRange>,
     pub children: Box<[DocumentElement]>,

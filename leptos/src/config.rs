@@ -1,51 +1,47 @@
-use ftml_dom::{DocumentState, counters::LogicalLevel};
+use ftml_dom::{DocumentState, counters::LogicalLevel, utils::JsDisplay};
 use ftml_ontology::narrative::elements::SectionLevel;
 use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri};
 use leptos::context::Provider;
 use leptos::prelude::*;
 
-use crate::{
-    callbacks::{OnSectionTitle, SectionWrap},
-    utils::ReactiveStore,
-};
+use crate::utils::ReactiveStore;
+
+#[cfg(feature = "callbacks")]
+use crate::callbacks::{OnSectionTitle, SectionWrap};
 
 #[derive(Clone, Default)]
 #[cfg_attr(feature = "csr", derive(serde::Serialize, serde::Deserialize))]
-//#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
-//#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FtmlConfig {
-    #[cfg_attr(feature = "csr", serde(default))]
-    #[cfg_attr(feature = "csr", serde(rename = "allowHovers"))]
+    #[cfg_attr(feature = "csr", serde(default, rename = "allowHovers"))]
     pub allow_hovers: Option<bool>,
 
-    #[cfg_attr(feature = "csr", serde(default))]
-    #[cfg_attr(feature = "csr", serde(rename = "allowFormalInfo"))]
+    #[cfg_attr(feature = "csr", serde(default, rename = "allowFormalInfo"))]
     pub allow_formals: Option<bool>,
 
-    #[cfg_attr(feature = "csr", serde(default))]
-    #[cfg_attr(feature = "csr", serde(rename = "allowNotationChanges"))]
+    #[cfg_attr(feature = "csr", serde(default, rename = "allowNotationChanges"))]
     pub allow_notation_changes: Option<bool>,
 
-    #[cfg_attr(feature = "csr", serde(default))]
-    #[cfg_attr(feature = "csr", serde(rename = "documentUri"))]
+    #[cfg_attr(feature = "csr", serde(default, rename = "documentUri"))]
     pub document_uri: Option<DocumentUri>,
 
-    #[cfg_attr(feature = "csr", serde(default))]
-    #[cfg_attr(feature = "csr", serde(rename = "highlightStyle"))]
+    #[cfg_attr(feature = "csr", serde(default, rename = "highlightStyle"))]
     pub highlight_style: Option<HighlightStyle>,
 
-    #[cfg_attr(feature = "csr", serde(default))]
-    #[cfg_attr(feature = "csr", serde(rename = "autoexpandLimit"))]
+    #[cfg_attr(feature = "csr", serde(default, rename = "autoexpandLimit"))]
     pub autoexpand_limit: Option<LogicalLevel>,
 
-    #[cfg_attr(feature = "csr", serde(skip))]
+    #[cfg(feature = "callbacks")]
+    #[serde(skip)]
     pub section_wrap: Option<SectionWrap>,
 
-    #[cfg_attr(feature = "csr", serde(skip))]
+    #[cfg(feature = "callbacks")]
+    #[serde(skip)]
     pub on_section_title: Option<OnSectionTitle>,
 }
 
-#[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "csr", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum HighlightStyle {
     Colored,
@@ -66,36 +62,34 @@ pub struct AutoexpandLimit(pub LogicalLevel);
 #[derive(Copy, Clone)]
 pub struct AllowNotationChanges(bool);
 
-#[cfg(feature = "typescript")]
 #[derive(thiserror::Error, Debug)]
 pub enum FtmlConfigParseError {
     #[error("not a javascript object")]
-    NotAnObject(leptos_react::utils::JsDisplay),
+    NotAnObject(JsDisplay),
     #[error("invalid value for {0}: {1}")]
-    InvalidValue(&'static str, leptos_react::utils::JsDisplay),
+    InvalidValue(&'static str, JsDisplay),
     #[error("invalid URI in {0}: {1}")]
     InvalidUri(&'static str, ftml_uris::errors::UriParseError),
+    #[cfg(feature = "callbacks")]
     #[error("invalid javascript function in {0}: {1}")]
     InvalidFun(&'static str, leptos_react::functions::NotAJsFunction),
 }
 
-#[cfg(feature = "typescript")]
-impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
+#[cfg(feature = "csr")]
+impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
     type Error = (Self, Vec<FtmlConfigParseError>);
-    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+    fn try_from_js_value(value: leptos::wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
         macro_rules! fields {
             ($($stat:ident = $name:literal),* $(,)?) => {
                 std::thread_local! {$(
-                    static $stat : std::cell::LazyCell<wasm_bindgen::JsValue> =std::cell::LazyCell::new(|| wasm_bindgen::JsValue::from($name));
+                    static $stat : std::cell::LazyCell<leptos::wasm_bindgen::JsValue> =std::cell::LazyCell::new(|| leptos::wasm_bindgen::JsValue::from($name));
                 )*}
             }
         }
         if !value.is_object() {
             return Err((
                 Self::default(),
-                vec![FtmlConfigParseError::NotAnObject(
-                    leptos_react::utils::JsDisplay(value),
-                )],
+                vec![FtmlConfigParseError::NotAnObject(JsDisplay(value))],
             ));
         }
         let mut config = Self::default();
@@ -143,7 +137,7 @@ impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
                     Some($v) => $b,
                     None => errors.push(FtmlConfigParseError::InvalidValue(
                         $name,
-                        leptos_react::utils::JsDisplay($e),
+                        JsDisplay($e),
                     )),
                 }
             };
@@ -160,15 +154,17 @@ impl wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
         });
         get!(v @ "highlightStyle" = HIGHLIGHT_STYLE ?
             j => HighlightStyle::try_from_js_value(j);
-            e => FtmlConfigParseError::InvalidValue("highlightStyle", leptos_react::utils::JsDisplay(e));
+            e => FtmlConfigParseError::InvalidValue("highlightStyle", JsDisplay(e));
             {config.highlight_style = Some(v)}
         );
         get!(v @ "autoexpandLimit" = AUTOEXPAND_LIMIT ?
             j => LogicalLevel::try_from_js_value(j);
-            e => FtmlConfigParseError::InvalidValue("autoexpandLimit", leptos_react::utils::JsDisplay(e));
+            e => FtmlConfigParseError::InvalidValue("autoexpandLimit", JsDisplay(e));
             {config.autoexpand_limit = Some(v)}
         );
+        #[cfg(feature = "callbacks")]
         get!(v @ "sectionWrap" = SECTION_WRAP ?F { config.section_wrap = Some(v) });
+        #[cfg(feature = "callbacks")]
         get!(v @ "onSectionTitle" = ON_SECTION_TITLE ?F { config.on_section_title = Some(v) });
         /*
         #[cfg_attr(feature = "csr", serde(rename = "autoexpandLimit"))]
@@ -197,17 +193,19 @@ impl FtmlConfig {
         if let Some(b) = self.allow_notation_changes {
             provide_context(AllowNotationChanges(b));
         }
-        if let Some(b) = self.section_wrap {
-            provide_context(Some(b));
-        }
-        if let Some(b) = self.on_section_title {
-            provide_context(Some(b));
-        }
         if let Some(h) = self.highlight_style {
             provide_context(RwSignal::new(h));
         }
         if let Some(limit) = self.autoexpand_limit {
             provide_context(RwSignal::new(AutoexpandLimit(limit)));
+        }
+        #[cfg(feature = "callbacks")]
+        if let Some(b) = self.section_wrap {
+            provide_context(Some(b));
+        }
+        #[cfg(feature = "callbacks")]
+        if let Some(b) = self.on_section_title {
+            provide_context(Some(b));
         }
         self.document_uri
     }
@@ -360,22 +358,36 @@ impl FtmlConfigState {
         children: F,
     ) -> impl IntoView + use<V, F> {
         use leptos::either::Either::{Left, Right};
-        if let Some(Some(w)) = use_context::<Option<SectionWrap>>() {
-            Left(w.wrap(uri, children))
-        } else {
-            Right(children())
+        #[cfg(not(feature = "callbacks"))]
+        {
+            children()
+        }
+        #[cfg(feature = "callbacks")]
+        {
+            if let Some(Some(w)) = use_context::<Option<SectionWrap>>() {
+                Left(w.wrap(uri, children))
+            } else {
+                Right(children())
+            }
         }
     }
 
     pub fn insert_section_title(lvl: SectionLevel) -> impl IntoView + use<> {
-        if let Some(Some(w)) = use_context::<Option<OnSectionTitle>>() {
-            let NarrativeUri::Element(uri) = DocumentState::current_uri() else {
-                tracing::error!("Could not determine URI for current section");
-                return None;
-            };
-            Some(w.insert(&uri, &lvl))
-        } else {
-            None
+        #[cfg(not(feature = "callbacks"))]
+        {
+            None::<&'static str>
+        }
+        #[cfg(feature = "callbacks")]
+        {
+            if let Some(Some(w)) = use_context::<Option<OnSectionTitle>>() {
+                let NarrativeUri::Element(uri) = DocumentState::current_uri() else {
+                    tracing::error!("Could not determine URI for current section");
+                    return None;
+                };
+                Some(w.insert(&uri, &lvl))
+            } else {
+                None
+            }
         }
     }
 }

@@ -14,6 +14,10 @@ pub use uninterned::NonEmptyStr;
 
 macros::intern!(IDS IdStr = IdStore:NonEmptyInternedStr|NonEmptyStr @ 1024);
 
+#[cfg(feature = "typescript")]
+#[::wasm_bindgen::prelude::wasm_bindgen(typescript_custom_section)]
+const TS_CUSTOM: &str = "export type Id = string;";
+
 /// An arbitrary Identifier; not part of a URI,
 /// but similarly implemented, e.g. (if `interned`-feature is active)
 /// interned, equality-checkable etc.

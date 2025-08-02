@@ -6,52 +6,13 @@
  */
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
+#[cfg(feature = "callbacks")]
 pub mod callbacks;
 pub mod components;
 pub mod config;
 pub mod utils;
 
-use ftml_dom::{FtmlViews, utils::local_cache::SendBackend};
+use ftml_dom::utils::local_cache::SendBackend;
 use std::marker::PhantomData;
 
 pub struct Views<B: SendBackend>(PhantomData<B>);
-
-/// Activate FTML viewer on the entire body of the page
-#[cfg(feature = "csr")]
-#[allow(clippy::semicolon_if_nothing_returned)]
-pub fn iterate_body<B: SendBackend>() {
-    leptos_posthoc::hydrate_body(move |orig| {
-        use ftml_uris::DocumentUri;
-
-        let mut meta = ftml_dom::DocumentMeta::get();
-        if let Ok(scripts) = leptos::tachys::dom::document().query_selector_all("head script") {
-            let mut i = 0;
-            while let Some(node) = scripts.get(i) {
-                use leptos::wasm_bindgen::JsCast;
-                i += 1;
-                let Ok(elem) = node.dyn_into::<leptos::web_sys::Element>() else {
-                    continue;
-                };
-                if elem.get_attribute("src").is_none()
-                    && elem
-                        .get_attribute("type")
-                        .is_some_and(|s| s == "application/json")
-                    && elem.get_attribute("id").is_some_and(|s| s == "ftml")
-                {
-                    let inner = elem.inner_html();
-                    match serde_json::from_str::<config::FtmlConfig>(&inner) {
-                        Ok(cfg) => {
-                            if let Some(uri) = cfg.apply() {
-                                meta.uri = Some(uri);
-                            }
-                        }
-                        Err(e) => tracing::error!("failed to deserialize ftml config json: {e}"),
-                    }
-                }
-            }
-        }
-        let uri = meta.uri.unwrap_or_else(|| DocumentUri::no_doc().clone());
-
-        Views::<B>::top(|| ftml_dom::setup_document(uri, || Views::<B>::cont(orig)))
-    })
-}

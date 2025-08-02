@@ -26,6 +26,7 @@ pub enum Term {
     Var(Variable),
     /// An application of `head` to `arguments` (e.g. $n + m$)
     Application {
+        #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
         head: Box<Self>,
         arguments: Box<[Argument]>,
     },
@@ -34,24 +35,30 @@ pub enum Term {
     /// and `body` being the (final) expression *in which* the variables are bound
     /// (e.g. $\int_{t=0}^\infty f(t) \mathrm dt$)
     Bound {
+        #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
         head: Box<Self>,
         arguments: Box<[BoundArgument]>,
+        #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
         body: Box<Self>,
     },
     /// Record projection; the field named `key` in the record `record`.
     /// The optional `record_type` ideally references the type in which field names
     /// can be looked up.
     Field {
-        record: Box<Term>,
+        #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
+        record: Box<Self>,
         key: UriName,
         /// does not count as a subterm
-        record_type: Option<Box<Term>>,
+        #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
+        record_type: Option<Box<Self>>,
     },
     /// A non-alpha-renamable variable
     Label {
         name: UriName,
-        df: Option<Box<Term>>,
-        tp: Option<Box<Term>>,
+        #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
+        df: Option<Box<Self>>,
+        #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
+        tp: Option<Box<Self>>,
     },
     /// An opaque/informal expression; may contain formal islands, which are collected in
     /// `expressions`.
@@ -59,7 +66,8 @@ pub enum Term {
         tag: Id,
         attributes: Box<[(Id, Box<str>)]>,
         children: Box<[Opaque]>,
-        terms: Box<[Term]>,
+        #[cfg_attr(feature = "typescript", tsify(type = "Term[]"))]
+        terms: Box<[Self]>,
     },
 }
 impl Term {

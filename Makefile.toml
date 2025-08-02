@@ -7,9 +7,18 @@ args = ["+nightly", "doc", "--no-deps", "--all-features"]
 
 [tasks.doc]
 
-[tasks.dodocs]
+[tasks.docs]
+clear = true
 workspace = false
 script = '''
 cargo make docidx-only
 cargo make doc
+'''
+
+[tasks.default]
+clear = true
+workspace = false
+script = '''
+cd viewer
+cargo make
 '''

@@ -29,41 +29,45 @@ pub trait IsDocumentElement: super::Narrative {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum DocumentElement {
     SetSectionLevel(SectionLevel),
     UseModule(ModuleUri),
     Module {
         range: DocumentRange,
         module: ModuleUri,
+        #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
         children: Box<[Self]>,
     },
     MathStructure {
         range: DocumentRange,
         structure: SymbolUri,
+        #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
         children: Box<[Self]>,
     },
     Extension {
         range: DocumentRange,
         extension: SymbolUri,
         target: SymbolUri,
+        #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
         children: Box<[Self]>,
     },
     Morphism {
         range: DocumentRange,
         morphism: SymbolUri,
+        #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
         children: Box<[Self]>,
     },
     SymbolDeclaration(SymbolUri),
     ImportModule(ModuleUri),
 
     Section(Section),
-    SkipSection(Box<[Self]>),
+    SkipSection(#[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))] Box<[Self]>),
     Paragraph(LogicalParagraph),
     Problem(Problem),
     Slide {
         range: DocumentRange,
         uri: DocumentElementUri,
+        #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
         children: Box<[Self]>,
     },
     DocumentReference {
@@ -73,12 +77,14 @@ pub enum DocumentElement {
     Notation {
         symbol: SymbolUri,
         uri: DocumentElementUri,
+        #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
         notation: DataRef<Notation>,
     },
     VariableDeclaration(VariableDeclaration),
     VariableNotation {
         variable: DocumentElementUri,
         uri: DocumentElementUri,
+        #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
         notation: DataRef<Notation>,
     },
     Definiendum {

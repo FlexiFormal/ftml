@@ -7,6 +7,7 @@
  */
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
+mod clonable_views;
 pub mod counters;
 mod document;
 pub(crate) mod extractor;
@@ -15,23 +16,7 @@ pub mod mathml;
 pub mod notations;
 pub mod terms;
 pub mod toc;
-pub mod utils {
-    pub mod actions;
-    pub mod css;
-    pub mod local_cache;
-
-    /// ### Panics
-    pub fn owned<V: leptos::prelude::IntoView>(
-        f: impl FnOnce() -> V,
-    ) -> leptos::tachys::reactive_graph::OwnedView<V> {
-        let owner = leptos::prelude::Owner::current()
-            .expect("no current reactive Owner found")
-            .child();
-        let children = owner.with(f);
-        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
-    }
-}
-mod clonable_views;
+pub mod utils;
 pub use clonable_views::ClonableView;
 mod views;
 
@@ -197,7 +182,7 @@ mod client {
             #[cfg(feature = "csr")]
             web_sys::js_sys::Reflect::set(
                 &JsValue::from(window),
-                &JsValue::from("FLAMS_SERVER_URL"),
+                &JsValue::from("FTML_SERVER_URL"),
                 &JsValue::from("https://mathhub.info"),
             )
             .expect("error setting Window property");

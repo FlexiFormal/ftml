@@ -27,7 +27,14 @@ async fn main() {
             move || shell(leptos_options.clone())
         })
         .fallback(leptos_axum::file_and_error_handler(shell))
-        .with_state(leptos_options);
+        .with_state(leptos_options)
+        .layer(
+            tower_http::cors::CorsLayer::new()
+                .allow_methods([http::Method::GET, http::Method::POST])
+                .allow_origin(tower_http::cors::Any)
+                //.allow_credentials(true)
+                .allow_headers([http::header::COOKIE, http::header::SET_COOKIE]),
+        );
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`

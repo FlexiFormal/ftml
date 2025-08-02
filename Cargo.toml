@@ -8,9 +8,30 @@ members = [
     "ftml5ever",
     "dom",
     "leptos",
+    "viewer",
 ]
 exclude = ["tests"]
 resolver = "3"
+
+[profile.release]
+panic = 'abort'
+opt-level = 'z'
+lto = true
+overflow-checks = false
+strip = true
+
+[profile.dev]
+strip = "none"
+opt-level = 2
+debug = true
+split-debuginfo = "off"
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+#codegen-units = 256
+rpath = false
 
 [workspace.lints.clippy]
 enum_glob_use = "deny"
@@ -68,6 +89,8 @@ send_wrapper = "0.6.0"
 html5ever = "0.35"
 phf = "0.12"
 lightningcss = { version = "1.0.0-alpha.67", default-features = false }
+console_error_panic_hook = "0.1"
+tracing-wasm = { version = "0.2" }
 
 
 paste = "1"

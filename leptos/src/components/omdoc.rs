@@ -1,6 +1,6 @@
 use crate::utils::{
     Header,
-    block::{Block, Footer, HeaderLeft, HeaderRight},
+    block::{Block, HeaderLeft, HeaderRight},
 };
 use ftml_dom::{notations::TermExt, utils::local_cache::SendBackend};
 use ftml_ontology::domain::declarations::symbols::{Symbol, SymbolData};

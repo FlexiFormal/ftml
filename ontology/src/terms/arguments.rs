@@ -10,7 +10,10 @@ use super::{Term, Variable};
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Argument {
     Simple(Term),
-    Sequence(Either<Term, Box<[Term]>>),
+    Sequence(
+        #[cfg_attr(feature = "typescript", tsify(type = "{Left: Term}|{Right:Term[]}"))]
+        Either<Term, Box<[Term]>>,
+    ),
 }
 
 impl Argument {
@@ -29,9 +32,18 @@ impl Argument {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum BoundArgument {
     Simple(Term),
-    Sequence(Either<Term, Box<[Term]>>),
+    Sequence(
+        #[cfg_attr(feature = "typescript", tsify(type = "{Left: Term}|{Right:Term[]}"))]
+        Either<Term, Box<[Term]>>,
+    ),
     Bound(Variable),
-    BoundSeq(Either<Variable, Box<[Variable]>>),
+    BoundSeq(
+        #[cfg_attr(
+            feature = "typescript",
+            tsify(type = "{Left: Variable}|{Right:Variable[]}")
+        )]
+        Either<Variable, Box<[Variable]>>,
+    ),
 }
 impl BoundArgument {
     #[must_use]

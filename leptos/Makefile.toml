@@ -13,6 +13,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=hydrate"]
 
+[tasks.test-callbacks]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=callbacks"]
+
 [tasks.test-ssr]
 command = "cargo"
 install_crate = false
@@ -28,6 +33,7 @@ dependencies = [
     "test-no-features",
     "test-csr",
     "test-hydrate",
+    "test-callbacks",
     "test-ssr",
     "test-typescript",
 ]

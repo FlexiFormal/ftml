@@ -28,7 +28,6 @@ use ftml_ontology::{
 #[cfg(feature = "rdf")]
 use ftml_uris::FtmlUri;
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, LeafUri, ModuleUri, SymbolUri};
-use smallvec::SmallVec;
 use std::{borrow::Cow, hint::unreachable_unchecked};
 
 #[derive(Clone, Debug)]
@@ -520,7 +519,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         id: Option<Id>,
         head: VarOrSym,
         prec: isize,
-        argprecs: SmallVec<isize, 9>,
+        argprecs: Vec<isize>,
         component: Option<NotationComponent>,
         op: Option<NotationNode>,
     ) -> super::Result<()> {

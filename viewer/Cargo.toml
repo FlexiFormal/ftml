@@ -1,0 +1,57 @@
+[package]
+name = "ftml-viewer"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[features]
+## Generates typescript bindings
+typescript = ["tsify"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--html-in-header",
+    "doc/katex-header.html",
+    "--html-in-header",
+    "doc/docs.html",
+]
+# cargo +nightly doc --no-deps --all-features --release --open
+
+[build-dependencies]
+rustc_version = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+rstest = { workspace = true }
+criterion = { workspace = true }
+
+[dependencies]
+document-features = { workspace = true }
+
+ftml-leptos = { workspace = true, features = ["csr", "typescript"] }
+ftml-backend = { workspace = true, features = ["wasm", "cached", "server_fn"] }
+ftml-uris = { workspace = true }
+ftml-dom = { workspace = true }
+
+serde_json = { workspace = true }
+parking_lot = { workspace = true }
+leptos = { workspace = true }
+leptos-posthoc = { workspace = true }
+tracing-wasm = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true, features = ["release_max_level_info"] }
+wasm-bindgen = { workspace = true }
+serde = { workspace = true }
+console_error_panic_hook = { workspace = true }
+
+tsify = { workspace = true, optional = true }

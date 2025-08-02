@@ -16,7 +16,6 @@ use ftml_ontology::{
     terms::{ArgumentMode, Variable},
 };
 use ftml_uris::{Id, IsNarrativeUri, errors::SegmentParseError};
-use smallvec::SmallVec;
 use std::{borrow::Cow, num::NonZeroU8, str::FromStr};
 
 type Result<E> = super::Result<(<E as FtmlExtractor>::Return, Option<CloseFtmlElement>)>;
@@ -698,7 +697,7 @@ pub fn notation<E: FtmlExtractor>(
         0
     };
 
-    let mut argprecs = SmallVec::default();
+    let mut argprecs = Vec::new();
     if let Some(s) = attrs.get(FtmlKey::Argprecs) {
         for s in s.as_ref().split(',') {
             if s.is_empty() {

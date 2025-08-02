@@ -1,14 +1,9 @@
 mod terms;
-use std::num::NonZeroU8;
 
-use ftml_core::extraction::ArgumentPosition;
-use leptos::math::mtext;
-pub use terms::*;
-
+use crate::ClonableView;
 use crate::terms::{ReactiveApplication, ReactiveTerm};
-use crate::utils::owned;
-use crate::{ClonableView, document::WithHead};
 use crate::{DocumentState, FtmlViews};
+use ftml_core::extraction::ArgumentPosition;
 use ftml_core::{FtmlKey, extraction::VarOrSym};
 use ftml_ontology::{
     narrative::elements::{
@@ -17,7 +12,10 @@ use ftml_ontology::{
     },
     terms::ArgumentMode,
 };
+use leptos::math::mtext;
 use leptos::{either::Either, prelude::*};
+use std::num::NonZeroU8;
+pub use terms::*;
 
 pub trait NotationExt {
     fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(

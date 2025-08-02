@@ -16,7 +16,6 @@ use ftml_ontology::{
     terms::{Argument, ArgumentMode, BoundArgument, Term, Variable},
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, LeafUri, ModuleUri, SymbolUri};
-use smallvec::SmallVec;
 
 use crate::extraction::{FtmlExtractionError, nodes::FtmlNode};
 
@@ -71,7 +70,7 @@ pub enum OpenFtmlElement {
         id: Option<Id>,
         head: VarOrSym,
         prec: isize,
-        argprecs: SmallVec<isize, 9>,
+        argprecs: Vec<isize>,
     },
     Argument(ArgumentPosition),
     NotationArg(ArgumentPosition),
@@ -182,7 +181,7 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
         id: Option<Id>,
         head: VarOrSym,
         prec: isize,
-        argprecs: SmallVec<isize, 9>,
+        argprecs: Vec<isize>,
         component: Option<NotationComponent>,
         op: Option<NotationNode>,
     },

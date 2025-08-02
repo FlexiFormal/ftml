@@ -1,6 +1,5 @@
 use crate::{terms::ArgumentMode, utils::RefTree};
 use ftml_uris::Id;
-use smallvec::SmallVec;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -9,7 +8,7 @@ use smallvec::SmallVec;
 pub struct Notation {
     pub precedence: isize,
     pub id: Option<Id>,
-    pub argprecs: SmallVec<isize, 9>,
+    pub argprecs: Vec<isize>,
     pub component: NotationComponent,
     pub op: Option<NotationNode>,
 }

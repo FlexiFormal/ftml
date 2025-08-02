@@ -5,11 +5,9 @@ use leptos::prelude::*;
 macro_rules! callback {
     (@common $name:ident( $( $arg:ident:$argtp:ty),* ) ) => {
 
-        #[cfg(feature = "typescript")]
         #[derive(Clone)]
         pub struct $name(callback!(@TYPE $($argtp),* ));
 
-        #[cfg(feature = "typescript")]
         impl leptos_react::functions::JsRet for $name {
             type Error =
                 <callback!(@TYPE $($argtp),* ) as leptos_react::functions::JsRet>::Error;
@@ -21,48 +19,15 @@ macro_rules! callback {
     };
     (Insert $name:ident( $( $arg:ident:$argtp:ty),* ) ) => {
         callback!(@common $name( $($arg:$argtp),* ) );
-
-        #[cfg(not(feature = "typescript"))]
-        impl $name {
-            pub fn from<V: IntoView>(
-                f: impl Fn($(&$argtp,)*) -> V + 'static + Send + Sync,
-            ) -> Self {
-                Self(std::sync::Arc::new(move |$($arg),*| f($($arg),* ).into_any()))
-            }
-        }
-
-        #[cfg(not(feature = "typescript"))]
-        #[derive(Clone)]
-        pub struct $name(std::sync::Arc<dyn Fn(  $(&$argtp),*) -> AnyView + Send + Sync>);
         impl $name {
             #[must_use]
             pub fn insert(&self, $( $arg: &$argtp, )*) -> impl IntoView + use<> {
-                #[cfg(not(feature = "typescript"))]
-                {
-                    (&*self.0)($( $arg),* )
-                }
-                #[cfg(feature = "typescript")]
-                {
-                    self.0.insert($( $arg.clone() ),*)
-                }
+                self.0.insert($( $arg.clone() ),*)
             }
         }
     };
     (Wrap $name:ident( $( $arg:ident:$argtp:ty),* ) ) => {
         callback!(@common $name( $($arg:$argtp),* ) );
-
-        #[cfg(not(feature = "typescript"))]
-        impl $name {
-            pub fn from<V: IntoView>(
-                f: impl Fn($(&$argtp,)* AnyView) -> V + 'static + Send + Sync,
-            ) -> Self {
-                Self(std::sync::Arc::new(move |$($arg,)* v| f($($arg,)* v).into_any()))
-            }
-        }
-
-        #[cfg(not(feature = "typescript"))]
-        #[derive(Clone)]
-        pub struct $name(std::sync::Arc<dyn Fn(  $(&$argtp,)*  AnyView) -> AnyView + Send + Sync>);
 
         impl $name {
             pub fn wrap<V: IntoView, F: FnOnce() -> V>(
@@ -70,15 +35,7 @@ macro_rules! callback {
                 $( $arg: &$argtp, )*
                 v: F,
             ) -> impl IntoView + use<V, F> {
-                #[cfg(not(feature = "typescript"))]
-                {
-                    let any = view! { {v()}}.into_any();
-                    (&*self.0)($( $arg, )* any)
-                }
-                #[cfg(feature = "typescript")]
-                {
-                    self.0.wrap($( $arg.clone(), )* v)
-                }
+                self.0.wrap($( $arg.clone(), )* v)
             }
         }
     };
