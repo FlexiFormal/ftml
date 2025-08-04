@@ -188,16 +188,16 @@ do_keys! {
 
     /// Denotes a new [LogicalParagraph] of [ParagraphKind::Definition]
     /// for the given [Symbol]s using the given styles.
-    Definition                              = "definition"          + Id,Inline,Fors,Styles; &>> Definiens, Definiendum; := todo
+    Definition                              = "definition"          + Id,Inline,Fors,Styles; &>> Definiens, Definiendum; := definition
     /// Denotes a new [LogicalParagraph] of [ParagraphKind::Assertion] (Theorems, Lemmata,
     /// Axioms, etc.) for the given [Symbol]s using the given styles.
-    Assertion                               = "assertion"           + Id,Inline,Fors,Styles; := todo
+    Assertion                               = "assertion"           + Id,Inline,Fors,Styles; := assertion
     /// Denotes a new [LogicalParagraph] of [ParagraphKind::Example] (this includes counterexamples)
     /// for the given [Symbol]s using the given styles.
-    Example                                 = "example"             + Id,Inline,Fors,Styles; := todo
+    Example                                 = "example"             + Id,Inline,Fors,Styles; := example
     /// Denotes a new [LogicalParagraph] of [ParagraphKind::Paragraph]
     /// for the given [Symbol]s using the given styles.
-    Paragraph                               = "paragraph"           + Id,Inline,Fors,Styles; := todo
+    Paragraph                               = "paragraph"           + Id,Inline,Fors,Styles; := paragraph
 
     /// Denotes a new [Problem] with [`sub_problem`](Problem::sub_problem)`=false`
     Problem                                 = "problem"             + Id,Styles,Autogradable,ProblemPoints ; := todo

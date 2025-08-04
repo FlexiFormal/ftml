@@ -1,6 +1,6 @@
 use crate::{
     ClonableView,
-    markers::{InputrefInfo, SectionInfo},
+    markers::{InputrefInfo, ParagraphInfo, SectionInfo},
     terms::{ReactiveApplication, TopTerm},
 };
 use ftml_core::extraction::VarOrSym;
@@ -44,21 +44,36 @@ pub trait FtmlViews: 'static {
         super::global_setup(then)
     }
 
-    #[inline]
     fn section<V: IntoView>(
-        _info: SectionInfo,
+        info: SectionInfo,
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
-        then()
+        view! {
+            <div id=info.id style=info.style class=info.class>
+              {then()}
+            </div>
+        }
+    }
+
+    #[inline]
+    fn paragraph<V: IntoView>(
+        info: ParagraphInfo,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        view! {
+          <div class=info.class style=info.style>{then()}</div>
+        }
     }
 
     #[inline]
     fn section_title<V: IntoView>(
         _lvl: SectionLevel,
-        _class: &'static str,
+        class: &'static str,
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
-        then()
+        view! {
+          <div class=class>{then()}</div>
+        }
     }
 
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
@@ -111,7 +126,7 @@ pub trait FtmlViews: 'static {
 
 pub trait TermTrackedViews: 'static {
     fn current_top_term() -> Option<DocumentElementUri> {
-        use_context::<TopTerm>().map(|t| t.uri)
+        use_context::<Option<TopTerm>>().and_then(|t| t.map(|t| t.uri))
     }
 
     #[inline]
@@ -119,21 +134,36 @@ pub trait TermTrackedViews: 'static {
         super::global_setup(then)
     }
 
-    #[inline]
     fn section<V: IntoView>(
-        _info: SectionInfo,
+        info: SectionInfo,
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
-        then()
+        view! {
+            <div id=info.id style=info.style class=info.class>
+              {then()}
+            </div>
+        }
+    }
+
+    #[inline]
+    fn paragraph<V: IntoView>(
+        info: ParagraphInfo,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        view! {
+          <div class=info.class style=info.style>{then()}</div>
+        }
     }
 
     #[inline]
     fn section_title<V: IntoView>(
         _lvl: SectionLevel,
-        _class: &'static str,
+        class: &'static str,
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
-        then()
+        view! {
+          <div class=class>{then()}</div>
+        }
     }
 
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
@@ -183,12 +213,21 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
         <T as TermTrackedViews>::top(then)
     }
+
     #[inline]
     fn section<V: IntoView>(
         info: SectionInfo,
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         <T as TermTrackedViews>::section(info, then)
+    }
+
+    #[inline]
+    fn paragraph<V: IntoView>(
+        info: ParagraphInfo,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::paragraph(info, then)
     }
 
     #[inline]

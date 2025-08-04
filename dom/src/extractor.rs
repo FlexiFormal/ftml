@@ -13,7 +13,7 @@ use ftml_core::{
 use ftml_ontology::narrative::DocumentRange;
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::{
-    prelude::Set,
+    prelude::{ReadSignal, Set},
     web_sys::{Element, NodeList, js_sys::JsString},
 };
 use leptos::{
@@ -35,15 +35,18 @@ pub struct DomExtractor {
     pub context: NarrativeUri,
     pub mode: ExtractorMode,
     pub is_done: RwSignal<bool>,
+    pub is_done_read: ReadSignal<bool>,
 }
 impl DomExtractor {
     #[inline]
     pub fn new(uri: DocumentUri, context: NarrativeUri) -> Self {
+        let is_done = RwSignal::new(false);
         Self {
             state: ExtractorState::new(uri, false),
             context,
             mode: ExtractorMode::Pending,
-            is_done: RwSignal::new(false),
+            is_done_read: is_done.read_only(),
+            is_done,
         }
     }
 

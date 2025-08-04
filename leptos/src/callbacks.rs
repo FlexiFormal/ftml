@@ -1,4 +1,4 @@
-use ftml_ontology::narrative::elements::SectionLevel;
+use ftml_ontology::narrative::elements::{SectionLevel, paragraphs::ParagraphKind};
 use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
 
@@ -46,4 +46,5 @@ macro_rules! callback {
 }
 
 callback!(Wrap SectionWrap(u:DocumentElementUri));
+callback!(Wrap ParagraphWrap(u:DocumentElementUri,kind:ParagraphKind));
 callback!(Insert OnSectionTitle(u:DocumentElementUri,lvl: SectionLevel));

@@ -1,6 +1,7 @@
 pub mod inputref;
 pub mod notations;
 pub mod omdoc;
+pub mod paragraphs;
 pub mod sections;
 pub mod terms;
 
@@ -44,6 +45,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     ) -> impl IntoView {
         sections::section(info, then)
     }
+
     #[inline]
     fn section_title<V: IntoView>(
         lvl: SectionLevel,
@@ -51,6 +53,14 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         sections::section_title(lvl, class, then)
+    }
+
+    #[inline]
+    fn paragraph<V: IntoView>(
+        info: ftml_dom::markers::ParagraphInfo,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        paragraphs::paragraph(info, then)
     }
 
     #[inline]
@@ -98,7 +108,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView {
-        terms::oma::<B>(head, then)
+        terms::oma::<B>(false, head, then)
     }
 
     #[inline]
@@ -108,6 +118,6 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> impl IntoView {
-        terms::oma::<B>(head, then)
+        terms::oma::<B>(true, head, then)
     }
 }

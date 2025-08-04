@@ -5,11 +5,21 @@ use crate::{
     document::DocumentState,
     extractor::DomExtractor,
     terms::{ReactiveApplication, ReactiveTerm},
-    utils::actions::{OneShot, SetOneShotDone},
+    utils::{
+        ContextChain,
+        actions::{OneShot, SetOneShotDone},
+        local_cache::LOCAL_CACHE,
+    },
 };
 use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, VarOrSym};
-use ftml_ontology::{narrative::elements::SectionLevel, terms::Variable};
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, SymbolUri};
+use ftml_ontology::{
+    narrative::elements::{
+        SectionLevel,
+        paragraphs::{ParagraphFormatting, ParagraphKind},
+    },
+    terms::Variable,
+};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, SymbolUri};
 use leptos::{
     IntoView,
     prelude::{IntoAny, Memo, RwSignal, with_context},
@@ -48,6 +58,13 @@ pub enum Marker {
     },
     Argument(ArgumentPosition),
     CurrentSectionLevel(bool),
+    Paragraph {
+        uri: DocumentElementUri,
+        kind: ParagraphKind,
+        formatting: ParagraphFormatting,
+        styles: Box<[Id]>,
+        fors: Vec<SymbolUri>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -57,6 +74,17 @@ pub struct SectionInfo {
     pub class: Option<&'static str>,
     pub lvl: LogicalLevel,
     pub id: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ParagraphInfo {
+    pub uri: DocumentElementUri,
+    pub style: Memo<String>,
+    pub class: Option<String>,
+    pub kind: ParagraphKind,
+    pub formatting: ParagraphFormatting,
+    pub styles: Box<[Id]>,
+    pub fors: Vec<SymbolUri>,
 }
 
 #[derive(Clone, Debug)]
@@ -80,7 +108,7 @@ impl Marker {
         orig: OriginalNode,
     ) -> impl IntoView {
         #[allow(clippy::enum_glob_use)]
-        use leptos::either::EitherOf14::*;
+        use leptos::either::EitherOf15::*;
         let Some(m) = markers.pop() else {
             return A(leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
                 orig,
@@ -124,10 +152,11 @@ impl Marker {
                 H(DocumentState::do_inputref(target, uri, Views::inputref))
             }
             Self::Argument(pos) => {
+                ContextChain::provide(Some(pos));
                 if let Some(r) =
                     with_context::<Option<ReactiveTerm>, _>(|t| t.as_ref().map(|t| t.app)).flatten()
                 {
-                    let node = MarkedNode::new(markers, orig, is_math).into();
+                    let node = MarkedNode::new(markers, orig, is_math, false).into();
                     M(
                         //owned!(
                         ReactiveApplication::add_argument::<Views>(r, pos, node), //)
@@ -157,7 +186,9 @@ impl Marker {
                     (_, _) => "paragraph",
                 })
             }
-            Self::Comp => G(Views::comp(MarkedNode::new(markers, orig, is_math).into())),
+            Self::Comp => G(Views::comp(
+                MarkedNode::new(markers, orig, is_math, true).into(),
+            )),
             Self::SymbolReference {
                 uri,
                 notation,
@@ -166,7 +197,7 @@ impl Marker {
                 uri,
                 notation,
                 in_term,
-                MarkedNode::new(markers, orig, is_math).into(),
+                MarkedNode::new(markers, orig, is_math, true).into(),
             )),
             Self::VariableReference {
                 var,
@@ -176,7 +207,7 @@ impl Marker {
                 var,
                 notation,
                 in_term,
-                MarkedNode::new(markers, orig, is_math).into(),
+                MarkedNode::new(markers, orig, is_math, true).into(),
             )),
             Self::OMA {
                 head,
@@ -186,7 +217,7 @@ impl Marker {
                 head,
                 notation,
                 uri,
-                MarkedNode::new(markers, orig, is_math).into(),
+                MarkedNode::new(markers, orig, is_math, true).into(),
             )),
             Self::OMBIND {
                 head,
@@ -196,8 +227,33 @@ impl Marker {
                 head,
                 notation,
                 uri,
-                MarkedNode::new(markers, orig, is_math).into(),
+                MarkedNode::new(markers, orig, is_math, true).into(),
             )),
+            Self::Paragraph {
+                uri,
+                kind,
+                formatting,
+                styles,
+                fors,
+            } => {
+                if *uri.document_uri() != *DocumentUri::no_doc() {
+                    LOCAL_CACHE
+                        .paragraphs
+                        .insert(uri.clone(), orig.html_string());
+                }
+                O(DocumentState::new_paragraph(
+                    uri,
+                    kind,
+                    formatting,
+                    styles,
+                    fors,
+                    move |info| {
+                        Views::paragraph(info, move || {
+                            Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
+                        })
+                    },
+                ))
+            }
         }
     }
 
@@ -253,6 +309,19 @@ impl Marker {
                 notation: notation.clone(),
                 uri: uri.clone(),
             }),
+            OpenFtmlElement::Paragraph {
+                uri,
+                kind,
+                formatting,
+                styles,
+                fors,
+            } => Some(Self::Paragraph {
+                uri: uri.clone(),
+                kind: *kind,
+                formatting: *formatting,
+                styles: styles.clone(),
+                fors: fors.iter().map(|(u, _)| u.clone()).collect(),
+            }),
             OpenFtmlElement::Argument(pos) => Some(Self::Argument(*pos)),
             OpenFtmlElement::CurrentSectionLevel(b) => Some(Self::CurrentSectionLevel(*b)),
             OpenFtmlElement::Counter(_)
@@ -269,6 +338,7 @@ impl Marker {
             | OpenFtmlElement::ImportModule(_)
             | OpenFtmlElement::UseModule(_)
             | OpenFtmlElement::VariableDeclaration { .. }
+            | OpenFtmlElement::ParagraphTitle
             | OpenFtmlElement::None => None,
         }
     }

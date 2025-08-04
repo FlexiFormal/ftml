@@ -18,6 +18,7 @@ pub fn has_notation<B: SendBackend>(
     use leptos::either::Either::{Left, Right};
     let notation = FtmlConfigState::notation_preference(&uri);
     let finished = DocumentState::finished_parsing();
+
     move || {
         notation.get().map_or_else(
             || Left(children.clone().into_view::<crate::Views<B>>()),

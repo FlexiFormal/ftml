@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use either::Either::{Left, Right};
 use ftml_ontology::{
-    narrative::elements::{DocumentElement, DocumentTerm, VariableDeclaration},
+    narrative::elements::{DocumentElement, DocumentTerm, LogicalParagraph, VariableDeclaration},
     terms::{ArgumentMode, Term, Variable},
 };
 use ftml_uris::{
@@ -83,7 +83,8 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::NotationArg(_) => None,
                 OpenNarrativeElement::Section { uri, .. }
                 | OpenNarrativeElement::Notation { uri, .. }
-                | OpenNarrativeElement::VariableDeclaration { uri, .. } => Some(uri),
+                | OpenNarrativeElement::VariableDeclaration { uri, .. }
+                | OpenNarrativeElement::Paragraph { uri, .. } => Some(uri),
             })
             .map_or_else(
                 || NarrativeUriRef::Document(self.in_document()),
@@ -102,6 +103,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::SkipSection { .. } => return false,
             }
         }
@@ -147,7 +149,8 @@ pub trait FtmlExtractor: 'static + Sized {
             let ch = match n {
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
-                | OpenNarrativeElement::SkipSection { children } => children,
+                | OpenNarrativeElement::SkipSection { children }
+                | OpenNarrativeElement::Paragraph { children, .. } => children,
                 OpenNarrativeElement::Invisible
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::NotationComp { .. }
@@ -169,10 +172,44 @@ pub trait FtmlExtractor: 'static + Sized {
                 }
             }
         }
+        for c in self.iterate_dones().rev() {
+            match c {
+                DocumentElement::VariableDeclaration(VariableDeclaration { uri, data })
+                    if ew(uri.name(), &name) =>
+                {
+                    return Variable::Ref {
+                        declaration: uri.clone(),
+                        is_sequence: Some(data.is_seq),
+                    };
+                }
+                _ => (),
+            }
+        }
         Variable::Name {
             name,
             notated: None,
         }
+    }
+
+    fn last_paragraph(&self) -> Option<&LogicalParagraph> {
+        for e in self.iterate_narrative() {
+            match e {
+                OpenNarrativeElement::Invisible => (),
+                OpenNarrativeElement::Module { children, .. }
+                | OpenNarrativeElement::Section { children, .. }
+                | OpenNarrativeElement::Paragraph { children, .. }
+                | OpenNarrativeElement::SkipSection { children } => match children.last() {
+                    Some(DocumentElement::Paragraph(p)) => return Some(p),
+                    _ => break,
+                },
+                OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::NotationArg(_) => break,
+            }
+        }
+        None
     }
 
     fn last_term(&self) -> Option<&Term> {
@@ -181,6 +218,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Invisible => (),
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
+                | OpenNarrativeElement::Paragraph { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => match children.last() {
                     Some(DocumentElement::Term(DocumentTerm { term, .. })) => return Some(term),
                     _ => break,

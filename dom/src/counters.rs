@@ -551,13 +551,17 @@ impl SectionCounters {
 
     /// ### Panics
     /// Outside of a document context
-    pub fn get_para(&mut self, kind: ParagraphKind, styles: &[Id]) -> Memo<String> {
+    pub fn get_para(
+        &mut self,
+        kind: ParagraphKind,
+        styles: &[Id],
+    ) -> (Memo<String>, Option<String>) {
         self.init_paras();
         self.current = LogicalLevel::Paragraph;
         let cnt = self
             .for_paras
             .with_untracked(|all_styles| Self::get_counter(all_styles, kind, styles));
-        if let Some(cntname) = cnt {
+        let memo = if let Some(cntname) = cnt {
             let cnt = self.counters.with_untracked(|cntrs| {
                 *cntrs
                     .iter()
@@ -568,7 +572,26 @@ impl SectionCounters {
             cnt.inc_memo(move |i| format!("counter-set:ftml-{cntname} {i};"))
         } else {
             Memo::new(|_| String::new())
-        }
+        };
+        let prefix = match kind {
+            ParagraphKind::Assertion => Some("ftml-assertion"),
+            ParagraphKind::Definition => Some("ftml-definition"),
+            ParagraphKind::Example => Some("ftml-example"),
+            ParagraphKind::Paragraph => Some("ftml-paragraph"),
+            _ => None,
+        };
+        let cls = prefix.map(|p| {
+            let mut s = String::new();
+            s.push_str(p);
+            for style in styles {
+                s.push(' ');
+                s.push_str(p);
+                s.push('-');
+                s.push_str(style.as_ref());
+            }
+            s
+        });
+        (memo, cls)
     }
 
     pub fn get_problem(&mut self, _styles: &[Id]) -> Memo<String> {

@@ -53,7 +53,9 @@ pub struct ReactiveStore {
 impl ReactiveStore {
     #[inline]
     pub(crate) fn new() -> Self {
-        let owner = Owner::new();
+        let owner = leptos::prelude::Owner::current()
+            .expect("no current reactive Owner found")
+            .child();
         owner.with(|| DocumentState::no_document(|| ()));
         Self {
             notations: Map::default(),

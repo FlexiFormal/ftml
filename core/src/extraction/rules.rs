@@ -11,11 +11,15 @@ use ftml_ontology::{
     domain::declarations::symbols::{ArgumentSpec, AssocType, SymbolData},
     narrative::{
         documents::{DocumentCounter, DocumentStyle},
-        elements::{sections::SectionLevel, variables::VariableData},
+        elements::{
+            paragraphs::{ParagraphFormatting, ParagraphKind},
+            sections::SectionLevel,
+            variables::VariableData,
+        },
     },
-    terms::{ArgumentMode, Variable},
+    terms::{ArgumentMode, Term, Variable},
 };
-use ftml_uris::{Id, IsNarrativeUri, errors::SegmentParseError};
+use ftml_uris::{Id, IsNarrativeUri, SymbolUri, errors::SegmentParseError};
 use std::{borrow::Cow, num::NonZeroU8, str::FromStr};
 
 type Result<E> = super::Result<(<E as FtmlExtractor>::Return, Option<CloseFtmlElement>)>;
@@ -169,6 +173,10 @@ pub fn title<E: FtmlExtractor>(
             OpenNarrativeElement::Section { .. } => {
                 drop(iter);
                 return ret!(ext,node <- SectionTitle + SectionTitle);
+            }
+            OpenNarrativeElement::Paragraph { .. } => {
+                drop(iter);
+                return ret!(ext,node <- ParagraphTitle + ParagraphTitle);
             }
             OpenNarrativeElement::SkipSection { .. }
             | OpenNarrativeElement::Notation { .. }
@@ -821,6 +829,112 @@ pub fn argmapsep<E: FtmlExtractor>(
     crate::TODO!()
 }
 
+fn do_paragraph<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+    kind: ParagraphKind,
+) -> Result<E> {
+    let uri = attrs.get_elem_uri_from_id(ext, Cow::Borrowed(kind.as_str()))?;
+    let inline = attrs.get_bool(FtmlKey::Inline);
+    let mut fors: Vec<(SymbolUri, Option<Term>)> = Vec::new();
+    if let Some(f) = attrs.get(FtmlKey::Fors) {
+        for f in f.as_ref().split(',') {
+            let uri = f
+                .trim()
+                .parse()
+                .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::Fors))?;
+            if !fors.iter().any(|(u, _)| *u == uri) {
+                fors.push((uri, None));
+            }
+        }
+    }
+    let styles = opt!(
+        attrs.get_typed_vec::<FtmlExtractionError, _>(FtmlKey::Styles, |s| {
+            s.trim()
+                .parse()
+                .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::Fors))
+        })
+    )
+    .unwrap_or_default();
+
+    let formatting = if inline {
+        ParagraphFormatting::Inline
+    } else if matches!(kind, ParagraphKind::Proof | ParagraphKind::SubProof) {
+        let hide = attrs.get_bool(FtmlKey::ProofHide);
+        if hide {
+            ParagraphFormatting::Collapsed
+        } else {
+            ParagraphFormatting::Block
+        }
+    } else {
+        ParagraphFormatting::Block
+    };
+
+    del!(keys - Id, Inline, Fors, Styles, ProofHide);
+    ret!(ext,node <- Paragraph{
+        kind,
+        formatting,
+        styles:styles.into_boxed_slice(),
+        uri,
+        fors
+    } + Paragraph)
+}
+
+pub fn definition<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    do_paragraph(ext, attrs, keys, node, ParagraphKind::Definition)
+}
+
+pub fn paragraph<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    do_paragraph(ext, attrs, keys, node, ParagraphKind::Paragraph)
+}
+
+pub fn assertion<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    do_paragraph(ext, attrs, keys, node, ParagraphKind::Assertion)
+}
+
+pub fn example<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    do_paragraph(ext, attrs, keys, node, ParagraphKind::Example)
+}
+
+pub fn proof<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    do_paragraph(ext, attrs, keys, node, ParagraphKind::Proof)
+}
+pub fn subproof<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    do_paragraph(ext, attrs, keys, node, ParagraphKind::SubProof)
+}
+
 /*
 
 pub fn defcomp<E: FtmlExtractor>(
@@ -877,53 +991,6 @@ pub fn slide_number<E: FtmlExtractor>(
     crate::TODO!()
 }
 
-pub fn definition<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn paragraph<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn assertion<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn example<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn proof<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn subproof<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
 
 pub fn proofbody<E: FtmlExtractor>(
     ext: &mut E,

@@ -18,12 +18,15 @@ pub mod terms;
 pub mod toc;
 pub mod utils;
 pub use clonable_views::ClonableView;
+use ftml_backend::ParagraphOrProblemKind;
+use ftml_ontology::narrative::elements::paragraphs::ParagraphKind;
 mod views;
 
 use crate::{
-    extractor::{ExtractorMode, FtmlDomElement},
+    extractor::{DomExtractor, ExtractorMode, FtmlDomElement},
     markers::Marker,
     terms::ReactiveApplication,
+    utils::local_cache::LOCAL_CACHE,
 };
 pub use document::{DocumentMeta, DocumentState, setup_document};
 use ftml_core::extraction::{CloseFtmlElement, FtmlExtractor, VarOrSym};
@@ -140,11 +143,12 @@ fn iterate<Views: FtmlViews + ?Sized>(
                     use CloseFtmlElement::*;
                     match c {
                         OMA | OMBIND => ReactiveApplication::close(),
+                        Paragraph => add_paragraph(sig),
                         Module | SymbolDeclaration | Invisible | Section | SectionTitle
                         | SkipSection | SymbolReference | VariableReference | Argument | Type
                         | Definiens | Notation | CompInNotation | NotationOpComp | NotationComp
                         | ArgSep | MainCompInNotation | NotationArg | DocTitle
-                        | VariableDeclaration | Comp => (),
+                        | VariableDeclaration | Comp | ParagraphTitle => (),
                     }
                 }
             }
@@ -157,6 +161,32 @@ fn iterate<Views: FtmlViews + ?Sized>(
         })
     };
     (rview, and_then)
+}
+
+fn add_paragraph(sig: RwSignal<DomExtractor>) {
+    sig.with_untracked(|ext| {
+        if let Some(p) = ext.last_paragraph() {
+            let popk = if p.kind.is_definition_like(&p.styles) {
+                ParagraphOrProblemKind::Definition
+            } else {
+                match p.kind {
+                    ParagraphKind::Definition => ParagraphOrProblemKind::Definition,
+                    ParagraphKind::Example => ParagraphOrProblemKind::Example,
+                    _ => return,
+                }
+            };
+            for (s, _) in &p.fors {
+                match LOCAL_CACHE.fors.entry(s.clone()) {
+                    dashmap::Entry::Occupied(mut v) => {
+                        v.get_mut().push((p.uri.clone(), popk));
+                    }
+                    dashmap::Entry::Vacant(e) => {
+                        e.insert(vec![(p.uri.clone(), popk)]);
+                    }
+                }
+            }
+        }
+    });
 }
 
 #[cfg(any(feature = "csr", feature = "hydrate"))]

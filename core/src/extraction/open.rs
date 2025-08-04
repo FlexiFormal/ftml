@@ -9,6 +9,7 @@ use ftml_ontology::{
         elements::{
             DocumentElement,
             notations::{NotationComponent, NotationNode},
+            paragraphs::{ParagraphFormatting, ParagraphKind},
             sections::SectionLevel,
             variables::VariableData,
         },
@@ -41,6 +42,7 @@ pub enum OpenFtmlElement {
     Counter(DocumentCounter),
     Invisible,
     SectionTitle,
+    ParagraphTitle,
     SkipSection,
     Comp,
     SymbolReference {
@@ -72,6 +74,13 @@ pub enum OpenFtmlElement {
         prec: isize,
         argprecs: Vec<isize>,
     },
+    Paragraph {
+        uri: DocumentElementUri,
+        kind: ParagraphKind,
+        formatting: ParagraphFormatting,
+        styles: Box<[Id]>,
+        fors: Vec<(SymbolUri, Option<Term>)>,
+    },
     Argument(ArgumentPosition),
     NotationArg(ArgumentPosition),
     Type,
@@ -91,6 +100,7 @@ pub enum CloseFtmlElement {
     Invisible,
     Section,
     SectionTitle,
+    ParagraphTitle,
     SkipSection,
     SymbolReference,
     VariableReference,
@@ -108,6 +118,7 @@ pub enum CloseFtmlElement {
     ArgSep,
     DocTitle,
     Comp,
+    Paragraph,
 }
 
 #[derive(Debug, Clone)]
@@ -192,6 +203,15 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
     ArgSep {
         node: N,
         components: Vec<(NotationComponent, crate::NodePath)>,
+    },
+    Paragraph {
+        uri: DocumentElementUri,
+        kind: ParagraphKind,
+        fors: Vec<(SymbolUri, Option<Term>)>,
+        formatting: ParagraphFormatting,
+        styles: Box<[Id]>,
+        children: Vec<DocumentElement>,
+        title: Option<DocumentRange>,
     },
     NotationArg(ArgumentPosition),
     Invisible,
@@ -468,8 +488,8 @@ impl ArgumentPosition {
     #[must_use]
     pub const fn mode(&self) -> ArgumentMode {
         match self {
-            Self::Simple(..) => ArgumentMode::Simple,
-            Self::Sequence { .. } => ArgumentMode::Sequence,
+            Self::Simple(_, m) => *m,
+            Self::Sequence { mode, .. } => *mode,
         }
     }
     #[inline]
@@ -703,6 +723,24 @@ impl OpenFtmlElement {
                     op: None,
                 }),
             },
+            Self::Paragraph {
+                uri,
+                kind,
+                formatting,
+                styles,
+                fors,
+            } => Split::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::Paragraph {
+                    uri,
+                    kind,
+                    fors,
+                    formatting,
+                    styles,
+                    title: None,
+                    children: Vec::new(),
+                }),
+            },
             Self::NotationComp => Split::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::NotationComp {
@@ -733,7 +771,10 @@ impl OpenFtmlElement {
             Self::SetSectionLevel(lvl) => Split::Meta(MetaDatum::SetSectionLevel(lvl)),
             Self::ImportModule(uri) => Split::Meta(MetaDatum::ImportModule(uri)),
             Self::UseModule(uri) => Split::Meta(MetaDatum::UseModule(uri)),
-            Self::None | Self::SectionTitle | Self::CurrentSectionLevel(_) => Split::None,
+            Self::None
+            | Self::SectionTitle
+            | Self::ParagraphTitle
+            | Self::CurrentSectionLevel(_) => Split::None,
         }
     }
 }

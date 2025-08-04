@@ -3,8 +3,11 @@ use std::hint::unreachable_unchecked;
 use crate::{
     ClonableView, DocumentState, FtmlViews,
     notations::NotationExt,
-    terms::ReactiveTerm,
-    utils::local_cache::{SendBackend, WithLocalCache},
+    terms::{ReactiveTerm, TopTerm},
+    utils::{
+        local_cache::{SendBackend, WithLocalCache},
+        owned,
+    },
 };
 use ftml_core::extraction::VarOrSym;
 use ftml_ontology::{
@@ -20,6 +23,16 @@ use leptos::{math::mtext, prelude::*};
 
 pub trait TermExt {
     fn into_view<Views: FtmlViews, Be: SendBackend>(self, in_term: bool) -> AnyView;
+    fn into_view_safe<Views: FtmlViews, Be: SendBackend>(self) -> impl IntoView
+    where
+        Self: Sized,
+    {
+        owned(move || {
+            provide_context(None::<TopTerm>);
+            provide_context(None::<ReactiveTerm>);
+            self.into_view::<Views, Be>(false)
+        })
+    }
 }
 
 fn no_notation<Views: FtmlViews>(

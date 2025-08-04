@@ -2,13 +2,16 @@ use crate::{
     VarOrSym,
     counters::{LogicalLevel, SectionCounters},
     extractor::DomExtractor,
-    markers::{InputrefInfo, SectionInfo},
+    markers::{InputrefInfo, ParagraphInfo, SectionInfo},
     toc::{CurrentId, NavElems, TOCElem},
-    utils::owned,
+    utils::{ContextChain, owned},
 };
-use ftml_core::extraction::{FtmlExtractor, OpenDomainElement};
-use ftml_ontology::narrative::elements::SectionLevel;
-use ftml_uris::{DocumentElementUri, DocumentUri, Language, NarrativeUri};
+use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenDomainElement};
+use ftml_ontology::narrative::elements::{
+    SectionLevel,
+    paragraphs::{ParagraphFormatting, ParagraphKind},
+};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, NarrativeUri, SymbolUri};
 use leptos::prelude::*;
 use smallvec::SmallVec;
 use std::str::FromStr;
@@ -56,6 +59,8 @@ struct InInputref(bool);
 #[derive(Clone, PartialEq, Eq)]
 pub struct WithHead(pub Option<VarOrSym>);
 
+pub struct InArgument(pub ArgumentPosition);
+
 pub struct DocumentState;
 impl DocumentState {
     /// ### Panics
@@ -98,9 +103,8 @@ impl DocumentState {
 
     /// ### Panics
     pub fn finished_parsing() -> ReadSignal<bool> {
-        with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(|e| e.is_done))
+        with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(|e| e.is_done_read))
             .expect("Not in a document context")
-            .read_only()
     }
 
     pub fn current_term_head() -> Option<VarOrSym> {
@@ -132,18 +136,6 @@ impl DocumentState {
         })
         .flatten()
     }
-
-    /*
-    // ### Panics
-    pub fn with_styles_untracked<R>(
-        f: impl FnOnce(&[DocumentCounter], &[DocumentStyle]) -> R,
-    ) -> R {
-        with_context::<RwSignal<DomExtractor>, _>(|s| {
-            s.with_untracked(|e| f(&e.state.counters, &e.state.styles))
-        })
-        .expect("Not in a document context")
-    }
-     */
 
     #[inline]
     pub fn in_inputref() -> bool {
@@ -189,6 +181,10 @@ impl DocumentState {
         f()
     }
 
+    pub fn arguments() -> impl Iterator<Item = ArgumentPosition> {
+        ContextChain::<Option<ArgumentPosition>>::iter().flatten()
+    }
+
     pub(crate) fn new_section<V: IntoView>(
         uri: DocumentElementUri,
         f: impl FnOnce(SectionInfo) -> V,
@@ -205,6 +201,27 @@ impl DocumentState {
             class,
             lvl,
             id,
+        })
+    }
+
+    pub(crate) fn new_paragraph<V: IntoView>(
+        uri: DocumentElementUri,
+        kind: ParagraphKind,
+        formatting: ParagraphFormatting,
+        styles: Box<[Id]>,
+        fors: Vec<SymbolUri>,
+        f: impl FnOnce(ParagraphInfo) -> V,
+    ) -> impl IntoView {
+        let mut counters: SectionCounters = expect_context();
+        let (style, class) = counters.get_para(kind, &styles);
+        f(ParagraphInfo {
+            uri,
+            style,
+            class,
+            kind,
+            formatting,
+            styles,
+            fors,
         })
     }
 

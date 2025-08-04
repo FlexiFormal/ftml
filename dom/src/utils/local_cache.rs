@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use either::Either;
 use ftml_backend::{BackendError, FtmlBackend, GlobalBackend, ParagraphOrProblemKind};
 use ftml_ontology::{
@@ -14,6 +12,7 @@ use ftml_ontology::{
 use ftml_uris::{
     DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, UriKind,
 };
+use std::marker::PhantomData;
 
 pub trait SendBackend:
     GlobalBackend<Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone> + Send
@@ -31,7 +30,8 @@ pub struct LocalCache {
     pub(crate) notations: Map<LeafUri, Vec<(DocumentElementUri, Notation)>>,
     pub(crate) documents: Set<Document>,
     pub(crate) modules: Set<Module>,
-    pub(crate) paragraphs: Set<(DocumentElementUri, ParagraphOrProblemKind)>,
+    pub(crate) fors: Map<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>>,
+    pub(crate) paragraphs: Map<DocumentElementUri, String>,
 }
 
 pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
@@ -39,7 +39,8 @@ pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
         notations: Map::default(),
         documents: Set::default(),
         modules: Set::default(),
-        paragraphs: Set::default(),
+        fors: Map::default(),
+        paragraphs: Map::default(),
     });
 
 pub struct WithLocalCache<B: SendBackend>(PhantomData<B>);
@@ -74,7 +75,17 @@ impl<B: SendBackend> WithLocalCache<B> {
         context: Option<NarrativeUri>,
     ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<B::Error>>> + Send + use<B>
     {
-        self.get_fragment(uri.into(), context)
+        if let Some(v) = LOCAL_CACHE.fors.get(&uri) {
+            if let Some((uri, _)) = v
+                .iter()
+                .find(|(_, k)| matches!(k, ParagraphOrProblemKind::Definition))
+            {
+                if let Some(s) = LOCAL_CACHE.paragraphs.get(uri) {
+                    return either::Either::Left(std::future::ready(Ok((s.clone(), Vec::new()))));
+                }
+            }
+        }
+        either::Either::Right(self.get_fragment(uri.into(), context))
     }
 
     pub fn get_module(

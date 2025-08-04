@@ -18,8 +18,10 @@ use ftml_ontology::{
         DataBuffer, DocumentRange,
         documents::{Document, DocumentCounter, DocumentData, DocumentStyle, DocumentStyles},
         elements::{
-            DocumentElement, DocumentTerm, Notation, Section, VariableDeclaration,
+            DocumentElement, DocumentTerm, LogicalParagraph, Notation, Section,
+            VariableDeclaration,
             notations::{NotationComponent, NotationNode},
+            paragraphs::{ParagraphFormatting, ParagraphKind},
             variables::VariableData,
         },
     },
@@ -135,10 +137,6 @@ macro_rules! get_module {
             uri: $uri,
             ..
         }) = $self.domain.last_mut()
-        /*.iter_mut()
-        .rev()
-        .find(|e| matches!(e, OpenDomainElement::Module { .. }))
-         */
         else {
             return Err(FtmlExtractionError::NotIn(
                 FtmlKey::Module,
@@ -349,6 +347,30 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Section)),
             },
+            CloseFtmlElement::Paragraph => match self.narrative.pop() {
+                Some(OpenNarrativeElement::Paragraph {
+                    uri,
+                    kind,
+                    formatting,
+                    styles,
+                    children,
+                    fors,
+                    title,
+                }) => {
+                    self.close_paragraph(
+                        uri,
+                        kind,
+                        fors,
+                        formatting,
+                        styles,
+                        children,
+                        title,
+                        node.range(),
+                    );
+                    Ok(())
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Paragraph)),
+            },
             CloseFtmlElement::SkipSection => match self.narrative.pop() {
                 Some(OpenNarrativeElement::SkipSection { children }) => {
                     self.push_elem(DocumentElement::SkipSection(children.into_boxed_slice()));
@@ -460,7 +482,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens)),
             },
-            CloseFtmlElement::SectionTitle => self.close_title(node),
+            CloseFtmlElement::SectionTitle => self.close_section_title(node),
+            CloseFtmlElement::ParagraphTitle => self.close_paragraph_title(node),
             CloseFtmlElement::DocTitle => {
                 self.title = Some(node.inner_string().into_owned().into_boxed_str());
                 Ok(())
@@ -481,6 +504,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             match d {
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
+                | OpenNarrativeElement::Paragraph { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => {
                     children.push(e);
                     return;
@@ -510,6 +534,31 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             children: children.into_boxed_slice(),
         };
         self.push_elem(DocumentElement::Section(sec));
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn close_paragraph(
+        &mut self,
+        uri: DocumentElementUri,
+        kind: ParagraphKind,
+        fors: Vec<(SymbolUri, Option<Term>)>,
+        formatting: ParagraphFormatting,
+        styles: Box<[Id]>,
+        children: Vec<DocumentElement>,
+        title: Option<DocumentRange>,
+        range: DocumentRange,
+    ) {
+        let p = LogicalParagraph {
+            kind,
+            uri,
+            formatting,
+            title,
+            range,
+            styles,
+            children: children.into_boxed_slice(),
+            fors: fors.into_boxed_slice(),
+        };
+        self.push_elem(DocumentElement::Paragraph(p));
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -556,7 +605,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 },
                 declaration.into(),
             ),
-            VarOrSym::V(_) => return Err(FtmlExtractionError::InvalidValue(FtmlKey::Notation)),
+            VarOrSym::V(_) => {
+                return Err(FtmlExtractionError::InvalidValue(FtmlKey::Notation));
+            }
         };
         self.notations.push((leaf, uri, not));
         self.push_elem(e);
@@ -692,7 +743,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         }
     }
 
-    fn close_title(&mut self, node: &N) -> super::Result<()> {
+    fn close_section_title(&mut self, node: &N) -> super::Result<()> {
         for e in self.narrative.iter_mut() {
             match e {
                 OpenNarrativeElement::Section { title, .. } if title.is_none() => {
@@ -704,6 +755,32 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 OpenNarrativeElement::SkipSection { .. }
                 | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::NotationArg(_) => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
+                }
+                OpenNarrativeElement::Module { .. } | OpenNarrativeElement::Invisible => (),
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title))
+    }
+
+    fn close_paragraph_title(&mut self, node: &N) -> super::Result<()> {
+        for e in self.narrative.iter_mut() {
+            match e {
+                OpenNarrativeElement::Paragraph { title, .. } if title.is_none() => {
+                    *title = Some(node.range());
+                    return Ok(());
+                }
+                OpenNarrativeElement::Paragraph { title, .. } => {
+                    return Err(FtmlExtractionError::DuplicateValue(FtmlKey::Title));
+                }
+                OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
@@ -774,6 +851,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenNarrativeElement::Invisible => (),
 
                 OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::SkipSection { .. }
                 | OpenNarrativeElement::Notation { .. }
@@ -828,6 +906,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::NotationArg(_)
                 | OpenNarrativeElement::Module { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens));

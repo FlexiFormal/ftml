@@ -35,3 +35,42 @@ pub fn owned<V: leptos::prelude::IntoView>(
     let children = owner.with(f);
     leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
 }
+
+#[derive(Debug, Clone)]
+pub struct ContextChain<T: Send + Sync + Clone + 'static> {
+    value: T,
+    parent: Option<Box<ContextChain<T>>>,
+}
+impl<T: Send + Sync + Clone + 'static + std::fmt::Debug> ContextChain<T> {
+    pub fn provide(value: T) {
+        leptos::prelude::provide_context(Self {
+            value,
+            parent: leptos::prelude::use_context::<Self>().map(Box::new),
+        });
+    }
+
+    pub fn get() -> Option<T> {
+        leptos::prelude::use_context::<Self>().map(|v| v.value)
+    }
+    pub fn with<R>(f: impl FnOnce(&T) -> R) -> Option<R> {
+        leptos::prelude::with_context::<Self, _>(|v| f(&v.value))
+    }
+    pub fn iter() -> impl Iterator<Item = T> {
+        struct ChainIter<T: Send + Sync + Clone + 'static> {
+            current: Option<ContextChain<T>>,
+        }
+        impl<T: Send + Sync + Clone + 'static> Iterator for ChainIter<T> {
+            type Item = T;
+            fn next(&mut self) -> Option<Self::Item> {
+                if let Some(next) = self.current.take() {
+                    self.current = next.parent.map(|v| *v);
+                    Some(next.value)
+                } else {
+                    None
+                }
+            }
+        }
+        let slf = leptos::prelude::use_context::<Self>();
+        ChainIter { current: slf }
+    }
+}

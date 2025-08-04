@@ -1,5 +1,7 @@
 #![allow(clippy::must_use_candidate)]
 
+use std::hint::unreachable_unchecked;
+
 use crate::{
     SendBackend,
     config::{FtmlConfigState, HighlightStyle},
@@ -11,12 +13,13 @@ use ftml_dom::{
     notations::TermExt,
     terms::ReactiveApplication,
     utils::{
+        ContextChain,
         css::{CssExt, inject_css},
         local_cache::LocalCache,
         owned,
     },
 };
-use ftml_ontology::terms::Variable;
+use ftml_ontology::terms::{ArgumentMode, Variable};
 use ftml_uris::{DocumentElementUri, Id, LeafUri, SymbolUri};
 use leptos::prelude::*;
 
@@ -58,12 +61,40 @@ pub fn variable_reference<B: SendBackend>(var: Variable, children: ClonableView)
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
+    if let Some(pos) = DocumentState::arguments().next()
+        && [
+            ArgumentMode::BoundVariable,
+            ArgumentMode::BoundVariableSequence,
+        ]
+        .contains(&pos.mode())
+    {
+        if let Some(binder) = ContextChain::<InBinder>::get() {
+            tracing::trace!("Updating context {binder:?}");
+            binder.vars.update(|v| v.push(var.clone()));
+        } else {
+            tracing::trace!("No binder found");
+        }
+    }
     children.into_view::<crate::Views<B>>()
 }
 
 pub fn omv<B: SendBackend>(var: Variable, _in_term: bool, children: ClonableView) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     tracing::trace!("OMV({var})");
+    if let Some(pos) = DocumentState::arguments().next()
+        && [
+            ArgumentMode::BoundVariable,
+            ArgumentMode::BoundVariableSequence,
+        ]
+        .contains(&pos.mode())
+    {
+        if let Some(binder) = ContextChain::<InBinder>::get() {
+            tracing::trace!("Updating context {binder:?}");
+            binder.vars.update(|v| v.push(var.clone()));
+        } else {
+            tracing::trace!("No binder found");
+        }
+    }
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
@@ -81,17 +112,41 @@ pub fn omv<B: SendBackend>(var: Variable, _in_term: bool, children: ClonableView
     }
 }
 
+#[derive(Copy, Clone)]
+struct InBinder {
+    hovered: RwSignal<bool>,
+    vars: RwSignal<Vec<Variable>>,
+}
+impl std::fmt::Debug for InBinder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InBinder")
+            .field("hovered", &self.hovered.get_untracked())
+            .field("vars", &self.vars.get_untracked())
+            .finish()
+    }
+}
+
 pub fn oma<B: SendBackend>(
+    is_binder: bool,
     head: ReadSignal<ReactiveApplication>,
     children: ClonableView,
 ) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     tracing::trace!("OMA|OMBIND({head:?},...)");
-    provide_context(InTerm {
-        hovered: RwSignal::new(false),
-    });
+    let hovered = RwSignal::new(false);
+    provide_context(InTerm { hovered });
+    if is_binder {
+        ContextChain::provide(InBinder {
+            hovered,
+            vars: RwSignal::new(Vec::new()),
+        });
+    }
     if !FtmlConfigState::allow_notation_changes() {
         tracing::trace!("No notation changes");
+        return Right(children.into_view::<crate::Views<B>>());
+    }
+    if !children.is_math() {
+        tracing::trace!("Not in math");
         return Right(children.into_view::<crate::Views<B>>());
     }
 
@@ -100,10 +155,6 @@ pub fn oma<B: SendBackend>(
         VarOrSym::V(Variable::Ref { declaration, .. }) => Some(declaration.clone().into()),
         VarOrSym::V(_) => None,
     });
-    if !children.is_math() {
-        tracing::trace!("Not in math");
-        return Right(children.into_view::<crate::Views<B>>());
-    }
     let ret = move |children| {
         if let Some(uri) = &uri {
             Left(super::notations::has_notation::<B>(
@@ -170,6 +221,53 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
         tracing::warn!("InTerm is missing!");
         return Left(children.into_view::<crate::Views<B>>());
     };
+    if is_var {
+        let arg = DocumentState::arguments().next();
+        tracing::trace!("variable comp: {head}@{arg:?}");
+        if arg.is_some_and(|a| [ArgumentMode::Sequence, ArgumentMode::Simple].contains(&a.mode())) {
+            let VarOrSym::V(var) = head.clone() else {
+                // SAFETY: is_var==true
+                unsafe { unreachable_unchecked() }
+            };
+            let actual_signal = RwSignal::new(None);
+            Effect::new(move || {
+                if let Some(new_hovered) = ContextChain::<InBinder>::iter().find_map(|ctx| {
+                    if ctx.vars.with(|v| v.contains(&var)) {
+                        Some(ctx.hovered)
+                    } else {
+                        None
+                    }
+                }) {
+                    tracing::trace!("{var}@{arg:?} inherits signal");
+                    actual_signal.set(Some(new_hovered));
+                }
+            });
+            let has_changed = RwSignal::new(false);
+            Effect::new(move || {
+                is_hovered.track();
+                if let Some(sig) = actual_signal.get() {
+                    if has_changed.get_untracked() {
+                        has_changed.update_untracked(|b| *b = false);
+                    } else {
+                        has_changed.update_untracked(|b| *b = true);
+                        is_hovered.set(sig.get());
+                    }
+                }
+            });
+            Effect::new(move || {
+                is_hovered.track();
+                if let Some(sig) = actual_signal.get() {
+                    if has_changed.get_untracked() {
+                        has_changed.update_untracked(|b| *b = false);
+                    } else {
+                        has_changed.update_untracked(|b| *b = true);
+                        sig.set(is_hovered.get());
+                    }
+                }
+            });
+        }
+    }
+
     let style = FtmlConfigState::highlight_style();
     let class = Memo::new(move |_| comp_class(false, is_hovered.get(), is_var, style.get()));
     let top_class = Memo::new(move |_| {
@@ -214,42 +312,64 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
 }
 
 //#[component]
-pub fn term_popover<BE: SendBackend>(head: VarOrSym) -> impl IntoView {
+pub fn term_popover<Be: SendBackend>(head: VarOrSym) -> impl IntoView {
     use leptos::either::EitherOf3::{A, B, C};
     match head {
         VarOrSym::V(Variable::Name { name, notated }) => A(unresolved_var_popover(name, notated)),
         VarOrSym::V(Variable::Ref {
             declaration,
             is_sequence,
-        }) => B(resolved_var_popover(
+        }) => B(resolved_var_popover::<Be>(
             declaration,
             is_sequence.unwrap_or_default(),
         )),
-        VarOrSym::S(uri) => C(symbol_popover::<BE>(uri)),
+        VarOrSym::S(uri) => C(symbol_popover::<Be>(uri)),
     }
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn unresolved_var_popover(name: Id, _notated: Option<Id>) -> impl IntoView {
+pub fn unresolved_var_popover(name: Id, notated: Option<Id>) -> impl IntoView {
     view! {
         <div>
-            "Variable: " {name.to_string()}
+            "Variable: " {notated.map_or_else(|| name.to_string(),|n| n.to_string())}
         </div>
     }
 }
 
-pub fn resolved_var_popover(uri: DocumentElementUri, is_sequence: bool) -> impl IntoView {
-    use thaw::Tooltip;
+pub fn resolved_var_popover<B: SendBackend>(
+    uri: DocumentElementUri,
+    is_sequence: bool,
+) -> impl IntoView {
     let title = if is_sequence {
-        "Variable Sequenc: "
+        "Variable Sequence: "
     } else {
         "Variable: "
     };
-    view! {
-        <Tooltip content = uri.to_string()>
-            {title}{uri.name().to_string()}
-        </Tooltip>
-    }
+    view! {<div class="ftml-symbol-popup" style="text-align:left;">
+        {title}{uri.name().to_string()}
+        {LocalCache::with::<B,_,_,_>(|b| b.get_variable(uri),|v| {
+            let v = match &v {
+                either::Either::Left(v) => v,
+                either::Either::Right(v) => &**v
+            };
+            let tp = v.data.tp.as_ref();
+            let df = v.data.df.as_ref();
+            view! {
+                {df.map(|df| {
+                    view!{<div><span>
+                        "Defined as "
+                        <math>{df.clone().into_view::<crate::Views<B>,B>(false)}</math>
+                    </span></div>}
+                })}
+                {tp.map(|tp| {
+                    view!{<div><span>
+                        "Of type "
+                        <math>{tp.clone().into_view::<crate::Views<B>,B>(false)}</math>
+                    </span></div>}
+                })}
+            }
+        })}
+    </div>}
 }
 
 pub fn symbol_popover<B: SendBackend>(uri: SymbolUri) -> impl IntoView {
@@ -387,8 +507,8 @@ fn formals<Be: SendBackend>(
                view!("In term "{owned(move || LocalCache::with_or_toast::<Be,_,_,_,_>(
                    |r| r.get_document_term(u),
                    |t|  match t {
-                       ::either::Left(t) => t.term.into_view::<crate::Views<Be>,Be>(false),
-                       ::either::Right(t) => t.term.clone().into_view::<crate::Views<Be>,Be>(false),
+                       ::either::Left(t) => t.term.into_view_safe::<crate::Views<Be>,Be>(),
+                       ::either::Right(t) => t.term.clone().into_view_safe::<crate::Views<Be>,Be>(),
                    },
                    move || format!("error: {uri}")
                ))})

@@ -1,6 +1,6 @@
-use crate::{ClonableView, FtmlViews, extractor::DomExtractor};
-use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, VarOrSym};
-use ftml_ontology::terms::{ArgumentMode, Term};
+use crate::{ClonableView, FtmlViews};
+use ftml_core::extraction::{ArgumentPosition, VarOrSym};
+use ftml_ontology::terms::ArgumentMode;
 use ftml_uris::DocumentElementUri;
 use leptos::either::Either::{self, Left, Right};
 use leptos::prelude::*;
@@ -95,7 +95,7 @@ impl ReactiveApplication {
             arguments: Vec::new(),
         }));
         if let Some(uri) = &uri {
-            provide_context(TopTerm { uri: uri.clone() });
+            provide_context(Some(TopTerm { uri: uri.clone() }));
         }
         provide_context(Some(ReactiveTerm { app: sig, uri }));
         children(sig.read_only())

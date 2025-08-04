@@ -71,7 +71,14 @@ args = [
     "--timings",
 ]
 
+[tasks.copy]
+script_runner = "@shell"
+script = '''
+    cp ../bin/viewer/ftml.js ../tests/leptos/public/ftml.js
+    cp ../bin/viewer/ftml_bg.wasm ../tests/leptos/public/ftml_bg.wasm
+'''
+
 
 [tasks.default]
 clear = true
-dependencies = ["wasm-pack", "patch-js"]
+dependencies = ["wasm-pack", "patch-js", "copy"]

@@ -4,8 +4,11 @@ use crate::{
     extractor::{DomExtractor, FtmlDomElement},
     markers::{Marker, MarkerList},
     terms::{ReactiveApplication, ReactiveTerm},
+    utils::ContextChain,
 };
-use ftml_core::extraction::{FtmlExtractor, OpenDomainElement, OpenNarrativeElement};
+use ftml_core::extraction::{
+    ArgumentPosition, FtmlExtractor, OpenDomainElement, OpenNarrativeElement,
+};
 use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
@@ -23,6 +26,7 @@ enum ClonableNode {
 #[derive(Clone)]
 pub struct MarkedNode {
     markers: MarkerList,
+    no_arg: bool,
     state: std::sync::Arc<parking_lot::Mutex<NodeState>>,
     is_math: bool,
     //owner: leptos::prelude::Owner,
@@ -53,7 +57,7 @@ impl MarkedNode {
             return self.render::<Views>().into_any();
         };
         let owner = self.owner();
-        let child = move || -> ClonableView { self.child().into() };
+        let child = move |b| -> ClonableView { self.child(b).into() };
         owner.with(move || match marker {
             Marker::CurrentSectionLevel(cap) => {
                 let lvl = DocumentState::current_section_level();
@@ -81,39 +85,48 @@ impl MarkedNode {
                 in_term,
                 uri,
                 notation,
-            } => Views::symbol_reference(uri, notation, in_term, child()).into_any(),
+            } => Views::symbol_reference(uri, notation, in_term, child(true)).into_any(),
             Marker::VariableReference {
                 in_term,
                 var,
                 notation,
-            } => Views::variable_reference(var, notation, in_term, child()).into_any(),
+            } => Views::variable_reference(var, notation, in_term, child(true)).into_any(),
             Marker::OMA {
                 head,
                 notation,
                 uri,
-            } => Views::application(head, notation, uri, child()).into_any(),
+            } => Views::application(head, notation, uri, child(true)).into_any(),
             Marker::OMBIND {
                 head,
                 notation,
                 uri,
-            } => Views::binder_application(head, notation, uri, child()).into_any(),
+            } => Views::binder_application(head, notation, uri, child(true)).into_any(),
             Marker::Argument(pos) if first_pass => {
                 with_context::<Option<ReactiveTerm>, _>(|t| t.as_ref().map(|t| t.app))
                     .flatten()
                     .map_or_else(
-                        || child().into_view::<Views>(),
-                        |r| ReactiveApplication::add_argument::<Views>(r, pos, child()).into_any(),
+                        || child(false).into_view::<Views>(),
+                        |r| {
+                            ReactiveApplication::add_argument::<Views>(r, pos, child(false))
+                                .into_any()
+                        },
                     )
             }
-            Marker::Argument(_) => child().into_view::<Views>().into_any(),
-            Marker::Comp => Views::comp(child()).into_any(),
+            Marker::Argument(_) => child(false).into_view::<Views>().into_any(),
+            Marker::Comp => Views::comp(child(true)).into_any(),
             _ => ftml_core::TODO!(),
         })
     }
-    pub(crate) fn new(markers: MarkerList, orig: OriginalNode, is_math: bool) -> Self {
+    pub(crate) fn new(
+        markers: MarkerList,
+        orig: OriginalNode,
+        is_math: bool,
+        no_arg: bool,
+    ) -> Self {
         Self {
             markers,
             is_math,
+            no_arg,
             state: std::sync::Arc::new(parking_lot::Mutex::new(NodeState {
                 orig,
                 last_domain: None,
@@ -123,7 +136,7 @@ impl MarkedNode {
             })),
         }
     }
-    fn child(&self) -> Self {
+    fn child(&self, no_arg: bool) -> Self {
         // by construction, self.markers.len() > 0
         let mut state = self.state.lock();
         if let Some(c) = &state.child {
@@ -137,6 +150,7 @@ impl MarkedNode {
                 .cloned()
                 .collect(),
             is_math: self.is_math,
+            no_arg,
             //owner: Owner::current().expect("not in a reactive context"),
             state: std::sync::Arc::new(parking_lot::Mutex::new(NodeState {
                 orig,
@@ -156,6 +170,9 @@ impl MarkedNode {
             state.owner.clone().map_or_else(
                 || {
                     let owner = Owner::current().expect("not in a reactive context");
+                    if self.no_arg {
+                        ContextChain::provide(None::<ArgumentPosition>);
+                    }
                     state.owner = Some(owner.clone());
                     let sig = expect_context::<RwSignal<DomExtractor>>();
                     state.last_domain = sig.with_untracked(|e| e.iterate_domain().next().cloned());
@@ -195,7 +212,9 @@ impl MarkedNode {
                 });
             }
         }
+        //tracing::warn!("Current owner ancestry: {:?}", owner.ancestry());
         owner
+        //Owner::current().expect("exists")
     }
 
     fn render<Views: FtmlViews + ?Sized>(&self) -> impl IntoView + use<Views> {
@@ -207,7 +226,7 @@ impl MarkedNode {
         owner.with(|| {
             leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
                 orig,
-                cont: super::iterate::<Views>,
+                cont: |e: &_| super::iterate::<Views>(e),
                 skip_head: true,
                 class: None::<String>.into(),
                 style: None::<String>.into(),

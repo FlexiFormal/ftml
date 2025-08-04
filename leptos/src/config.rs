@@ -1,5 +1,5 @@
 use ftml_dom::{DocumentState, counters::LogicalLevel, utils::JsDisplay};
-use ftml_ontology::narrative::elements::SectionLevel;
+use ftml_ontology::narrative::elements::{SectionLevel, paragraphs::ParagraphKind};
 use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri};
 use leptos::context::Provider;
 use leptos::prelude::*;
@@ -194,10 +194,14 @@ impl FtmlConfig {
             provide_context(AllowNotationChanges(b));
         }
         if let Some(h) = self.highlight_style {
-            provide_context(RwSignal::new(h));
+            let style = RwSignal::new(h);
+            provide_context(style);
+            provide_context(style.read_only());
         }
         if let Some(limit) = self.autoexpand_limit {
-            provide_context(RwSignal::new(AutoexpandLimit(limit)));
+            let sig = RwSignal::new(AutoexpandLimit(limit));
+            provide_context(sig);
+            provide_context(sig.read_only());
         }
         #[cfg(feature = "callbacks")]
         if let Some(b) = self.section_wrap {
@@ -230,15 +234,22 @@ impl FtmlConfig {
                 r
             };
             provide_context(style);
+            provide_context(style.read_only());
         }
         if with_context::<RwSignal<AutoexpandLimit>, _>(|_| ()).is_none() {
-            provide_context(RwSignal::new(AutoexpandLimit(LogicalLevel::Section(
+            let sig = RwSignal::new(AutoexpandLimit(LogicalLevel::Section(
                 SectionLevel::Section,
-            ))));
+            )));
+            provide_context(sig);
+            provide_context(sig.read_only());
         }
         if with_context::<StoredValue<ReactiveStore>, _>(|_| ()).is_none() {
             provide_context(StoredValue::new(ReactiveStore::new()));
         }
+        /*tracing::warn!(
+            "Top setup: {}",
+            Owner::current().expect("exists").debug_id()
+        );*/
     }
 }
 
@@ -271,7 +282,11 @@ impl FtmlConfigState {
     /// ### Panics
     #[must_use]
     pub fn notation_preference(uri: &LeafUri) -> ReadSignal<Option<DocumentElementUri>> {
-        Self::notation_preference_signal(uri).read_only()
+        let sig = Self::notation_preference_signal(uri);
+        with_context::<StoredValue<ReactiveStore>, _>(|s| {
+            s.with_value(|s| s.with(|| sig.read_only()))
+        })
+        .expect("Not in an ftml context")
     }
 
     pub(crate) fn notation_preference_signal(
@@ -332,13 +347,17 @@ impl FtmlConfigState {
     #[inline]
     #[must_use]
     pub fn highlight_style() -> ReadSignal<HighlightStyle> {
-        expect_context::<RwSignal<HighlightStyle>>().read_only()
+        /*tracing::warn!(
+            "Highlight style ancestry: {:?}",
+            Owner::current().expect("exists").ancestry()
+        );*/
+        expect_context()
     }
 
     #[inline]
     #[must_use]
     pub fn autoexpand_limit() -> ReadSignal<AutoexpandLimit> {
-        expect_context::<RwSignal<AutoexpandLimit>>().read_only()
+        expect_context()
     }
 
     #[inline]
@@ -366,6 +385,28 @@ impl FtmlConfigState {
         {
             if let Some(Some(w)) = use_context::<Option<SectionWrap>>() {
                 Left(w.wrap(uri, children))
+            } else {
+                Right(children())
+            }
+        }
+    }
+
+    pub fn wrap_paragraph<V: IntoView, F: FnOnce() -> V>(
+        uri: &DocumentElementUri,
+        kind: ParagraphKind,
+        children: F,
+    ) -> impl IntoView + use<V, F> {
+        use leptos::either::Either::{Left, Right};
+        #[cfg(not(feature = "callbacks"))]
+        {
+            children()
+        }
+        #[cfg(feature = "callbacks")]
+        {
+            use crate::callbacks::ParagraphWrap;
+
+            if let Some(Some(w)) = use_context::<Option<ParagraphWrap>>() {
+                Left(w.wrap(uri, &kind, children))
             } else {
                 Right(children())
             }
