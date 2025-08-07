@@ -248,7 +248,7 @@ do_keys! {
     Notation                    = "notation" := notation
     NotationComp                = "notationcomp" := notation_comp
     NotationOpComp              = "notationopcomp" := notation_op_comp
-    Definiendum                 = "definiendum"         <= Definition, Paragraph, Assertion; := todo
+    Definiendum                 = "definiendum"         <= Definition, Paragraph, Assertion; := definiendum
 
     Type                        = "type" := type_component
     Conclusion                  = "conclusion" := todo

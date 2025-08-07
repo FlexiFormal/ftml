@@ -207,8 +207,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             title: take(&mut self.title), // todo
             elements: take(&mut self.top).into_boxed_slice(),
             styles: DocumentStyles {
-                counters: take(&mut self.counters).into_boxed_slice(),
-                styles: take(&mut self.styles).into_boxed_slice(),
+                // clone instead of take because DomExtractor
+                // still needs them
+                counters: self.counters.clone().into_boxed_slice(),
+                styles: self.styles.clone().into_boxed_slice(),
             },
         }
         .close();
@@ -291,6 +293,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
 
     /// ### Errors
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     pub fn close(&mut self, elem: CloseFtmlElement, node: &N) -> super::Result<()> {
         tracing::debug!("Closing: {elem:?} in {:?}", self.domain);
         match elem {
@@ -335,6 +338,12 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     Ok(())
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Vardef)),
+            },
+            CloseFtmlElement::Definiendum => match self.narrative.pop() {
+                Some(OpenNarrativeElement::Definiendum(uri)) => {
+                    self.close_definiendum(uri, node.range())
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiendum)),
             },
             CloseFtmlElement::Section => match self.narrative.pop() {
                 Some(OpenNarrativeElement::Section {
@@ -514,10 +523,30 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::NotationArg(_) => (),
             }
         }
         self.top.push(e);
+    }
+
+    fn close_definiendum(
+        &mut self,
+        uri: SymbolUri,
+        range: DocumentRange,
+    ) -> Result<(), FtmlExtractionError> {
+        let mut iter = self.narrative.iter_mut();
+        while let Some(e) = iter.next() {
+            if let OpenNarrativeElement::Paragraph { fors, .. } = e {
+                if !fors.iter().any(|p| p.0 == uri) {
+                    fors.push((uri.clone(), None));
+                }
+                drop(iter);
+                self.push_elem(DocumentElement::Definiendum { range, uri });
+                return Ok(());
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiendum))
     }
 
     fn close_section(
@@ -558,6 +587,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             children: children.into_boxed_slice(),
             fors: fors.into_boxed_slice(),
         };
+        tracing::info!("Adding paragraph {p:?}");
         self.push_elem(DocumentElement::Paragraph(p));
     }
 
@@ -759,6 +789,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -784,6 +815,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -858,6 +890,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Module { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
@@ -908,6 +941,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Module { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens));
                 }

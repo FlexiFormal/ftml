@@ -21,7 +21,7 @@ use ftml_dom::{
 };
 use ftml_ontology::terms::{ArgumentMode, Variable};
 use ftml_uris::{DocumentElementUri, Id, LeafUri, SymbolUri};
-use leptos::prelude::*;
+use leptos::{prelude::*, tachys::reactive_graph::OwnedView};
 
 #[derive(Copy, Clone)]
 struct InTerm {
@@ -166,16 +166,7 @@ pub fn oma<B: SendBackend>(
             Right(children.into_view::<crate::Views<B>>())
         }
     };
-    /*let memo = Memo::new(move |_| {
-        head.with(|a| match a {
-            ReactiveApplication::Open(_) => "No term yet".to_string(),
-            ReactiveApplication::Closed(ClosedApp { term, .. }) => {
-                tracing::debug!("New term arrived: {:?}", term.debug_short());
-                format!("{:?}", term.debug_short())
-            }
-        })
-    });*/
-    Left(ret(children)) //.attr("title", memo))
+    Left(ret(children))
 }
 
 const fn comp_class(
@@ -477,8 +468,7 @@ pub(crate) fn do_onclick<Be: SendBackend>(
 
         // formals
         {move || if allow_formals.get() {
-            let uri = uri.clone();
-            Some(owned(move || formals::<Be>(uri,top_term)))
+            Some(formals::<Be>(uri.clone(),top_term))
         } else {None} }
     })
 }
@@ -491,7 +481,7 @@ fn formals<Be: SendBackend>(
     use thaw::Divider;
     view! {
         <div style="margin:5px;"><Divider/></div>
-        {lazy_collapsible(Some(|| "Formal Details"), move || view!{
+        {lazy_collapsible(Some(|| "Formal Details"), move ||view!{
             {
                 let symbol = symbol.clone();
                 LocalCache::with_or_toast::<Be,_,_,_,_>(
@@ -502,18 +492,18 @@ fn formals<Be: SendBackend>(
                 },
                 || "error"
             )}
-            {move || uri.with(|u| u.clone().map(|u| {
-                let uri = u.clone();
-               view!("In term "{owned(move || LocalCache::with_or_toast::<Be,_,_,_,_>(
+            {move || { uri.with(|u| u.clone().map(|u|  {
+               let uri = u.clone();
+               view!("In term "{LocalCache::with_or_toast::<Be,_,_,_,_>(
                    |r| r.get_document_term(u),
                    |t|  match t {
-                       ::either::Left(t) => t.term.into_view_safe::<crate::Views<Be>,Be>(),
-                       ::either::Right(t) => t.term.clone().into_view_safe::<crate::Views<Be>,Be>(),
+                       ::either::Left(t) => ReactiveStore::render_term::<Be>(t.term),
+                       ::either::Right(t) => ReactiveStore::render_term::<Be>(t.term.clone()),
                    },
                    move || format!("error: {uri}")
-               ))})
+               )})
             }
-            ))}
+            ))}}
         })}
     }
 }

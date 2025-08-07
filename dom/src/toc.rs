@@ -1,6 +1,6 @@
 use ftml_ontology::narrative::elements::paragraphs::ParagraphKind;
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri};
-use leptos::{prelude::*, tachys::reactive_graph::OwnedView};
+use leptos::prelude::*;
 
 use crate::utils::actions::{OneShot, SetOneShotDone};
 
@@ -123,9 +123,11 @@ impl NavElems {
         }
     }
     #[allow(clippy::missing_const_for_fn)]
-    pub fn navigate_to(&self, id: &str) {
+    pub fn navigate_to(&self, _id: &str) {
         #[cfg(any(feature = "csr", feature = "hydrate"))]
         {
+            #[allow(clippy::used_underscore_binding)]
+            let id = _id;
             tracing::trace!("Looking for #{id}");
             let mut curr = id;
             loop {

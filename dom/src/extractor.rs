@@ -13,7 +13,7 @@ use ftml_core::{
 use ftml_ontology::narrative::DocumentRange;
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::{
-    prelude::{ReadSignal, Set},
+    prelude::ReadSignal,
     web_sys::{Element, NodeList, js_sys::JsString},
 };
 use leptos::{

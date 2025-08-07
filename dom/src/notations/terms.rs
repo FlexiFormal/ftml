@@ -2,6 +2,7 @@ use std::hint::unreachable_unchecked;
 
 use crate::{
     ClonableView, DocumentState, FtmlViews,
+    document::CurrentUri,
     notations::NotationExt,
     terms::{ReactiveTerm, TopTerm},
     utils::{
@@ -35,6 +36,16 @@ pub trait TermExt {
     }
 }
 
+macro_rules! maybe_comp {
+    ($e:expr) => {
+        if with_context::<CurrentUri, _>(|_| ()).is_some() {
+            leptos::either::Either::Left(Views::comp(ClonableView::new(true, move || $e)))
+        } else {
+            leptos::either::Either::Right($e)
+        }
+    };
+}
+
 fn no_notation<Views: FtmlViews>(
     name: &str,
     arguments: Vec<Either<ClonableView, Vec<ClonableView>>>,
@@ -43,13 +54,13 @@ fn no_notation<Views: FtmlViews>(
         v.map(ClonableView::into_view::<Views>, |v| {
             let mut args = v.into_iter();
             view! {
-                {Views::comp(ClonableView::new(true,|| mo().child('(')))}
+                {maybe_comp!(mo().child('('))}
                 {args.next().map(ClonableView::into_view::<Views>)}
                 {args.map(|v| view!{
-                    {Views::comp(ClonableView::new(true,|| mo().child(',')))}
+                    {maybe_comp!(mo().child(','))}
                     {v.into_view::<Views>()}
                 }).collect_view()}
-                {Views::comp(ClonableView::new(true,|| mo().child(')')))}
+                {maybe_comp!(mo().child(')'))}
             }
         })
     }
@@ -59,23 +70,25 @@ fn no_notation<Views: FtmlViews>(
     let mut args = arguments.into_iter();
     Either::Right(view! {<mrow>
         {mtext().style("color:red").child(name.to_string())}
-        {Views::comp(ClonableView::new(true,|| mo().child('(')))}
+        {maybe_comp!(mo().child('('))}
         {args.next().map(do_view::<Views>)}
         {args.map(|v| view!{
-            {Views::comp(ClonableView::new(true,|| mo().child(',')))}
+            {maybe_comp!(mo().child(','))}
             {do_view::<Views>(v)}
         }).collect_view()}
-        {Views::comp(ClonableView::new(true,|| mo().child(')')))}
+        {maybe_comp!(mo().child(')'))}
     </mrow>})
 }
 
 impl TermExt for Term {
     #[allow(clippy::too_many_lines)]
     fn into_view<Views: FtmlViews, Be: SendBackend>(self, in_term: bool) -> AnyView {
-        use leptos::either::EitherOf7::{A, B, C, D, E, F, G};
+        use leptos::either::{
+            Either::{Left, Right},
+            EitherOf7::{A, B, C, D, E, F, G},
+        };
         tracing::trace!("Presenting {self:?}");
         //owned(move || {
-        provide_context(None::<ReactiveTerm>);
         match self {
             Self::Symbol(s) => A(sym::<Views, Be>(s, in_term)),
             Self::Var(Variable::Ref {
@@ -92,12 +105,19 @@ impl TermExt for Term {
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(*head) };
                 D(DocumentState::with_head(vos.clone(), move || {
-                    Views::application(
-                        vos.clone(),
-                        None,
-                        None,
-                        do_application_inner::<Views, Be>(leaf, vos, arguments),
-                    )
+                    if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                        Left(Views::application(
+                            vos.clone(),
+                            None,
+                            None,
+                            do_application_inner::<Views, Be>(leaf, vos, arguments),
+                        ))
+                    } else {
+                        Right(
+                            do_application_inner::<Views, Be>(leaf, vos, arguments)
+                                .into_view::<Views>(),
+                        )
+                    }
                 }))
             }
             Self::Bound {
@@ -113,12 +133,19 @@ impl TermExt for Term {
                     body.clone().into_view::<Views, Be>(true)
                 })));
                 E(DocumentState::with_head(vos.clone(), move || {
-                    Views::binder_application(
-                        vos.clone(),
-                        None,
-                        None,
-                        do_application_inner::<Views, Be>(leaf, vos, arguments),
-                    )
+                    if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                        Left(Views::binder_application(
+                            vos.clone(),
+                            None,
+                            None,
+                            do_application_inner::<Views, Be>(leaf, vos, arguments),
+                        ))
+                    } else {
+                        Right(
+                            do_application_inner::<Views, Be>(leaf, vos, arguments)
+                                .into_view::<Views>(),
+                        )
+                    }
                 }))
             }
             Self::Opaque {
@@ -144,25 +171,47 @@ impl TermExt for Term {
 fn sym<Views: FtmlViews, Be: SendBackend>(uri: SymbolUri, in_term: bool) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     DocumentState::with_head(VarOrSym::S(uri.clone()), move || {
-        Views::symbol_reference(
-            uri.clone(),
-            None,
-            in_term,
-            ClonableView::new(true, move || {
-                let uri = uri.clone();
-                with_notations::<Be, _, _>(uri.clone().into(), move |t| {
-                    if let Some(n) = t {
-                        Left(n.as_view::<Views>(&VarOrSym::S(uri)))
+        if with_context::<CurrentUri, _>(|_| ()).is_some() {
+            Left(Views::symbol_reference(
+                uri.clone(),
+                None,
+                in_term,
+                ClonableView::new(true, move || {
+                    let uri = uri.clone();
+                    with_notations::<Be, _, _>(uri.clone().into(), move |t| {
+                        if let Some(n) = t {
+                            if let Some(n) = n.op {
+                                Left(Left(super::view_node(&n)))
+                            } else {
+                                Left(Right(n.as_view::<Views>(&VarOrSym::S(uri))))
+                            }
+                        } else {
+                            Right(
+                                mtext()
+                                    .style("color:red")
+                                    .child(uri.name().last().to_string()),
+                            )
+                        }
+                    })
+                }),
+            ))
+        } else {
+            Right(with_notations::<Be, _, _>(uri.clone().into(), move |t| {
+                if let Some(n) = t {
+                    if let Some(n) = n.op {
+                        Left(Left(super::view_node(&n)))
                     } else {
-                        Right(
-                            mtext()
-                                .style("color:red")
-                                .child(uri.name().last().to_string()),
-                        )
+                        Left(Right(n.as_view::<Views>(&VarOrSym::S(uri))))
                     }
-                })
-            }),
-        )
+                } else {
+                    Right(
+                        mtext()
+                            .style("color:red")
+                            .child(uri.name().last().to_string()),
+                    )
+                }
+            }))
+        }
     })
 }
 
@@ -178,36 +227,62 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
             is_sequence,
         }),
         move || {
-            Views::variable_reference(
-                Variable::Ref {
-                    declaration: uri.clone(),
-                    is_sequence,
-                },
-                None,
-                in_term,
-                ClonableView::new(true, move || {
-                    let uri = uri.clone();
-                    with_notations::<Be, _, _>(uri.clone().into(), move |t| {
-                        if let Some(n) = t {
-                            Left(n.as_view::<Views>(&VarOrSym::V(Variable::Ref {
+            if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                Left(Views::variable_reference(
+                    Variable::Ref {
+                        declaration: uri.clone(),
+                        is_sequence,
+                    },
+                    None,
+                    in_term,
+                    ClonableView::new(true, move || {
+                        let uri = uri.clone();
+                        with_notations::<Be, _, _>(uri.clone().into(), move |t| {
+                            if let Some(n) = t {
+                                if let Some(n) = n.op {
+                                    Left(Left(super::view_node(&n)))
+                                } else {
+                                    Left(Right(n.as_view::<Views>(&VarOrSym::V(Variable::Ref {
+                                        declaration: uri,
+                                        is_sequence,
+                                    }))))
+                                }
+                            } else {
+                                Right(
+                                    mtext()
+                                        .style("color:red")
+                                        .child(uri.name().last().to_string()),
+                                )
+                            }
+                        })
+                    }),
+                ))
+            } else {
+                Right(with_notations::<Be, _, _>(uri.clone().into(), move |t| {
+                    if let Some(n) = t {
+                        if let Some(n) = n.op {
+                            Left(Left(super::view_node(&n)))
+                        } else {
+                            Left(Right(n.as_view::<Views>(&VarOrSym::V(Variable::Ref {
                                 declaration: uri,
                                 is_sequence,
-                            })))
-                        } else {
-                            Right(
-                                mtext()
-                                    .style("color:red")
-                                    .child(uri.name().last().to_string()),
-                            )
+                            }))))
                         }
-                    })
-                }),
-            )
+                    } else {
+                        Right(
+                            mtext()
+                                .style("color:red")
+                                .child(uri.name().last().to_string()),
+                        )
+                    }
+                }))
+            }
         },
     )
 }
 
 fn var_name<Views: FtmlViews>(name: Id, notated: Option<Id>, in_term: bool) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
     let not = notated
         .as_ref()
         .map_or_else(|| name.to_string(), Id::to_string);
@@ -217,12 +292,16 @@ fn var_name<Views: FtmlViews>(name: Id, notated: Option<Id>, in_term: bool) -> i
             notated: notated.clone(),
         }),
         move || {
-            Views::variable_reference(
-                Variable::Name { name, notated },
-                None,
-                in_term,
-                ClonableView::new(true, move || mi().child(not.clone())),
-            )
+            if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                Left(Views::variable_reference(
+                    Variable::Name { name, notated },
+                    None,
+                    in_term,
+                    ClonableView::new(true, move || mi().child(not.clone())),
+                ))
+            } else {
+                Right(mi().child(not))
+            }
         },
     )
 }

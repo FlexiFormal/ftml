@@ -64,7 +64,9 @@ fn iterate<Views: FtmlViews + ?Sized>(
     use extractor::NodeAttrs;
 
     //provide_context(OwnerId::new());
-    let sig = expect_context::<RwSignal<DomExtractor>>();
+    let Some(sig) = use_context::<RwSignal<DomExtractor>>() else {
+        return (None, None);
+    };
     let finish = sig.update_untracked(|ext| {
         ext.mode == ExtractorMode::Pending && {
             ext.mode = ExtractorMode::Extracting;
@@ -148,7 +150,7 @@ fn iterate<Views: FtmlViews + ?Sized>(
                         | SkipSection | SymbolReference | VariableReference | Argument | Type
                         | Definiens | Notation | CompInNotation | NotationOpComp | NotationComp
                         | ArgSep | MainCompInNotation | NotationArg | DocTitle
-                        | VariableDeclaration | Comp | ParagraphTitle => (),
+                        | VariableDeclaration | Comp | ParagraphTitle | Definiendum => (),
                     }
                 }
             }
@@ -175,7 +177,9 @@ fn add_paragraph(sig: RwSignal<DomExtractor>) {
                     _ => return,
                 }
             };
+            tracing::trace!("Adding paragraph for: {:?}", p.fors);
             for (s, _) in &p.fors {
+                tracing::trace!("Adding local paragraph for {s}");
                 match LOCAL_CACHE.fors.entry(s.clone()) {
                     dashmap::Entry::Occupied(mut v) => {
                         v.get_mut().push((p.uri.clone(), popk));
@@ -185,6 +189,8 @@ fn add_paragraph(sig: RwSignal<DomExtractor>) {
                     }
                 }
             }
+        } else {
+            tracing::warn!("No closing paragraph found!");
         }
     });
 }

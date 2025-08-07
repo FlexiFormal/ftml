@@ -246,10 +246,6 @@ impl FtmlConfig {
         if with_context::<StoredValue<ReactiveStore>, _>(|_| ()).is_none() {
             provide_context(StoredValue::new(ReactiveStore::new()));
         }
-        /*tracing::warn!(
-            "Top setup: {}",
-            Owner::current().expect("exists").debug_id()
-        );*/
     }
 }
 
@@ -347,10 +343,6 @@ impl FtmlConfigState {
     #[inline]
     #[must_use]
     pub fn highlight_style() -> ReadSignal<HighlightStyle> {
-        /*tracing::warn!(
-            "Highlight style ancestry: {:?}",
-            Owner::current().expect("exists").ancestry()
-        );*/
         expect_context()
     }
 

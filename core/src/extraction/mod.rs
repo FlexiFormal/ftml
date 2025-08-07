@@ -80,7 +80,8 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::Invisible
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
-                | OpenNarrativeElement::NotationArg(_) => None,
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_) => None,
                 OpenNarrativeElement::Section { uri, .. }
                 | OpenNarrativeElement::Notation { uri, .. }
                 | OpenNarrativeElement::VariableDeclaration { uri, .. }
@@ -104,6 +105,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::SkipSection { .. } => return false,
             }
         }
@@ -156,6 +158,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::ArgSep { .. } => continue, // Narrative::Notation(_) => continue,
             };
             for c in ch.iter().rev() {
@@ -194,7 +197,7 @@ pub trait FtmlExtractor: 'static + Sized {
     fn last_paragraph(&self) -> Option<&LogicalParagraph> {
         for e in self.iterate_narrative() {
             match e {
-                OpenNarrativeElement::Invisible => (),
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::Definiendum(_) => (),
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::Paragraph { children, .. }
@@ -209,7 +212,10 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::NotationArg(_) => break,
             }
         }
-        None
+        match self.iterate_dones().next_back() {
+            Some(DocumentElement::Paragraph(p)) => Some(p),
+            _ => None,
+        }
     }
 
     fn last_term(&self) -> Option<&Term> {
@@ -227,6 +233,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::NotationArg(_) => break,
             }
         }

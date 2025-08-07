@@ -32,7 +32,7 @@ ssr = [
 
 ftml-leptos = { path = "../../leptos" }
 ftml-dom = { path = "../../dom" }
-ftml-uris = { path = "../../uris" }
+ftml-uris = { path = "../../uris", features = ["interned"] }
 ftml-ontology = { path = "../../ontology" }
 ftml-backend = { path = "../../backend", features = ["cached", "server_fn"] }
 

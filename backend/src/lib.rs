@@ -32,8 +32,7 @@ use ftml_ontology::{
     utils::Css,
 };
 use ftml_uris::{
-    ArchiveId, DocumentElementUri, DocumentUri, Language, LeafUri, ModuleUri, NarrativeUri,
-    SymbolUri, Uri,
+    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
 };
 use futures_util::{FutureExt, TryFutureExt};
 
@@ -239,11 +238,11 @@ pub trait FlamsBackend {
         &self,
         uri: Option<Uri>,
         rp: Option<String>,
-        a: Option<ArchiveId>,
+        a: Option<ftml_uris::ArchiveId>,
         p: Option<String>,
         d: Option<String>,
         m: Option<String>,
-        l: Option<Language>,
+        l: Option<ftml_uris::Language>,
         e: Option<String>,
         s: Option<String>,
         context: Option<NarrativeUri>,
@@ -256,7 +255,7 @@ pub trait FlamsBackend {
     fn get_module(
         &self,
         uri: Option<ModuleUri>,
-        a: Option<ArchiveId>,
+        a: Option<ftml_uris::ArchiveId>,
         p: Option<String>,
         m: Option<String>,
     ) -> impl Future<Output = Result<Module, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
@@ -267,10 +266,10 @@ pub trait FlamsBackend {
         &self,
         uri: Option<DocumentUri>,
         rp: Option<String>,
-        a: Option<ArchiveId>,
+        a: Option<ftml_uris::ArchiveId>,
         p: Option<String>,
         d: Option<String>,
-        l: Option<Language>,
+        l: Option<ftml_uris::Language>,
     ) -> impl Future<Output = Result<Document, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
 
     /// `/content/notations`
@@ -279,11 +278,11 @@ pub trait FlamsBackend {
         &self,
         uri: Option<Uri>,
         rp: Option<String>,
-        a: Option<ArchiveId>,
+        a: Option<ftml_uris::ArchiveId>,
         p: Option<String>,
         d: Option<String>,
         m: Option<String>,
-        l: Option<Language>,
+        l: Option<ftml_uris::Language>,
         e: Option<String>,
         s: Option<String>,
     ) -> impl Future<
@@ -298,7 +297,7 @@ pub trait FlamsBackend {
     fn get_logical_paragraphs(
         &self,
         uri: Option<SymbolUri>,
-        a: Option<ArchiveId>,
+        a: Option<ftml_uris::ArchiveId>,
         p: Option<String>,
         m: Option<String>,
         s: Option<String>,

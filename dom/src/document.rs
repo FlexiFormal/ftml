@@ -6,7 +6,7 @@ use crate::{
     toc::{CurrentId, NavElems, TOCElem},
     utils::{ContextChain, owned},
 };
-use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenDomainElement};
+use ftml_core::extraction::ArgumentPosition;
 use ftml_ontology::narrative::elements::{
     SectionLevel,
     paragraphs::{ParagraphFormatting, ParagraphKind},
@@ -46,7 +46,13 @@ pub fn setup_document<Ch: IntoView + 'static>(
     uri: DocumentUri,
     children: impl FnOnce() -> Ch,
 ) -> impl IntoView {
-    provide_context(RwSignal::new(DomExtractor::new(uri.clone(), uri.into())));
+    provide_context(RwSignal::new(DomExtractor::new(
+        uri.clone(),
+        uri.clone().into(),
+    )));
+    provide_context(InDocument(uri.clone()));
+    provide_context(CurrentUri(uri.clone().into()));
+    provide_context(ContextUri(uri.into()));
     provide_context(SectionCounters::default());
     provide_context(RwSignal::new(CurrentTOC::default()));
     provide_context(RwSignal::new(NavElems::new()));
@@ -59,36 +65,40 @@ struct InInputref(bool);
 #[derive(Clone, PartialEq, Eq)]
 pub struct WithHead(pub Option<VarOrSym>);
 
-pub struct InArgument(pub ArgumentPosition);
+#[derive(Clone, PartialEq, Eq)]
+struct InDocument(DocumentUri);
+
+#[derive(Clone, PartialEq, Eq)]
+struct ContextUri(NarrativeUri);
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct CurrentUri(pub NarrativeUri);
 
 pub struct DocumentState;
 impl DocumentState {
     /// ### Panics
     pub fn current_uri() -> NarrativeUri {
-        with_context::<RwSignal<DomExtractor>, _>(|s| {
-            s.with_untracked(|e| e.get_narrative_uri().owned())
+        with_context::<CurrentUri, _>(|s| {
+            s.0.clone() //s.with_untracked(|e| e.state.document.clone())
         })
         .expect("Not in a document context")
     }
 
     /// ### Panics
     pub fn document_uri() -> DocumentUri {
-        with_context::<RwSignal<DomExtractor>, _>(|s| {
-            s.with_untracked(|e| e.state.document.clone())
+        with_context::<InDocument, _>(|s| {
+            s.0.clone() //s.with_untracked(|e| e.state.document.clone())
         })
         .expect("Not in a document context")
     }
 
     /// ### Panics
     pub fn context_uri() -> NarrativeUri {
-        with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(|e| e.context.clone()))
-            .expect("Not in a document context")
+        with_context::<ContextUri, _>(|s| s.0.clone()).expect("Not in a document context")
     }
 
-    /// ### Panics
-    pub fn in_term() -> bool {
-        with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(DomExtractor::in_term))
-            .expect("Not in a document context")
+    pub fn current_term_head() -> Option<VarOrSym> {
+        use_context::<WithHead>().and_then(|w| w.0)
     }
 
     pub fn with_head<V: IntoView, F: FnOnce() -> V>(
@@ -105,36 +115,6 @@ impl DocumentState {
     pub fn finished_parsing() -> ReadSignal<bool> {
         with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(|e| e.is_done_read))
             .expect("Not in a document context")
-    }
-
-    pub fn current_term_head() -> Option<VarOrSym> {
-        if let Some(WithHead(Some(h))) = use_context() {
-            return Some(h);
-        }
-        with_context::<RwSignal<DomExtractor>, _>(|s| {
-            s.with_untracked(|e| {
-                for e in e.iterate_domain() {
-                    match e {
-                        OpenDomainElement::SymbolReference { uri, .. } => {
-                            return Some(VarOrSym::S(uri.clone()));
-                        }
-                        OpenDomainElement::VariableReference { var, .. } => {
-                            return Some(VarOrSym::V(var.clone()));
-                        }
-                        OpenDomainElement::OMA { head, .. }
-                        | OpenDomainElement::OMBIND { head, .. } => return Some(head.clone()),
-                        OpenDomainElement::Module { .. }
-                        | OpenDomainElement::SymbolDeclaration { .. }
-                        | OpenDomainElement::Argument { .. }
-                        | OpenDomainElement::Type { .. }
-                        | OpenDomainElement::Definiens { .. } => return None,
-                        OpenDomainElement::Comp => (),
-                    }
-                }
-                None
-            })
-        })
-        .flatten()
     }
 
     #[inline]
@@ -169,7 +149,13 @@ impl DocumentState {
         f: F,
     ) -> impl IntoView + use<V, F> {
         let context = Self::context_uri() & uri.name();
-        provide_context(RwSignal::new(DomExtractor::new(target, context.into())));
+        provide_context(RwSignal::new(DomExtractor::new(
+            target.clone(),
+            context.clone().into(),
+        )));
+        provide_context(CurrentUri(target.clone().into()));
+        provide_context(InDocument(target));
+        provide_context(ContextUri(context.into()));
         f()
     }
 
@@ -178,6 +164,9 @@ impl DocumentState {
             DocumentUri::no_doc().clone(),
             DocumentUri::no_doc().clone().into(),
         )));
+        provide_context(InDocument(DocumentUri::no_doc().clone()));
+        provide_context(ContextUri(DocumentUri::no_doc().clone().into()));
+        provide_context(CurrentUri(DocumentUri::no_doc().clone().into()));
         f()
     }
 

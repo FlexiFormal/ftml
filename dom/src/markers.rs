@@ -2,9 +2,9 @@ use crate::{
     FtmlViews,
     clonable_views::MarkedNode,
     counters::LogicalLevel,
-    document::DocumentState,
+    document::{CurrentUri, DocumentState, WithHead},
     extractor::DomExtractor,
-    terms::{ReactiveApplication, ReactiveTerm},
+    terms::ReactiveTerm,
     utils::{
         ContextChain,
         actions::{OneShot, SetOneShotDone},
@@ -20,10 +20,7 @@ use ftml_ontology::{
     terms::Variable,
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, SymbolUri};
-use leptos::{
-    IntoView,
-    prelude::{IntoAny, Memo, RwSignal, with_context},
-};
+use leptos::prelude::{AnyView, IntoAny, Memo, RwSignal, provide_context, use_context};
 use leptos_posthoc::OriginalNode;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -45,6 +42,7 @@ pub enum Marker {
     },
     SkipSection,
     SectionTitle,
+    ParagraphTitle,
     Comp,
     OMA {
         uri: Option<DocumentElementUri>,
@@ -106,17 +104,16 @@ impl Marker {
         invisible: bool,
         is_math: bool,
         orig: OriginalNode,
-    ) -> impl IntoView {
-        #[allow(clippy::enum_glob_use)]
-        use leptos::either::EitherOf15::*;
+    ) -> AnyView {
         let Some(m) = markers.pop() else {
-            return A(leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
+            return leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
                 orig,
                 cont: super::iterate::<Views>,
                 skip_head: true,
                 class: None::<String>.into(),
                 style: None::<String>.into(),
-            }));
+            })
+            .into_any();
         };
         if invisible {
             tracing::debug!("skipping invisibles");
@@ -129,45 +126,51 @@ impl Marker {
             | Self::VariableReference { .. }
                 if invisible =>
             {
-                B(Self::apply::<Views>(markers, invisible, is_math, orig).into_any())
+                Self::apply::<Views>(markers, invisible, is_math, orig)
             }
-            Self::Section(uri) => C(DocumentState::new_section(uri, move |info| {
-                Views::section(info, move || {
-                    Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
+            Self::Section(uri) => {
+                provide_context(CurrentUri(uri.clone().into()));
+                DocumentState::new_section(uri, move |info| {
+                    Views::section(info, move || {
+                        Self::apply::<Views>(markers, invisible, is_math, orig)
+                    })
                 })
-            })),
-            Self::SkipSection => D(DocumentState::skip_section(move || {
-                Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
-            })),
+                .into_any()
+            }
+            Self::SkipSection => DocumentState::skip_section(move || {
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            })
+            .into_any(),
             Self::SectionTitle => {
                 let (LogicalLevel::Section(lvl), cls) = DocumentState::title_class() else {
                     tracing::error!("Unexpected section title");
-                    return E(Self::apply::<Views>(markers, invisible, is_math, orig).into_any());
+                    return Self::apply::<Views>(markers, invisible, is_math, orig);
                 };
-                F(Views::section_title(lvl, cls, move || {
-                    Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
-                }))
+                Views::section_title(lvl, cls, move || {
+                    Self::apply::<Views>(markers, invisible, is_math, orig)
+                })
+                .into_any()
             }
+            Self::ParagraphTitle => Views::paragraph_title(move || {
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            })
+            .into_any(),
             Self::InputRef { target, uri } => {
-                H(DocumentState::do_inputref(target, uri, Views::inputref))
+                DocumentState::do_inputref(target, uri, Views::inputref).into_any()
             }
             Self::Argument(pos) => {
                 ContextChain::provide(Some(pos));
-                if let Some(r) =
-                    with_context::<Option<ReactiveTerm>, _>(|t| t.as_ref().map(|t| t.app)).flatten()
-                {
+                provide_context(WithHead(None));
+                if let Some(r) = use_context::<Option<ReactiveTerm>>().flatten() {
                     let node = MarkedNode::new(markers, orig, is_math, false).into();
-                    M(
-                        //owned!(
-                        ReactiveApplication::add_argument::<Views>(r, pos, node), //)
-                    )
+                    r.add_argument::<Views>(pos, node).into_any()
                 } else {
-                    B(Self::apply::<Views>(markers, invisible, is_math, orig).into_any())
+                    Self::apply::<Views>(markers, invisible, is_math, orig)
                 }
             }
             Self::CurrentSectionLevel(cap) => {
                 let lvl = DocumentState::current_section_level();
-                N(match (lvl, cap) {
+                match (lvl, cap) {
                     (LogicalLevel::None, true) => "Document",
                     (LogicalLevel::None, _) => "document",
                     (LogicalLevel::Section(SectionLevel::Part), true) => "Part",
@@ -184,51 +187,74 @@ impl Marker {
                     (LogicalLevel::BeamerSlide, _) => "slide",
                     (_, true) => "Paragraph",
                     (_, _) => "paragraph",
-                })
+                }
+                .into_any()
             }
-            Self::Comp => G(Views::comp(
-                MarkedNode::new(markers, orig, is_math, true).into(),
-            )),
+            Self::Comp => {
+                Views::comp(MarkedNode::new(markers, orig, is_math, true).into()).into_any()
+            }
             Self::SymbolReference {
                 uri,
                 notation,
                 in_term,
-            } => I(Views::symbol_reference(
-                uri,
-                notation,
-                in_term,
-                MarkedNode::new(markers, orig, is_math, true).into(),
-            )),
+            } => {
+                provide_context(WithHead(Some(VarOrSym::S(uri.clone()))));
+                Views::symbol_reference(
+                    uri,
+                    notation,
+                    in_term,
+                    MarkedNode::new(markers, orig, is_math, true).into(),
+                )
+                .into_any()
+            }
             Self::VariableReference {
                 var,
                 notation,
                 in_term,
-            } => J(Views::variable_reference(
-                var,
-                notation,
-                in_term,
-                MarkedNode::new(markers, orig, is_math, true).into(),
-            )),
+            } => {
+                provide_context(WithHead(Some(VarOrSym::V(var.clone()))));
+                Views::variable_reference(
+                    var,
+                    notation,
+                    in_term,
+                    MarkedNode::new(markers, orig, is_math, true).into(),
+                )
+                .into_any()
+            }
             Self::OMA {
                 head,
                 notation,
                 uri,
-            } => K(Views::application(
-                head,
-                notation,
-                uri,
-                MarkedNode::new(markers, orig, is_math, true).into(),
-            )),
+            } => {
+                provide_context(WithHead(Some(head.clone())));
+                if let Some(uri) = &uri {
+                    provide_context(CurrentUri(uri.clone().into()));
+                }
+                Views::application(
+                    head,
+                    notation,
+                    uri,
+                    MarkedNode::new(markers, orig, is_math, true).into(),
+                )
+                .into_any()
+            }
             Self::OMBIND {
                 head,
                 notation,
                 uri,
-            } => L(Views::binder_application(
-                head,
-                notation,
-                uri,
-                MarkedNode::new(markers, orig, is_math, true).into(),
-            )),
+            } => {
+                provide_context(WithHead(Some(head.clone())));
+                if let Some(uri) = &uri {
+                    provide_context(CurrentUri(uri.clone().into()));
+                }
+                Views::binder_application(
+                    head,
+                    notation,
+                    uri,
+                    MarkedNode::new(markers, orig, is_math, true).into(),
+                )
+                .into_any()
+            }
             Self::Paragraph {
                 uri,
                 kind,
@@ -236,23 +262,18 @@ impl Marker {
                 styles,
                 fors,
             } => {
+                provide_context(CurrentUri(uri.clone().into()));
                 if *uri.document_uri() != *DocumentUri::no_doc() {
                     LOCAL_CACHE
                         .paragraphs
                         .insert(uri.clone(), orig.html_string());
                 }
-                O(DocumentState::new_paragraph(
-                    uri,
-                    kind,
-                    formatting,
-                    styles,
-                    fors,
-                    move |info| {
-                        Views::paragraph(info, move || {
-                            Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
-                        })
-                    },
-                ))
+                DocumentState::new_paragraph(uri, kind, formatting, styles, fors, move |info| {
+                    Views::paragraph(info, move || {
+                        Self::apply::<Views>(markers, invisible, is_math, orig)
+                    })
+                })
+                .into_any()
             }
         }
     }
@@ -280,6 +301,7 @@ impl Marker {
             OpenFtmlElement::Comp => Some(Self::Comp),
             OpenFtmlElement::SkipSection => Some(Self::SkipSection),
             OpenFtmlElement::SectionTitle => Some(Self::SectionTitle),
+            OpenFtmlElement::ParagraphTitle => Some(Self::ParagraphTitle),
             OpenFtmlElement::Section(uri) => Some(Self::Section(uri.clone())),
             OpenFtmlElement::SymbolReference { uri, notation } => Some(Self::SymbolReference {
                 uri: uri.clone(),
@@ -337,8 +359,8 @@ impl Marker {
             | OpenFtmlElement::ArgSep
             | OpenFtmlElement::ImportModule(_)
             | OpenFtmlElement::UseModule(_)
+            | OpenFtmlElement::Definiendum(_)
             | OpenFtmlElement::VariableDeclaration { .. }
-            | OpenFtmlElement::ParagraphTitle
             | OpenFtmlElement::None => None,
         }
     }

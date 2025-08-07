@@ -1,6 +1,6 @@
 use crate::{config::FtmlConfigState, utils::LocalCacheExt};
 use ftml_dom::{
-    ClonableView, DocumentState,
+    ClonableView,
     notations::NotationExt,
     terms::ReactiveApplication,
     utils::local_cache::{GlobalLocal, LocalCache, SendBackend},
@@ -17,13 +17,18 @@ pub fn has_notation<B: SendBackend>(
 ) -> impl IntoView + use<B> + 'static {
     use leptos::either::Either::{Left, Right};
     let notation = FtmlConfigState::notation_preference(&uri);
-    let finished = DocumentState::finished_parsing();
+    let finished = RwSignal::new(false);
+    let _ = Effect::new(move || finished.set(true));
 
     move || {
         notation.get().map_or_else(
             || Left(children.clone().into_view::<crate::Views<B>>()),
             |notation| {
-                if finished.get() {
+                if finished.try_get().is_some_and(|b| b) {
+                    tracing::trace!(
+                        "Replacing notation for {uri} with {:?} arguments",
+                        arguments.as_ref().map(|v| v.with_untracked(|v| v.len()))
+                    );
                     Right(with_notation::<B>(
                         uri.clone(),
                         notation,
@@ -51,7 +56,7 @@ pub fn with_notation<B: SendBackend>(
         |c| c.get_notation(h, notation),
         move |n| {
             match arguments {
-                None => Left(n.as_view_safe::<crate::Views<B>>(&head.into())),
+                None => Left(n.as_op::<crate::Views<B>>(&head.into())),
                 Some(s) => {
                     let args = s.with(|s| {
                         if let ReactiveApplication::Closed(c) = s {
@@ -60,7 +65,7 @@ pub fn with_notation<B: SendBackend>(
                             Vec::new()
                         }
                     });
-                    Right(n.with_arguments_safe::<crate::Views<B>, _>(&head.into(), &args))
+                    Right(n.with_arguments::<crate::Views<B>, _>(&head.into(), &args))
                 }
             }
             .attr("style", "border: 1px dotted red;")

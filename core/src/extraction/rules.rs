@@ -163,10 +163,12 @@ pub fn skipsection<E: FtmlExtractor>(
 
 pub fn title<E: FtmlExtractor>(
     ext: &mut E,
-    _attrs: &mut E::Attributes<'_>,
-    _keys: &mut KeyList,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
     node: &E::Node,
 ) -> Result<E> {
+    del!(keys - Invisible);
+    attrs.remove(FtmlKey::Invisible);
     let mut iter = ext.iterate_narrative();
     while let Some(e) = iter.next() {
         match e {
@@ -183,6 +185,7 @@ pub fn title<E: FtmlExtractor>(
             | OpenNarrativeElement::NotationComp { .. }
             | OpenNarrativeElement::ArgSep { .. }
             | OpenNarrativeElement::VariableDeclaration { .. }
+            | OpenNarrativeElement::Definiendum(_)
             | OpenNarrativeElement::NotationArg(_) => {
                 break;
             }
@@ -935,6 +938,16 @@ pub fn subproof<E: FtmlExtractor>(
     do_paragraph(ext, attrs, keys, node, ParagraphKind::SubProof)
 }
 
+pub fn definiendum<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    let s = attrs.get_symbol_uri(FtmlKey::Definiendum)?;
+    ret!(ext,node <- Definiendum(s) + Definiendum)
+}
+
 /*
 
 pub fn defcomp<E: FtmlExtractor>(
@@ -1137,14 +1150,6 @@ pub fn prooftitle<E: FtmlExtractor>(
 }
 
 pub fn subprooftitle<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn definiendum<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
     keys: &mut KeyList,

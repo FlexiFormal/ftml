@@ -76,6 +76,13 @@ pub trait FtmlViews: 'static {
         }
     }
 
+    #[inline]
+    fn paragraph_title<V: IntoView>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
+        view! {
+          <div class="ftml-title-paragraph">{then()}</div>
+        }
+    }
+
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
 
     #[inline]
@@ -166,6 +173,13 @@ pub trait TermTrackedViews: 'static {
         }
     }
 
+    #[inline]
+    fn paragraph_title<V: IntoView>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
+        view! {
+          <div class="ftml-title-paragraph">{then()}</div>
+        }
+    }
+
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
 
     #[inline]
@@ -237,6 +251,11 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         <T as TermTrackedViews>::section_title(lvl, class, then)
+    }
+
+    #[inline]
+    fn paragraph_title<V: IntoView>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
+        <T as TermTrackedViews>::paragraph_title(then)
     }
 
     #[inline]

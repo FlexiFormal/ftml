@@ -7,15 +7,15 @@ use ftml_backend::FtmlBackend;
 use ftml_core::extraction::VarOrSym;
 use ftml_dom::{
     DocumentState,
-    utils::{
-        local_cache::{LocalCache, SendBackend, WithLocalCache},
-        owned,
-    },
+    notations::TermExt,
+    utils::local_cache::{LocalCache, SendBackend, WithLocalCache},
 };
+use ftml_ontology::terms::Term;
 use ftml_uris::{DocumentElementUri, LeafUri};
 use leptos::{
     IntoView,
-    prelude::{Owner, RwSignal, StoredValue, expect_context},
+    prelude::{Owner, RwSignal, StoredValue, WithValue, expect_context},
+    tachys::reactive_graph::OwnedView,
 };
 
 #[leptos::prelude::slot]
@@ -49,6 +49,7 @@ pub struct ReactiveStore {
     pub(crate) notations: Map<LeafUri, RwSignal<Option<DocumentElementUri>>>,
     pub(crate) on_clicks: Map<VarOrSym, OnClickData>,
     owner: Owner,
+    term_owner: Owner,
 }
 impl ReactiveStore {
     #[inline]
@@ -56,20 +57,31 @@ impl ReactiveStore {
         let owner = leptos::prelude::Owner::current()
             .expect("no current reactive Owner found")
             .child();
-        owner.with(|| DocumentState::no_document(|| ()));
+        owner.with(|| DocumentState::no_document(|| {}));
+        let term_owner = owner.child();
         Self {
             notations: Map::default(),
             on_clicks: Map::default(),
             owner,
+            term_owner,
         }
     }
     #[inline]
     pub fn with<R>(&self, f: impl FnOnce() -> R) -> R {
         self.owner.with(f)
     }
+
+    #[must_use]
+    pub fn render_term<Be: SendBackend>(t: Term) -> impl IntoView {
+        Self::get().with_value(|slf| {
+            slf.term_owner
+                .with(move || t.into_view_safe::<crate::Views<Be>, Be>())
+        })
+    }
+
     #[inline]
     #[must_use]
-    fn get() -> StoredValue<Self> {
+    pub(crate) fn get() -> StoredValue<Self> {
         expect_context()
     }
     /// #### Panics
@@ -89,13 +101,15 @@ impl ReactiveStore {
             (owner, r)
         };
         let vos = vos.clone();
+        let child = owner.child();
         owner.with(move || {
             let _ = {
                 view! {<Dialog open=on_clicked><DialogSurface>{
-                    owned(|| {
+                    let r = child.with(|| {
                         provide_context(slf);
                         crate::components::terms::do_onclick::<Be>(&vos,uri,allow_formals)
-                    })
+                    });
+                    OwnedView::new_with_owner(r.into_view(), child)
                 }</DialogSurface></Dialog>}
             };
             data

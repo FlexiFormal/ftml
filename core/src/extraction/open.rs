@@ -90,6 +90,7 @@ pub enum OpenFtmlElement {
     CurrentSectionLevel(bool),
     ImportModule(ModuleUri),
     UseModule(ModuleUri),
+    Definiendum(SymbolUri),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -119,6 +120,7 @@ pub enum CloseFtmlElement {
     DocTitle,
     Comp,
     Paragraph,
+    Definiendum,
 }
 
 #[derive(Debug, Clone)]
@@ -215,6 +217,7 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
     },
     NotationArg(ArgumentPosition),
     Invisible,
+    Definiendum(SymbolUri),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -740,6 +743,10 @@ impl OpenFtmlElement {
                     title: None,
                     children: Vec::new(),
                 }),
+            },
+            Self::Definiendum(s) => Split::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::Definiendum(s)),
             },
             Self::NotationComp => Split::Open {
                 domain: None,
