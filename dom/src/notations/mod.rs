@@ -104,7 +104,7 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
                             {
 
                                 if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                                    Left(Views::comp(ClonableView::new(true,|| leptos::math::mo().child(","))))
+                                    Left(Views::comp(false,ClonableView::new(true,|| leptos::math::mo().child(","))))
                                 } else {
                                     Right(leptos::math::mo().child(","))
                                 }
@@ -201,9 +201,12 @@ impl NotationExt for Notation {
                 |op| {
                     let op = op.clone();
                     if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                        Views::comp(ClonableView::new(true, move || {
-                            view_node(&op).attr("data-ftml-comp", "")
-                        }))
+                        Views::comp(
+                            false,
+                            ClonableView::new(true, move || {
+                                view_node(&op).attr("data-ftml-comp", "")
+                            }),
+                        )
                         .into_any()
                     } else {
                         view_node(&op).attr("data-ftml-comp", "").into_any()
@@ -248,9 +251,10 @@ pub(crate) fn view_component_with_args<Views: FtmlViews>(
         NotationComponent::Comp(n) | NotationComponent::MainComp(n) => {
             let n = n.clone();
             if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                Views::comp(ClonableView::new(true, move || {
-                    view_node(&n).attr("data-ftml-comp", "")
-                }))
+                Views::comp(
+                    false,
+                    ClonableView::new(true, move || view_node(&n).attr("data-ftml-comp", "")),
+                )
                 .into_any()
             } else {
                 view_node(&n).attr("data-ftml-comp", "").into_any()

@@ -1,7 +1,9 @@
 use std::{borrow::Cow, str::FromStr};
 
 use ftml_ontology::terms::Variable;
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, Uri};
+use ftml_uris::{
+    DocumentElementUri, DocumentUri, DomainUri, Id, Language, ModuleUri, SymbolUri, Uri,
+};
 
 use super::Result;
 use crate::{
@@ -124,6 +126,15 @@ pub trait Attributes {
         self.take_typed(key, SymbolUri::from_str)
     }
 
+    /// #### Errors
+    #[inline]
+    fn take_symbol_or_module_uri(&mut self, key: FtmlKey) -> Result<ModuleUri> {
+        match self.take_typed(key, DomainUri::from_str)? {
+            DomainUri::Module(m) => Ok(m),
+            DomainUri::Symbol(s) => Ok(s.into_module()),
+        }
+    }
+
     /// ### Errors
     fn get_symbol_or_var(
         &mut self,
@@ -202,7 +213,7 @@ pub trait Attributes {
             |m| {
                 v.as_ref()
                     .parse()
-                    .map(|v| m.clone() / &v)
+                    .map(|v| m.into_owned() / &v)
                     .map_err(|e| (key, e).into())
             },
         )
@@ -226,7 +237,7 @@ pub trait Attributes {
             },
             |m| {
                 v.parse()
-                    .map(|v| m.clone() / &v)
+                    .map(|v| m.into_owned() / &v)
                     .map_err(|e| (key, e).into())
             },
         )
@@ -245,7 +256,7 @@ pub trait Attributes {
         let module = extractor.get_domain_uri(in_elem)?;
         v.as_ref()
             .parse()
-            .map(|v| module.clone() | v)
+            .map(|v| module.into_owned() | v)
             .map_err(|e| (key, e).into())
     }
 
@@ -261,7 +272,7 @@ pub trait Attributes {
         };
         let module = extractor.get_domain_uri(in_elem)?;
         v.parse()
-            .map(|v| module.clone() | v)
+            .map(|v| module.into_owned() | v)
             .map_err(|e| (key, e).into())
     }
 

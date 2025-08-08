@@ -251,6 +251,7 @@ dict! {
     /// complement class.
     complementOf << ObjectProperty;
 
+    #[allow(clippy::doc_markdown)]
     /// Syntactically, `owl:inverseOf` is a built-in OWL property with `owl:ObjectProperty` as its
     /// domain and range. An axiom of the form $P_1$ `owl:inverseOf` $P_2$ asserts that for every
     /// pair $(x,y)$ in the property extension of $P_1$, there is a pair $(y,x)$ in the property
@@ -274,6 +275,7 @@ dict! {
     /// `owl:ObjectProperty`.
     TransitiveProperty :Class <: ObjectProperty;
 
+    #[allow(clippy::doc_markdown)]
     /// A functional property is a property that can have only one (unique) value $y$ for each
     /// instance $x$, i.e. there cannot be two distinct values $y_1$ and $y_2$ such that the pairs
     /// $(x,y_1)$ and $(x,y_2)$ are both instances of this property. Both object properties and

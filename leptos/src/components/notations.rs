@@ -27,7 +27,9 @@ pub fn has_notation<B: SendBackend>(
                 if finished.try_get().is_some_and(|b| b) {
                     tracing::trace!(
                         "Replacing notation for {uri} with {:?} arguments",
-                        arguments.as_ref().map(|v| v.with_untracked(|v| v.len()))
+                        arguments
+                            .as_ref()
+                            .map(|v| v.with_untracked(ReactiveApplication::len))
                     );
                     Right(with_notation::<B>(
                         uri.clone(),

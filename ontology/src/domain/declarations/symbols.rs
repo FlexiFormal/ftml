@@ -26,6 +26,8 @@ pub struct SymbolData {
     pub role: Box<[Id]>,
     pub tp: Option<Term>,
     pub df: Option<Term>,
+    pub return_type: Option<Term>,
+    pub argument_types: Box<[Term]>,
     pub assoctype: Option<AssocType>,
     pub reordering: Option<Id>,
 }

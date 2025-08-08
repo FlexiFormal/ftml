@@ -414,16 +414,15 @@ impl Solutions {
                                     } else {
                                         s.parse::<i32>().ok().map(|i| i as f32)
                                     };
-                                    if let Some(f) = num {
-                                        if !from.is_some_and(|v| f < v)
-                                            && !to.is_some_and(|v| f > v)
-                                        {
-                                            if *verdict {
-                                                pts += 1.0;
-                                            }
-                                            fill_correct = Some(*verdict);
-                                            matching = Some(i);
+                                    if let Some(f) = num
+                                        && !from.is_some_and(|v| f < v)
+                                        && !to.is_some_and(|v| f > v)
+                                    {
+                                        if *verdict {
+                                            pts += 1.0;
                                         }
+                                        fill_correct = Some(*verdict);
+                                        matching = Some(i);
                                     }
                                 }
                                 options.push(FillinFeedback {

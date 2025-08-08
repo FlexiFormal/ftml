@@ -39,7 +39,7 @@ pub trait TermExt {
 macro_rules! maybe_comp {
     ($e:expr) => {
         if with_context::<CurrentUri, _>(|_| ()).is_some() {
-            leptos::either::Either::Left(Views::comp(ClonableView::new(true, move || $e)))
+            leptos::either::Either::Left(Views::comp(false, ClonableView::new(true, move || $e)))
         } else {
             leptos::either::Either::Right($e)
         }

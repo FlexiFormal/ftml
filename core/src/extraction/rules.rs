@@ -189,7 +189,9 @@ pub fn title<E: FtmlExtractor>(
             | OpenNarrativeElement::NotationArg(_) => {
                 break;
             }
-            OpenNarrativeElement::Module { .. } | OpenNarrativeElement::Invisible => (),
+            OpenNarrativeElement::Module { .. }
+            | OpenNarrativeElement::MathStructure { .. }
+            | OpenNarrativeElement::Invisible => (),
         }
     }
     Err(FtmlExtractionError::NotIn(
@@ -250,7 +252,7 @@ pub fn symdecl<E: FtmlExtractor>(
         .get(FtmlKey::Macroname)
         .map(|s| s.as_ref().parse())
         .transpose()
-        .map_err(|_| (FtmlKey::ArgumentReordering, ()))?;
+        .map_err(|_| (FtmlKey::Macroname, ()))?;
     del!(keys - Role, AssocType, Args, ArgumentReordering, Macroname);
     ret!(ext,node <- SymbolDeclaration {
         uri,
@@ -260,6 +262,8 @@ pub fn symdecl<E: FtmlExtractor>(
             role,
             assoctype,
             reordering,
+            return_type:None,
+            argument_types:Box::new([]),
             tp: None,
             df: None,
         }),
@@ -320,7 +324,7 @@ fn do_vardef<E: FtmlExtractor>(
         .get(FtmlKey::Macroname)
         .map(|s| s.as_ref().parse())
         .transpose()
-        .map_err(|_| (FtmlKey::ArgumentReordering, ()))?;
+        .map_err(|_| (FtmlKey::Macroname, ()))?;
     let bind = attrs.get_bool(FtmlKey::Bind);
 
     del!(
@@ -359,16 +363,29 @@ pub fn type_component<E: FtmlExtractor>(
     ret!(ext,node <- Type + Type)
 }
 
-pub fn definiens<E: FtmlExtractor>(
+pub fn return_type<E: FtmlExtractor>(
     ext: &mut E,
     _attrs: &mut E::Attributes<'_>,
     _keys: &mut KeyList,
     node: &E::Node,
 ) -> Result<E> {
     if ext.in_term() {
+        return Err(FtmlExtractionError::InvalidIn(FtmlKey::ReturnType, "terms"));
+    }
+    ret!(ext,node <- ReturnType + ReturnType)
+}
+
+pub fn definiens<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    if ext.in_term() {
         return Err(FtmlExtractionError::InvalidIn(FtmlKey::Definiens, "terms"));
     }
-    ret!(ext,node <- Definiens + Definiens)
+    let uri = opt!(attrs.get_symbol_uri(FtmlKey::Definiens));
+    ret!(ext,node <- Definiens(uri) + Definiens)
 }
 
 pub fn style<E: FtmlExtractor>(
@@ -426,13 +443,29 @@ pub fn module<E: FtmlExtractor>(
     } + Module)
 }
 
+pub fn mathstructure<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    let uri = attrs.take_new_symbol_uri(FtmlKey::MathStructure, FtmlKey::MathStructure, ext)?;
+    let macroname = attrs
+        .get(FtmlKey::Macroname)
+        .map(|s| s.as_ref().parse())
+        .transpose()
+        .map_err(|_| (FtmlKey::Macroname, ()))?;
+    del!(keys - Macroname);
+    ret!(ext,node <- MathStructure{uri,macroname} + MathStructure)
+}
+
 pub fn usemodule<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
     _keys: &mut KeyList,
     node: &E::Node,
 ) -> Result<E> {
-    let uri = attrs.take_module_uri(FtmlKey::UseModule)?;
+    let uri = attrs.take_symbol_or_module_uri(FtmlKey::UseModule)?;
     ret!(ext,node <- UseModule(uri))
 }
 
@@ -442,10 +475,11 @@ pub fn importmodule<E: FtmlExtractor>(
     _keys: &mut KeyList,
     node: &E::Node,
 ) -> Result<E> {
-    let uri = attrs.take_module_uri(FtmlKey::UseModule)?;
+    let uri = attrs.take_symbol_or_module_uri(FtmlKey::ImportModule)?;
     ret!(ext,node <- ImportModule(uri))
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn term<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
@@ -497,16 +531,22 @@ pub fn term<E: FtmlExtractor>(
                 None
                 | Some(
                     OpenDomainElement::Module { .. }
+                    | OpenDomainElement::MathStructure { .. }
                     | OpenDomainElement::SymbolDeclaration { .. }
                     | OpenDomainElement::SymbolReference { .. }
                     | OpenDomainElement::VariableReference { .. }
                     | OpenDomainElement::OMA { .. }
                     | OpenDomainElement::OMBIND { .. }
+                    | OpenDomainElement::OML { .. }
+                    | OpenDomainElement::ComplexTerm { .. }
                     | OpenDomainElement::Type { .. }
+                    | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. },
                 ) => false,
-                Some(OpenDomainElement::Argument { .. }) => true,
-                Some(OpenDomainElement::Comp) => {
+                Some(OpenDomainElement::Argument { .. } | OpenDomainElement::HeadTerm { .. }) => {
+                    true
+                }
+                Some(OpenDomainElement::Comp | OpenDomainElement::DefComp) => {
                     return Err(FtmlExtractionError::InvalidIn(
                         FtmlKey::Term,
                         "notation components",
@@ -515,14 +555,15 @@ pub fn term<E: FtmlExtractor>(
             })
     };
 
+    if let VarOrSym::V(Variable::Ref { declaration, .. }) = &head {
+        attrs.set(FtmlKey::Head.attr_name(), declaration);
+    }
+
     match (kind, head) {
         (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::S(uri)) => {
             ret!(ext,node <- SymbolReference{uri,notation} + SymbolReference)
         }
         (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::V(var)) => {
-            if let Variable::Ref { declaration, .. } = &var {
-                attrs.set(FtmlKey::Head.attr_name(), declaration);
-            }
             ret!(ext,node <- VariableReference{var,notation} + VariableReference)
         }
         (OpenTermKind::OMA, head) => {
@@ -531,9 +572,6 @@ pub fn term<E: FtmlExtractor>(
             } else {
                 Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
             };
-            if let VarOrSym::V(Variable::Ref { declaration, .. }) = &head {
-                attrs.set(FtmlKey::Head.attr_name(), declaration);
-            }
             ret!(ext,node <- OMA{head,notation,uri} + OMA)
         }
         (OpenTermKind::OMBIND, head) => {
@@ -542,38 +580,26 @@ pub fn term<E: FtmlExtractor>(
             } else {
                 Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
             };
-            if let VarOrSym::V(Variable::Ref { declaration, .. }) = &head {
-                attrs.set(FtmlKey::Head.attr_name(), declaration);
-            }
             ret!(ext,node <- OMBIND{head,notation,uri} + OMBIND)
+        }
+        (OpenTermKind::Complex, head) => {
+            let uri = if in_term(ext)? {
+                None
+            } else {
+                Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
+            };
+            ret!(ext,node <- ComplexTerm{head,notation,uri} + ComplexTerm)
+        }
+        (OpenTermKind::OML, VarOrSym::V(Variable::Name { name, .. })) => {
+            // SAFETY: names are valid UriNames
+            let name = unsafe { name.as_ref().parse().unwrap_unchecked() };
+            ret!(ext,node <- OML{name} + OML)
+        }
+        (OpenTermKind::OML, VarOrSym::V(Variable::Ref { declaration, .. })) => {
+            ret!(ext,node <- OML{name:declaration.name} + OML)
         }
         (k, _) => crate::TODO!("{k:?}"),
     }
-
-    /*
-    let term = match (kind, head) {
-        (OpenTermKind::OML, VarOrSym::V(PreVar::Unresolved(name))) => {
-            extractor.open_decl();
-            OpenTerm::OML { name } //, tp: None, df: None }
-        }
-        (OpenTermKind::Complex, head) => {
-            extractor.open_complex_term();
-            OpenTerm::Complex(head)
-        }
-        (k, head) => {
-            extractor.add_error(FTMLError::InvalidHeadForTermKind(k, head.clone()));
-            extractor.open_args();
-            OpenTerm::OMA { head, notation } //, args: SmallVec::new() }
-        }
-    };
-    let is_top = if extractor.in_term() {
-        false
-    } else {
-        extractor.set_in_term(true);
-        true
-    };
-    Some(OpenFTMLElement::OpenTerm { term, is_top })
-    */
 }
 
 pub fn arg<E: FtmlExtractor>(
@@ -604,10 +630,11 @@ pub fn arg<E: FtmlExtractor>(
 
 pub fn headterm<E: FtmlExtractor>(
     ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
+    _attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
 ) -> Result<E> {
-    crate::TODO!()
+    ret!(ext,node <- HeadTerm + HeadTerm)
 }
 
 fn do_comp<E: FtmlExtractor>(ext: &mut E, node: &E::Node) -> Result<E> {
@@ -616,16 +643,22 @@ fn do_comp<E: FtmlExtractor>(ext: &mut E, node: &E::Node) -> Result<E> {
             OpenDomainElement::SymbolReference { .. }
             | OpenDomainElement::OMA { .. }
             | OpenDomainElement::OMBIND { .. }
+            | OpenDomainElement::ComplexTerm { .. }
+            | OpenDomainElement::OML { .. }
             | OpenDomainElement::VariableReference { .. },
         ) => (),
         None
         | Some(
             OpenDomainElement::Module { .. }
+            | OpenDomainElement::MathStructure { .. }
             | OpenDomainElement::SymbolDeclaration { .. }
             | OpenDomainElement::Argument { .. }
+            | OpenDomainElement::HeadTerm { .. }
             | OpenDomainElement::Type { .. }
+            | OpenDomainElement::ReturnType { .. }
             | OpenDomainElement::Definiens { .. }
-            | OpenDomainElement::Comp,
+            | OpenDomainElement::Comp
+            | OpenDomainElement::DefComp,
         ) => {
             return Err(FtmlExtractionError::NotIn(FtmlKey::Comp, "a term"));
         }
@@ -667,6 +700,40 @@ pub fn maincomp<E: FtmlExtractor>(
         return ret!(ext,node <- None + MainCompInNotation);
     }
     do_comp(ext, node)
+}
+
+pub fn defcomp<E: FtmlExtractor>(
+    ext: &mut E,
+    _attrs: &mut E::Attributes<'_>,
+    _keys: &mut KeyList,
+    node: &E::Node,
+) -> Result<E> {
+    match ext.iterate_domain().next() {
+        Some(
+            OpenDomainElement::SymbolReference { .. }
+            | OpenDomainElement::OMA { .. }
+            | OpenDomainElement::OMBIND { .. }
+            | OpenDomainElement::OML { .. }
+            | OpenDomainElement::ComplexTerm { .. }
+            | OpenDomainElement::VariableReference { .. },
+        ) => (),
+        None
+        | Some(
+            OpenDomainElement::Module { .. }
+            | OpenDomainElement::MathStructure { .. }
+            | OpenDomainElement::SymbolDeclaration { .. }
+            | OpenDomainElement::Argument { .. }
+            | OpenDomainElement::HeadTerm { .. }
+            | OpenDomainElement::Type { .. }
+            | OpenDomainElement::ReturnType { .. }
+            | OpenDomainElement::Definiens { .. }
+            | OpenDomainElement::Comp
+            | OpenDomainElement::DefComp,
+        ) => {
+            return Err(FtmlExtractionError::NotIn(FtmlKey::DefComp, "a term"));
+        }
+    }
+    ret!(ext,node <- DefComp + DefComp)
 }
 
 pub fn notation<E: FtmlExtractor>(
@@ -724,16 +791,6 @@ pub fn notation<E: FtmlExtractor>(
 
     del!(keys - NotationFragment, Precedence, Argprecs);
     ret!(ext,node <- Notation{id,uri,head,prec,argprecs} + Notation)
-
-    /*
-    extractor.open_notation();
-    Some(OpenFTMLElement::Notation {
-        id,
-        symbol,
-        precedence: prec,
-        argprecs,
-    })
-     */
 }
 
 pub fn notation_comp<E: FtmlExtractor>(
@@ -950,23 +1007,6 @@ pub fn definiendum<E: FtmlExtractor>(
 
 /*
 
-pub fn defcomp<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-    node: &E::Node,
-) -> Result<E> {
-    crate::TODO!()
-}
-
-pub fn mathstructure<E: FtmlExtractor>(
-    ext: &mut E,
-    attrs: &mut E::Attributes<'_>,
-    keys: &mut KeyList,
-    node: &E::Node,
-) -> Result<E> {
-    crate::TODO!()
-}
 
 pub fn morphism<E: FtmlExtractor>(
     ext: &mut E,

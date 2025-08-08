@@ -44,6 +44,7 @@ pub enum Marker {
     SectionTitle,
     ParagraphTitle,
     Comp,
+    DefComp,
     OMA {
         uri: Option<DocumentElementUri>,
         head: VarOrSym,
@@ -120,6 +121,7 @@ impl Marker {
         }
         match m {
             Self::Comp
+            | Self::DefComp
             | Self::Argument(_)
             | Self::OMA { .. }
             | Self::SymbolReference { .. }
@@ -191,7 +193,10 @@ impl Marker {
                 .into_any()
             }
             Self::Comp => {
-                Views::comp(MarkedNode::new(markers, orig, is_math, true).into()).into_any()
+                Views::comp(false, MarkedNode::new(markers, orig, is_math, true).into()).into_any()
+            }
+            Self::DefComp => {
+                Views::comp(true, MarkedNode::new(markers, orig, is_math, true).into()).into_any()
             }
             Self::SymbolReference {
                 uri,
@@ -278,6 +283,7 @@ impl Marker {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn from(ext: &DomExtractor, elem: &OpenFtmlElement) -> Option<Self> {
         match elem {
             OpenFtmlElement::SetSectionLevel(lvl) => {
@@ -299,10 +305,23 @@ impl Marker {
                 uri: uri.clone(),
             }),
             OpenFtmlElement::Comp => Some(Self::Comp),
+            OpenFtmlElement::DefComp | OpenFtmlElement::Definiendum(_) => Some(Self::DefComp),
             OpenFtmlElement::SkipSection => Some(Self::SkipSection),
             OpenFtmlElement::SectionTitle => Some(Self::SectionTitle),
             OpenFtmlElement::ParagraphTitle => Some(Self::ParagraphTitle),
             OpenFtmlElement::Section(uri) => Some(Self::Section(uri.clone())),
+            OpenFtmlElement::ComplexTerm { head, notation, .. } => match head {
+                VarOrSym::S(s) => Some(Self::SymbolReference {
+                    uri: s.clone(),
+                    notation: notation.clone(),
+                    in_term: ext.in_term(),
+                }),
+                VarOrSym::V(v) => Some(Self::VariableReference {
+                    var: v.clone(),
+                    notation: notation.clone(),
+                    in_term: ext.in_term(),
+                }),
+            },
             OpenFtmlElement::SymbolReference { uri, notation } => Some(Self::SymbolReference {
                 uri: uri.clone(),
                 notation: notation.clone(),
@@ -349,19 +368,22 @@ impl Marker {
             OpenFtmlElement::Counter(_)
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::Module { .. }
+            | OpenFtmlElement::MathStructure { .. }
             | OpenFtmlElement::Style(_)
             | OpenFtmlElement::NotationArg(_)
             | OpenFtmlElement::Type
-            | OpenFtmlElement::Definiens
+            | OpenFtmlElement::ReturnType
+            | OpenFtmlElement::Definiens(_)
             | OpenFtmlElement::Notation { .. }
             | OpenFtmlElement::SymbolDeclaration { .. }
             | OpenFtmlElement::NotationComp
             | OpenFtmlElement::ArgSep
             | OpenFtmlElement::ImportModule(_)
             | OpenFtmlElement::UseModule(_)
-            | OpenFtmlElement::Definiendum(_)
             | OpenFtmlElement::VariableDeclaration { .. }
-            | OpenFtmlElement::None => None,
+            | OpenFtmlElement::None
+            | OpenFtmlElement::OML { .. }
+            | OpenFtmlElement::HeadTerm => None,
         }
     }
 }

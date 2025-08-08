@@ -70,10 +70,10 @@ impl SymbolUri {
         &self.name
     }
 
-    /// Converts this module into a [`SymbolUri`].
+    /// Converts this symbol into a [`ModuleUri`].
     ///
     /// Concatenates the name of this symbol to the name of the containing module, generating
-    /// a [`ModuleUri`] for a nested module with the name of this symbol.
+    /// a [`ModuleUri`] for a nested module / structure / morphism with the name of this symbol.
     ///
     /// # Examples
     ///

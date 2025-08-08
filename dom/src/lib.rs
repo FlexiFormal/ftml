@@ -149,8 +149,9 @@ fn iterate<Views: FtmlViews + ?Sized>(
                         Module | SymbolDeclaration | Invisible | Section | SectionTitle
                         | SkipSection | SymbolReference | VariableReference | Argument | Type
                         | Definiens | Notation | CompInNotation | NotationOpComp | NotationComp
-                        | ArgSep | MainCompInNotation | NotationArg | DocTitle
-                        | VariableDeclaration | Comp | ParagraphTitle | Definiendum => (),
+                        | ArgSep | MainCompInNotation | NotationArg | DocTitle | ReturnType
+                        | VariableDeclaration | Comp | DefComp | ParagraphTitle | Definiendum
+                        | MathStructure | ComplexTerm | HeadTerm | OML => (),
                     }
                 }
             }

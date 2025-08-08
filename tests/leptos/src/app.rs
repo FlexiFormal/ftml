@@ -84,7 +84,7 @@ macro_rules! backend {
 
         ftml_backend::new_global!(GlobalBackend = Cached(RemoteFlams [
             $(
-                concat!("http://mathhub.info?a=FTML/meta&p=tests&d=",$name,"&l=en")
+                concat!("https://mathhub.info?a=FTML/meta&p=tests&d=",$name,"&l=en")
                 => concat!("http://localhost:3000/api/get?d=",$name,".en")
             ),*
         ;$num]));
@@ -99,7 +99,7 @@ macro_rules! backend {
             fn go(uri: &str, s: &str) -> Result<(DocumentUri, Vec<Css>, String), ServerFnError<String>> {
 
                 Ok((
-                    format!("http://mathhub.info?a=FTML/meta&p=tests&d={uri}&l=en")
+                    format!("https://mathhub.info?a=FTML/meta&p=tests&d={uri}&l=en")
                         .parse()
                         .expect("is valid"),
                     Vec::new(),
@@ -115,14 +115,14 @@ macro_rules! backend {
         }
     };
 }
-backend!( 4: ["sections","para","symbolsmodules","paragraphs"]);
+backend!( 5: ["sections","para","symbolsmodules","paragraphs","structures"]);
 
 type Views = ftml_leptos::Views<GlobalBackend>;
 
 #[component]
 fn Ftml() -> impl IntoView {
     use ftml_dom::FtmlViews;
-    let uri: ftml_uris::DocumentUri = "http://mathhub.info?a=FTML/meta&p=tests&d=all&l=en"
+    let uri: ftml_uris::DocumentUri = "https://mathhub.info?a=FTML/meta&p=tests&d=all&l=en"
         .parse()
         .unwrap();
     const HTML: &str = include_str!("../public/all.en.html");

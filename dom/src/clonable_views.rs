@@ -163,7 +163,8 @@ impl MarkedNode {
                 )
             }
             //Marker::Argument(_) => child(false).into_view::<Views>().into_any(),
-            Marker::Comp => Views::comp(child(true)).into_any(),
+            Marker::Comp => Views::comp(false, child(true)).into_any(),
+            Marker::DefComp => Views::comp(true, child(true)).into_any(),
             _ => ftml_core::TODO!(),
         }
         //    )})
@@ -218,6 +219,7 @@ impl MarkedNode {
         next
     }
 
+    #[deprecated(note = "clean up")]
     fn owner(&self) -> Owner {
         /*let mut state = self.state.lock();
         let (owner, set_state) = {
@@ -275,7 +277,7 @@ impl MarkedNode {
         }
         drop(state);
         let owner = Owner::current().expect("exists");
-        self.add_owner(owner.clone());
+        self.add_owner(owner);
         //owner
         Owner::current().expect("exists")
     }

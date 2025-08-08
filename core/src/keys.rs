@@ -182,29 +182,29 @@ macro_rules! do_keys {
 //pub const PREFIX: &str = ftml!();
 
 do_keys! {
-    /// Denotes a new [Section]. The given [SectionLevel] is only a sanity check;
-    /// the actual level is determined by the occurrence within a [Document].
+    /// Denotes a new [`Section`];
+    /// the actual section level is determined by the occurrence within a [`Document`].
     Section                     @ SectionLevel  = "section"         + Id; -!"in [LogicalParagraph]s, [Problem]s or [Slide]s"; := section
 
-    /// Denotes a new [LogicalParagraph] of [ParagraphKind::Definition]
+    /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Definition`]
     /// for the given [Symbol]s using the given styles.
     Definition                              = "definition"          + Id,Inline,Fors,Styles; &>> Definiens, Definiendum; := definition
-    /// Denotes a new [LogicalParagraph] of [ParagraphKind::Assertion] (Theorems, Lemmata,
+    /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Assertion`] (Theorems, Lemmata,
     /// Axioms, etc.) for the given [Symbol]s using the given styles.
     Assertion                               = "assertion"           + Id,Inline,Fors,Styles; := assertion
-    /// Denotes a new [LogicalParagraph] of [ParagraphKind::Example] (this includes counterexamples)
+    /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Example`] (this includes counterexamples)
     /// for the given [Symbol]s using the given styles.
     Example                                 = "example"             + Id,Inline,Fors,Styles; := example
-    /// Denotes a new [LogicalParagraph] of [ParagraphKind::Paragraph]
-    /// for the given [Symbol]s using the given styles.
+    /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Paragraph`]
+    /// for the given [`Symbol`]s using the given styles.
     Paragraph                               = "paragraph"           + Id,Inline,Fors,Styles; := paragraph
 
-    /// Denotes a new [Problem] with [`sub_problem`](Problem::sub_problem)`=false`
+    /// Denotes a new [`Problem`] with <code>[sub_problem](Problem::sub_problem)=false</code>
     Problem                                 = "problem"             + Id,Styles,Autogradable,ProblemPoints ; := todo
-    /// Denotes a new [Problem] with [`sub_problem`](Problem::sub_problem)`=true`
+    /// Denotes a new [`Problem`] with <code>[sub_problem](Problem::sub_problem)=true</code>
     SubProblem                              = "subproblem"          + Id,Styles,Autogradable,ProblemPoints ; := todo
 
-    /// Denotes a [Slide], implying that the [Document] is (or contains in some sense)
+    /// Denotes a [`Slide`], implying that the [`Document`] is (or contains in some sense)
     /// a presentation.
     Slide                                   = "slide"               + Id;    -!"in [LogicalParagraph]s, [Problem]s or [Slide]s"; := todo
 
@@ -217,12 +217,12 @@ do_keys! {
 
     // ------------------------------------------------------------------------------------
 
-    /// Denotes a new [Module] (or [NestedModule]) with the given [Name] in the
-    /// current [Namespace](PathURI).
+    /// Denotes a new [`Module`] (or [`NestedModule`]) with the given [`Name`] in the
+    /// current [`Namespace`](PathURI).
     Module                      @ String        = "module"              + Metatheory, Signature; := module
 
-    /// Denotes a new [MathStructure] or [Extension] with the given [Name].
-    MathStructure               @ String        = "feature-structure"   + Macroname; !"in [Module]s"; := todo
+    /// Denotes a new [`MathStructure`] or [`Extension`] with the given [`Name`].
+    MathStructure               @ String        = "feature-structure"   + Macroname; !"in [Module]s"; := mathstructure
 
     /// <div class="ftml-wip">TODO</div>
     Morphism                                    = "feature-morphism" := todo
@@ -261,7 +261,7 @@ do_keys! {
 
     Term                        = "term" := term
     Arg                         = "arg" := arg
-    HeadTerm                    = "headterm" := todo
+    HeadTerm                    = "headterm" := headterm
 
     ImportModule                = "import" := importmodule
     UseModule                   = "usemodule" := usemodule
@@ -308,12 +308,12 @@ do_keys! {
     Comp                        = "comp" := comp
     VarComp                     = "varcomp" := comp
     MainComp                    = "maincomp" := maincomp
-    DefComp                     = "defcomp" := todo
+    DefComp                     = "defcomp" := defcomp
 
     Invisible                   = "invisible" := invisible
 
     IfInputref                  = "ifinputref" := todo
-    ReturnType                  = "returntype" := todo
+    ReturnType                  = "returntype" := return_type
     ArgTypes                    = "argtypes" := todo
 
     SRef                        = "sref" := todo

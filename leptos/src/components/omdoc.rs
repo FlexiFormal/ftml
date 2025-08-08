@@ -20,6 +20,8 @@ impl FtmlViewable for Symbol {
             role,
             tp,
             df,
+            return_type,
+            argument_types,
             assoctype,
             reordering,
         } = &**data;

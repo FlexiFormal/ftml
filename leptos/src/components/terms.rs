@@ -16,12 +16,11 @@ use ftml_dom::{
         ContextChain,
         css::{CssExt, inject_css},
         local_cache::LocalCache,
-        owned,
     },
 };
 use ftml_ontology::terms::{ArgumentMode, Variable};
 use ftml_uris::{DocumentElementUri, Id, LeafUri, SymbolUri};
-use leptos::{prelude::*, tachys::reactive_graph::OwnedView};
+use leptos::prelude::*;
 
 #[derive(Copy, Clone)]
 struct InTerm {
@@ -169,27 +168,45 @@ pub fn oma<B: SendBackend>(
     Left(ret(children))
 }
 
-const fn comp_class(
-    is_defi: bool,
-    is_hovered: bool,
-    is_var: bool,
-    style: HighlightStyle,
-) -> &'static str {
+const fn comp_class(is_hovered: bool, is_var: bool, style: HighlightStyle) -> &'static str {
     use HighlightStyle as HL;
-    match (is_defi, is_hovered, is_var, style) {
-        (_, false, true, _) => "ftml-var-comp",
-        (_, true, true, _) => "ftml-var-comp ftml-comp-hover",
-        (true, false, _, HL::Colored | HL::None) => "ftml-def-comp",
-        (true, false, _, HL::Subtle) => "ftml-def-comp-subtle",
-        (true, true, _, HL::Colored | HL::None) => "ftml-def-comp ftml-comp-hover",
-        (true, true, _, HL::Subtle) => "ftml-def-comp-subtle ftml-comp-hover",
-        (_, false, false, HL::Colored | HL::None) => "ftml-comp",
-        (_, false, false, HL::Subtle) => "ftml-comp-subtle",
-        (_, true, false, HL::Subtle) => "ftml-comp-subtle ftml-comp-hover",
-        (_, true, false, HL::Colored | HL::None) => "ftml-comp ftml-comp-hover",
-        (_, false, _, HL::Off) => "",
-        (_, true, _, HL::Off) => "ftml-comp-hover",
+    match (is_hovered, is_var, style) {
+        (false, true, _) => "ftml-var-comp",
+        (true, true, _) => "ftml-var-comp ftml-comp-hover",
+        (false, false, HL::Colored | HL::None) => "ftml-comp",
+        (false, false, HL::Subtle) => "ftml-comp-subtle",
+        (true, false, HL::Subtle) => "ftml-comp-subtle ftml-comp-hover",
+        (true, false, HL::Colored | HL::None) => "ftml-comp ftml-comp-hover",
+        (false, _, HL::Off) => "",
+        (true, _, HL::Off) => "ftml-comp-hover",
     }
+}
+
+pub fn defcomp<B: SendBackend>(children: ClonableView) -> impl IntoView {
+    use HighlightStyle as HL;
+    use leptos::either::Either::{Left, Right};
+    tracing::trace!("doing defcomp");
+    if !FtmlConfigState::allow_hovers() {
+        tracing::trace!("hovers disabled");
+        return Left(children.into_view::<crate::Views<B>>());
+    }
+    let is_hovered = use_context::<InTerm>().map(|h| h.hovered);
+    let style = FtmlConfigState::highlight_style();
+    let class = Memo::new(
+        move |_| match (is_hovered.is_some_and(|h| h.get()), style.get()) {
+            (false, HL::Colored | HL::None) => "ftml-def-comp",
+            (false, HL::Subtle) => "ftml-def-comp-subtle",
+            (true, HL::Colored | HL::None) => "ftml-def-comp ftml-comp-hover",
+            (true, HL::Subtle) => "ftml-def-comp-subtle ftml-comp-hover",
+            (false, HL::Off) => "",
+            (true, HL::Off) => "ftml-comp-hover",
+        },
+    );
+    Right(
+        children
+            .into_view::<crate::Views<B>>()
+            .attr("class", move || class),
+    )
 }
 
 pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
@@ -260,7 +277,7 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
     }
 
     let style = FtmlConfigState::highlight_style();
-    let class = Memo::new(move |_| comp_class(false, is_hovered.get(), is_var, style.get()));
+    let class = Memo::new(move |_| comp_class(is_hovered.get(), is_var, style.get()));
     let top_class = Memo::new(move |_| {
         if is_hovered.get() {
             tracing::trace!("Hovering");
