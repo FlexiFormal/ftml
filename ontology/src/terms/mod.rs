@@ -7,6 +7,7 @@ pub mod opaque;
 pub use arguments::{Argument, ArgumentMode, BoundArgument};
 #[cfg(feature = "openmath")]
 pub mod om;
+pub mod records;
 pub mod simplify;
 
 //mod syn;

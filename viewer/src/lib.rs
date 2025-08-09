@@ -13,13 +13,14 @@ pub mod config;
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
 pub fn run() {
     use tracing_subscriber::prelude::*;
-    fn filter() -> tracing_subscriber::filter::Targets {
+    fn filter(lvl: config::LogLevel) -> tracing_subscriber::filter::Targets {
+        let lvl: tracing::Level = lvl.into();
         tracing_subscriber::filter::Targets::new()
-            .with_target("ftml_dom", tracing::Level::WARN)
-            .with_target("ftml_leptos", tracing::Level::WARN)
-            .with_target("ftml_core", tracing::Level::WARN)
-            .with_target("ftml_backend", tracing::Level::WARN)
-            .with_target("ssr_example", tracing::Level::WARN)
+            .with_target("ftml_dom", lvl)
+            .with_target("ftml_leptos", lvl)
+            .with_target("ftml_core", lvl)
+            .with_target("ftml_backend", lvl)
+            .with_target("ssr_example", lvl)
             .with_target(
                 "leptos_posthoc",
                 tracing_subscriber::filter::LevelFilter::ERROR,
@@ -27,14 +28,13 @@ pub fn run() {
     }
 
     console_error_panic_hook::set_once();
-    let filter = filter();
 
-    let mut meta = ftml_dom::DocumentMeta::get();
+    let meta = ftml_dom::DocumentMeta::get();
     let (mut cfg, errors) = config::parse_config();
 
     tracing_subscriber::registry()
         .with(tracing_wasm::WASMLayer::default())
-        .with(filter)
+        .with(filter(cfg.log_level))
         .init();
 
     for e in errors {

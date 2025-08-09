@@ -1,6 +1,6 @@
+pub mod content;
 pub mod inputref;
 pub mod notations;
-pub mod omdoc;
 pub mod paragraphs;
 pub mod sections;
 pub mod terms;

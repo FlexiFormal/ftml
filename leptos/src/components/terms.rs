@@ -461,7 +461,10 @@ pub(crate) fn do_onclick<Be: SendBackend>(
     let name = s.name().last().to_string();
     let uri_string = s.to_string();
     let uri = s.clone();
-    let paras = LocalCache::resource::<Be, _, _>(move |b| b.get_paragraphs(s, false));
+    let paras =
+        LocalCache::resource::<Be, _, _>(
+            move |b| async move { Ok(b.get_paragraphs(s, false).await) },
+        );
     B(view! {
         // paras
         <div style="display:flex;flex-direction:row;">
@@ -494,24 +497,25 @@ fn formals<Be: SendBackend>(
     symbol: SymbolUri,
     uri: ReadSignal<Option<DocumentElementUri>>,
 ) -> impl IntoView + use<Be> {
-    use super::omdoc::FtmlViewable;
+    use super::content::FtmlViewable;
     use thaw::Divider;
     view! {
         <div style="margin:5px;"><Divider/></div>
         {lazy_collapsible(Some(|| "Formal Details"), move ||view!{
             {
-                let symbol = symbol.clone();
+                let sym = symbol.clone();
+                let bol = symbol.clone();
                 LocalCache::with_or_toast::<Be,_,_,_,_>(
-                move |r| r.get_symbol(symbol),
-                |s| match s {
-                    ::either::Left(s) => s.as_view::<Be>(),
-                    ::either::Right(s) => s.as_view::<Be>()
-                },
-                || "error"
+                    move |r| r.get_symbol(sym),
+                    |s| match s {
+                        ::either::Left(s) => s.as_view::<Be>(),
+                        ::either::Right(s) => s.as_view::<Be>()
+                    },
+                    move || view!({format!("error getting uri {bol}")}<br/>)
             )}
             {move || { uri.with(|u| u.clone().map(|u|  {
                let uri = u.clone();
-               view!("In term "{LocalCache::with_or_toast::<Be,_,_,_,_>(
+               view!("In term: "{LocalCache::with_or_toast::<Be,_,_,_,_>(
                    |r| r.get_document_term(u),
                    |t|  match t {
                        ::either::Left(t) => ReactiveStore::render_term::<Be>(t.term),

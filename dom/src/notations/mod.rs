@@ -186,7 +186,7 @@ impl NotationExt for Notation {
             let h = head.to_string();
             //provide_context(WithHead(Some(head.clone())));
             let r = view_component_with_args::<Views>(&self.component, args)
-                .attr(FtmlKey::Term.attr_name(), "OMID")
+                .attr(FtmlKey::Term.attr_name(), "OMBIND")
                 .attr(FtmlKey::Head.attr_name(), h);
             ReactiveApplication::close();
             r

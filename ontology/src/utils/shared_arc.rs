@@ -66,7 +66,7 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
     /// iff `get` errors. In that case, we also return the original `self`.
     pub fn inherit<NewInner, Err>(
         self,
-        get: fn(&Inner) -> Result<&NewInner, Err>,
+        get: impl FnOnce(&Inner) -> Result<&NewInner, Err>,
     ) -> Result<SharedArc<Outer, NewInner>, (Self, Err)> {
         let elem = match get(&*self) {
             Ok(e) => e as *const NewInner,
@@ -77,6 +77,24 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
             elem,
         })
     }
+
+    /// If a reference to an `Inner` allows to get at a `NewInner`, then we can safely turn this
+    /// `SharedArc<Outer,Inner>` into a `SharedArc<Outer,NewInner>`.
+    ///
+    /// ## Errors
+    /// iff `get` errors. In that case, we also return the original `self`.
+    pub fn inherit_infallibly<NewInner>(
+        self,
+        get: impl FnOnce(&Inner) -> &NewInner,
+    ) -> SharedArc<Outer, NewInner> {
+        // SAFETY: known to not be null
+        let elem = get(unsafe { &*self.elem });
+        SharedArc {
+            outer: self.outer,
+            elem,
+        }
+    }
+
     /*
     pub fn new_from_outer<Err>(
         outer: Outer,

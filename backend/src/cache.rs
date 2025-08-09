@@ -89,6 +89,11 @@ where
     B::Error: Clone + Send + Sync + std::fmt::Debug,
 {
     type Error = CacheError<B::Error>;
+    #[inline]
+    fn document_link_url(&self, uri: &DocumentUri) -> String {
+        self.inner.document_link_url(uri)
+    }
+
     fn get_fragment(
         &self,
         uri: Uri,

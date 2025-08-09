@@ -1,0 +1,23 @@
+.ftml-notation-table {
+    width: auto !important;
+}
+.ftml-notation-header {
+    font-size: small;
+    font-weight: bold;
+    align-content: center;
+    text-align: center;
+    height: fit-content !important;
+    border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+}
+.ftml-notation-cell {
+    align-content: center;
+    text-align: center;
+    height: fit-content !important;
+    border: var(--strokeWidthThin) solid var(--colorNeutralStroke2);
+}
+.ftml-notation-cell:first-child button {
+    display: contents !important;
+}
+.ftml-notation-header:first-child button {
+    display: contents !important;
+}

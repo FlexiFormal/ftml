@@ -8,7 +8,7 @@ use leptos::prelude::*;
 pub(crate) struct ReactiveTerm {
     //pub uri: Option<DocumentElementUri>,
     pub app: RwSignal<ReactiveApplication>,
-    owner: Owner,
+    //owner: Owner,
 }
 
 pub enum ReactiveApplication {
@@ -40,8 +40,7 @@ impl ReactiveTerm {
         position: ArgumentPosition,
         children: ClonableView,
     ) -> impl IntoView {
-        let owner = self.owner.child();
-        children.add_owner(owner);
+        children.set_state();
         let ch = children.clone();
         self.app.try_update_untracked(move |app| {
             tracing::trace!("Adding argument to {} at position {position:?}", app.head());
@@ -123,7 +122,7 @@ impl ReactiveApplication {
         }
         provide_context(Some(ReactiveTerm {
             app: sig,
-            owner: Owner::current().expect("Not in a reactive context"),
+            //owner: Owner::current().expect("Not in a reactive context"),
         }));
         children(sig.read_only())
     }

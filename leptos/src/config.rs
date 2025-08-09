@@ -264,7 +264,7 @@ impl FtmlConfigState {
     }
 
     /// ### Panics
-    pub fn disable_hovers<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
+    pub fn disable_hovers<V: IntoView, F: FnOnce() -> V>(f: F) -> impl IntoView + use<F, V> {
         let owner = leptos::prelude::Owner::current()
             .expect("no current reactive Owner found")
             .child();

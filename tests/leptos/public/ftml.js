@@ -314,7 +314,7 @@ let wasm_bindgen;
         wasm.__wbindgen_export_11(arg0, arg1, addHeapObject(arg2));
     }
 
-    function __wbg_adapter_428(arg0, arg1, arg2, arg3) {
+    function __wbg_adapter_442(arg0, arg1, arg2, arg3) {
         wasm.__wbindgen_export_12(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
     }
 
@@ -323,40 +323,40 @@ let wasm_bindgen;
      */
     __exports.FtmlKey = Object.freeze({
         /**
-         * r" Denotes a new [Section]. The given [SectionLevel] is only a sanity check;
-         * r" the actual level is determined by the occurrence within a [Document].
+         * r" Denotes a new [`Section`];
+         * r" the actual section level is determined by the occurrence within a [`Document`].
          */
         Section: 0, "0": "Section",
         /**
-         * r" Denotes a new [LogicalParagraph] of [ParagraphKind::Definition]
+         * r" Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Definition`]
          * r" for the given [Symbol]s using the given styles.
          */
         Definition: 1, "1": "Definition",
         /**
-         * r" Denotes a new [LogicalParagraph] of [ParagraphKind::Assertion] (Theorems, Lemmata,
+         * r" Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Assertion`] (Theorems, Lemmata,
          * r" Axioms, etc.) for the given [Symbol]s using the given styles.
          */
         Assertion: 2, "2": "Assertion",
         /**
-         * r" Denotes a new [LogicalParagraph] of [ParagraphKind::Example] (this includes counterexamples)
+         * r" Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Example`] (this includes counterexamples)
          * r" for the given [Symbol]s using the given styles.
          */
         Example: 3, "3": "Example",
         /**
-         * r" Denotes a new [LogicalParagraph] of [ParagraphKind::Paragraph]
-         * r" for the given [Symbol]s using the given styles.
+         * r" Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Paragraph`]
+         * r" for the given [`Symbol`]s using the given styles.
          */
         Paragraph: 4, "4": "Paragraph",
         /**
-         * r" Denotes a new [Problem] with [`sub_problem`](Problem::sub_problem)`=false`
+         * r" Denotes a new [`Problem`] with <code>[sub_problem](Problem::sub_problem)=false</code>
          */
         Problem: 5, "5": "Problem",
         /**
-         * r" Denotes a new [Problem] with [`sub_problem`](Problem::sub_problem)`=true`
+         * r" Denotes a new [`Problem`] with <code>[sub_problem](Problem::sub_problem)=true</code>
          */
         SubProblem: 6, "6": "SubProblem",
         /**
-         * r" Denotes a [Slide], implying that the [Document] is (or contains in some sense)
+         * r" Denotes a [`Slide`], implying that the [`Document`] is (or contains in some sense)
          * r" a presentation.
          */
         Slide: 7, "7": "Slide",
@@ -366,12 +366,12 @@ let wasm_bindgen;
          */
         SlideNumber: 8, "8": "SlideNumber",
         /**
-         * r" Denotes a new [Module] (or [NestedModule]) with the given [Name] in the
-         * r" current [Namespace](PathURI).
+         * r" Denotes a new [`Module`] (or [`NestedModule`]) with the given [`Name`] in the
+         * r" current [`Namespace`](PathURI).
          */
         Module: 9, "9": "Module",
         /**
-         * r" Denotes a new [MathStructure] or [Extension] with the given [Name].
+         * r" Denotes a new [`MathStructure`] or [`Extension`] with the given [`Name`].
          */
         MathStructure: 10, "10": "MathStructure",
         /**
@@ -1463,7 +1463,7 @@ let wasm_bindgen;
                     const a = state0.a;
                     state0.a = 0;
                     try {
-                        return __wbg_adapter_428(a, state0.b, arg0, arg1);
+                        return __wbg_adapter_442(a, state0.b, arg0, arg1);
                     } finally {
                         state0.a = a;
                     }
@@ -1557,6 +1557,10 @@ let wasm_bindgen;
             const ret = getObject(arg0).parentNode;
             return isLikeNone(ret) ? 0 : addHeapObject(ret);
         };
+        imports.wbg.__wbg_parseFloat_7e07eec2726e65d0 = function(arg0, arg1) {
+            const ret = Number.parseFloat(getStringFromWasm0(arg0, arg1));
+            return ret;
+        };
         imports.wbg.__wbg_prepend_536a5a2dc0b99b47 = function() { return handleError(function (arg0, arg1) {
             getObject(arg0).prepend(getObject(arg1));
         }, arguments) };
@@ -1643,6 +1647,14 @@ let wasm_bindgen;
         imports.wbg.__wbg_scrollIntoView_281bcffa62eea382 = function(arg0, arg1) {
             getObject(arg0).scrollIntoView(arg1 !== 0);
         };
+        imports.wbg.__wbg_scrollX_02fa7e84cc48b8fe = function() { return handleError(function (arg0) {
+            const ret = getObject(arg0).scrollX;
+            return ret;
+        }, arguments) };
+        imports.wbg.__wbg_scrollY_94bf061418186bb3 = function() { return handleError(function (arg0) {
+            const ret = getObject(arg0).scrollY;
+            return ret;
+        }, arguments) };
         imports.wbg.__wbg_setAttribute_2704501201f15687 = function() { return handleError(function (arg0, arg1, arg2, arg3, arg4) {
             getObject(arg0).setAttribute(getStringFromWasm0(arg1, arg2), getStringFromWasm0(arg3, arg4));
         }, arguments) };
@@ -1692,6 +1704,12 @@ let wasm_bindgen;
         };
         imports.wbg.__wbg_settextContent_d29397f7b994d314 = function(arg0, arg1, arg2) {
             getObject(arg0).textContent = arg1 === 0 ? undefined : getStringFromWasm0(arg1, arg2);
+        };
+        imports.wbg.__wbg_setx_deda91e4072c4965 = function(arg0, arg1) {
+            getObject(arg0).x = arg1;
+        };
+        imports.wbg.__wbg_sety_092a898a2f8929d7 = function(arg0, arg1) {
+            getObject(arg0).y = arg1;
         };
         imports.wbg.__wbg_slice_972c243648c9fd2e = function(arg0, arg1, arg2) {
             const ret = getObject(arg0).slice(arg1 >>> 0, arg2 >>> 0);
@@ -1792,6 +1810,14 @@ let wasm_bindgen;
             const ret = getObject(arg0).width;
             return ret;
         };
+        imports.wbg.__wbg_x_27b56c5721e559a8 = function(arg0) {
+            const ret = getObject(arg0).x;
+            return ret;
+        };
+        imports.wbg.__wbg_x_2bc3f61e11d9f2e1 = function(arg0) {
+            const ret = getObject(arg0).x;
+            return ret;
+        };
         imports.wbg.__wbg_y_be10a4f665290032 = function(arg0) {
             const ret = getObject(arg0).y;
             return ret;
@@ -1828,32 +1854,32 @@ let wasm_bindgen;
             const ret = false;
             return ret;
         };
-        imports.wbg.__wbindgen_closure_wrapper11866 = function(arg0, arg1, arg2) {
-            const ret = makeClosure(arg0, arg1, 3051, __wbg_adapter_60);
+        imports.wbg.__wbindgen_closure_wrapper15492 = function(arg0, arg1, arg2) {
+            const ret = makeClosure(arg0, arg1, 3414, __wbg_adapter_60);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper18820 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 3899, __wbg_adapter_63);
+        imports.wbg.__wbindgen_closure_wrapper21000 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 4459, __wbg_adapter_63);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper19646 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 4010, __wbg_adapter_66);
+        imports.wbg.__wbindgen_closure_wrapper21867 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 4575, __wbg_adapter_66);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper19648 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 4010, __wbg_adapter_69);
+        imports.wbg.__wbindgen_closure_wrapper21869 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 4575, __wbg_adapter_69);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper19848 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 4049, __wbg_adapter_72);
+        imports.wbg.__wbindgen_closure_wrapper22069 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 4614, __wbg_adapter_72);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper19850 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 4049, __wbg_adapter_75);
+        imports.wbg.__wbindgen_closure_wrapper22071 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 4614, __wbg_adapter_75);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper19915 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 4055, __wbg_adapter_78);
+        imports.wbg.__wbindgen_closure_wrapper22136 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 4620, __wbg_adapter_78);
             return addHeapObject(ret);
         };
         imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {

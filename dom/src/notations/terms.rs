@@ -6,7 +6,8 @@ use crate::{
     notations::NotationExt,
     terms::{ReactiveTerm, TopTerm},
     utils::{
-        local_cache::{SendBackend, WithLocalCache},
+        FutureExt,
+        local_cache::{LocalCache, SendBackend, WithLocalCache},
         owned,
     },
 };
@@ -83,20 +84,17 @@ fn no_notation<Views: FtmlViews>(
 impl TermExt for Term {
     #[allow(clippy::too_many_lines)]
     fn into_view<Views: FtmlViews, Be: SendBackend>(self, in_term: bool) -> AnyView {
-        use leptos::either::{
-            Either::{Left, Right},
-            EitherOf7::{A, B, C, D, E, F, G},
-        };
+        use leptos::either::Either::{Left, Right};
         tracing::trace!("Presenting {self:?}");
         //owned(move || {
         match self {
-            Self::Symbol(s) => A(sym::<Views, Be>(s, in_term)),
+            Self::Symbol(s) => sym::<Views, Be>(s, in_term).into_any(),
             Self::Var(Variable::Ref {
                 declaration,
                 is_sequence,
-            }) => B(var_ref::<Views, Be>(declaration, is_sequence, in_term)),
+            }) => var_ref::<Views, Be>(declaration, is_sequence, in_term).into_any(),
             Self::Var(Variable::Name { name, notated }) => {
-                C(var_name::<Views>(name, notated, in_term))
+                var_name::<Views>(name, notated, in_term).into_any()
             }
             Self::Application { head, arguments }
                 if matches!(*head, Self::Symbol(_) | Self::Var(Variable::Ref { .. })) =>
@@ -104,7 +102,7 @@ impl TermExt for Term {
                 let arguments = do_args::<Views, Be>(arguments);
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(*head) };
-                D(DocumentState::with_head(vos.clone(), move || {
+                DocumentState::with_head(vos.clone(), move || {
                     if with_context::<CurrentUri, _>(|_| ()).is_some() {
                         Left(Views::application(
                             vos.clone(),
@@ -118,7 +116,8 @@ impl TermExt for Term {
                                 .into_view::<Views>(),
                         )
                     }
-                }))
+                })
+                .into_any()
             }
             Self::Bound {
                 head,
@@ -132,7 +131,7 @@ impl TermExt for Term {
                 arguments.push(Either::Left(ClonableView::new(true, move || {
                     body.clone().into_view::<Views, Be>(true)
                 })));
-                E(DocumentState::with_head(vos.clone(), move || {
+                DocumentState::with_head(vos.clone(), move || {
                     if with_context::<CurrentUri, _>(|_| ()).is_some() {
                         Left(Views::binder_application(
                             vos.clone(),
@@ -146,7 +145,8 @@ impl TermExt for Term {
                                 .into_view::<Views>(),
                         )
                     }
-                }))
+                })
+                .into_any()
             }
             Self::Opaque {
                 tag,
@@ -158,12 +158,54 @@ impl TermExt for Term {
                     .into_iter()
                     .map(|t| Some(move || t.into_view::<Views, Be>(true)))
                     .collect::<Vec<_>>();
-                F(do_opaque(&tag, attributes, children, &mut terms))
+                do_opaque(&tag, attributes, children, &mut terms)
             }
-            t => G(mtext().child(format!("{t:?}"))),
+
+            Self::Application { head, arguments }
+                if matches!(
+                    &*head,
+                    Self::Field {
+                        record,
+                        key,
+                        record_type: Some(_)
+                    }
+                ) =>
+            {
+                // let arguments = do_args::<Views, Be>(arguments);
+                let Self::Field {
+                    record,
+                    key,
+                    record_type: Some(tp),
+                } = *head
+                else {
+                    // SAFETY: pattern match above
+                    unsafe { unreachable_unchecked() }
+                };
+                let tp = *tp;
+                FutureExt::into_view(
+                    move || {
+                        tp.clone().get_in_record_type_async(key.clone(), |uri| {
+                            WithLocalCache::<Be>::default().get_structure(uri)
+                        })
+                    },
+                    |r| match r {
+                        Err(e) => Right(e.to_string()),
+                        Ok(None) => Right("(Structure not found)".to_string()),
+                        Ok(Some(r)) => Left(
+                            Self::Application {
+                                head: Box::new(Self::Symbol(r.uri.clone())),
+                                arguments,
+                            }
+                            .into_view::<Views, Be>(true),
+                        ),
+                    },
+                )
+                .into_any()
+            }
+            t => mtext().child(format!("{t:?}")).into_any(),
         }
         //})
-        .into_any()
+
         //
     }
 }
@@ -199,7 +241,10 @@ fn sym<Views: FtmlViews, Be: SendBackend>(uri: SymbolUri, in_term: bool) -> impl
             Right(with_notations::<Be, _, _>(uri.clone().into(), move |t| {
                 if let Some(n) = t {
                     if let Some(n) = n.op {
-                        Left(Left(super::view_node(&n)))
+                        Left(Left(Views::comp(
+                            false,
+                            ClonableView::new(true, move || super::view_node(&n)),
+                        )))
                     } else {
                         Left(Right(n.as_view::<Views>(&VarOrSym::S(uri))))
                     }
@@ -240,7 +285,10 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
                         with_notations::<Be, _, _>(uri.clone().into(), move |t| {
                             if let Some(n) = t {
                                 if let Some(n) = n.op {
-                                    Left(Left(super::view_node(&n)))
+                                    Left(Left(Views::comp(
+                                        false,
+                                        ClonableView::new(true, move || super::view_node(&n)),
+                                    )))
                                 } else {
                                     Left(Right(n.as_view::<Views>(&VarOrSym::V(Variable::Ref {
                                         declaration: uri,
@@ -465,6 +513,21 @@ fn with_notations<
     uri: LeafUri,
     then: F,
 ) -> impl IntoView + use<Be, V, F> {
+    use crate::utils::FutureExt;
+    FutureExt::into_view(
+        move || WithLocalCache::<Be>::default().get_notations(uri.clone()),
+        move |gl| {
+            let not = gl
+                .local
+                .and_then(|v| v.first().cloned().map(|p| p.1))
+                .or_else(|| {
+                    gl.global
+                        .and_then(|r| r.ok().and_then(|v| v.first().cloned().map(|p| p.1)))
+                });
+            then(not)
+        },
+    )
+    /*
     view! {
         <Suspense fallback = || "…">{move || {
             let uri = uri.clone();
@@ -478,6 +541,7 @@ fn with_notations<
         }}
         </Suspense>
     }
+    */
 }
 
 // SAFETY: requires head be Sym or Var::Ref

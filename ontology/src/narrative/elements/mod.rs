@@ -204,12 +204,12 @@ impl Ftml for DocumentElement {
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
         use ftml_uris::FtmlUri;
         use ulo::triple;
-        macro_rules! syms {
+        /*macro_rules! syms {
             ($iri:ident $e:expr) => {{
                 $e.symbols().collect::<rustc_hash::FxHashSet<_>>().into_iter()
                     .map(move |s| triple!(<($iri.clone())> dc:hasPart <(s.to_iri())>))
             }};
-        }
+        }*/
         match self {
             Self::SetSectionLevel(_)
             | Self::UseModule(_)

@@ -23,7 +23,14 @@ pub mod errors;
 pub use errors::*;
 
 use ftml_ontology::{
-    domain::{SharedDeclaration, declarations::symbols::Symbol, modules::Module},
+    domain::{
+        SharedDeclaration,
+        declarations::{
+            structures::{MathStructure, StructureExtension},
+            symbols::Symbol,
+        },
+        modules::Module,
+    },
     narrative::{
         SharedDocumentElement,
         documents::Document,
@@ -111,6 +118,8 @@ pub trait FtmlBackend {
         cache::CachedBackend::new(self)
     }
 
+    fn document_link_url(&self, uri: &DocumentUri) -> String;
+
     fn get_fragment(
         &self,
         uri: Uri,
@@ -144,12 +153,39 @@ pub trait FtmlBackend {
     ) -> impl Future<
         Output = Result<Either<Symbol, SharedDeclaration<Symbol>>, BackendError<Self::Error>>,
     > + Send {
+        let uri = uri.simple_module();
         let name = uri.name;
         self.get_module(uri.module).map(move |r| {
             let m = r?;
             m.get_as(&name).map_or_else(
                 || Err(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
                 |d| Ok(Either::Right(d)),
+            )
+        })
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn get_structure(
+        &self,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        let uri = uri.simple_module();
+        let name = uri.name;
+        self.get_module(uri.module).map(move |r| {
+            let m = r?;
+            m.get_as(&name).map_or_else(
+                || {
+                    m.get_as(&name).map_or_else(
+                        || Err(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                        |d| Ok(Either::Right(d)),
+                    )
+                },
+                |d| Ok(Either::Left(d)),
             )
         })
     }
@@ -232,6 +268,8 @@ pub trait FtmlBackend {
 
 #[cfg(feature = "server_fn")]
 pub trait FlamsBackend {
+    fn document_link_url(&self, uri: &DocumentUri) -> String;
+
     /// `/content/fragment`
     #[allow(clippy::too_many_arguments)]
     fn get_fragment(
@@ -316,6 +354,11 @@ where
     FB: FlamsBackend,
 {
     type Error = server_fn::error::ServerFnErrorErr;
+
+    #[inline]
+    fn document_link_url(&self, uri: &DocumentUri) -> String {
+        <Self as FlamsBackend>::document_link_url(self, uri)
+    }
 
     fn get_fragment(
         &self,

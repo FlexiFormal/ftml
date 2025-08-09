@@ -28,7 +28,6 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
 
 #[component]
 pub fn App() -> impl IntoView {
-    use thaw::Scrollbar;
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
 
@@ -42,14 +41,14 @@ pub fn App() -> impl IntoView {
 
         // content for this welcome page
         //<Router>
-            <Scrollbar style="width:100vw;height:100vh;">
+            //<Scrollbar style="width:100vw;height:100vh;">
                 <main>
                     <HomePage/>
                     //<Routes fallback=|| "Page not found.".into_view()>
                     //    <Route path=StaticSegment("") view=HomePage/>
                     //</Routes>
                 </main>
-            </Scrollbar>
+            //</Scrollbar>
         //</Router>
     }
 }

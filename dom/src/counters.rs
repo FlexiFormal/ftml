@@ -680,10 +680,10 @@ impl SectionCounters {
                             children: chs,
                             ..
                         } = e
+                            && u == uri
+                            && i == id
                         {
-                            if u == uri && i == id {
-                                return Some(chs.clone());
-                            }
+                            return Some(chs.clone());
                         }
                     }
                 }

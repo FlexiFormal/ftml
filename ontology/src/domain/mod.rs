@@ -12,7 +12,7 @@ pub mod declarations;
 pub mod modules;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct SharedDeclaration<T: IsDeclaration>(SharedArc<Module, T>);
+pub struct SharedDeclaration<T: IsDeclaration>(pub SharedArc<Module, T>);
 impl<T: IsDeclaration> std::ops::Deref for SharedDeclaration<T> {
     type Target = T;
     #[inline]
@@ -39,15 +39,16 @@ pub trait HasDeclarations: crate::Ftml {
         use either_of::EitherOf5::*;
         let mut steps = steps.into_iter().peekable();
         let mut curr = A(self.declarations());
-        macro_rules! ret {
-            ($i:ident $e:expr;$m:expr) => {{
-                if steps.peek().is_none() {
-                    return T::from_declaration($e);
-                }
-                curr = $i($m.declarations());
-            }};
-        }
-        while let Some(step) = steps.next() {
+        'outer: while let Some(step) = steps.next() {
+            macro_rules! ret {
+                ($i:ident $e:expr;$m:expr) => {{
+                    if steps.peek().is_none() {
+                        return T::from_declaration($e);
+                    }
+                    curr = $i($m.declarations());
+                    continue 'outer;
+                }};
+            }
             while let Some(c) = curr.next() {
                 match c {
                     AnyDeclarationRef::NestedModule(m) if m.uri.name().last() == step => {
@@ -68,6 +69,7 @@ pub trait HasDeclarations: crate::Ftml {
                     _ => (),
                 }
             }
+            return None;
         }
         None
     }

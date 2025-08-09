@@ -142,6 +142,14 @@ where
     E::Err: Into<BackendError<E>>,
 {
     type Error = E;
+
+    fn document_link_url(&self, uri: &DocumentUri) -> String {
+        self.redirects.for_documents(uri).map_or_else(
+            || format!("{}?uri={}", self.documents_url, uri.url_encoded()),
+            |r| r.to_string(),
+        )
+    }
+
     #[allow(clippy::similar_names)]
     fn get_fragment(
         &self,
@@ -260,11 +268,19 @@ mod server_fn {
     use ::server_fn::error::ServerFnErrorErr;
     use ftml_ontology::utils::Css;
     use ftml_uris::{
-        DocumentElementUri, FtmlUri, LeafUri, NarrativeUri, Uri, components::UriComponentTuple,
+        DocumentElementUri, DocumentUri, FtmlUri, LeafUri, NarrativeUri, Uri,
+        components::UriComponentTuple,
     };
     use futures_util::TryFutureExt;
 
     impl<Url: std::fmt::Display, Re: Redirects> FlamsBackend for RemoteFlamsBackend<Url, Re> {
+        fn document_link_url(&self, uri: &DocumentUri) -> String {
+            self.redirects.for_documents(uri).map_or_else(
+                || format!("{}?uri={}", self.url, uri.url_encoded()),
+                |r| r.to_string(),
+            )
+        }
+
         ftml_uris::compfun! {!!
             #[allow(clippy::similar_names)]
             fn get_fragment(&self,uri:Uri,context:Option<NarrativeUri>) -> impl Future<Output=Result<(Uri, Vec<Css>,String), BackendError<ServerFnErrorErr>>> {
@@ -312,11 +328,10 @@ mod server_fn {
             >,
         > + Send {
             use std::fmt::Write;
-            if let Some(uri) = &uri {
-                if let Some(url) = self.redirects.for_modules(uri) {
-                    return super::call::<_, SFnE>(url.to_string())
-                        .map_err(BackendError::from_other);
-                }
+            if let Some(uri) = &uri
+                && let Some(url) = self.redirects.for_modules(uri)
+            {
+                return super::call::<_, SFnE>(url.to_string()).map_err(BackendError::from_other);
             }
             let url = {
                 let mut s = String::with_capacity(64);
@@ -359,11 +374,10 @@ mod server_fn {
             >,
         > + Send {
             use std::fmt::Write;
-            if let Some(uri) = &uri {
-                if let Some(url) = self.redirects.for_documents(uri) {
-                    return super::call::<_, SFnE>(url.to_string())
-                        .map_err(BackendError::from_other);
-                }
+            if let Some(uri) = &uri
+                && let Some(url) = self.redirects.for_documents(uri)
+            {
+                return super::call::<_, SFnE>(url.to_string()).map_err(BackendError::from_other);
             }
             let url = {
                 let mut s = String::with_capacity(64);

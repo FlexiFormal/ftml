@@ -20,6 +20,8 @@ pub mod utils;
 pub use clonable_views::ClonableView;
 use ftml_backend::ParagraphOrProblemKind;
 use ftml_ontology::narrative::elements::paragraphs::ParagraphKind;
+use ftml_uris::DocumentUri;
+use smallvec::SmallVec;
 mod views;
 
 use crate::{
@@ -127,43 +129,56 @@ fn iterate<Views: FtmlViews + ?Sized>(
     let and_then = if close.is_empty() && !finish {
         None
     } else {
-        Some(move || {
-            let mut closes = close.clone();
-            closes.reverse();
-            tracing::trace!("closing element: {close:?}");
-            sig.update_untracked(move |extractor| {
-                for c in close.into_iter().rev() {
-                    if let Err(e) = extractor.close(c, &n) {
-                        tracing::error!("{e}");
-                        leptos::web_sys::console::log_1(&n.0);
-                    }
-                }
-            });
-            if !invisible {
-                for c in closes {
-                    #[allow(clippy::enum_glob_use)]
-                    use CloseFtmlElement::*;
-                    match c {
-                        OMA | OMBIND => ReactiveApplication::close(),
-                        Paragraph => add_paragraph(sig),
-                        Module | SymbolDeclaration | Invisible | Section | SectionTitle
-                        | SkipSection | SymbolReference | VariableReference | Argument | Type
-                        | Definiens | Notation | CompInNotation | NotationOpComp | NotationComp
-                        | ArgSep | MainCompInNotation | NotationArg | DocTitle | ReturnType
-                        | VariableDeclaration | Comp | DefComp | ParagraphTitle | Definiendum
-                        | MathStructure | ComplexTerm | HeadTerm | OML => (),
-                    }
-                }
-            }
-            if finish {
-                let r = sig.update_untracked(DomExtractor::finish);
-                if let Some(r) = r {
-                    r.set(true);
-                }
-            }
-        })
+        Some(move || close_things(close, sig, invisible, finish, n))
     };
     (rview, and_then)
+}
+
+fn close_things(
+    close: SmallVec<CloseFtmlElement, 2>,
+    sig: RwSignal<DomExtractor>,
+    invisible: bool,
+    finish: bool,
+    n: FtmlDomElement,
+) {
+    let mut closes = close.clone();
+    closes.reverse();
+    tracing::trace!("closing element: {close:?}");
+    sig.update_untracked(move |extractor| {
+        for c in close.into_iter().rev() {
+            if let Err(e) = extractor.close(c, &n) {
+                tracing::error!("{e}");
+                leptos::web_sys::console::log_1(&n.0);
+            }
+        }
+    });
+    if !invisible {
+        for c in closes {
+            #[allow(clippy::enum_glob_use)]
+            use CloseFtmlElement::*;
+            match c {
+                OMA | OMBIND => ReactiveApplication::close(),
+                Paragraph => {
+                    if sig.with_untracked(|r| r.state.document == *DocumentUri::no_doc()) {
+                        tracing::debug!("No document; paragraph ignored");
+                    } else {
+                        add_paragraph(sig);
+                    }
+                }
+                Module | SymbolDeclaration | Invisible | Section | SectionTitle | SkipSection
+                | SymbolReference | VariableReference | Argument | Type | Definiens | Notation
+                | CompInNotation | NotationOpComp | NotationComp | ArgSep | MainCompInNotation
+                | NotationArg | DocTitle | ReturnType | VariableDeclaration | Comp | DefComp
+                | ParagraphTitle | Definiendum | MathStructure | ComplexTerm | HeadTerm | OML => (),
+            }
+        }
+    }
+    if finish {
+        let r = sig.update_untracked(DomExtractor::finish);
+        if let Some(r) = r {
+            r.set(true);
+        }
+    }
 }
 
 fn add_paragraph(sig: RwSignal<DomExtractor>) {
@@ -178,7 +193,7 @@ fn add_paragraph(sig: RwSignal<DomExtractor>) {
                     _ => return,
                 }
             };
-            tracing::trace!("Adding paragraph for: {:?}", p.fors);
+            tracing::debug!("Adding paragraph for: {:?}", p.fors);
             for (s, _) in &p.fors {
                 tracing::trace!("Adding local paragraph for {s}");
                 match LOCAL_CACHE.fors.entry(s.clone()) {

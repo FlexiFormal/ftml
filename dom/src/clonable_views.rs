@@ -18,19 +18,19 @@ use leptos_posthoc::OriginalNode;
 pub struct ClonableView(ClonableNode);
 
 impl ClonableView {
-    pub(crate) fn add_owner(&self, owner: Owner) {
+    pub(crate) fn set_state(&self) {
         match &self.0 {
-            ClonableNode::Node(n) => n.add_owner(owner),
-            ClonableNode::Fn { owner: o, .. } => *o.lock() = Some(owner),
+            ClonableNode::Node(n) => n.set_state(),
+            ClonableNode::Fn { .. } => (),
         }
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum ClonableNode {
     Node(MarkedNode),
     Fn {
         is_math: bool,
-        owner: std::sync::Arc<parking_lot::Mutex<Option<Owner>>>,
         f: Box<dyn ClonableViewT>,
     },
 }
@@ -54,7 +54,7 @@ pub struct MarkedNode {
 
 struct NodeState {
     orig: OriginalNode,
-    owner: Option<Owner>,
+    saved_state: bool,
     child: Option<MarkedNode>,
     last_domain: Option<OpenDomainElement<FtmlDomElement>>,
     last_narrative: Option<OpenNarrativeElement<FtmlDomElement>>,
@@ -62,18 +62,16 @@ struct NodeState {
 }
 
 impl MarkedNode {
-    fn add_owner(&self, owner: Owner) {
+    fn set_state(&self) {
         let mut state = self.state.lock();
-        owner.with(|| {
-            if self.no_arg {
-                ContextChain::provide(None::<ArgumentPosition>);
-            }
-            //state.owner = Some(owner.clone());
-            let sig = expect_context::<RwSignal<DomExtractor>>();
-            state.last_domain = sig.with_untracked(|e| e.iterate_domain().next().cloned());
-            state.last_narrative = sig.with_untracked(|e| e.iterate_narrative().next().cloned());
-        });
-        state.owner = Some(owner);
+        if self.no_arg {
+            ContextChain::provide(None::<ArgumentPosition>);
+        }
+        //state.owner = Some(owner.clone());
+        let sig = expect_context::<RwSignal<DomExtractor>>();
+        state.last_domain = sig.with_untracked(|e| e.iterate_domain().next().cloned());
+        state.last_narrative = sig.with_untracked(|e| e.iterate_narrative().next().cloned());
+        state.saved_state = true;
     }
 
     #[inline]
@@ -81,19 +79,13 @@ impl MarkedNode {
         self.is_math
     }
     pub fn first_pass(&self) -> bool {
-        self.state.lock().owner.is_none()
+        !self.state.lock().saved_state
     }
     pub fn into_view<Views: FtmlViews + ?Sized>(self) -> AnyView {
-        /*let first_pass = self.first_pass();
-        if !first_pass {
-            tracing::debug!("Rerendering already rendered node");
-        }*/
         let Some(marker) = self.markers.last().cloned() else {
             return self.render::<Views>().into_any();
         };
-        //let owner = self.owner();
         let child = move |b| -> ClonableView { self.child(b).into() };
-        //owner.with(move || { owned(||
         match marker {
             Marker::CurrentSectionLevel(cap) => {
                 let lvl = DocumentState::current_section_level();
@@ -162,12 +154,10 @@ impl MarkedNode {
                     |r| r.add_argument::<Views>(pos, child(false)).into_any(),
                 )
             }
-            //Marker::Argument(_) => child(false).into_view::<Views>().into_any(),
             Marker::Comp => Views::comp(false, child(true)).into_any(),
             Marker::DefComp => Views::comp(true, child(true)).into_any(),
             _ => ftml_core::TODO!(),
         }
-        //    )})
         .into_any()
     }
     pub(crate) fn new(
@@ -184,7 +174,7 @@ impl MarkedNode {
                 orig,
                 last_domain: None,
                 last_narrative: None,
-                owner: None,
+                saved_state: false,
                 child: None,
                 was_rendered: false,
             })),
@@ -205,12 +195,11 @@ impl MarkedNode {
                 .collect(),
             is_math: self.is_math,
             no_arg,
-            //owner: Owner::current().expect("not in a reactive context"),
             state: std::sync::Arc::new(parking_lot::Mutex::new(NodeState {
                 orig,
                 last_domain: None,
                 last_narrative: None,
-                owner: None,
+                saved_state: false,
                 child: None,
                 was_rendered: false,
             })),
@@ -219,71 +208,17 @@ impl MarkedNode {
         next
     }
 
-    #[deprecated(note = "clean up")]
-    fn owner(&self) -> Owner {
-        /*let mut state = self.state.lock();
-        let (owner, set_state) = {
-            state.owner.clone().map_or_else(
-                || {
-                    let owner = Owner::current().expect("not in a reactive context");
-                    if self.no_arg {
-                        ContextChain::provide(None::<ArgumentPosition>);
-                    }
-                    //state.owner = Some(owner.clone());
-                    let sig = expect_context::<RwSignal<DomExtractor>>();
-                    state.last_domain = sig.with_untracked(|e| e.iterate_domain().next().cloned());
-                    state.last_narrative =
-                        sig.with_untracked(|e| e.iterate_narrative().next().cloned());
-                    (owner, false)
-                },
-                |o| (o, true),
-            )
-        };
-        if set_state {
-            let dom = state.last_domain.clone();
-            let narr = state.last_narrative.clone();
-            let has_dom = dom.is_some();
-            let has_narr = narr.is_some();
-            drop(state);
-            let sig = owner.with(|| expect_context::<RwSignal<DomExtractor>>());
-            if has_dom || has_narr {
-                sig.update_untracked(|e| {
-                    if let Some(dom) = dom {
-                        tracing::debug!("Setting last domain to {dom:?}");
-                        match dom {
-                            OpenDomainElement::Argument {
-                                position, terms, ..
-                            } => e.state.domain.push(OpenDomainElement::Argument {
-                                position,
-                                terms,
-                                node: FtmlDomElement::new((*self.state.lock().orig).clone()),
-                            }),
-                            o => e.state.domain.push(o),
-                        }
-                    }
-                    if let Some(narr) = narr {
-                        tracing::debug!("Setting last narrative to {narr:?}");
-                        e.state.narrative.push(narr);
-                    }
-                });
-            }
-        }
-        //tracing::warn!("Current owner ancestry: {:?}", owner.ancestry());
-        //owner
-        */
+    fn maybe_set_state(&self) {
         let state = self.state.lock();
-        if let Some(owner) = &state.owner {
-            return Owner::current().expect("exists"); //owner.clone();
+        if state.saved_state {
+            return;
         }
         drop(state);
-        let owner = Owner::current().expect("exists");
-        self.add_owner(owner);
-        //owner
-        Owner::current().expect("exists")
+        self.set_state();
     }
 
     fn render<Views: FtmlViews + ?Sized>(&self) -> impl IntoView + use<Views> {
-        let owner = self.owner();
+        self.maybe_set_state();
         let mut state = self.state.lock();
         let was_rendered = state.was_rendered;
         state.was_rendered = true;
@@ -303,7 +238,7 @@ impl MarkedNode {
         drop(state);
 
         if was_rendered && (dom.is_some() || narr.is_some()) {
-            let sig = owner.with(|| expect_context::<RwSignal<DomExtractor>>());
+            let sig = expect_context::<RwSignal<DomExtractor>>();
             sig.update_untracked(|e| {
                 if let Some(dom) = dom {
                     tracing::debug!("Setting last domain to {dom:?}");
@@ -324,14 +259,12 @@ impl MarkedNode {
                 }
             });
         }
-        owner.with(|| {
-            leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
-                orig,
-                cont: |e: &_| super::iterate::<Views>(e),
-                skip_head: true,
-                class: None::<String>.into(),
-                style: None::<String>.into(),
-            })
+        leptos_posthoc::DomCont(leptos_posthoc::DomContProps {
+            orig,
+            cont: |e: &_| super::iterate::<Views>(e),
+            skip_head: true,
+            class: None::<String>.into(),
+            style: None::<String>.into(),
         })
     }
 }
@@ -349,7 +282,6 @@ impl ClonableView {
     ) -> Self {
         Self(ClonableNode::Fn {
             is_math,
-            owner: std::sync::Arc::new(parking_lot::Mutex::new(None)),
             f: f.into_boxed(),
         })
     }
@@ -358,10 +290,7 @@ impl ClonableView {
     pub fn into_view<Views: FtmlViews + ?Sized>(self) -> AnyView {
         match self.0 {
             ClonableNode::Node(n) => n.into_view::<Views>(),
-            ClonableNode::Fn { f, owner, .. } => {
-                let owner = owner.lock().clone();
-                owner.map_or_else(|| f.as_view(), |owner| owner.with(|| f.as_view()))
-            }
+            ClonableNode::Fn { f, .. } => f.as_view(),
         }
     }
 }
@@ -369,9 +298,8 @@ impl Clone for ClonableView {
     fn clone(&self) -> Self {
         match &self.0 {
             ClonableNode::Node(n) => Self(ClonableNode::Node(n.clone())),
-            ClonableNode::Fn { is_math, f, owner } => Self(ClonableNode::Fn {
+            ClonableNode::Fn { is_math, f } => Self(ClonableNode::Fn {
                 is_math: *is_math,
-                owner: owner.clone(),
                 f: f.as_boxed(),
             }),
         }

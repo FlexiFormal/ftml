@@ -1,7 +1,14 @@
 use either::Either;
 use ftml_backend::{BackendError, FtmlBackend, GlobalBackend, ParagraphOrProblemKind};
 use ftml_ontology::{
-    domain::{SharedDeclaration, declarations::symbols::Symbol, modules::Module},
+    domain::{
+        SharedDeclaration,
+        declarations::{
+            structures::{MathStructure, StructureExtension},
+            symbols::Symbol,
+        },
+        modules::Module,
+    },
     narrative::{
         SharedDocumentElement,
         documents::Document,
@@ -10,7 +17,7 @@ use ftml_ontology::{
     utils::Css,
 };
 use ftml_uris::{
-    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, UriKind,
+    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri, UriKind,
 };
 use std::marker::PhantomData;
 
@@ -56,6 +63,19 @@ pub struct GlobalLocal<T, E> {
     pub global: Option<Result<T, E>>,
     pub local: Option<T>,
 }
+impl<T, E> GlobalLocal<Vec<T>, E> {
+    #[allow(clippy::should_implement_trait)]
+    pub fn into_iter(self) -> impl Iterator<Item = T> {
+        self.local
+            .unwrap_or_default()
+            .into_iter()
+            .chain(if let Some(Ok(v)) = self.global {
+                either::Left(v.into_iter())
+            } else {
+                either::Right(std::iter::empty())
+            })
+    }
+}
 
 impl<B: SendBackend> WithLocalCache<B> {
     #[inline]
@@ -65,7 +85,13 @@ impl<B: SendBackend> WithLocalCache<B> {
         context: Option<NarrativeUri>,
     ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<B::Error>>> + Send + use<B>
     {
-        B::get().get_fragment(uri, context)
+        if let Uri::DocumentElement(uri) = &uri
+            && let Some(s) = LOCAL_CACHE.paragraphs.get(uri)
+        {
+            either::Either::Left(std::future::ready(Ok((s.clone(), Vec::new()))))
+        } else {
+            either::Either::Right(B::get().get_fragment(uri, context))
+        }
     }
 
     #[inline]
@@ -75,15 +101,13 @@ impl<B: SendBackend> WithLocalCache<B> {
         context: Option<NarrativeUri>,
     ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<B::Error>>> + Send + use<B>
     {
-        if let Some(v) = LOCAL_CACHE.fors.get(&uri) {
-            if let Some((uri, _)) = v
+        if let Some(v) = LOCAL_CACHE.fors.get(&uri)
+            && let Some((uri, _)) = v
                 .iter()
                 .find(|(_, k)| matches!(k, ParagraphOrProblemKind::Definition))
-            {
-                if let Some(s) = LOCAL_CACHE.paragraphs.get(uri) {
-                    return either::Either::Left(std::future::ready(Ok((s.clone(), Vec::new()))));
-                }
-            }
+            && let Some(s) = LOCAL_CACHE.paragraphs.get(uri)
+        {
+            return either::Either::Left(std::future::ready(Ok((s.clone(), Vec::new()))));
         }
         either::Either::Right(self.get_fragment(uri.into(), context))
     }
@@ -136,7 +160,10 @@ impl<B: SendBackend> WithLocalCache<B> {
         Output = Result<Either<Symbol, SharedDeclaration<Symbol>>, BackendError<B::Error>>,
     > + Send
     + use<B> {
+        let uri = uri.simple_module();
+        tracing::warn!("Getting {uri}");
         if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
+            tracing::warn!("Module {} found", uri.module);
             let r = m
                 .get_as::<Symbol>(&uri.name)
                 .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
@@ -145,6 +172,32 @@ impl<B: SendBackend> WithLocalCache<B> {
             return either::Either::Left(std::future::ready(r));
         }
         either::Either::Right(B::get().get_symbol(uri))
+    }
+
+    pub fn get_structure(
+        &self,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
+            BackendError<B::Error>,
+        >,
+    > + Send
+    + use<B> {
+        let uri = uri.simple_module();
+        if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
+            let r = m.get_as::<MathStructure>(&uri.name).map_or_else(
+                || {
+                    m.get_as::<StructureExtension>(&uri.name)
+                        .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
+                            Ok(either::Either::Right(d))
+                        })
+                },
+                |d| Ok(either::Either::Left(d)),
+            );
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(B::get().get_structure(uri))
     }
 
     pub fn get_variable(
@@ -200,10 +253,20 @@ impl<B: SendBackend> WithLocalCache<B> {
         uri: SymbolUri,
         problems: bool,
     ) -> impl Future<
-        Output = Result<Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
+        Output = GlobalLocal<
+            Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
+            BackendError<B::Error>,
+        >,
     > + Send
     + use<B> {
-        B::get().get_logical_paragraphs(uri, problems)
+        async move {
+            let local = LOCAL_CACHE.fors.get(&uri).as_deref().cloned();
+            let global = B::get().get_logical_paragraphs(uri, problems).await;
+            GlobalLocal {
+                local,
+                global: Some(global),
+            }
+        }
     }
 
     pub fn get_notation(

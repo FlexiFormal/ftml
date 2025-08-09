@@ -2,7 +2,7 @@ pub mod actions;
 pub mod css;
 pub mod local_cache;
 
-use leptos::wasm_bindgen::JsValue;
+use leptos::{IntoView, prelude::Suspend, wasm_bindgen::JsValue};
 
 #[derive(Debug)]
 pub struct JsDisplay(pub JsValue);
@@ -72,5 +72,29 @@ impl<T: Send + Sync + Clone + 'static + std::fmt::Debug> ContextChain<T> {
         }
         let slf = leptos::prelude::use_context::<Self>();
         ChainIter { current: slf }
+    }
+}
+
+pub trait FutureExt {
+    type T;
+    fn into_view<V: IntoView + 'static>(
+        self,
+        f: impl FnOnce(Self::T) -> V + Clone + Send + 'static,
+    ) -> impl IntoView;
+}
+impl<T, Fut: std::future::Future<Output = T> + Send, F: Fn() -> Fut + Clone + Send + 'static>
+    FutureExt for F
+{
+    type T = T;
+    fn into_view<V: IntoView + 'static>(
+        self,
+        f: impl FnOnce(T) -> V + Clone + Send + 'static,
+    ) -> impl IntoView {
+        use leptos::prelude::{Suspense, view};
+        view!(<Suspense fallback = || "…">{move || {
+            let s = self.clone();
+            let mut f = f.clone();
+            Suspend::new(async move {let ret = s().await;f(ret)})
+        }}</Suspense>)
     }
 }

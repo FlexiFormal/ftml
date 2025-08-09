@@ -36,10 +36,11 @@ pub trait Narrative: crate::Ftml {
     ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator;
 
     #[cfg(feature = "rdf")]
-    #[deprecated(note = "inputref etc missing")]
     fn contains_triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use crate::narrative::elements::{LogicalParagraph, Problem, Section, VariableDeclaration};
         use ftml_uris::FtmlUri;
         use ulo::triple;
+
         let Some(iri) = self.narrative_uri().map(NarrativeUriRef::to_iri) else {
             return either::Either::Left(std::iter::empty());
         };
@@ -51,9 +52,39 @@ pub trait Narrative: crate::Ftml {
                         either::Either::Right,
                     )
                 })
-                .filter_map(move |e| {
-                    e.element_uri()
-                        .map(|e| triple!(<(iri.clone())> ulo:contains <(e.to_iri())>))
+                .filter_map(move |e| match e {
+                    DocumentElementRef::UseModule(m) | DocumentElementRef::ImportModule(m) => {
+                        Some(triple!(<(iri.clone())> dc:requires <(m.to_iri())>))
+                    }
+                    DocumentElementRef::Module { module: uri, .. } => {
+                        Some(triple!(<(iri.clone())> ulo:contains <(uri.to_iri())>))
+                    }
+                    DocumentElementRef::DocumentReference { target, .. } => {
+                        Some(triple!(<(iri.clone())> dc:hasPart <(target.to_iri())>))
+                    }
+                    DocumentElementRef::Section(Section { uri, .. })
+                    | DocumentElementRef::Paragraph(LogicalParagraph { uri, .. })
+                    | DocumentElementRef::Problem(Problem { uri, .. })
+                    | DocumentElementRef::Slide { uri, .. }
+                    | DocumentElementRef::VariableDeclaration(VariableDeclaration {
+                        uri, ..
+                    })
+                    | DocumentElementRef::Term(DocumentTerm { uri, .. })
+                    | DocumentElementRef::Notation { uri, .. }
+                    | DocumentElementRef::VariableNotation { uri, .. } => {
+                        Some(triple!(<(iri.clone())> ulo:contains <(uri.to_iri())>))
+                    }
+                    DocumentElementRef::MathStructure { structure: uri, .. }
+                    | DocumentElementRef::Extension { extension: uri, .. }
+                    | DocumentElementRef::Morphism { morphism: uri, .. }
+                    | DocumentElementRef::SymbolDeclaration(uri) => {
+                        Some(triple!(<(iri.clone())> ulo:contains <(uri.to_iri())>))
+                    }
+                    DocumentElementRef::SetSectionLevel(_)
+                    | DocumentElementRef::SkipSection(_)
+                    | DocumentElementRef::Definiendum { .. }
+                    | DocumentElementRef::SymbolReference { .. }
+                    | DocumentElementRef::VariableReference { .. } => None, //e.element_uri().map(|e| triple!(<(iri.clone())> ulo:contains <(e.to_iri())>))
                 }),
         )
     }

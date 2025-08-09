@@ -33,8 +33,14 @@ impl crate::__private::Sealed for DocumentData {}
 impl crate::Ftml for DocumentData {
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
-        todo!();
-        Vec::new()
+        use ftml_uris::{FtmlUri, IsNarrativeUri, UriWithArchive};
+        use ulo::triple;
+        let iri = self.uri.to_iri();
+        [
+            triple!(<(iri.clone())> dc:language = (self.uri.language().to_string()) ),
+            triple!(<(iri.clone())> : ulo:document),
+            triple!(<(self.uri.archive_uri().to_iri())> ulo:contains <(iri)>),
+        ]
     }
 }
 impl Narrative for DocumentData {
