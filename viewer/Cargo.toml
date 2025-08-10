@@ -39,9 +39,14 @@ rustc_version = { workspace = true }
 document-features = { workspace = true }
 
 ftml-leptos = { workspace = true, features = ["csr", "typescript"] }
-ftml-backend = { workspace = true, features = ["wasm", "cached", "server_fn"] }
+ftml-backend = { workspace = true, features = [
+    "wasm",
+    "cached",
+    "server_fn",
+    "deepsize",
+] }
 ftml-uris = { workspace = true, features = ["interned"] }
-ftml-dom = { workspace = true }
+ftml-dom = { workspace = true, features = ["deepsize"] }
 
 serde_json = { workspace = true }
 parking_lot = { workspace = true }
@@ -53,5 +58,6 @@ tracing = { workspace = true, features = ["release_max_level_info"] }
 wasm-bindgen = { workspace = true }
 serde = { workspace = true }
 console_error_panic_hook = { workspace = true }
+bytesize = { workspace = true }
 
 tsify = { workspace = true, optional = true }

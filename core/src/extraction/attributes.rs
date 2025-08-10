@@ -1,6 +1,6 @@
 use std::{borrow::Cow, str::FromStr};
 
-use ftml_ontology::terms::Variable;
+use ftml_ontology::terms::{VarOrSym, Variable};
 use ftml_uris::{
     DocumentElementUri, DocumentUri, DomainUri, Id, Language, ModuleUri, SymbolUri, Uri,
 };
@@ -8,7 +8,7 @@ use ftml_uris::{
 use super::Result;
 use crate::{
     FtmlKey,
-    extraction::{FtmlExtractionError, FtmlExtractor, VarOrSym},
+    extraction::{FtmlExtractionError, FtmlExtractor},
 };
 
 pub trait Attributes {
@@ -148,22 +148,22 @@ pub trait Attributes {
         if head.contains('?') {
             let uri = head.parse::<Uri>().map_err(|e| (key, e))?;
             match uri {
-                Uri::Symbol(s) => Ok(VarOrSym::S(s)),
+                Uri::Symbol(s) => Ok(VarOrSym::Sym(s)),
                 Uri::Module(m) => {
                     let Some(s) = m.into_symbol() else {
                         return Err(FtmlExtractionError::InvalidValue(key));
                     };
-                    Ok(VarOrSym::S(s))
+                    Ok(VarOrSym::Sym(s))
                 }
                 //Uri::Module(_) => VarOrSym::S(m.into()) ???
-                Uri::DocumentElement(e) => Ok(VarOrSym::V(Variable::Ref {
+                Uri::DocumentElement(e) => Ok(VarOrSym::Var(Variable::Ref {
                     declaration: e,
                     is_sequence: None,
                 })),
                 _ => Err(FtmlExtractionError::InvalidValue(key)),
             }
         } else {
-            Ok(VarOrSym::V(ext.resolve_variable_name(
+            Ok(VarOrSym::Var(ext.resolve_variable_name(
                 head.parse().map_err(|e| (key, e))?,
             )))
         }

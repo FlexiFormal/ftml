@@ -95,7 +95,10 @@ impl Term {
                 let name: Id = unsafe { name.parse().unwrap_unchecked() };
                 // SAFETY: txt is key in map
                 let notated = Some(unsafe { txt.parse().unwrap_unchecked() });
-                Self::Var(Variable::Name { name, notated })
+                Self::Var {
+                    variable: Variable::Name { name, notated },
+                    presentation: None,
+                }
             }
             Self::Opaque {
                 tag,
@@ -146,12 +149,15 @@ impl Term {
             }
 
             // structure field projections:
-            Self::Application { head, arguments }
-                if matches!(&*head, Self::Symbol(s) if s == &*metatheory::FIELD_PROJECTION)
-                    && matches!(
-                        &*arguments,
-                        [Argument::Simple(_), Argument::Simple(Self::Label { .. })]
-                    ) =>
+            Self::Application {
+                head,
+                arguments,
+                presentation,
+            } if matches!(&*head, Self::Symbol{uri,..} if uri == &*metatheory::FIELD_PROJECTION)
+                && matches!(
+                    &*arguments,
+                    [Argument::Simple(_), Argument::Simple(Self::Label { .. })]
+                ) =>
             {
                 destruct!(
                     [
@@ -165,12 +171,10 @@ impl Term {
                 );
 
                 let (record, record_type) = match record {
-                    Self::Application { head, arguments }
-                        if matches!(&*head, Self::Symbol(s) if s == &*metatheory::OF_TYPE)
-                            && matches!(
-                                &*arguments,
-                                [Argument::Simple(_), Argument::Simple(_)]
-                            ) =>
+                    Self::Application {
+                        head, arguments, ..
+                    } if matches!(&*head, Self::Symbol{uri,..} if uri == &*metatheory::OF_TYPE)
+                        && matches!(&*arguments, [Argument::Simple(_), Argument::Simple(_)]) =>
                     {
                         destruct!(
                             [Argument::Simple(record), Argument::Simple(record_type)] = arguments
@@ -183,13 +187,15 @@ impl Term {
                     record: Box::new(record),
                     key,
                     record_type,
+                    presentation,
                 }
             }
 
             // module type (redundant):
-            Self::Application { head, arguments }
-                if matches!(&*head, Self::Symbol(s) if s == &*metatheory::MODULE_TYPE)
-                    && matches!(&*arguments, [Argument::Simple(Self::Symbol(_))]) =>
+            Self::Application {
+                head, arguments, ..
+            } if matches!(&*head, Self::Symbol{uri,..} if uri == &*metatheory::MODULE_TYPE)
+                && matches!(&*arguments, [Argument::Simple(Self::Symbol { .. })]) =>
             {
                 destruct!([Argument::Simple(head)] = arguments);
                 head

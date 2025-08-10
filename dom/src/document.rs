@@ -1,5 +1,4 @@
 use crate::{
-    VarOrSym,
     counters::{LogicalLevel, SectionCounters},
     extractor::DomExtractor,
     markers::{InputrefInfo, ParagraphInfo, SectionInfo},
@@ -7,9 +6,12 @@ use crate::{
     utils::{ContextChain, owned},
 };
 use ftml_core::extraction::ArgumentPosition;
-use ftml_ontology::narrative::elements::{
-    SectionLevel,
-    paragraphs::{ParagraphFormatting, ParagraphKind},
+use ftml_ontology::{
+    narrative::elements::{
+        SectionLevel,
+        paragraphs::{ParagraphFormatting, ParagraphKind},
+    },
+    terms::VarOrSym,
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, NarrativeUri, SymbolUri};
 use leptos::prelude::*;

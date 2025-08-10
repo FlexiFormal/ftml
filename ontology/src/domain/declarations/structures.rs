@@ -160,3 +160,34 @@ impl HasDeclarations for StructureExtension {
         DomainUriRef::Symbol(&self.uri)
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for StructureDeclaration {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        match self {
+            Self::Symbol(s) => s.deep_size_of_children(context),
+            Self::Morphism(m) => m.deep_size_of_children(context),
+            Self::Import(_) => 0,
+        }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for MathStructure {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.elements
+            .iter()
+            .map(|v| std::mem::size_of_val(v) + v.deep_size_of_children(context))
+            .sum::<usize>()
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for StructureExtension {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.elements
+            .iter()
+            .map(|v| std::mem::size_of_val(v) + v.deep_size_of_children(context))
+            .sum::<usize>()
+    }
+}

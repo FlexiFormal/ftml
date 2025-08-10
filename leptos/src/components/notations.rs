@@ -58,7 +58,7 @@ pub fn with_notation<B: SendBackend>(
         |c| c.get_notation(h, notation),
         move |n| {
             match arguments {
-                None => Left(n.as_op::<crate::Views<B>>(&head.into())),
+                None => Left(n.as_op::<crate::Views<B>>(&head.into(), None)),
                 Some(s) => {
                     let args = s.with(|s| {
                         if let ReactiveApplication::Closed(c) = s {
@@ -67,7 +67,7 @@ pub fn with_notation<B: SendBackend>(
                             Vec::new()
                         }
                     });
-                    Right(n.with_arguments::<crate::Views<B>, _>(&head.into(), &args))
+                    Right(n.with_arguments::<crate::Views<B>, _>(&head.into(), None, &args))
                 }
             }
             .attr("style", "border: 1px dotted red;")
@@ -160,7 +160,7 @@ fn do_notation_selector<Be: SendBackend, E: std::fmt::Display>(
                 {all.into_iter().map(|(not_uri,not)| {
                     let head = head.clone();
                     let notation = FtmlConfigState::disable_hovers(move ||
-                        not.as_view_safe::<crate::Views<Be>>(&head.into())
+                        not.as_view_safe::<crate::Views<Be>>(&head.into(),None)
                     );
                     view!(<ComboboxOption text="" value=not_uri.to_string()>
                         <math>{ notation}</math>

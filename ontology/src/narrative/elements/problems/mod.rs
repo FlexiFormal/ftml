@@ -16,9 +16,18 @@ pub use solutions::*;
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Problem {
-    pub sub_problem: bool,
     pub uri: DocumentElementUri,
     pub range: DocumentRange,
+    pub children: Box<[DocumentElement]>,
+    pub data: Box<ProblemData>,
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct ProblemData {
+    pub sub_problem: bool,
     pub autogradable: bool,
     pub points: Option<f32>,
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
@@ -29,11 +38,11 @@ pub struct Problem {
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef[]"))]
     pub notes: Box<[DataRef<Box<str>>]>,
     pub title: Option<DocumentRange>,
-    pub children: Box<[DocumentElement]>,
     pub styles: Box<[Id]>,
     pub preconditions: Box<[(CognitiveDimension, SymbolUri)]>,
     pub objectives: Box<[(CognitiveDimension, SymbolUri)]>,
 }
+
 impl crate::__private::Sealed for Problem {}
 impl crate::Ftml for Problem {
     #[cfg(feature = "rdf")]
@@ -46,7 +55,7 @@ impl crate::Ftml for Problem {
 
         self.contains_triples()
             .into_iter()
-            .chain(self.objectives.iter().flat_map(move |(d, s)| {
+            .chain(self.data.objectives.iter().flat_map(move |(d, s)| {
                 let b = ulo::rdf_types::BlankNode::default();
                 [
                     triple!(<(iri2.clone())> ulo:has_objective (b.clone())!),
@@ -54,7 +63,7 @@ impl crate::Ftml for Problem {
                     triple!((b)! ulo:po_has_symbol <(s.to_iri())>),
                 ]
             }))
-            .chain(self.preconditions.iter().flat_map(move |(d, s)| {
+            .chain(self.data.preconditions.iter().flat_map(move |(d, s)| {
                 let b = ulo::rdf_types::BlankNode::default();
                 [
                     triple!(<(iri3.clone())> ulo:has_precondition (b.clone())!),
@@ -62,7 +71,7 @@ impl crate::Ftml for Problem {
                     triple!((b)! ulo:po_has_symbol <(s.to_iri())>),
                 ]
             }))
-            .chain(std::iter::once(if self.sub_problem {
+            .chain(std::iter::once(if self.data.sub_problem {
                 triple!(<(iri)> : ulo:subproblem)
             } else {
                 triple!(<(iri)> : ulo:problem)
@@ -105,12 +114,12 @@ impl IsDocumentElement for Problem {
 impl Eq for Problem {}
 impl PartialEq for Problem {
     fn eq(&self, other: &Self) -> bool {
-        self.sub_problem == other.sub_problem && self.uri == other.uri
+        self.data.sub_problem == other.data.sub_problem && self.uri == other.uri
     }
 }
 impl std::hash::Hash for Problem {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.sub_problem.hash(state);
+        self.data.sub_problem.hash(state);
         self.uri.hash(state);
     }
 }
@@ -276,5 +285,29 @@ impl std::str::FromStr for CognitiveDimension {
             return Ok(Create);
         }
         Err(NotACognitiveDimension)
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for ProblemData {
+    fn deep_size_of_children(&self, _: &mut deepsize::Context) -> usize {
+        (self.gnotes.len() * std::mem::size_of::<DataRef<GradingNote>>())
+            + (self.hints.len() * std::mem::size_of::<DocumentRange>())
+            + (self.notes.len() * std::mem::size_of::<DataRef<Box<str>>>())
+            + (self.styles.len() * std::mem::size_of::<Id>())
+            + (self.preconditions.len() * std::mem::size_of::<(CognitiveDimension, SymbolUri)>())
+            + (self.objectives.len() * std::mem::size_of::<(CognitiveDimension, SymbolUri)>())
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Problem {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.children
+            .iter()
+            .map(|v| std::mem::size_of_val(v) + v.deep_size_of_children(context))
+            .sum::<usize>()
+            + std::mem::size_of::<ProblemData>()
+            + self.data.deep_size_of_children(context)
     }
 }

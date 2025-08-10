@@ -4,13 +4,12 @@ pub mod theming;
 
 use crate::components::terms::OnClickData;
 use ftml_backend::FtmlBackend;
-use ftml_core::extraction::VarOrSym;
 use ftml_dom::{
     DocumentState,
     notations::TermExt,
     utils::local_cache::{LocalCache, SendBackend, WithLocalCache},
 };
-use ftml_ontology::terms::Term;
+use ftml_ontology::terms::{Term, VarOrSym};
 use ftml_uris::{DocumentElementUri, LeafUri};
 use leptos::{
     IntoView,

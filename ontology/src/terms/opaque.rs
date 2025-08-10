@@ -100,3 +100,24 @@ impl std::fmt::Display for Opaque {
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Opaque {
+    fn deep_size_of_children(&self, _: &mut deepsize::Context) -> usize {
+        match self {
+            Self::Node {
+                attributes,
+                children,
+                ..
+            } => {
+                attributes
+                    .iter()
+                    .map(|p| std::mem::size_of_val(p) + p.1.len())
+                    .sum::<usize>()
+                    + children.iter().map(Self::deep_size_of).sum::<usize>()
+            }
+            Self::Text(t) => t.len(),
+            Self::Term(_) => 0,
+        }
+    }
+}

@@ -285,3 +285,132 @@ impl<B: SendBackend> WithLocalCache<B> {
         Right(B::get().get_notation(symbol, uri))
     }
 }
+
+#[cfg(feature = "deepsize")]
+pub struct CacheSize {
+    pub num_notations: usize,
+    pub notations_bytes: usize,
+    pub num_documents: usize,
+    pub documents_bytes: usize,
+    pub num_modules: usize,
+    pub modules_bytes: usize,
+    pub num_fors: usize,
+    pub fors_bytes: usize,
+    pub num_paragraphs: usize,
+    pub paragraphs_bytes: usize,
+}
+#[cfg(feature = "deepsize")]
+impl CacheSize {
+    #[must_use]
+    pub const fn total_bytes(&self) -> usize {
+        self.notations_bytes
+            + self.documents_bytes
+            + self.modules_bytes
+            + self.fors_bytes
+            + self.paragraphs_bytes
+    }
+}
+
+#[cfg(feature = "deepsize")]
+pub fn cache_size() -> CacheSize {
+    use deepsize::DeepSizeOf;
+    let mut num_notations = 0;
+    let mut notations_bytes = 0;
+    for n in &LOCAL_CACHE.notations {
+        notations_bytes += std::mem::size_of::<LeafUri>();
+        let value = n.value();
+        notations_bytes += std::mem::size_of_val(value);
+        for v in value {
+            num_notations += 1;
+            notations_bytes += std::mem::size_of::<DocumentElementUri>() + v.1.deep_size_of();
+        }
+    }
+    let mut num_documents = 0;
+    let mut documents_bytes = 0;
+    for d in LOCAL_CACHE.documents.iter() {
+        num_documents += 1;
+        documents_bytes += d.deep_size_of();
+    }
+    let mut num_modules = 0;
+    let mut modules_bytes = 0;
+    for d in LOCAL_CACHE.modules.iter() {
+        num_modules += 1;
+        modules_bytes += d.deep_size_of();
+    }
+    let mut num_fors = 0;
+    let mut fors_bytes = 0;
+    for n in &LOCAL_CACHE.fors {
+        fors_bytes += std::mem::size_of::<SymbolUri>();
+        let value = n.value();
+        fors_bytes += std::mem::size_of_val(value);
+        num_fors = value.len();
+        fors_bytes +=
+            value.len() * std::mem::size_of::<(DocumentElementUri, ParagraphOrProblemKind)>();
+    }
+    let mut num_paragraphs = 0;
+    let mut paragraphs_bytes = 0;
+    for n in &LOCAL_CACHE.paragraphs {
+        num_paragraphs += 1;
+        paragraphs_bytes += std::mem::size_of::<(DocumentElementUri, String)>();
+        paragraphs_bytes += n.value().len();
+    }
+    CacheSize {
+        num_notations,
+        notations_bytes,
+        num_documents,
+        documents_bytes,
+        num_modules,
+        modules_bytes,
+        num_fors,
+        fors_bytes,
+        num_paragraphs,
+        paragraphs_bytes,
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl std::fmt::Display for CacheSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let total = self.total_bytes();
+        let Self {
+            num_notations,
+            notations_bytes,
+            num_documents,
+            documents_bytes,
+            num_modules,
+            modules_bytes,
+            num_fors,
+            fors_bytes,
+            num_paragraphs,
+            paragraphs_bytes,
+        } = self;
+        write!(
+            f,
+            "\n\
+             notations:  {num_notations} ({})\n\
+             documents:  {num_documents} ({})\n\
+             modules:    {num_modules} ({})\n\
+             fors:       {num_fors} ({})\n\
+             paragraphs  {num_paragraphs} ({})\n\
+             ----------------------------------\n\
+             total: {}
+            ",
+            bytesize::ByteSize::b(*notations_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*documents_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*modules_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*fors_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*paragraphs_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(total as u64).display().iec_short(),
+        )
+    }
+}

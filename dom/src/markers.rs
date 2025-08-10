@@ -11,13 +11,13 @@ use crate::{
         local_cache::LOCAL_CACHE,
     },
 };
-use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, VarOrSym};
+use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement};
 use ftml_ontology::{
     narrative::elements::{
         SectionLevel,
         paragraphs::{ParagraphFormatting, ParagraphKind},
     },
-    terms::Variable,
+    terms::{VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, SymbolUri};
 use leptos::prelude::{AnyView, IntoAny, Memo, RwSignal, provide_context, use_context};
@@ -203,7 +203,7 @@ impl Marker {
                 notation,
                 in_term,
             } => {
-                provide_context(WithHead(Some(VarOrSym::S(uri.clone()))));
+                provide_context(WithHead(Some(VarOrSym::Sym(uri.clone()))));
                 Views::symbol_reference(
                     uri,
                     notation,
@@ -217,7 +217,7 @@ impl Marker {
                 notation,
                 in_term,
             } => {
-                provide_context(WithHead(Some(VarOrSym::V(var.clone()))));
+                provide_context(WithHead(Some(VarOrSym::Var(var.clone()))));
                 Views::variable_reference(
                     var,
                     notation,
@@ -311,12 +311,12 @@ impl Marker {
             OpenFtmlElement::ParagraphTitle => Some(Self::ParagraphTitle),
             OpenFtmlElement::Section(uri) => Some(Self::Section(uri.clone())),
             OpenFtmlElement::ComplexTerm { head, notation, .. } => match head {
-                VarOrSym::S(s) => Some(Self::SymbolReference {
+                VarOrSym::Sym(s) => Some(Self::SymbolReference {
                     uri: s.clone(),
                     notation: notation.clone(),
                     in_term: ext.in_term(),
                 }),
-                VarOrSym::V(v) => Some(Self::VariableReference {
+                VarOrSym::Var(v) => Some(Self::VariableReference {
                     var: v.clone(),
                     notation: notation.clone(),
                     in_term: ext.in_term(),

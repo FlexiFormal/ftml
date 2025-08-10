@@ -92,7 +92,8 @@ macro_rules! debugdisplay {
 macro_rules! intern {
     ($static:ident = $store:ident:$str_type:ident @ $num:literal ) => {
         #[cfg(feature = "interned")]//, not(feature = "api")))]
-        static $static: std::sync::LazyLock<crate::aux::interned::InternMap> =
+        #[allow(clippy::redundant_pub_crate)]
+        pub(crate) static $static: std::sync::LazyLock<crate::aux::interned::InternMap> =
             std::sync::LazyLock::new(crate::aux::interned::InternMap::default);
         #[cfg(feature = "interned")]//, not(feature = "api")))]
         #[inline]

@@ -687,3 +687,26 @@ impl<
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for DocumentElement {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        match self {
+            Self::Module { children, .. }
+            | Self::MathStructure { children, .. }
+            | Self::Extension { children, .. }
+            | Self::Morphism { children, .. }
+            | Self::Slide { children, .. }
+            | Self::SkipSection(children) => children
+                .iter()
+                .map(|c| std::mem::size_of_val(c) + c.deep_size_of_children(context))
+                .sum::<usize>(),
+            Self::Section(s) => s.deep_size_of_children(context),
+            Self::Paragraph(s) => s.deep_size_of_children(context),
+            Self::Problem(s) => s.deep_size_of_children(context),
+            Self::VariableDeclaration(s) => s.deep_size_of_children(context),
+            Self::Term(t) => t.term.deep_size_of_children(context),
+            _ => 0,
+        }
+    }
+}

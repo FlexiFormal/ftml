@@ -150,3 +150,30 @@ mod serde_impl {
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for ModuleData {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.declarations
+            .iter()
+            .map(|v| std::mem::size_of_val(v) + v.deep_size_of_children(context))
+            .sum::<usize>()
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Module {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        std::mem::size_of::<ModuleData>() + self.0.deep_size_of_children(context)
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for NestedModule {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.declarations
+            .iter()
+            .map(|v| std::mem::size_of_val(v) + v.deep_size_of_children(context))
+            .sum::<usize>()
+    }
+}

@@ -4,8 +4,9 @@ use crate::ClonableView;
 use crate::document::CurrentUri;
 use crate::terms::{ReactiveApplication, ReactiveTerm, TopTerm};
 use crate::{DocumentState, FtmlViews};
+use ftml_core::FtmlKey;
 use ftml_core::extraction::ArgumentPosition;
-use ftml_core::{FtmlKey, extraction::VarOrSym};
+use ftml_ontology::terms::VarOrSym;
 use ftml_ontology::{
     narrative::elements::{
         Notation,
@@ -22,26 +23,44 @@ pub trait NotationExt {
     fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(
         &self,
         head: &VarOrSym,
+        this: Option<&ClonableView>,
         args: &R,
     ) -> impl IntoView + use<Self, Views, R>;
     fn with_arguments_safe<Views: FtmlViews, R: ArgumentRender + ?Sized>(
         &self,
         head: &VarOrSym,
+        this: Option<&ClonableView>,
         args: &R,
     ) -> impl IntoView + use<Self, Views, R> {
         DocumentState::with_head(head.clone(), move || {
             provide_context(None::<TopTerm>);
             provide_context(None::<ReactiveTerm>);
-            self.with_arguments::<Views, R>(head, args)
+            self.with_arguments::<Views, R>(head, this, args)
         })
     }
-    fn as_view<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Self, Views>;
-    fn as_view_safe<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Self, Views> {
-        DocumentState::with_head(head.clone(), move || self.as_view::<Views>(head))
+    fn as_view<Views: FtmlViews>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+    ) -> impl IntoView + use<Self, Views>;
+    fn as_view_safe<Views: FtmlViews>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+    ) -> impl IntoView + use<Self, Views> {
+        DocumentState::with_head(head.clone(), move || self.as_view::<Views>(head, this))
     }
-    fn as_op<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Self, Views>;
-    fn as_op_safe<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Self, Views> {
-        DocumentState::with_head(head.clone(), move || self.as_op::<Views>(head))
+    fn as_op<Views: FtmlViews>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+    ) -> impl IntoView + use<Self, Views>;
+    fn as_op_safe<Views: FtmlViews>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+    ) -> impl IntoView + use<Self, Views> {
+        DocumentState::with_head(head.clone(), move || self.as_op::<Views>(head, this))
     }
 }
 
@@ -176,16 +195,17 @@ impl NotationExt for Notation {
     fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(
         &self,
         head: &VarOrSym,
+        this: Option<&ClonableView>,
         args: &R,
     ) -> impl IntoView + use<Views, R> {
         use leptos::either::Either::{Left, Right};
         if args.is_empty() {
-            return Left(self.as_op::<Views>(head));
+            return Left(self.as_op::<Views>(head, this));
         }
         Right(/*owned(move ||*/ {
             let h = head.to_string();
             //provide_context(WithHead(Some(head.clone())));
-            let r = view_component_with_args::<Views>(&self.component, args)
+            let r = view_component_with_args::<Views>(&self.component, args, this)
                 .attr(FtmlKey::Term.attr_name(), "OMBIND")
                 .attr(FtmlKey::Head.attr_name(), h);
             ReactiveApplication::close();
@@ -193,11 +213,15 @@ impl NotationExt for Notation {
         }) //)
     }
 
-    fn as_op<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Views> {
+    fn as_op<Views: FtmlViews>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+    ) -> impl IntoView + use<Views> {
         self.op
             .as_ref()
             .map_or_else(
-                || view_component_with_args::<Views>(&self.component, &DummyRender),
+                || view_component_with_args::<Views>(&self.component, &DummyRender, this),
                 |op| {
                     let op = op.clone();
                     if with_context::<CurrentUri, _>(|_| ()).is_some() {
@@ -217,11 +241,15 @@ impl NotationExt for Notation {
             .attr(FtmlKey::Head.attr_name(), head.to_string())
     }
 
-    fn as_view<Views: FtmlViews>(&self, head: &VarOrSym) -> impl IntoView + use<Views> {
+    fn as_view<Views: FtmlViews>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+    ) -> impl IntoView + use<Views> {
         //owned(move || {
         let h = head.to_string();
         //provide_context(WithHead(Some(head.clone())));
-        view_component_with_args::<Views>(&self.component, &DummyRender)
+        view_component_with_args::<Views>(&self.component, &DummyRender, this)
             .attr(FtmlKey::Term.attr_name(), "OMID")
             .attr(FtmlKey::Head.attr_name(), h)
         //})
@@ -231,6 +259,7 @@ impl NotationExt for Notation {
 pub(crate) fn view_component_with_args<Views: FtmlViews>(
     comp: &NotationComponent,
     args: &(impl ArgumentRender + ?Sized),
+    this: Option<&ClonableView>,
 ) -> AnyView {
     match comp {
         NotationComponent::Text(s) => s.to_string().into_any(),
@@ -243,11 +272,25 @@ pub(crate) fn view_component_with_args<Views: FtmlViews>(
                 tag.as_ref(),
                 children
                     .iter()
-                    .map(|c| view_component_with_args::<Views>(c, args))
+                    .map(|c| view_component_with_args::<Views>(c, args, this))
                     .collect_view(),
             ),
             |n, (k, v)| n.attr(k.to_string(), v.to_string()).into_any(),
         ),
+        NotationComponent::MainComp(n) if this.is_some() => {
+            // SAFETY: defined
+            let this = unsafe { this.unwrap_unchecked().clone() };
+            let n = n.clone();
+            let inner = if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                leptos::either::Either::Left(Views::comp(
+                    false,
+                    ClonableView::new(true, move || view_node(&n).attr("data-ftml-comp", "")),
+                ))
+            } else {
+                leptos::either::Either::Right(view_node(&n).attr("data-ftml-comp", ""))
+            };
+            view!(<msub>{inner}{this.into_view::<Views>()}</msub>).into_any()
+        }
         NotationComponent::Comp(n) | NotationComponent::MainComp(n) => {
             let n = n.clone();
             if with_context::<CurrentUri, _>(|_| ()).is_some() {
@@ -275,7 +318,7 @@ pub(crate) fn view_component_with_args<Views: FtmlViews>(
                     {args.render_arg_at::<Views>(*index, 0, *mode)}
                 {
                     (1..len).map(|i| view!{
-                        {sep.iter().map(|s| view_component_with_args::<Views>(s,args)).collect_view()}
+                        {sep.iter().map(|s| view_component_with_args::<Views>(s,args,this)).collect_view()}
                         {args.render_arg_at::<Views>(*index, i, *mode)}
                     }).collect_view()
                 }

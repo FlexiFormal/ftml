@@ -21,6 +21,12 @@ impl<T: IsDocumentElement> std::ops::Deref for SharedDocumentElement<T> {
         &self.0
     }
 }
+impl<T: IsDocumentElement + std::fmt::Debug> std::fmt::Debug for SharedDocumentElement<T> {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (**self).fmt(f)
+    }
+}
 impl Document {
     pub fn get_as<T: IsDocumentElement>(&self, name: &UriName) -> Option<SharedDocumentElement<T>> {
         SharedArc::opt_new(self, |m| &m.0, move |e| e.find(name.steps()).ok_or(()))

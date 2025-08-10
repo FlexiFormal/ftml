@@ -23,6 +23,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=typescript"]
 
+[tasks.test-deepsize]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=deepsize"]
+
 [tasks.all-tests]
 dependencies = [
     "test-no-features",
@@ -30,6 +35,7 @@ dependencies = [
     "test-hydrate",
     "test-ssr",
     "test-typescript",
+    "test-deepsize",
 ]
 
 [tasks.doc]

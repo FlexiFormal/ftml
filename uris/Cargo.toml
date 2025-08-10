@@ -35,7 +35,7 @@ tantivy = ["dep:tantivy"]
 ## [`DocumentElementUri`](crate::DocumentElementUri)
 openmath = ["dep:openmath"]
 ## interns Uris for deduplication, reduced memory usage and faster equality checks.
-interned = []
+interned = ["dep:bytesize"]
 ## Allows for creating RDF IRIs from URIs using [`oxrdf::NamedNode`](oxrdf::NamedNode)
 rdf = ["dep:oxrdf"]
 ## Hides interning global statics behind extern blocks for compatibility with
@@ -93,3 +93,4 @@ leptos_router = { workspace = true, optional = true }
 tantivy = { workspace = true, optional = true }
 openmath = { workspace = true, optional = true }
 oxrdf = { workspace = true, optional = true }
+bytesize = { workspace = true, optional = true }

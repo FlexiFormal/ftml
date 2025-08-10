@@ -151,16 +151,24 @@ impl openmath::ser::OMSerializable for Term {
         serializer: S,
     ) -> Result<S::Ok, S::Err> {
         match self {
-            Self::Symbol(s) => s.as_oms().as_openmath(serializer),
-            Self::Var(Variable::Name { name, .. }) => serializer.omv(name),
-            Self::Var(Variable::Ref { declaration, .. }) => serializer.omattr(
+            Self::Symbol { uri, .. } => uri.as_oms().as_openmath(serializer),
+            Self::Var {
+                variable: Variable::Name { name, .. },
+                ..
+            } => serializer.omv(name),
+            Self::Var {
+                variable: Variable::Ref { declaration, .. },
+                ..
+            } => serializer.omattr(
                 std::iter::once((
                     &*ftml_uris::metatheory::RESOLVED_VARIABLE_URI,
                     &declaration.as_oms(),
                 )),
                 &Omv(declaration.name()),
             ),
-            Self::Application { head, arguments } => serializer.oma(
+            Self::Application {
+                head, arguments, ..
+            } => serializer.oma(
                 &**head,
                 arguments.iter().map(|a| match a {
                     Argument::Simple(a) => either_of::EitherOf3::A(a),
@@ -172,6 +180,7 @@ impl openmath::ser::OMSerializable for Term {
                 head,
                 arguments,
                 body,
+                ..
             } => Args {
                 head: &**head,
                 args: arguments,
@@ -194,12 +203,18 @@ impl openmath::de::OMDeserializable<'_> for Term {
             OM::OMS { cd, name, attrs: _ } => {
                 let path: PathUri = cd_base.parse()?;
                 let sym = path | UriName::from_str(&cd)? | UriName::from_str(&name)?;
-                Ok(Self::Symbol(sym))
+                Ok(Self::Symbol {
+                    uri: sym,
+                    presentation: None,
+                })
             }
-            OM::OMV { name, .. } => Ok(Self::Var(Variable::Name {
-                name: Id::from_str(&name)?,
-                notated: None,
-            })),
+            OM::OMV { name, .. } => Ok(Self::Var {
+                variable: Variable::Name {
+                    name: Id::from_str(&name)?,
+                    notated: None,
+                },
+                presentation: None,
+            }),
 
             o => Err(Error::Unsupported(o.kind())),
         }

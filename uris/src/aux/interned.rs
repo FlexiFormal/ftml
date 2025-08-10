@@ -5,6 +5,121 @@ use std::{
     borrow::Borrow, hash::Hasher, marker::PhantomData, num::NonZeroUsize, ops::Deref, str::FromStr,
 };
 
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct MemoryState {
+    pub num_ids: usize,
+    pub ids_bytes: usize,
+    pub num_archives: usize,
+    pub archives_bytes: usize,
+    pub num_uri_names: usize,
+    pub uri_names_bytes: usize,
+    pub num_uri_paths: usize,
+    pub uri_paths_bytes: usize,
+    pub num_base_uris: usize,
+    pub base_uris_bytes: usize,
+}
+impl MemoryState {
+    #[must_use]
+    pub const fn total_bytes(&self) -> usize {
+        self.ids_bytes
+            + self.archives_bytes
+            + self.uri_names_bytes
+            + self.uri_paths_bytes
+            + self.base_uris_bytes
+    }
+}
+impl std::fmt::Display for MemoryState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let total = self.total_bytes();
+        let Self {
+            num_ids,
+            ids_bytes,
+            num_archives,
+            archives_bytes,
+            num_uri_names,
+            uri_names_bytes,
+            num_uri_paths,
+            uri_paths_bytes,
+            num_base_uris,
+            base_uris_bytes,
+        } = self;
+        write!(
+            f,
+            "\nids:       {num_ids} ({})\n\
+             archives:  {num_archives} ({})\n\
+             names:     {num_uri_names} ({})\n\
+             paths:     {num_uri_paths} ({})\n\
+             base uris: {num_base_uris} ({})\n\
+             ----------------------------------\n\
+             total: {}
+            ",
+            bytesize::ByteSize::b(*ids_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*archives_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*uri_names_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*uri_paths_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*base_uris_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(total as u64).display().iec_short(),
+        )
+    }
+}
+
+#[must_use]
+pub fn get_memory_state() -> MemoryState {
+    macro_rules! data {
+        ($num:ident,$bytes:ident = $thing:expr) => {
+            let mut $num = 0;
+            let $bytes = $thing
+                .0
+                .iter()
+                .map(|k| {
+                    $num += 1;
+                    k.len() + std::mem::size_of::<strumbra::SharedString>()
+                })
+                .sum();
+        };
+    }
+    data!(num_ids, ids_bytes = super::IDS);
+    data!(num_archives, archives_bytes = crate::uris::archive::IDS);
+    data!(num_uri_names, uri_names_bytes = crate::uris::module::NAMES);
+    data!(num_uri_paths, uri_paths_bytes = crate::uris::paths::PATHS);
+    let (num_base_uris, base_uris_bytes) = {
+        let lock = crate::uris::base::BASE_URIS.lock();
+        (
+            lock.len(),
+            lock.iter()
+                .map(|ib| {
+                    std::mem::size_of::<crate::uris::base::InternedBaseURI>()
+                        + ib.string.len()
+                        + std::mem::size_of::<url::Url>()
+                        + ib.url.as_str().len()
+                })
+                .sum(),
+        )
+    };
+    MemoryState {
+        num_ids,
+        ids_bytes,
+        num_archives,
+        archives_bytes,
+        num_uri_names,
+        uri_names_bytes,
+        num_uri_paths,
+        uri_paths_bytes,
+        num_base_uris,
+        base_uris_bytes,
+    }
+}
+
 pub type InternMap = (
     dashmap::DashSet<strumbra::SharedString, rustc_hash::FxBuildHasher>,
     // mutex, so we can lock the whole map for certain actions

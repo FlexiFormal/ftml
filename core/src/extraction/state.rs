@@ -3,7 +3,7 @@ use crate::{
     extraction::{
         ArgumentPosition, CloseFtmlElement, FtmlExtractionError, MetaDatum, OpenArgument,
         OpenBoundArgument, OpenDomainElement, OpenFtmlElement, OpenNarrativeElement, Split,
-        VarOrSym, nodes::FtmlNode,
+        nodes::FtmlNode,
     },
 };
 use ftml_ontology::{
@@ -26,7 +26,7 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{Term, Variable},
+    terms::{Term, VarOrSym, Variable},
 };
 #[cfg(feature = "rdf")]
 use ftml_uris::FtmlUri;
@@ -851,7 +851,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             .map_err(|e| FtmlExtractionError::EncodingError(FtmlKey::Notation, e.to_string()))?;
 
         let (e, leaf) = match head {
-            VarOrSym::S(s) => (
+            VarOrSym::Sym(s) => (
                 DocumentElement::Notation {
                     symbol: s.clone(),
                     uri: uri.clone(),
@@ -859,7 +859,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 },
                 s.into(),
             ),
-            VarOrSym::V(Variable::Ref { declaration, .. }) => (
+            VarOrSym::Var(Variable::Ref { declaration, .. }) => (
                 DocumentElement::VariableNotation {
                     variable: declaration.clone(),
                     uri: uri.clone(),
@@ -867,7 +867,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 },
                 declaration.into(),
             ),
-            VarOrSym::V(_) => {
+            VarOrSym::Var(_) => {
                 return Err(FtmlExtractionError::InvalidValue(FtmlKey::Notation));
             }
         };
@@ -1494,13 +1494,27 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 return Err(FtmlExtractionError::MissingArgument(i + 1));
             }
         }
-        let head = head_term.unwrap_or_else(|| match head {
-            VarOrSym::S(s) => Term::Symbol(s),
-            VarOrSym::V(v) => Term::Var(v),
-        });
+        let (head, presentation) = if let Some(t) = head_term {
+            (t, Some(head))
+        } else {
+            (
+                match head {
+                    VarOrSym::Sym(s) => Term::Symbol {
+                        uri: s,
+                        presentation: None,
+                    },
+                    VarOrSym::Var(v) => Term::Var {
+                        variable: v,
+                        presentation: None,
+                    },
+                },
+                None,
+            )
+        };
         let term = Term::Application {
             head: Box::new(head),
             arguments: args.into_boxed_slice(),
+            presentation,
         }
         .simplify();
         self.close_app_term(uri, term, node)
@@ -1529,14 +1543,29 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 return Err(FtmlExtractionError::MissingArgument(i + 1));
             }
         }
-        let head = head_term.unwrap_or_else(|| match head {
-            VarOrSym::S(s) => Term::Symbol(s),
-            VarOrSym::V(v) => Term::Var(v),
-        });
+
+        let (head, presentation) = if let Some(t) = head_term {
+            (t, Some(head))
+        } else {
+            (
+                match head {
+                    VarOrSym::Sym(s) => Term::Symbol {
+                        uri: s,
+                        presentation: None,
+                    },
+                    VarOrSym::Var(v) => Term::Var {
+                        variable: v,
+                        presentation: None,
+                    },
+                },
+                None,
+            )
+        };
         let term = Term::Bound {
             head: Box::new(head),
             body: Box::new(body),
             arguments: args.into_boxed_slice(),
+            presentation,
         }
         .simplify();
         self.close_app_term(uri, term, node)
@@ -1544,7 +1573,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
 
     fn close_complex(
         &mut self,
-        _head: VarOrSym,
+        head: VarOrSym,
         head_term: Option<Term>,
         uri: Option<DocumentElementUri>,
         node: &N,
@@ -1552,6 +1581,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         let Some(term) = head_term else {
             return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term));
         };
+        let term = term.with_presentation(head);
         self.close_term(term, node, |slf, term| {
             uri.map_or_else(
                 || {
@@ -1567,39 +1597,53 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     }
 
     fn close_oms(&mut self, uri: SymbolUri, notation: Option<Id>, node: &N) -> super::Result<()> {
-        self.close_term(Term::Symbol(uri), node, |slf, term| {
-            let Term::Symbol(uri) = term else {
-                // SAFETY: close_term returns the same term
-                unsafe { unreachable_unchecked() }
-            };
-            slf.push_elem(DocumentElement::SymbolReference {
-                range: node.range(),
+        self.close_term(
+            Term::Symbol {
                 uri,
-                notation,
-            });
-            Ok(())
-        })
+                presentation: None,
+            },
+            node,
+            |slf, term| {
+                let Term::Symbol { uri, .. } = term else {
+                    // SAFETY: close_term returns the same term
+                    unsafe { unreachable_unchecked() }
+                };
+                slf.push_elem(DocumentElement::SymbolReference {
+                    range: node.range(),
+                    uri,
+                    notation,
+                });
+                Ok(())
+            },
+        )
     }
 
     fn close_omv(&mut self, var: Variable, notation: Option<Id>, node: &N) -> super::Result<()> {
-        self.close_term(Term::Var(var), node, |slf, term| {
-            let Term::Var(var) = term else {
-                // SAFETY: close_term returns the same term
-                unsafe { unreachable_unchecked() }
-            };
-            let uri = match var {
-                Variable::Name { .. } => return Ok(()),
-                Variable::Ref {
-                    declaration,
-                    is_sequence,
-                } => declaration,
-            };
-            slf.push_elem(DocumentElement::VariableReference {
-                range: node.range(),
-                uri,
-                notation,
-            });
-            Ok(())
-        })
+        self.close_term(
+            Term::Var {
+                variable: var,
+                presentation: None,
+            },
+            node,
+            |slf, term| {
+                let Term::Var { variable: var, .. } = term else {
+                    // SAFETY: close_term returns the same term
+                    unsafe { unreachable_unchecked() }
+                };
+                let uri = match var {
+                    Variable::Name { .. } => return Ok(()),
+                    Variable::Ref {
+                        declaration,
+                        is_sequence,
+                    } => declaration,
+                };
+                slf.push_elem(DocumentElement::VariableReference {
+                    range: node.range(),
+                    uri,
+                    notation,
+                });
+                Ok(())
+            },
+        )
     }
 }

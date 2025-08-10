@@ -4,7 +4,7 @@ use crate::{
     FtmlKey,
     extraction::{
         ArgumentPosition, CloseFtmlElement, FtmlExtractionError, FtmlExtractor, KeyList,
-        OpenDomainElement, OpenFtmlElement, OpenNarrativeElement, VarOrSym, attributes::Attributes,
+        OpenDomainElement, OpenFtmlElement, OpenNarrativeElement, attributes::Attributes,
     },
 };
 use ftml_ontology::{
@@ -17,7 +17,7 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{ArgumentMode, Term, Variable},
+    terms::{ArgumentMode, Term, VarOrSym, Variable},
 };
 use ftml_uris::{Id, IsNarrativeUri, SymbolUri, errors::SegmentParseError};
 use std::{borrow::Cow, num::NonZeroU8, str::FromStr};
@@ -555,15 +555,15 @@ pub fn term<E: FtmlExtractor>(
             })
     };
 
-    if let VarOrSym::V(Variable::Ref { declaration, .. }) = &head {
+    if let VarOrSym::Var(Variable::Ref { declaration, .. }) = &head {
         attrs.set(FtmlKey::Head.attr_name(), declaration);
     }
 
     match (kind, head) {
-        (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::S(uri)) => {
+        (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::Sym(uri)) => {
             ret!(ext,node <- SymbolReference{uri,notation} + SymbolReference)
         }
-        (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::V(var)) => {
+        (OpenTermKind::OMS | OpenTermKind::OMV, VarOrSym::Var(var)) => {
             ret!(ext,node <- VariableReference{var,notation} + VariableReference)
         }
         (OpenTermKind::OMA, head) => {
@@ -590,12 +590,12 @@ pub fn term<E: FtmlExtractor>(
             };
             ret!(ext,node <- ComplexTerm{head,notation,uri} + ComplexTerm)
         }
-        (OpenTermKind::OML, VarOrSym::V(Variable::Name { name, .. })) => {
+        (OpenTermKind::OML, VarOrSym::Var(Variable::Name { name, .. })) => {
             // SAFETY: names are valid UriNames
             let name = unsafe { name.as_ref().parse().unwrap_unchecked() };
             ret!(ext,node <- OML{name} + OML)
         }
-        (OpenTermKind::OML, VarOrSym::V(Variable::Ref { declaration, .. })) => {
+        (OpenTermKind::OML, VarOrSym::Var(Variable::Ref { declaration, .. })) => {
             ret!(ext,node <- OML{name:declaration.name} + OML)
         }
         (k, _) => crate::TODO!("{k:?}"),

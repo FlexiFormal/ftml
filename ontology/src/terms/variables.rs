@@ -39,3 +39,11 @@ impl Debug for Variable {
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Variable {
+    #[inline]
+    fn deep_size_of_children(&self, _: &mut deepsize::Context) -> usize {
+        0
+    }
+}

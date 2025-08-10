@@ -62,3 +62,31 @@ pub fn iterate_body(cfg: config::FtmlViewerConfig) {
         })
     });
 }
+
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn print_cache() {
+    use ftml_backend::GlobalBackend;
+    let uris = ftml_uris::get_memory_state();
+    let local_cache = ftml_dom::utils::local_cache::cache_size();
+    let remote_cache = backend::GlobalBackend::get().cache_size();
+    let total = uris.total_bytes() + local_cache.total_bytes() + remote_cache.total_bytes();
+    leptos::logging::log!(
+        "Uris: {uris}\nLocal Cache: {local_cache}\nRemote Cache: {remote_cache}\
+        \n---------------------\nTotal: {}",
+        bytesize::ByteSize::b(total as u64).display().iec_short()
+    );
+}
+
+/*
+
+#[cfg(feature = "deepsize")]
+{
+    let uris = ftml_uris::get_memory_state();
+    let cache = crate::utils::local_cache::cache_size();
+    let total = uris.total_bytes() + cache.total_bytes();
+    tracing::warn!(
+        "Uris: {uris}\nCache: {cache}\n---------------------\nTotal: {}",
+        bytesize::ByteSize::b(total as u64).display().iec_short()
+    );
+}
+ */

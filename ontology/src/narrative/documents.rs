@@ -155,3 +155,31 @@ mod serde_impl {
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for DocumentStyles {
+    fn deep_size_of_children(&self, _: &mut deepsize::Context) -> usize {
+        (self.counters.len() * std::mem::size_of::<DocumentCounter>())
+            + (self.styles.len() * std::mem::size_of::<DocumentStyle>())
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for DocumentData {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.title.as_ref().map(|s| s.len()).unwrap_or_default()
+            + self.styles.deep_size_of_children(context)
+            + self
+                .elements
+                .iter()
+                .map(|e| std::mem::size_of_val(e) + e.deep_size_of_children(context))
+                .sum::<usize>()
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Document {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        std::mem::size_of::<DocumentData>() + self.0.deep_size_of_children(context)
+    }
+}

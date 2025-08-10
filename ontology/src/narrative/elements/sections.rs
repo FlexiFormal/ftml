@@ -176,3 +176,13 @@ impl From<SectionLevel> for u8 {
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Section {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.children
+            .iter()
+            .map(|e| std::mem::size_of_val(e) + e.deep_size_of_children(context))
+            .sum::<usize>()
+    }
+}

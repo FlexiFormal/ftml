@@ -7,7 +7,6 @@ use crate::{
     config::{FtmlConfigState, HighlightStyle},
     utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
 };
-use ftml_core::extraction::VarOrSym;
 use ftml_dom::{
     ClonableView, DocumentState, FtmlViews, TermTrackedViews,
     notations::TermExt,
@@ -18,7 +17,7 @@ use ftml_dom::{
         local_cache::LocalCache,
     },
 };
-use ftml_ontology::terms::{ArgumentMode, Variable};
+use ftml_ontology::terms::{ArgumentMode, VarOrSym, Variable};
 use ftml_uris::{DocumentElementUri, Id, LeafUri, SymbolUri};
 use leptos::prelude::*;
 
@@ -150,9 +149,9 @@ pub fn oma<B: SendBackend>(
     }
 
     let uri: Option<LeafUri> = head.with_untracked(|h| match h.head() {
-        VarOrSym::S(s) => Some(s.clone().into()),
-        VarOrSym::V(Variable::Ref { declaration, .. }) => Some(declaration.clone().into()),
-        VarOrSym::V(_) => None,
+        VarOrSym::Sym(s) => Some(s.clone().into()),
+        VarOrSym::Var(Variable::Ref { declaration, .. }) => Some(declaration.clone().into()),
+        VarOrSym::Var(_) => None,
     });
     let ret = move |children| {
         if let Some(uri) = &uri {
@@ -224,7 +223,7 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
 
     inject_css("ftml-comp", include_str!("comp.css"));
 
-    let is_var = matches!(&head, VarOrSym::V(_));
+    let is_var = matches!(&head, VarOrSym::Var(_));
     let Some(is_hovered) = use_context::<InTerm>().map(|h| h.hovered) else {
         tracing::warn!("InTerm is missing!");
         return Left(children.into_view::<crate::Views<B>>());
@@ -233,7 +232,7 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
         let arg = DocumentState::arguments().next();
         tracing::trace!("variable comp: {head}@{arg:?}");
         if arg.is_some_and(|a| [ArgumentMode::Sequence, ArgumentMode::Simple].contains(&a.mode())) {
-            let VarOrSym::V(var) = head.clone() else {
+            let VarOrSym::Var(var) = head.clone() else {
                 // SAFETY: is_var==true
                 unsafe { unreachable_unchecked() }
             };
@@ -323,15 +322,15 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
 pub fn term_popover<Be: SendBackend>(head: VarOrSym) -> impl IntoView {
     use leptos::either::EitherOf3::{A, B, C};
     match head {
-        VarOrSym::V(Variable::Name { name, notated }) => A(unresolved_var_popover(name, notated)),
-        VarOrSym::V(Variable::Ref {
+        VarOrSym::Var(Variable::Name { name, notated }) => A(unresolved_var_popover(name, notated)),
+        VarOrSym::Var(Variable::Ref {
             declaration,
             is_sequence,
         }) => B(resolved_var_popover::<Be>(
             declaration,
             is_sequence.unwrap_or_default(),
         )),
-        VarOrSym::S(uri) => C(symbol_popover::<Be>(uri)),
+        VarOrSym::Sym(uri) => C(symbol_popover::<Be>(uri)),
     }
 }
 
@@ -445,18 +444,18 @@ pub(crate) fn do_onclick<Be: SendBackend>(
     use leptos::prelude::*;
     use thaw::{Divider, Skeleton, SkeletonItem, Spinner};
     let s = match vos {
-        VarOrSym::V(Variable::Name {
+        VarOrSym::Var(Variable::Name {
             notated: Some(n), ..
         }) => {
             return A(view! {<span>"Variable "{n.to_string()}</span>});
         }
-        VarOrSym::V(Variable::Name { name, .. }) => {
+        VarOrSym::Var(Variable::Name { name, .. }) => {
             return A(view! {<span>"Variable "{name.to_string()}</span>});
         }
-        VarOrSym::V(Variable::Ref { declaration, .. }) => {
+        VarOrSym::Var(Variable::Ref { declaration, .. }) => {
             return A(view! {<span>"Variable "{declaration.name.last().to_string()}</span>});
         }
-        VarOrSym::S(s) => s.clone(),
+        VarOrSym::Sym(s) => s.clone(),
     };
     let name = s.name().last().to_string();
     let uri_string = s.to_string();
@@ -517,10 +516,10 @@ fn formals<Be: SendBackend>(
                let uri = u.clone();
                view!("In term: "{LocalCache::with_or_toast::<Be,_,_,_,_>(
                    |r| r.get_document_term(u),
-                   |t|  match t {
+                   |t|  {tracing::warn!("Rendering term {t:?}");match t {
                        ::either::Left(t) => ReactiveStore::render_term::<Be>(t.term),
                        ::either::Right(t) => ReactiveStore::render_term::<Be>(t.term.clone()),
-                   },
+                   }},
                    move || format!("error: {uri}")
                )})
             }

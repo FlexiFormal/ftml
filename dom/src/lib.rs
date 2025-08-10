@@ -31,7 +31,7 @@ use crate::{
     utils::local_cache::LOCAL_CACHE,
 };
 pub use document::{DocumentMeta, DocumentState, setup_document};
-use ftml_core::extraction::{CloseFtmlElement, FtmlExtractor, VarOrSym};
+use ftml_core::extraction::{CloseFtmlElement, FtmlExtractor};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 pub use views::*;

@@ -320,3 +320,171 @@ impl<E: std::fmt::Debug + std::fmt::Display> From<kanal::ReceiveError> for Cache
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl<B: FtmlBackend> CachedBackend<B>
+where
+    B::Error: Clone + Send + Sync,
+{
+    #[allow(clippy::significant_drop_tightening)]
+    pub fn cache_size(&self) -> CacheSize {
+        use deepsize::DeepSizeOf;
+        let mut num_notations = 0;
+        let mut notations_bytes = 0;
+        for n in &self.notations_cache.map {
+            notations_bytes += std::mem::size_of::<LeafUri>();
+            let value = n.value().read();
+            let value = &*value;
+            notations_bytes += std::mem::size_of_val(value);
+            if let MaybeValue::Done(Ok(v)) = value {
+                for v in v {
+                    num_notations += 1;
+                    notations_bytes +=
+                        std::mem::size_of::<DocumentElementUri>() + v.1.deep_size_of();
+                }
+            }
+        }
+        let mut num_documents = 0;
+        let mut documents_bytes = 0;
+        for d in &self.documents_cache.map {
+            documents_bytes += std::mem::size_of::<DocumentUri>();
+            num_documents += 1;
+            let value = d.value().read();
+            let value = &*value;
+            documents_bytes += std::mem::size_of_val(value);
+            if let MaybeValue::Done(Ok(v)) = value {
+                documents_bytes += v.deep_size_of();
+            }
+        }
+        let mut num_modules = 0;
+        let mut modules_bytes = 0;
+        for d in &self.modules_cache.map {
+            num_modules += 1;
+            modules_bytes += std::mem::size_of::<ModuleUri>();
+            let value = d.value().read();
+            let value = &*value;
+            modules_bytes += std::mem::size_of_val(value);
+            if let MaybeValue::Done(Ok(v)) = value {
+                modules_bytes += v.deep_size_of();
+            }
+        }
+        let mut num_fragments = 0;
+        let mut fragments_bytes = 0;
+        for d in &self.fragment_cache.map {
+            num_fragments += 1;
+            fragments_bytes += std::mem::size_of::<(Uri, Option<NarrativeUri>)>();
+            let value = d.value().read();
+            let value = &*value;
+            fragments_bytes += std::mem::size_of_val(value);
+            if let MaybeValue::Done(Ok((s, c))) = value {
+                fragments_bytes += s.len();
+                for c in c {
+                    fragments_bytes += std::mem::size_of_val(c);
+                    match c {
+                        Css::Class { name, css } => fragments_bytes += name.len() + css.len(),
+                        Css::Inline(i) => fragments_bytes += i.len(),
+                        Css::Link(l) => fragments_bytes += l.len(),
+                    }
+                }
+            }
+        }
+        let mut num_paragraphs = 0;
+        let mut paragraphs_bytes = 0;
+        for n in &self.paragraphs_cache.map {
+            num_paragraphs += 1;
+            paragraphs_bytes += std::mem::size_of::<SymbolUri>();
+            let value = n.value().read();
+            let value = &*value;
+            fragments_bytes += std::mem::size_of_val(value);
+            if let MaybeValue::Done(Ok(v)) = value {
+                fragments_bytes +=
+                    v.len() * std::mem::size_of::<(DocumentElementUri, ParagraphOrProblemKind)>();
+            }
+        }
+        CacheSize {
+            num_notations,
+            notations_bytes,
+            num_documents,
+            documents_bytes,
+            num_modules,
+            modules_bytes,
+            num_fragments,
+            fragments_bytes,
+            num_paragraphs,
+            paragraphs_bytes,
+        }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+pub struct CacheSize {
+    pub num_notations: usize,
+    pub notations_bytes: usize,
+    pub num_documents: usize,
+    pub documents_bytes: usize,
+    pub num_modules: usize,
+    pub modules_bytes: usize,
+    pub num_fragments: usize,
+    pub fragments_bytes: usize,
+    pub num_paragraphs: usize,
+    pub paragraphs_bytes: usize,
+}
+
+#[cfg(feature = "deepsize")]
+impl CacheSize {
+    #[must_use]
+    pub const fn total_bytes(&self) -> usize {
+        self.notations_bytes
+            + self.documents_bytes
+            + self.modules_bytes
+            + self.fragments_bytes
+            + self.paragraphs_bytes
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl std::fmt::Display for CacheSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let total = self.total_bytes();
+        let Self {
+            num_notations,
+            notations_bytes,
+            num_documents,
+            documents_bytes,
+            num_modules,
+            modules_bytes,
+            num_fragments,
+            fragments_bytes,
+            num_paragraphs,
+            paragraphs_bytes,
+        } = self;
+        write!(
+            f,
+            "\n\
+             notations:  {num_notations} ({})\n\
+             documents:  {num_documents} ({})\n\
+             modules:    {num_modules} ({})\n\
+             fragments:  {num_fragments} ({})\n\
+             paragraphs  {num_paragraphs} ({})\n\
+             ----------------------------------\n\
+             total: {}
+            ",
+            bytesize::ByteSize::b(*notations_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*documents_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*modules_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*fragments_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(*paragraphs_bytes as u64)
+                .display()
+                .iec_short(),
+            bytesize::ByteSize::b(total as u64).display().iec_short(),
+        )
+    }
+}

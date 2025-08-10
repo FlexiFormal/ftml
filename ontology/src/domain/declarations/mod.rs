@@ -117,3 +117,17 @@ impl crate::Ftml for AnyDeclarationRef<'_> {
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Declaration {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        match self {
+            Self::NestedModule(m) => m.deep_size_of_children(context),
+            Self::Symbol(s) => s.deep_size_of_children(context),
+            Self::MathStructure(s) => s.deep_size_of_children(context),
+            Self::Morphism(s) => s.deep_size_of_children(context),
+            Self::Extension(s) => s.deep_size_of_children(context),
+            Self::Import(_) => 0,
+        }
+    }
+}

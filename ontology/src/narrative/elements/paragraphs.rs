@@ -179,3 +179,25 @@ impl std::str::FromStr for ParagraphKind {
         }
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for LogicalParagraph {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.children
+            .iter()
+            .map(|e| std::mem::size_of_val(e) + e.deep_size_of_children(context))
+            .sum::<usize>()
+            + (self.styles.len() * std::mem::size_of::<Id>())
+            + self
+                .fors
+                .iter()
+                .map(|p| {
+                    std::mem::size_of_val(p)
+                        + p.1
+                            .as_ref()
+                            .map(|t| t.deep_size_of_children(context))
+                            .unwrap_or_default()
+                })
+                .sum::<usize>()
+    }
+}

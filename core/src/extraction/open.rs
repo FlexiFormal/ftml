@@ -14,11 +14,9 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{Argument, ArgumentMode, BoundArgument, Term, Variable},
+    terms::{Argument, ArgumentMode, BoundArgument, Term, VarOrSym, Variable},
 };
-use ftml_uris::{
-    DocumentElementUri, DocumentUri, Id, Language, LeafUri, ModuleUri, SymbolUri, UriName,
-};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, UriName};
 
 use crate::extraction::{FtmlExtractionError, nodes::FtmlNode};
 
@@ -298,31 +296,6 @@ pub enum Split<N: FtmlNode> {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum VarOrSym {
-    S(SymbolUri),
-    V(Variable),
-}
-impl std::fmt::Display for VarOrSym {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::S(s) => s.fmt(f),
-            Self::V(v) => v.fmt(f),
-        }
-    }
-}
-impl From<LeafUri> for VarOrSym {
-    fn from(value: LeafUri) -> Self {
-        match value {
-            LeafUri::Symbol(s) => Self::S(s),
-            LeafUri::Element(e) => Self::V(Variable::Ref {
-                declaration: e,
-                is_sequence: None,
-            }),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum OpenArgument {
     None,
     Simple(Term),
@@ -417,26 +390,26 @@ impl OpenBoundArgument {
         use either::Either::Right;
         match self {
             Self::Simple {
-                term: Term::Var(v),
+                term: Term::Var { variable: v, .. },
                 should_be_var: true,
             } => Some(BoundArgument::Bound(v)),
             Self::Simple { term, .. } => Some(BoundArgument::Simple(term)),
             Self::Sequence {
-                terms: Left(Term::Var(v)),
+                terms: Left(Term::Var { variable: v, .. }),
                 should_be_var: true,
             } => Some(BoundArgument::BoundSeq(Left(v))),
             Self::Sequence {
                 terms: Right(v),
                 should_be_var: true,
-            } if v.iter().all(|t| matches!(t, Some(Term::Var(_)))) => {
+            } if v.iter().all(|t| matches!(t, Some(Term::Var { .. }))) => {
                 Some(BoundArgument::BoundSeq(Right(
                     v.into_iter()
                         .map(|v| {
-                            let Some(Term::Var(v)) = v else {
+                            let Some(Term::Var { variable, .. }) = v else {
                                 // SAFETY: iter.all() matches above
                                 unsafe { unreachable_unchecked() }
                             };
-                            v
+                            variable
                         })
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
@@ -600,59 +573,6 @@ impl ArgumentPosition {
         })
     }
 }
-
-impl From<SymbolUri> for VarOrSym {
-    #[inline]
-    fn from(value: SymbolUri) -> Self {
-        Self::S(value)
-    }
-}
-impl From<Variable> for VarOrSym {
-    #[inline]
-    fn from(value: Variable) -> Self {
-        Self::V(value)
-    }
-}
-
-/*
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum PreVar {
-    Resolved(DocumentElementUri),
-    Unresolved(UriName),
-}
-
-impl std::fmt::Display for PreVar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Resolved(declaration) => std::fmt::Display::fmt(declaration, f),
-            Self::Unresolved(name) => std::fmt::Display::fmt(name, f),
-        }
-    }
-}
-
-impl PreVar {
-    /*
-    fn resolve<State: FtmlExtractor>(self, state: &State) -> Term {
-        Term::Var(match self {
-            Self::Resolved(declaration) => Variable::Ref {
-                declaration,
-                is_sequence: None,
-            },
-            // TODO can we know is_sequence yet?
-            Self::Unresolved(name) => state.resolve_variable_name(name),
-        })
-    }
-     */
-    #[inline]
-    #[must_use]
-    pub const fn name(&self) -> &UriName {
-        match self {
-            Self::Resolved(declaration) => declaration.name(),
-            Self::Unresolved(name) => name,
-        }
-    }
-}
- */
 
 impl OpenFtmlElement {
     #[must_use]

@@ -2,6 +2,7 @@ use std::fmt::Write;
 
 use super::opaque::Opaque;
 use super::{BoundArgument, arguments::Argument, variables::Variable};
+use crate::terms::VarOrSym;
 use crate::utils::TreeIter;
 use ftml_uris::{Id, SymbolUri, UriName};
 
@@ -18,16 +19,21 @@ use ftml_uris::{Id, SymbolUri, UriName};
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Term {
     /// A reference to a symbol (e.g. $\mathbb N$)
-    Symbol(SymbolUri),
-    // A reference to a module (e.g. $\mathbb N$)
-    //Module(ModuleUri),
+    Symbol {
+        uri: SymbolUri,
+        presentation: Option<VarOrSym>,
+    },
     /// A reference to a (bound) variable (e.g. $x$)
-    Var(Variable),
+    Var {
+        variable: Variable,
+        presentation: Option<VarOrSym>,
+    },
     /// An application of `head` to `arguments` (e.g. $n + m$)
     Application {
         #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
         head: Box<Self>,
         arguments: Box<[Argument]>,
+        presentation: Option<VarOrSym>,
     },
     /// A *binding* application with `head` as operator, `arguments`
     /// being either variable bindings or arbitrary expression arguments,
@@ -39,6 +45,7 @@ pub enum Term {
         arguments: Box<[BoundArgument]>,
         #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
         body: Box<Self>,
+        presentation: Option<VarOrSym>,
     },
     /// Record projection; the field named `key` in the record `record`.
     /// The optional `record_type` ideally references the type in which field names
@@ -50,6 +57,7 @@ pub enum Term {
         /// does not count as a subterm
         #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
         record_type: Option<Box<Self>>,
+        presentation: Option<VarOrSym>,
     },
     /// A non-alpha-renamable variable
     Label {
@@ -87,12 +95,60 @@ impl Term {
     #[inline]
     pub fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
         ExprChildrenIter::One(self).dfs().filter_map(|e| {
-            if let Self::Symbol(s) = e {
-                Some(s)
+            if let Self::Symbol { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }
         })
+    }
+
+    #[must_use]
+    pub fn with_presentation(self, pres: VarOrSym) -> Self {
+        match self {
+            Self::Symbol { uri, .. } if !matches!(&pres,VarOrSym::Sym(s) if *s == uri) => {
+                Self::Symbol {
+                    uri,
+                    presentation: Some(pres),
+                }
+            }
+            Self::Var { variable, .. } if !matches!(&pres,VarOrSym::Var(v) if *v == variable) => {
+                Self::Var {
+                    variable,
+                    presentation: Some(pres),
+                }
+            }
+            Self::Application {
+                head, arguments, ..
+            } => Self::Application {
+                head,
+                arguments,
+                presentation: Some(pres),
+            },
+            Self::Bound {
+                head,
+                arguments,
+                body,
+                ..
+            } => Self::Bound {
+                head,
+                arguments,
+                body,
+                presentation: Some(pres),
+            },
+            Self::Field {
+                record,
+                key,
+                record_type,
+                ..
+            } => Self::Field {
+                record,
+                key,
+                record_type,
+                presentation: Some(pres),
+            },
+            o => o,
+        }
     }
 }
 
@@ -105,17 +161,17 @@ impl crate::utils::RefTree for Term {
     #[allow(refining_impl_trait_reachable)]
     fn tree_children(&self) -> ExprChildrenIter<'_> {
         match self {
-            Self::Symbol(_)
-            | Self::Var(_)
+            Self::Symbol{..}
+            | Self::Var{..}
             //| Self::Module(_)
             | Self::Label {
                 df: None, tp: None, ..
             } => ExprChildrenIter::E,
-            Self::Application { head, arguments } => ExprChildrenIter::App(Some(head), arguments),
+            Self::Application { head, arguments,.. } => ExprChildrenIter::App(Some(head), arguments),
             Self::Bound {
                 head,
                 arguments,
-                body,
+                body,..
             } => ExprChildrenIter::Bound(Some(head), arguments, body),
             Self::Label {
                 df: Some(df),
@@ -134,18 +190,31 @@ impl crate::utils::RefTree for Term {
 #[allow(clippy::too_many_lines)]
 fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match e {
-        Term::Symbol(s) if LONG => write!(f, "Sym({s})"),
-        Term::Symbol(s) => write!(f, "Sym({})", s.name()),
-        Term::Var(Variable::Name {
-            notated: Some(n), ..
-        }) => write!(f, "Var({n})"),
-        Term::Var(Variable::Name { name, .. }) => write!(f, "Var({name})"),
-        Term::Var(Variable::Ref { declaration, .. }) if LONG => write!(f, "Var({declaration})"),
-        Term::Var(Variable::Ref { declaration, .. }) => write!(f, "Var({})", declaration.name()),
+        Term::Symbol { uri, .. } if LONG => write!(f, "Sym({uri})"),
+        Term::Symbol { uri, .. } => write!(f, "Sym({})", uri.name()),
+        Term::Var {
+            variable: Variable::Name {
+                notated: Some(n), ..
+            },
+            ..
+        } => write!(f, "Var({n})"),
+        Term::Var {
+            variable: Variable::Name { name, .. },
+            ..
+        } => write!(f, "Var({name})"),
+        Term::Var {
+            variable: Variable::Ref { declaration, .. },
+            ..
+        } if LONG => write!(f, "Var({declaration})"),
+        Term::Var {
+            variable: Variable::Ref { declaration, .. },
+            ..
+        } => write!(f, "Var({})", declaration.name()),
         Term::Field {
             record,
             key,
             record_type: None,
+            ..
         } => {
             fmt::<LONG>(record, f)?;
             f.write_char('.')?;
@@ -204,7 +273,9 @@ fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             .field("", name)
             .field(":=", &df.debug_short())
             .finish(),
-        Term::Application { head, arguments } => f
+        Term::Application {
+            head, arguments, ..
+        } => f
             .debug_struct("OMA")
             .field("head", head)
             .field("arguments", arguments)
@@ -213,6 +284,7 @@ fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             head,
             arguments,
             body,
+            ..
         } => f
             .debug_struct("OMBIND")
             .field("head", head)
@@ -244,6 +316,7 @@ fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             record,
             key,
             record_type,
+            ..
         } => f
             .debug_struct("Field")
             .field("name", key)
@@ -368,6 +441,76 @@ impl<'a> Iterator for ExprChildrenIter<'a> {
                 }
                 Some(f)
             }
+        }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Term {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        match self {
+            Self::Application {
+                head, arguments, ..
+            } => {
+                std::mem::size_of::<Self>()
+                    + (**head).deep_size_of_children(context)
+                    + arguments.iter().map(Argument::deep_size_of).sum::<usize>()
+            }
+            Self::Bound {
+                head,
+                arguments,
+                body,
+                ..
+            } => {
+                std::mem::size_of::<Self>()
+                    + (**head).deep_size_of_children(context)
+                    + std::mem::size_of::<Self>()
+                    + (**body).deep_size_of_children(context)
+                    + arguments
+                        .iter()
+                        .map(BoundArgument::deep_size_of)
+                        .sum::<usize>()
+            }
+            Self::Field {
+                record,
+                record_type,
+                ..
+            } => {
+                std::mem::size_of::<Self>()
+                    + (**record).deep_size_of_children(context)
+                    + record_type
+                        .as_ref()
+                        .map(|t| std::mem::size_of::<Self>() + (**t).deep_size_of_children(context))
+                        .unwrap_or_default()
+            }
+            Self::Label { df, tp, .. } => {
+                tp.as_ref()
+                    .map(|t| std::mem::size_of::<Self>() + (**t).deep_size_of_children(context))
+                    .unwrap_or_default()
+                    + df.as_ref()
+                        .map(|t| std::mem::size_of::<Self>() + (**t).deep_size_of_children(context))
+                        .unwrap_or_default()
+            }
+            Self::Opaque {
+                attributes,
+                children,
+                terms,
+                ..
+            } => {
+                attributes
+                    .iter()
+                    .map(|p| std::mem::size_of_val(p) + p.1.len())
+                    .sum::<usize>()
+                    + children
+                        .iter()
+                        .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
+                        .sum::<usize>()
+                    + terms
+                        .iter()
+                        .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
+                        .sum::<usize>()
+            }
+            _ => 0,
         }
     }
 }

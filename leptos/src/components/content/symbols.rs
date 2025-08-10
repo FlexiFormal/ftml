@@ -7,7 +7,6 @@ use crate::{
     },
 };
 use ftml_backend::ParagraphOrProblemKind;
-use ftml_core::extraction::VarOrSym;
 use ftml_dom::{
     notations::{NotationExt, TermExt},
     utils::{
@@ -18,7 +17,7 @@ use ftml_dom::{
 use ftml_ontology::{
     domain::declarations::symbols::{ArgumentSpec, Symbol, SymbolData},
     narrative::elements::Notation,
-    terms::Variable,
+    terms::{VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, IsNarrativeUri, LeafUri, SymbolUri};
 use leptos::{html::span, prelude::*};
@@ -178,11 +177,11 @@ pub(super) fn do_notations<Be: SendBackend>(
     //let functional = arity.num() > 0;
     //let as_variable = matches!(uri, LeafUri::Element(_));
     let var_or_sym = match &uri {
-        LeafUri::Element(e) => VarOrSym::V(Variable::Ref {
+        LeafUri::Element(e) => VarOrSym::Var(Variable::Ref {
             declaration: e.clone(),
             is_sequence: None,
         }),
-        LeafUri::Symbol(s) => VarOrSym::S(s.clone()),
+        LeafUri::Symbol(s) => VarOrSym::Sym(s.clone()),
     };
     inject_css("ftml-notation-table", include_str!("notations.css"));
     LocalCache::with_or_toast::<Be, _, _, _, _>(
@@ -205,14 +204,14 @@ fn do_table<Be: SendBackend, E>(
         not: &Notation,
     ) -> impl IntoView + use<Be> {
         let functional = arity.num() > 0;
-        let notation = not.as_view_safe::<crate::Views<Be>>(head);
+        let notation = not.as_view_safe::<crate::Views<Be>>(head, None);
         let op = if functional {
-            let op = not.as_op_safe::<crate::Views<Be>>(head);
+            let op = not.as_op_safe::<crate::Views<Be>>(head, None);
             Some(view! {<TableCell class="ftml-notation-cell">{op}</TableCell>})
         } else {
             None
         };
-        let notation2 = not.as_view_safe::<crate::Views<Be>>(head);
+        let notation2 = not.as_view_safe::<crate::Views<Be>>(head, None);
         view! {<TableCell class="ftml-notation-cell">
             <Popover>
                 <PopoverTrigger slot><span>{notation}</span></PopoverTrigger>

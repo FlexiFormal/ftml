@@ -8,9 +8,9 @@ use crate::{
     utils::ContextChain,
 };
 use ftml_core::extraction::{
-    ArgumentPosition, FtmlExtractor, OpenDomainElement, OpenNarrativeElement, VarOrSym,
+    ArgumentPosition, FtmlExtractor, OpenDomainElement, OpenNarrativeElement,
 };
-use ftml_ontology::narrative::elements::SectionLevel;
+use ftml_ontology::{narrative::elements::SectionLevel, terms::VarOrSym};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
@@ -114,7 +114,7 @@ impl MarkedNode {
                 uri,
                 notation,
             } => {
-                provide_context(WithHead(Some(VarOrSym::S(uri.clone()))));
+                provide_context(WithHead(Some(VarOrSym::Sym(uri.clone()))));
                 Views::symbol_reference(uri, notation, in_term, child(true)).into_any()
             }
             Marker::VariableReference {
@@ -122,7 +122,7 @@ impl MarkedNode {
                 var,
                 notation,
             } => {
-                provide_context(WithHead(Some(VarOrSym::V(var.clone()))));
+                provide_context(WithHead(Some(VarOrSym::Var(var.clone()))));
                 Views::variable_reference(var, notation, in_term, child(true)).into_any()
             }
             Marker::OMA {

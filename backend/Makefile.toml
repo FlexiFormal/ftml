@@ -28,6 +28,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=cached"]
 
+[tasks.test-deepsize]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=deepsize"]
+
 [tasks.test-all-features]
 command = "cargo"
 install_crate = false

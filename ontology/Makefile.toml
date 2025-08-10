@@ -13,6 +13,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=wasm"]
 
+[tasks.test-deepsize]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=deepsize"]
+
 [tasks.test-typescript]
 command = "cargo"
 install_crate = false
@@ -44,6 +49,7 @@ dependencies = [
     "test-serde",
     "test-wasm",
     "test-typescript",
+    "test-deepsize",
     "test-rdf",
     "test-openmath",
     "test-lightningcss",

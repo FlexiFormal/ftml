@@ -3,8 +3,10 @@ use crate::{
     markers::{InputrefInfo, ParagraphInfo, SectionInfo},
     terms::{ReactiveApplication, TopTerm},
 };
-use ftml_core::extraction::VarOrSym;
-use ftml_ontology::{narrative::elements::SectionLevel, terms::Variable};
+use ftml_ontology::{
+    narrative::elements::SectionLevel,
+    terms::{VarOrSym, Variable},
+};
 use ftml_uris::{DocumentElementUri, Id, SymbolUri};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;

@@ -124,6 +124,8 @@ gloo-storage = "0.3"
 urlencoding = "2.1"
 futures-util = { version = "0.3", default-features = false }
 kanal = "0.1"
+bytesize = "2"
+deepsize = "0.2"
 
 openmath = "0.1"
 leptos-posthoc = { path = "../leptos-posthoc" } # { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }

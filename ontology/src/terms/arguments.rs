@@ -113,3 +113,39 @@ impl std::str::FromStr for ArgumentMode {
         s.as_bytes()[0].try_into()
     }
 }
+
+#[cfg(feature = "deepsize")]
+#[allow(clippy::redundant_closure_for_method_calls)]
+impl deepsize::DeepSizeOf for Argument {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        match self {
+            Self::Simple(t) => t.deep_size_of_children(context),
+            Self::Sequence(Either::Left(l)) => l.deep_size_of_children(context),
+            Self::Sequence(Either::Right(r)) => r
+                .iter()
+                .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
+                .sum(),
+        }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+#[allow(clippy::redundant_closure_for_method_calls)]
+impl deepsize::DeepSizeOf for BoundArgument {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        match self {
+            Self::Simple(t) => t.deep_size_of_children(context),
+            Self::Sequence(Either::Left(l)) => l.deep_size_of_children(context),
+            Self::Sequence(Either::Right(r)) => r
+                .iter()
+                .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
+                .sum(),
+            Self::Bound(v) => v.deep_size_of_children(context),
+            Self::BoundSeq(Either::Left(l)) => l.deep_size_of_children(context),
+            Self::BoundSeq(Either::Right(r)) => r
+                .iter()
+                .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
+                .sum(),
+        }
+    }
+}

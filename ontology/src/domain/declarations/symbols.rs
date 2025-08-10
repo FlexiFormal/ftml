@@ -50,14 +50,14 @@ impl crate::Ftml for Symbol {
             }};
         }
         match (&self.data.tp, &self.data.df) {
-            (Some(Term::Symbol(tp)), Some(df)) => A(syms!(df).chain([
+            (Some(Term::Symbol { uri: tp, .. }), Some(df)) => A(syms!(df).chain([
                 triple!(<(iri.clone())> : ulo:declaration),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
             ])),
             (Some(tp), Some(df)) => B(syms!(tp)
                 .chain(syms!(df))
                 .chain(std::iter::once(triple!(<(iri)> : ulo:declaration)))),
-            (Some(Term::Symbol(tp)), _) => C([
+            (Some(Term::Symbol { uri: tp, .. }), _) => C([
                 triple!(<(iri.clone())> : ulo:declaration),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
             ]
@@ -172,5 +172,39 @@ impl FromStr for ArgumentSpec {
             });
         }
         Ok(Self(ret))
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for SymbolData {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        (self.role.len() * std::mem::size_of::<Id>())
+            + self
+                .tp
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
+            + self
+                .df
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
+            + self
+                .return_type
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
+            + self
+                .argument_types
+                .iter()
+                .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
+                .sum::<usize>()
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Symbol {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        std::mem::size_of::<SymbolData>() + self.data.deep_size_of_children(context)
     }
 }

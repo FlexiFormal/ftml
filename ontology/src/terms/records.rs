@@ -54,10 +54,11 @@ fn get(
     >,
 ) -> Option<SharedDeclaration<Symbol>> {
     match term {
-        Term::Symbol(s) => from_structure(s, dones, name, get_struct),
-        Term::Application { head, arguments }
-            if matches!(&**head,Term::Symbol(s) if *s == *metatheory::RECORD_TYPE_MERGE)
-                && matches!(&**arguments, [Argument::Sequence(_)]) =>
+        Term::Symbol { uri, .. } => from_structure(uri, dones, name, get_struct),
+        Term::Application {
+            head, arguments, ..
+        } if matches!(&**head,Term::Symbol{uri,..} if *uri == *metatheory::RECORD_TYPE_MERGE)
+            && matches!(&**arguments, [Argument::Sequence(_)]) =>
         {
             let Term::Application { arguments, .. } = term else {
                 // SAFETY: pattern match above
@@ -95,10 +96,11 @@ fn get_async<
     get_struct: impl Fn(SymbolUri) -> Fut + Send + Clone + 'static,
 ) -> Pin<Box<dyn Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>> + Send>> {
     match term {
-        Term::Symbol(s) => from_structure_async(s, dones, name, get_struct),
-        Term::Application { head, arguments }
-            if matches!(&*head,Term::Symbol(s) if *s == *metatheory::RECORD_TYPE_MERGE)
-                && matches!(&*arguments, [Argument::Sequence(_)]) =>
+        Term::Symbol { uri, .. } => from_structure_async(uri, dones, name, get_struct),
+        Term::Application {
+            head, arguments, ..
+        } if matches!(&*head,Term::Symbol{uri,..} if *uri == *metatheory::RECORD_TYPE_MERGE)
+            && matches!(&*arguments, [Argument::Sequence(_)]) =>
         {
             let mut arguments = arguments.into_iter();
             let Some(Argument::Sequence(s)) = arguments.next() else {

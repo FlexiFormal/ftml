@@ -283,10 +283,10 @@ impl std::fmt::Display for BaseUri {
 /// This structure stores a hash of the URL string for fast lookups,
 /// the string representation, and the shared URL instance.
 #[cfg(feature = "interned")]
-struct InternedBaseURI {
-    hash: u64,
-    string: Box<str>,
-    url: Arc<url::Url>,
+pub struct InternedBaseURI {
+    pub hash: u64,
+    pub string: Box<str>,
+    pub url: Arc<url::Url>,
 }
 
 #[cfg(feature = "interned")]
@@ -321,7 +321,7 @@ impl PartialEq<url::Url> for InternedBaseURI {
 }
 
 #[cfg(feature = "interned")] //, not(feature = "api")))]
-static BASE_URIS: std::sync::LazyLock<parking_lot::Mutex<Vec<InternedBaseURI>>> =
+pub static BASE_URIS: std::sync::LazyLock<parking_lot::Mutex<Vec<InternedBaseURI>>> =
     std::sync::LazyLock::new(|| parking_lot::Mutex::new(Vec::with_capacity(8)));
 
 #[cfg(feature = "interned")] //, not(feature = "api")))]

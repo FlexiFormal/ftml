@@ -2,7 +2,7 @@ use ftml_uris::{DomainUriRef, ModuleUri, SymbolUri};
 
 use crate::domain::{
     HasDeclarations,
-    declarations::{Declaration, AnyDeclarationRef, IsDeclaration},
+    declarations::{AnyDeclarationRef, Declaration, IsDeclaration},
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -59,5 +59,15 @@ impl HasDeclarations for Morphism {
     #[inline]
     fn domain_uri(&self) -> DomainUriRef<'_> {
         DomainUriRef::Symbol(&self.uri)
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Morphism {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.elements
+            .iter()
+            .map(|v| std::mem::size_of_val(v) + v.deep_size_of_children(context))
+            .sum::<usize>()
     }
 }

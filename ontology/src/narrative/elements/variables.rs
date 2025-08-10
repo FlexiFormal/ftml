@@ -50,14 +50,14 @@ impl crate::Ftml for VariableDeclaration {
             }};
         }
         match (&self.data.tp, &self.data.df) {
-            (Some(Term::Symbol(tp)), Some(df)) => A(syms!(df).chain([
+            (Some(Term::Symbol { uri: tp, .. }), Some(df)) => A(syms!(df).chain([
                 triple!(<(iri.clone())> : ulo:variable),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
             ])),
             (Some(tp), Some(df)) => B(syms!(tp)
                 .chain(syms!(df))
                 .chain(std::iter::once(triple!(<(iri)> : ulo:variable)))),
-            (Some(Term::Symbol(tp)), _) => C([
+            (Some(Term::Symbol { uri: tp, .. }), _) => C([
                 triple!(<(iri.clone())> : ulo:variable),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
             ]
@@ -98,5 +98,29 @@ impl IsDocumentElement for VariableDeclaration {
             DocumentElementRef::VariableDeclaration(p) => Some(p),
             _ => None,
         }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for VariableData {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        (self.role.len() * std::mem::size_of::<Id>())
+            + self
+                .tp
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
+            + self
+                .df
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for VariableDeclaration {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        std::mem::size_of::<VariableData>() + (*self.data).deep_size_of_children(context)
     }
 }
