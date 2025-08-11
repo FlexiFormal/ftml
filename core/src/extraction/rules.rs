@@ -217,7 +217,8 @@ pub fn ifinputref<E: FtmlExtractor>(
     keys: &mut KeyList,
     node: &E::Node,
 ) -> Result<E> {
-    crate::TODO!()
+    let value = attrs.get_bool(FtmlKey::IfInputref);
+    ret!(ext,node <- IfInputref(value))
 }
 
 pub fn symdecl<E: FtmlExtractor>(

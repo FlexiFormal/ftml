@@ -274,6 +274,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     })?;
                     self.push_elem(DocumentElement::ImportModule(uri));
                 }
+                MetaDatum::IfInputref(_) => (),
             },
             Split::None => (),
         }

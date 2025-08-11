@@ -20,7 +20,9 @@ use ftml_ontology::{
     terms::{VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, SymbolUri};
-use leptos::prelude::{AnyView, IntoAny, Memo, RwSignal, provide_context, use_context};
+use leptos::prelude::{
+    AnyView, CustomAttribute, IntoAny, Memo, RwSignal, provide_context, use_context,
+};
 use leptos_posthoc::OriginalNode;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -64,6 +66,7 @@ pub enum Marker {
         styles: Box<[Id]>,
         fors: Vec<SymbolUri>,
     },
+    IfInputref(bool),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -130,6 +133,12 @@ impl Marker {
             {
                 Self::apply::<Views>(markers, invisible, is_math, orig)
             }
+            Self::IfInputref(b) if DocumentState::in_inputref() == b => {
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            }
+            Self::IfInputref(_) => Self::apply::<Views>(markers, invisible, is_math, orig)
+                .attr("style", "display:none;")
+                .into_any(),
             Self::Section(uri) => {
                 provide_context(CurrentUri(uri.clone().into()));
                 DocumentState::new_section(uri, move |info| {
@@ -304,6 +313,7 @@ impl Marker {
                 target: target.clone(),
                 uri: uri.clone(),
             }),
+            OpenFtmlElement::IfInputref(b) => Some(Self::IfInputref(*b)),
             OpenFtmlElement::Comp => Some(Self::Comp),
             OpenFtmlElement::DefComp | OpenFtmlElement::Definiendum(_) => Some(Self::DefComp),
             OpenFtmlElement::SkipSection => Some(Self::SkipSection),

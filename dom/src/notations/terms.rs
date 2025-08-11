@@ -199,10 +199,9 @@ impl TermExt for Term {
             } if matches!(
                 &*head,
                 Self::Field {
-                    record,
-                    key,
                     record_type: Some(_),
-                    presentation: None
+                    presentation: None,
+                    ..
                 }
             ) =>
             {
@@ -218,6 +217,8 @@ impl TermExt for Term {
                     unsafe { unreachable_unchecked() }
                 };
                 let tp = *tp;
+                let record =
+                    ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
                 FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
@@ -227,17 +228,12 @@ impl TermExt for Term {
                     |r| match r {
                         Err(e) => Right(e.to_string()),
                         Ok(None) => Right("(Structure not found)".to_string()),
-                        Ok(Some(r)) => Left(
-                            Self::Application {
-                                head: Box::new(Self::Symbol {
-                                    uri: r.uri.clone(),
-                                    presentation: None,
-                                }),
-                                arguments,
-                                presentation: None,
-                            }
-                            .into_view::<Views, Be>(true),
-                        ),
+                        Ok(Some(r)) => Left(application::<Views, Be>(
+                            VarOrSym::Sym(r.uri.clone()),
+                            r.uri.clone().into(),
+                            Some(record),
+                            arguments,
+                        )),
                     },
                 )
                 .into_any()

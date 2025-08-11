@@ -312,7 +312,7 @@ do_keys! {
 
     Invisible                   = "invisible" := invisible
 
-    IfInputref                  = "ifinputref" := todo
+    IfInputref                  = "ifinputref" := ifinputref
     ReturnType                  = "returntype" := return_type
     ArgTypes                    = "argtypes" := todo
 

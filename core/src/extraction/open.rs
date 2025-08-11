@@ -62,6 +62,7 @@ pub enum OpenFtmlElement {
         target: DocumentUri,
         uri: DocumentElementUri,
     },
+    IfInputref(bool),
     OMA {
         head: VarOrSym,
         notation: Option<Id>,
@@ -279,6 +280,7 @@ pub enum MetaDatum {
         target: DocumentUri,
         uri: DocumentElementUri,
     },
+    IfInputref(bool),
     SetSectionLevel(SectionLevel),
     ImportModule(ModuleUri),
     UseModule(ModuleUri),
@@ -795,6 +797,7 @@ impl OpenFtmlElement {
                 target: uri,
                 uri: id,
             }),
+            Self::IfInputref(b) => Split::Meta(MetaDatum::IfInputref(b)),
             Self::Style(s) => Split::Meta(MetaDatum::Style(s)),
             Self::Counter(c) => Split::Meta(MetaDatum::Counter(c)),
             Self::SetSectionLevel(lvl) => Split::Meta(MetaDatum::SetSectionLevel(lvl)),
