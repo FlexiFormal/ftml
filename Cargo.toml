@@ -63,9 +63,6 @@ server_fn_macro_default = "0.8"
 leptos_router = "0.8"
 leptos = "0.8"
 leptos_meta = "0.8"
-#thaw = { version = "0.5.0-beta" }
-#thaw = { path = "../thaw/thaw" }
-thaw = { git = "https://github.com/thaw-ui/thaw", branch = "thaw/v0.5" }
 
 icondata_bi = "0"
 
@@ -82,7 +79,6 @@ triomphe = "0.1"
 parking_lot = "0.12"
 dashmap = { version = "6" }
 const_format = "0.2"
-impl-tools = { git = "https://github.com/kas-gui/impl-tools" }          #"0.11.2"
 thiserror = "2"
 arrayvec = "0.7"
 document-features = "0.2"
@@ -128,8 +124,12 @@ bytesize = "2"
 deepsize = "0.2"
 
 openmath = "0.1"
-leptos-posthoc = { path = "../leptos-posthoc" } # { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }
-leptos-react = { path = "../leptos-react" }
+#thaw = { version = "0.5.0-beta" }
+#thaw = { path = "../thaw/thaw" }
+thaw = { git = "https://github.com/thaw-ui/thaw", branch = "thaw/v0.5" }
+impl-tools = { git = "https://github.com/kas-gui/impl-tools" }                                  #"0.11.2"
+leptos-posthoc = { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }
+leptos-react = { git = "https://github.com/FlexiFormal/leptos-react.git" }
 
 proc-macro2 = "1"
 quote = "1"
