@@ -100,7 +100,7 @@ impl ReactiveApplication {
                 });
             }
             Self::Closed(_) => {
-                tracing::warn!("Tracked term is already closed");
+                tracing::debug!("Tracked term is already closed");
             }
         });
         /*} else {

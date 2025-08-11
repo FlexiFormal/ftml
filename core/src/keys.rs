@@ -329,33 +329,33 @@ do_keys! {
     AssignMorphismFrom          = "assignmorphismfrom" := todo
     AssignMorphismTo            = "assignmorphismto" := todo
 
-    AssocType                   = "assoctype" := todo
-    ArgumentReordering          = "reorderargs" := todo
+    AssocType                   = "assoctype" := no_op
+    ArgumentReordering          = "reorderargs" := no_op
     ArgNum                      = "argnum" := argnum
-    Bind                        = "bind" := todo
+    Bind                        = "bind" := no_op
     MorphismDomain              = "domain" := todo
     MorphismTotal               = "total" := todo
-    ArgMode                     = "argmode" := todo
-    NotationId                  = "notationid" := todo
-    Head                        = "head" := todo
-    Language                    = "language" := todo
+    ArgMode                     = "argmode" := no_op
+    NotationId                  = "notationid" := no_op
+    Head                        = "head" := no_op
+    Language                    = "language" := no_op
     /// The metatheory of a module, that provides the formal "language" the module
     /// is in
-    Metatheory                              = "metatheory"      - Module; := todo
-    Signature                               = "signature"       - Module; := todo
+    Metatheory                              = "metatheory"      - Module; := no_op
+    Signature                               = "signature"       - Module; := no_op
     Args                        = "args" := todo
     ProblemPoints               = "problempoints"               - Problem, SubProblem; := todo
     Autogradable                = "autogradable"                - Problem, SubProblem; := todo
     ProofHide                   = "proofhide"                   - Proof,SubProof; := todo
-    Macroname                   = "macroname"                   - MathStructure; := todo
-    Inline                      = "inline"                      - Definition, Paragraph, Assertion, Example, Problem, SubProblem; := todo
-    Fors                        = "fors"                        - Definition, Paragraph, Assertion, Example, Proof, SubProof; := todo
-    Id                          = "id"                          - Section,Definition, Paragraph, Assertion, Example, Proof, SubProof, Problem, SubProblem, Slide; := todo
-    NotationFragment            = "notationfragment" := todo
-    Precedence                  = "precedence" := todo
-    Role                        = "role" := todo
-    Styles                      = "styles" := todo
-    Argprecs                    = "argprecs" := todo
+    Macroname                   = "macroname"                   - MathStructure; := no_op
+    Inline                      = "inline"                      - Definition, Paragraph, Assertion, Example, Problem, SubProblem; := no_op
+    Fors                        = "fors"                        - Definition, Paragraph, Assertion, Example, Proof, SubProof; := no_op
+    Id                          = "id"                          - Section,Definition, Paragraph, Assertion, Example, Proof, SubProof, Problem, SubProblem, Slide; := no_op
+    NotationFragment            = "notationfragment" := no_op
+    Precedence                  = "precedence" := no_op
+    Role                        = "role" := no_op
+    Styles                      = "styles" := no_op
+    Argprecs                    = "argprecs" := no_op
 }
 
 impl std::fmt::Display for FtmlKey {

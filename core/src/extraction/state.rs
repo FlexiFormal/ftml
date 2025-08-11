@@ -202,11 +202,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             },
         }
         .close();
-        tracing::info!("Finished document {document:?}");
+        tracing::info!("Finished document {document:#?}");
         let modules = take(&mut self.modules)
             .into_iter()
             .map(|m| {
-                tracing::info!("Found module {m:?}");
+                tracing::info!("Found module {m:#?}");
                 m.close()
             })
             .collect();
@@ -746,7 +746,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     fn close_symbol(&mut self, uri: SymbolUri, data: Box<SymbolData>) -> super::Result<()> {
         //get_module!(parent,parent_uri <- self);
         let symbol = Symbol { uri, data };
-        tracing::info!("New symbol {symbol:?}");
+        tracing::info!("New symbol {symbol:#?}");
         self.push_domain(symbol, Declaration::Symbol, |s| {
             Ok(StructureDeclaration::Symbol(s))
         })?;
@@ -757,7 +757,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
 
     fn close_vardecl(&mut self, uri: DocumentElementUri, data: Box<VariableData>) {
         let var = VariableDeclaration { uri, data };
-        tracing::info!("New variable {var:?}");
+        tracing::info!("New variable {var:#?}");
         self.push_elem(DocumentElement::VariableDeclaration(var));
         //add_triples!(DOM self,symbol -> parent_uri);
         //parent.push(Declaration::Symbol(symbol));
@@ -820,7 +820,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             children: children.into_boxed_slice(),
             fors: fors.into_boxed_slice(),
         };
-        tracing::info!("Adding paragraph {p:?}");
+        tracing::info!("Adding paragraph {p:#?}");
         self.push_elem(DocumentElement::Paragraph(p));
     }
 
@@ -845,7 +845,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             component,
             op,
         };
-        tracing::info!("New notation for {head:?}: {not:?}");
+        tracing::info!("New notation for {head:?}: {not:#?}");
         let notation = self
             .buffer
             .push(&not)
