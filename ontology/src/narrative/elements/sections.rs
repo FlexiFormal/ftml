@@ -66,14 +66,15 @@ impl IsDocumentElement for Section {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[repr(u8)]
 pub enum SectionLevel {
-    Part,
-    Chapter,
-    Section,
-    Subsection,
-    Subsubsection,
-    Paragraph,
-    Subparagraph,
+    Part = 0,
+    Chapter = 1,
+    Section = 2,
+    Subsection = 3,
+    Subsubsection = 4,
+    Paragraph = 5,
+    Subparagraph = 6,
 }
 #[cfg(feature = "typescript")]
 impl wasm_bindgen::convert::TryFromJsValue for SectionLevel {
@@ -162,18 +163,9 @@ impl TryFrom<u8> for SectionLevel {
     }
 }
 impl From<SectionLevel> for u8 {
-    #[allow(clippy::enum_glob_use)]
+    #[inline]
     fn from(s: SectionLevel) -> Self {
-        use SectionLevel::*;
-        match s {
-            Part => 0,
-            Chapter => 1,
-            Section => 2,
-            Subsection => 3,
-            Subsubsection => 4,
-            Paragraph => 5,
-            Subparagraph => 6,
-        }
+        s as _
     }
 }
 

@@ -6,9 +6,9 @@ use ftml_uris::Id;
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Notation {
-    pub precedence: isize,
+    pub precedence: i64,
     pub id: Option<Id>,
-    pub argprecs: Vec<isize>,
+    pub argprecs: Vec<i64>,
     pub component: NotationComponent,
     pub op: Option<NotationNode>,
 }

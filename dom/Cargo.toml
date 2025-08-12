@@ -80,6 +80,7 @@ parking_lot = { workspace = true }
 thiserror = { workspace = true }
 either = { workspace = true }
 send_wrapper = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
 
 bytesize = { workspace = true, optional = true }
 deepsize = { workspace = true, optional = true }

@@ -2,6 +2,7 @@ use crate::{document::CurrentTOC, extractor::DomExtractor, toc::TOCElem};
 use ftml_ontology::narrative::elements::{paragraphs::ParagraphKind, sections::SectionLevel};
 use ftml_uris::{DocumentUri, Id};
 use leptos::prelude::*;
+use leptos::wasm_bindgen;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
@@ -15,19 +16,11 @@ pub enum LogicalLevel {
     BeamerSlide,
 }
 
-#[cfg(feature = "typescript")]
+//#[cfg(feature = "typescript")]
 impl wasm_bindgen::convert::TryFromJsValue for LogicalLevel {
-    type Error = wasm_bindgen::JsValue;
+    type Error = serde_wasm_bindgen::Error;
     fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
-        let Some(jstr) = value.as_string() else {
-            return SectionLevel::try_from_js_value(value).map(Self::Section);
-        };
-        Ok(match jstr.as_str() {
-            "None" => Self::None,
-            "Paragraph" => Self::Paragraph,
-            "BeamerSlide" => Self::BeamerSlide,
-            _ => return Err(value),
-        })
+        serde_wasm_bindgen::from_value(value)
     }
 }
 

@@ -44,7 +44,10 @@ args = [
 ]
 
 [tasks.patch-js]
-script = "echo \"wasm_bindgen();\" >> ../bin/viewer/ftml.js"
+script = '''
+sed -i 's/wasm_bindgen/ftmlViewer/g' ../bin/viewer/ftml.js
+echo "ftmlViewer();" >> ../bin/viewer/ftml.js
+'''
 
 [tasks.ts]
 env = { "RUSTFLAGS" = "--cfg getrandom_backend=\"wasm_js\" -Ctarget-cpu=mvp -Ctarget-feature=+multivalue,+mutable-globals,+reference-types,+sign-ext" }

@@ -219,10 +219,10 @@ mod client {
     #[inline]
     pub fn init() {
         INIT.call_once(|| {
-            let window = leptos::tachys::dom::window();
+            let global = leptos::web_sys::js_sys::global();
 
             web_sys::js_sys::Reflect::set(
-                &JsValue::from(window.clone()),
+                &JsValue::from(global.clone()),
                 &JsValue::from("hasFtmlAttribute"),
                 &JsValue::from(web_sys::js_sys::Function::new_with_args(
                     "node",
@@ -233,7 +233,7 @@ mod client {
 
             #[cfg(feature = "csr")]
             web_sys::js_sys::Reflect::set(
-                &JsValue::from(window),
+                &JsValue::from(global),
                 &JsValue::from("FTML_SERVER_URL"),
                 &JsValue::from("https://mathhub.info"),
             )
@@ -244,12 +244,11 @@ mod client {
     std::thread_local! {
         static HAS_FTML_ATTRIBUTE: std::cell::LazyCell<web_sys::js_sys::Function> =
             const { std::cell::LazyCell::new(|| {
-                let window = leptos::tachys::dom::window();
-                let ga = window
-                    .get("hasFtmlAttribute")
+                let global = leptos::web_sys::js_sys::global();
+                let ga = web_sys::js_sys::Reflect::get(&global,&JsValue::from_str("hasFtmlAttribute"))
                     .expect("error getting Window property");
                 ga.dyn_into()
-                    .expect("Window.hasFtmlAttribute is not a function")
+                    .expect("Global.hasFtmlAttribute is not a function")
             })  };
     }
 

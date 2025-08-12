@@ -38,7 +38,7 @@ rustc_version = { workspace = true }
 [dependencies]
 document-features = { workspace = true }
 
-ftml-leptos = { workspace = true, features = ["csr", "typescript"] }
+ftml-leptos = { workspace = true, features = ["csr"] }
 ftml-backend = { workspace = true, features = [
     "wasm",
     "cached",

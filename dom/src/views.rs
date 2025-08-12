@@ -34,10 +34,13 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
-    fn cont(node: OriginalNode) -> impl IntoView {
-        use leptos_posthoc::{DomChildrenCont, DomChildrenContProps};
-        DomChildrenCont(DomChildrenContProps {
+    fn cont(node: OriginalNode, skip_head: bool) -> impl IntoView {
+        use leptos_posthoc::{DomCont, DomContProps};
+        DomCont(DomContProps {
             orig: node,
+            skip_head,
+            class: None::<String>.into(),
+            style: None::<String>.into(),
             cont: super::iterate::<Self>,
         })
     }

@@ -1,5 +1,6 @@
 use std::{hint::unreachable_unchecked, num::NonZeroU8};
 
+use crate::extraction::{FtmlExtractionError, nodes::FtmlNode};
 use either::Either::{self, Left, Right};
 use ftml_ontology::{
     domain::declarations::{Declaration, structures::StructureDeclaration, symbols::SymbolData},
@@ -18,8 +19,9 @@ use ftml_ontology::{
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, UriName};
 
-use crate::extraction::{FtmlExtractionError, nodes::FtmlNode};
+pub use crate::keys::OpenFtmlElement;
 
+/*
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OpenFtmlElement {
     None,
@@ -50,6 +52,11 @@ pub enum OpenFtmlElement {
     SkipSection,
     Comp,
     DefComp,
+    InputRef {
+        target: DocumentUri,
+        uri: DocumentElementUri,
+    },
+    IfInputref(bool),
     SymbolReference {
         uri: SymbolUri,
         notation: Option<Id>,
@@ -58,11 +65,6 @@ pub enum OpenFtmlElement {
         var: Variable,
         notation: Option<Id>,
     },
-    InputRef {
-        target: DocumentUri,
-        uri: DocumentElementUri,
-    },
-    IfInputref(bool),
     OMA {
         head: VarOrSym,
         notation: Option<Id>,
@@ -85,8 +87,8 @@ pub enum OpenFtmlElement {
         uri: DocumentElementUri,
         id: Option<Id>,
         head: VarOrSym,
-        prec: isize,
-        argprecs: Vec<isize>,
+        prec: i64,
+        argprecs: Vec<i64>,
     },
     Paragraph {
         uri: DocumentElementUri,
@@ -108,6 +110,7 @@ pub enum OpenFtmlElement {
     Definiendum(SymbolUri),
     HeadTerm,
 }
+ */
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CloseFtmlElement {
@@ -245,8 +248,8 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
         uri: DocumentElementUri,
         id: Option<Id>,
         head: VarOrSym,
-        prec: isize,
-        argprecs: Vec<isize>,
+        prec: i64,
+        argprecs: Vec<i64>,
         component: Option<NotationComponent>,
         op: Option<NotationNode>,
     },
@@ -288,7 +291,7 @@ pub enum MetaDatum {
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum Split<N: FtmlNode> {
+pub enum AnyOpen<N: FtmlNode> {
     Meta(MetaDatum),
     Open {
         domain: Option<OpenDomainElement<N>>,
@@ -579,13 +582,13 @@ impl ArgumentPosition {
 impl OpenFtmlElement {
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub(crate) fn split<N: FtmlNode>(self, node: &N) -> Split<N> {
+    pub(crate) fn split<N: FtmlNode>(self, node: &N) -> AnyOpen<N> {
         match self {
             Self::Module {
                 uri,
                 meta,
                 signature,
-            } => Split::Open {
+            } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::Module {
                     uri: uri.clone(),
                     meta,
@@ -597,7 +600,7 @@ impl OpenFtmlElement {
                     children: Vec::new(),
                 }),
             },
-            Self::MathStructure { uri, macroname } => Split::Open {
+            Self::MathStructure { uri, macroname } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::MathStructure {
                     uri: uri.clone(),
                     macroname,
@@ -608,15 +611,15 @@ impl OpenFtmlElement {
                     children: Vec::new(),
                 }),
             },
-            Self::SymbolDeclaration { uri, data } => Split::Open {
+            Self::SymbolDeclaration { uri, data } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::SymbolDeclaration { uri, data }),
                 narrative: None,
             },
-            Self::VariableDeclaration { uri, data } => Split::Open {
+            Self::VariableDeclaration { uri, data } => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::VariableDeclaration { uri, data }),
             },
-            Self::Section(uri) => Split::Open {
+            Self::Section(uri) => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Section {
                     uri,
@@ -624,17 +627,17 @@ impl OpenFtmlElement {
                     children: Vec::new(),
                 }),
             },
-            Self::SkipSection => Split::Open {
+            Self::SkipSection => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::SkipSection {
                     children: Vec::new(),
                 }),
             },
-            Self::SymbolReference { uri, notation } => Split::Open {
+            Self::SymbolReference { uri, notation } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::SymbolReference { uri, notation }),
                 narrative: None,
             },
-            Self::VariableReference { var, notation } => Split::Open {
+            Self::VariableReference { var, notation } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::VariableReference { var, notation }),
                 narrative: None,
             },
@@ -642,7 +645,7 @@ impl OpenFtmlElement {
                 head,
                 notation,
                 uri,
-            } => Split::Open {
+            } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::OMA {
                     head,
                     head_term: None,
@@ -656,7 +659,7 @@ impl OpenFtmlElement {
                 head,
                 notation,
                 uri,
-            } => Split::Open {
+            } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::OMBIND {
                     head,
                     head_term: None,
@@ -666,7 +669,7 @@ impl OpenFtmlElement {
                 }),
                 narrative: None,
             },
-            Self::OML { name } => Split::Open {
+            Self::OML { name } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::OML { name }),
                 narrative: None,
             },
@@ -674,7 +677,7 @@ impl OpenFtmlElement {
                 head,
                 notation,
                 uri,
-            } => Split::Open {
+            } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::ComplexTerm {
                     head,
                     head_term: None,
@@ -683,11 +686,11 @@ impl OpenFtmlElement {
                 }),
                 narrative: None,
             },
-            Self::Invisible => Split::Open {
+            Self::Invisible => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Invisible),
             },
-            Self::Argument(a) => Split::Open {
+            Self::Argument(a) => AnyOpen::Open {
                 domain: Some(OpenDomainElement::Argument {
                     position: a,
                     terms: Vec::new(),
@@ -695,32 +698,32 @@ impl OpenFtmlElement {
                 }),
                 narrative: None,
             },
-            Self::HeadTerm => Split::Open {
+            Self::HeadTerm => AnyOpen::Open {
                 domain: Some(OpenDomainElement::HeadTerm {
                     terms: Vec::new(),
                     node: node.clone(),
                 }),
                 narrative: None,
             },
-            Self::NotationArg(a) => Split::Open {
+            Self::NotationArg(a) => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::NotationArg(a)),
             },
-            Self::Type => Split::Open {
+            Self::Type => AnyOpen::Open {
                 domain: Some(OpenDomainElement::Type {
                     terms: Vec::new(),
                     node: node.clone(),
                 }),
                 narrative: None,
             },
-            Self::ReturnType => Split::Open {
+            Self::ReturnType => AnyOpen::Open {
                 domain: Some(OpenDomainElement::ReturnType {
                     terms: Vec::new(),
                     node: node.clone(),
                 }),
                 narrative: None,
             },
-            Self::Definiens(uri) => Split::Open {
+            Self::Definiens(uri) => AnyOpen::Open {
                 domain: Some(OpenDomainElement::Definiens {
                     terms: Vec::new(),
                     node: node.clone(),
@@ -734,7 +737,7 @@ impl OpenFtmlElement {
                 head,
                 prec,
                 argprecs,
-            } => Split::Open {
+            } => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Notation {
                     id,
@@ -752,7 +755,7 @@ impl OpenFtmlElement {
                 formatting,
                 styles,
                 fors,
-            } => Split::Open {
+            } => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Paragraph {
                     uri,
@@ -764,49 +767,49 @@ impl OpenFtmlElement {
                     children: Vec::new(),
                 }),
             },
-            Self::Definiendum(s) => Split::Open {
+            Self::Definiendum(s) => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Definiendum(s)),
             },
-            Self::NotationComp => Split::Open {
+            Self::NotationComp => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::NotationComp {
                     node: node.clone(),
                     components: Vec::new(),
                 }),
             },
-            Self::ArgSep => Split::Open {
+            Self::ArgSep => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::ArgSep {
                     node: node.clone(),
                     components: Vec::new(),
                 }),
             },
-            Self::Comp => Split::Open {
+            Self::Comp => AnyOpen::Open {
                 domain: Some(OpenDomainElement::Comp),
                 narrative: None,
             },
-            Self::DefComp => Split::Open {
+            Self::DefComp => AnyOpen::Open {
                 domain: Some(OpenDomainElement::DefComp),
                 narrative: None,
             },
             Self::InputRef {
                 target: uri,
                 uri: id,
-            } => Split::Meta(MetaDatum::InputRef {
+            } => AnyOpen::Meta(MetaDatum::InputRef {
                 target: uri,
                 uri: id,
             }),
-            Self::IfInputref(b) => Split::Meta(MetaDatum::IfInputref(b)),
-            Self::Style(s) => Split::Meta(MetaDatum::Style(s)),
-            Self::Counter(c) => Split::Meta(MetaDatum::Counter(c)),
-            Self::SetSectionLevel(lvl) => Split::Meta(MetaDatum::SetSectionLevel(lvl)),
-            Self::ImportModule(uri) => Split::Meta(MetaDatum::ImportModule(uri)),
-            Self::UseModule(uri) => Split::Meta(MetaDatum::UseModule(uri)),
+            Self::IfInputref(b) => AnyOpen::Meta(MetaDatum::IfInputref(b)),
+            Self::Style(s) => AnyOpen::Meta(MetaDatum::Style(s)),
+            Self::Counter(c) => AnyOpen::Meta(MetaDatum::Counter(c)),
+            Self::SetSectionLevel(lvl) => AnyOpen::Meta(MetaDatum::SetSectionLevel(lvl)),
+            Self::ImportModule(uri) => AnyOpen::Meta(MetaDatum::ImportModule(uri)),
+            Self::UseModule(uri) => AnyOpen::Meta(MetaDatum::UseModule(uri)),
             Self::None
             | Self::SectionTitle
             | Self::ParagraphTitle
-            | Self::CurrentSectionLevel(_) => Split::None,
+            | Self::CurrentSectionLevel(_) => AnyOpen::None,
         }
     }
 }

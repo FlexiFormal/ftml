@@ -15,4 +15,35 @@
         margin-left: auto;
         margin-right: 0;
     }
+
+    p, .docblock > .advanced {
+    	margin: 0 0 .75em 0;
+    }
+    p:last-child, .docblock > .advanced:last-child {
+        margin: 0;
+    }
+    .advanced {
+        font-style: italic;
+    }
+    .content .docblock .advanced {
+    	border-left: 2px solid red;
+    	padding: 14px;
+    	position: relative;
+    	/* The "!important" part is required because the rule is otherwise overruled in this CSS
+    	selector: ".docblock > :not(.more-examples-toggle):not(.example-wrap)" */
+    	overflow-x: visible !important;
+    }
+    .content .docblock .advanced::before {
+    	color: red;
+    	content: "!!";
+    	position: absolute;
+    	left: -30px;
+    	top: 5px;
+    	font-weight: bold;
+    	font-size: 1.8rem;
+        text-shadow: 1px 0 0 black,-1px 0 0 black,0 1px 0 black,0 -1px 0 black;
+    }
+    .top-doc > .docblock >.advanced:first-child::before {
+        top: 10px;
+    }
 </style>

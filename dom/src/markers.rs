@@ -20,9 +20,7 @@ use ftml_ontology::{
     terms::{VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, SymbolUri};
-use leptos::prelude::{
-    AnyView, CustomAttribute, IntoAny, Memo, RwSignal, provide_context, use_context,
-};
+use leptos::prelude::{AnyView, IntoAny, Memo, RwSignal, provide_context, use_context};
 use leptos_posthoc::OriginalNode;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -136,9 +134,7 @@ impl Marker {
             Self::IfInputref(b) if DocumentState::in_inputref() == b => {
                 Self::apply::<Views>(markers, invisible, is_math, orig)
             }
-            Self::IfInputref(_) => Self::apply::<Views>(markers, invisible, is_math, orig)
-                .attr("style", "display:none;")
-                .into_any(),
+            Self::IfInputref(_) => ().into_any(),
             Self::Section(uri) => {
                 provide_context(CurrentUri(uri.clone().into()));
                 DocumentState::new_section(uri, move |info| {

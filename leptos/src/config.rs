@@ -158,8 +158,8 @@ impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
             {config.highlight_style = Some(v)}
         );
         get!(v @ "autoexpandLimit" = AUTOEXPAND_LIMIT ?
-            j => LogicalLevel::try_from_js_value(j);
-            e => FtmlConfigParseError::InvalidValue("autoexpandLimit", JsDisplay(e));
+            j => LogicalLevel::try_from_js_value(j.clone());
+            _e => FtmlConfigParseError::InvalidValue("autoexpandLimit", JsDisplay(j));
             {config.autoexpand_limit = Some(v)}
         );
         #[cfg(feature = "callbacks")]

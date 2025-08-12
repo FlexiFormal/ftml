@@ -1,8 +1,8 @@
 use crate::{
     FtmlKey,
     extraction::{
-        ArgumentPosition, CloseFtmlElement, FtmlExtractionError, MetaDatum, OpenArgument,
-        OpenBoundArgument, OpenDomainElement, OpenFtmlElement, OpenNarrativeElement, Split,
+        AnyOpen, ArgumentPosition, CloseFtmlElement, FtmlExtractionError, MetaDatum, OpenArgument,
+        OpenBoundArgument, OpenDomainElement, OpenFtmlElement, OpenNarrativeElement,
         nodes::FtmlNode,
     },
 };
@@ -250,7 +250,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     /// ### Errors
     pub fn add(&mut self, e: OpenFtmlElement, node: &N) -> Result<(), FtmlExtractionError> {
         match e.split(node) {
-            Split::Open { domain, narrative } => {
+            AnyOpen::Open { domain, narrative } => {
                 if let Some(dom) = domain {
                     self.domain.push(dom);
                 }
@@ -258,7 +258,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     self.narrative.push(narr);
                 }
             }
-            Split::Meta(m) => match m {
+            AnyOpen::Meta(m) => match m {
                 MetaDatum::Style(s) => self.styles.push(s),
                 MetaDatum::Counter(c) => self.counters.push(c),
                 MetaDatum::InputRef { target, uri } => {
@@ -276,7 +276,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 MetaDatum::IfInputref(_) => (),
             },
-            Split::None => (),
+            AnyOpen::None => (),
         }
         Ok(())
     }
@@ -830,8 +830,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         uri: DocumentElementUri,
         id: Option<Id>,
         head: VarOrSym,
-        prec: isize,
-        argprecs: Vec<isize>,
+        prec: i64,
+        argprecs: Vec<i64>,
         component: Option<NotationComponent>,
         op: Option<NotationNode>,
     ) -> super::Result<()> {

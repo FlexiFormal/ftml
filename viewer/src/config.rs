@@ -2,21 +2,17 @@
 use ftml_leptos::config::FtmlConfigParseError;
 use ftml_uris::DocumentUri;
 #[cfg(not(feature = "typescript"))]
-use wasm_bindgen::{JsCast, JsValue, convert::TryFromJsValue};
+use wasm_bindgen::{JsValue, convert::TryFromJsValue};
 
 #[cfg(not(feature = "typescript"))]
 pub(crate) fn parse_config() -> (FtmlViewerConfig, Vec<FtmlConfigParseError>) {
-    let window = leptos::tachys::dom::window();
-    window
-        .get("FTML_CONFIG")
-        .map_or_else(|| (FtmlViewerConfig::default(), Vec::new()), parse)
+    let global = leptos::web_sys::js_sys::global();
+    leptos::web_sys::js_sys::Reflect::get(&global, &JsValue::from_str("FTML_CONFIG"))
+        .map_or_else(|_| (FtmlViewerConfig::default(), Vec::new()), parse)
 }
 
 #[cfg(not(feature = "typescript"))]
-fn parse(cfg: leptos::web_sys::js_sys::Object) -> (FtmlViewerConfig, Vec<FtmlConfigParseError>) {
-    let Ok(cfg): Result<JsValue, _> = cfg.dyn_into() else {
-        return (FtmlViewerConfig::default(), Vec::new());
-    };
+fn parse(cfg: JsValue) -> (FtmlViewerConfig, Vec<FtmlConfigParseError>) {
     let (r, v) = match ftml_leptos::config::FtmlConfig::try_from_js_value(cfg.clone()) {
         Ok(r) => (r, Vec::new()),
         Err((r, v)) => (r, v),

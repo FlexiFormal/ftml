@@ -19,7 +19,6 @@ csr = [
     "ftml-backend/wasm",
     "ftml-backend/cached",
     "dep:wasm-bindgen",
-    "ftml-dom/typescript",
 ]
 ## Client-side in compbination with ssr
 hydrate = [
@@ -31,7 +30,7 @@ hydrate = [
 ## Server-side rendering
 ssr = ["leptos/ssr", "thaw/ssr"]
 ## generate typescript bindings
-typescript = ["csr", "dep:tsify"]
+typescript = ["csr", "dep:tsify", "ftml-dom/typescript"]
 ## Adds javascript callbacks for some components
 callbacks = ["csr", "dep:leptos-react"]
 
