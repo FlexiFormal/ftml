@@ -1,4 +1,4 @@
-use crate::{config::FtmlConfigState, utils::LocalCacheExt};
+use crate::{config::FtmlConfig, utils::LocalCacheExt};
 use ftml_dom::{
     DocumentState, FtmlViews,
     markers::InputrefInfo,
@@ -23,7 +23,7 @@ pub fn inputref<B: SendBackend>(info: InputrefInfo) -> impl IntoView {
         title,
     } = info;
     let lvl = DocumentState::current_section_level();
-    let limit = FtmlConfigState::autoexpand_limit();
+    let limit = FtmlConfig::autoexpand_limit();
     tracing::debug!("inputref {uri} at level {lvl:?}");
     let expand = Memo::new(move |_| lvl <= limit.get().0 || replacing_done.was_clicked());
     move || {

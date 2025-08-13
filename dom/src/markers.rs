@@ -3,15 +3,16 @@ use crate::{
     clonable_views::MarkedNode,
     counters::LogicalLevel,
     document::{CurrentUri, DocumentState, WithHead},
-    extractor::DomExtractor,
+    extractor::{DomExtractor, FtmlDomElement},
     terms::ReactiveTerm,
+    toc::{CurrentTOC, TocSource},
     utils::{
         ContextChain,
         actions::{OneShot, SetOneShotDone},
         local_cache::LOCAL_CACHE,
     },
 };
-use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement};
+use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, nodes::FtmlNode};
 use ftml_ontology::{
     narrative::elements::{
         SectionLevel,
@@ -19,8 +20,11 @@ use ftml_ontology::{
     },
     terms::{VarOrSym, Variable},
 };
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, SymbolUri};
-use leptos::prelude::{AnyView, IntoAny, Memo, RwSignal, provide_context, use_context};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, NarrativeUri, SymbolUri};
+use leptos::prelude::{
+    AnyView, CustomAttribute, IntoAny, Memo, RwSignal, Update, WithUntracked, expect_context,
+    provide_context, use_context, with_context,
+};
 use leptos_posthoc::OriginalNode;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -134,7 +138,7 @@ impl Marker {
             Self::IfInputref(b) if DocumentState::in_inputref() == b => {
                 Self::apply::<Views>(markers, invisible, is_math, orig)
             }
-            Self::IfInputref(_) => ().into_any(),
+            Self::IfInputref(_) => orig.attr("style", "display:none;").into_any(),
             Self::Section(uri) => {
                 provide_context(CurrentUri(uri.clone().into()));
                 DocumentState::new_section(uri, move |info| {
@@ -153,6 +157,18 @@ impl Marker {
                     tracing::error!("Unexpected section title");
                     return Self::apply::<Views>(markers, invisible, is_math, orig);
                 };
+
+                if with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract))
+                    .is_some_and(|b| b)
+                    && let NarrativeUri::Element(uri) = expect_context::<CurrentUri>().0
+                {
+                    let current_toc = expect_context::<RwSignal<CurrentTOC>>();
+                    let node = FtmlDomElement::new((*orig).clone());
+                    let title = node.inner_string().into_owned();
+                    if !title.is_empty() {
+                        current_toc.update(|toc| toc.set_title(&uri, title.into_boxed_str()));
+                    }
+                }
                 Views::section_title(lvl, cls, move || {
                     Self::apply::<Views>(markers, invisible, is_math, orig)
                 })

@@ -39,9 +39,7 @@ pub fn Block(
     };
     inject_css("ftml-block", include_str!("block.css"));
     let has_header = header.is_some() || header_right.is_some() || header_left.is_some();
-    let has_separator = separator.is_some()
-        || show_separator == Some(true)
-        || (show_separator.is_none() && has_header);
+    let has_separator = separator.is_some() || show_separator == Some(true);
     view! {
         <Card class="ftml-block-card">
             {if has_header {

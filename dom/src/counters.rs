@@ -1,4 +1,5 @@
-use crate::{document::CurrentTOC, extractor::DomExtractor, toc::TOCElem};
+use crate::toc::CurrentTOC;
+use crate::{extractor::DomExtractor, toc::TOCElem};
 use ftml_ontology::narrative::elements::{paragraphs::ParagraphKind, sections::SectionLevel};
 use ftml_uris::{DocumentUri, Id};
 use leptos::prelude::*;

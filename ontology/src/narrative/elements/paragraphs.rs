@@ -15,7 +15,7 @@ pub struct LogicalParagraph {
     pub kind: ParagraphKind,
     pub uri: DocumentElementUri,
     pub formatting: ParagraphFormatting,
-    pub title: Option<DocumentRange>,
+    pub title: Option<Box<str>>,
     pub range: DocumentRange,
     pub styles: Box<[Id]>,
     pub children: Box<[DocumentElement]>,
@@ -183,10 +183,12 @@ impl std::str::FromStr for ParagraphKind {
 #[cfg(feature = "deepsize")]
 impl deepsize::DeepSizeOf for LogicalParagraph {
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
-        self.children
-            .iter()
-            .map(|e| std::mem::size_of_val(e) + e.deep_size_of_children(context))
-            .sum::<usize>()
+        self.title.as_ref().map(|s| s.len()).unwrap_or_default()
+            + self
+                .children
+                .iter()
+                .map(|e| std::mem::size_of_val(e) + e.deep_size_of_children(context))
+                .sum::<usize>()
             + (self.styles.len() * std::mem::size_of::<Id>())
             + self
                 .fors

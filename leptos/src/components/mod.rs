@@ -3,7 +3,9 @@ pub mod inputref;
 pub mod notations;
 pub mod paragraphs;
 pub mod sections;
+pub mod sidebar;
 pub mod terms;
+pub mod toc;
 
 use crate::config::FtmlConfig;
 use ftml_dom::{

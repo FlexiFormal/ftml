@@ -238,7 +238,7 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
     },
     Section {
         uri: DocumentElementUri,
-        title: Option<DocumentRange>,
+        title: Option<Box<str>>,
         children: Vec<DocumentElement>,
     },
     SkipSection {
@@ -268,7 +268,7 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
         formatting: ParagraphFormatting,
         styles: Box<[Id]>,
         children: Vec<DocumentElement>,
-        title: Option<DocumentRange>,
+        title: Option<Box<str>>,
     },
     NotationArg(ArgumentPosition),
     Invisible,

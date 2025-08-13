@@ -20,6 +20,7 @@ pub struct DocumentData {
     pub title: Option<Box<str>>,
     pub elements: Box<[DocumentElement]>,
     pub styles: DocumentStyles,
+    pub top_section_level: SectionLevel,
 }
 impl DocumentData {
     #[must_use]

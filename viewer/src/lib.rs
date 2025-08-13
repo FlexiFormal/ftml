@@ -57,7 +57,9 @@ pub fn iterate_body(cfg: config::FtmlViewerConfig) {
         let uri = cfg.apply().unwrap_or_else(|| DocumentUri::no_doc().clone());
         ftml_leptos::Views::<backend::GlobalBackend>::top(|| {
             ftml_dom::setup_document(uri, || {
-                ftml_leptos::Views::<backend::GlobalBackend>::cont(orig, false)
+                ftml_leptos::Views::<backend::GlobalBackend>::document(|| {
+                    ftml_leptos::Views::<backend::GlobalBackend>::cont(orig, false)
+                })
             })
         })
     });

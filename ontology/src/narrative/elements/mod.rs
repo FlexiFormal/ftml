@@ -30,7 +30,7 @@ pub trait IsDocumentElement: super::Narrative {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum DocumentElement {
-    SetSectionLevel(SectionLevel),
+    //SetSectionLevel(SectionLevel),
     UseModule(ModuleUri),
     Module {
         range: DocumentRange,
@@ -175,8 +175,8 @@ impl super::Narrative for DocumentElement {
         #[allow(clippy::enum_glob_use)]
         use either_of::EitherOf5::*;
         match self {
-            Self::SetSectionLevel(_)
-            | Self::UseModule(_)
+            //Self::SetSectionLevel(_) |
+            Self::UseModule(_)
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::VariableDeclaration(_)
@@ -211,8 +211,8 @@ impl Ftml for DocumentElement {
             }};
         }*/
         match self {
-            Self::SetSectionLevel(_)
-            | Self::UseModule(_)
+            //Self::SetSectionLevel(_) |
+            Self::UseModule(_)
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::DocumentReference { .. }
@@ -425,12 +425,30 @@ impl crate::Ftml for DocumentElementRef<'_> {
     }
 }
 
+pub trait FlatIterable {
+    type Ref: std::ops::Deref<Target = DocumentElement>;
+    fn flat(self) -> impl Iterator<Item = Self::Ref>;
+}
+
+impl<'a, I: Iterator<Item = &'a DocumentElement>> FlatIterable for I {
+    type Ref = &'a DocumentElement;
+    fn flat(self) -> impl Iterator<Item = Self::Ref> {
+        self.flat_map(|e| {
+            if e.flat_children().is_empty() {
+                either::Right(std::iter::once(e))
+            } else {
+                either::Left(e.flat_children().iter())
+            }
+        })
+    }
+}
+
 impl DocumentElement {
     #[must_use]
-    pub fn opaque_children(&self) -> &[Self] {
+    pub fn flat_children(&self) -> &[Self] {
         match self {
-            Self::SetSectionLevel(_)
-            | Self::UseModule(_)
+            //Self::SetSectionLevel(_) |
+            Self::UseModule(_)
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::Definiendum { .. }
@@ -455,8 +473,8 @@ impl DocumentElement {
     #[must_use]
     pub const fn element_uri(&self) -> Option<&DocumentElementUri> {
         Some(match self {
-            Self::SetSectionLevel(_)
-            | Self::UseModule(_)
+            // Self::SetSectionLevel(_) |
+            Self::UseModule(_)
             | Self::Module { .. }
             | Self::MathStructure { .. }
             | Self::Extension { .. }
@@ -482,7 +500,7 @@ impl DocumentElement {
     #[must_use]
     pub fn as_ref(&self) -> DocumentElementRef<'_> {
         match self {
-            Self::SetSectionLevel(l) => DocumentElementRef::SetSectionLevel(*l),
+            //Self::SetSectionLevel(l) => DocumentElementRef::SetSectionLevel(*l),
             Self::UseModule(u) => DocumentElementRef::UseModule(u),
             Self::Module {
                 range,

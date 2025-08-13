@@ -1,10 +1,8 @@
 #![allow(clippy::must_use_candidate)]
 
-use std::hint::unreachable_unchecked;
-
 use crate::{
     SendBackend,
-    config::{FtmlConfigState, HighlightStyle},
+    config::{FtmlConfig, HighlightStyle},
     utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
 };
 use ftml_dom::{
@@ -20,6 +18,7 @@ use ftml_dom::{
 use ftml_ontology::terms::{ArgumentMode, VarOrSym, Variable};
 use ftml_uris::{DocumentElementUri, Id, LeafUri, SymbolUri};
 use leptos::prelude::*;
+use std::hint::unreachable_unchecked;
 
 #[derive(Copy, Clone)]
 struct InTerm {
@@ -45,7 +44,7 @@ pub fn oms<B: SendBackend>(
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
-    if FtmlConfigState::allow_notation_changes() {
+    if FtmlConfig::allow_notation_changes() {
         let head: LeafUri = uri.into();
         Left(super::notations::has_notation::<B>(head, children, None))
     } else {
@@ -96,7 +95,7 @@ pub fn omv<B: SendBackend>(var: Variable, _in_term: bool, children: ClonableView
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
-    if FtmlConfigState::allow_notation_changes() {
+    if FtmlConfig::allow_notation_changes() {
         match var {
             Variable::Name { .. } => Right(children.into_view::<crate::Views<B>>()),
             Variable::Ref { declaration, .. } => Left(super::notations::has_notation::<B>(
@@ -139,7 +138,7 @@ pub fn oma<B: SendBackend>(
             vars: RwSignal::new(Vec::new()),
         });
     }
-    if !FtmlConfigState::allow_notation_changes() {
+    if !FtmlConfig::allow_notation_changes() {
         tracing::trace!("No notation changes");
         return Right(children.into_view::<crate::Views<B>>());
     }
@@ -167,7 +166,7 @@ pub fn oma<B: SendBackend>(
     Left(ret(children))
 }
 
-const fn comp_class(is_hovered: bool, is_var: bool, style: HighlightStyle) -> &'static str {
+pub const fn comp_class(is_hovered: bool, is_var: bool, style: HighlightStyle) -> &'static str {
     use HighlightStyle as HL;
     match (is_hovered, is_var, style) {
         (false, true, _) => "ftml-var-comp",
@@ -185,12 +184,12 @@ pub fn defcomp<B: SendBackend>(children: ClonableView) -> impl IntoView {
     use HighlightStyle as HL;
     use leptos::either::Either::{Left, Right};
     tracing::trace!("doing defcomp");
-    if !FtmlConfigState::allow_hovers() {
+    if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");
         return Left(children.into_view::<crate::Views<B>>());
     }
     let is_hovered = use_context::<InTerm>().map(|h| h.hovered);
-    let style = FtmlConfigState::highlight_style();
+    let style = FtmlConfig::highlight_style();
     let class = Memo::new(
         move |_| match (is_hovered.is_some_and(|h| h.get()), style.get()) {
             (false, HL::Colored | HL::None) => "ftml-def-comp",
@@ -210,9 +209,8 @@ pub fn defcomp<B: SendBackend>(children: ClonableView) -> impl IntoView {
 
 pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
-    use thaw::{Popover, PopoverSize, PopoverTrigger};
     tracing::trace!("doing comp");
-    if !FtmlConfigState::allow_hovers() {
+    if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");
         return Left(children.into_view::<crate::Views<B>>());
     }
@@ -275,7 +273,12 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
         }
     }
 
-    let style = FtmlConfigState::highlight_style();
+    Right(comp_like::<B, _>(head, Some(is_hovered), true, move || {
+        children.into_view::<crate::Views<B>>()
+    }))
+    /*
+
+    let style = FtmlConfig::highlight_style();
     let class = Memo::new(move |_| comp_class(is_hovered.get(), is_var, style.get()));
     let top_class = Memo::new(move |_| {
         if is_hovered.get() {
@@ -289,12 +292,7 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
     //let none: Option<FragmentContinuation> = None;
     let children = children.into_view::<crate::Views<B>>();
     let on_click = ReactiveStore::on_click::<B>(&head);
-    let allow_formals = FtmlConfigState::allow_formal_info();
-    let top_term = if allow_formals {
-        crate::Views::<B>::current_top_term()
-    } else {
-        None
-    };
+    let allow_formals = FtmlConfig::allow_formal_info();
     let on_click = move |_| {
         on_click.click(allow_formals, top_term.clone());
     };
@@ -316,6 +314,60 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
             {term_popover::<B>(head)}
         </Popover>
     })
+     */
+}
+
+pub fn comp_like<B: SendBackend, V: IntoView + 'static>(
+    head: VarOrSym,
+    is_hovered: Option<RwSignal<bool>>,
+    top_term: bool,
+    children: impl FnOnce() -> V + Send + 'static,
+) -> impl IntoView {
+    use thaw::{Popover, PopoverSize, PopoverTrigger};
+
+    inject_css("ftml-comp", include_str!("comp.css"));
+    let is_hovered = is_hovered.unwrap_or_else(|| RwSignal::new(false));
+    let on_click = ReactiveStore::on_click::<B>(&head);
+    let allow_formals = FtmlConfig::allow_formal_info();
+    let top_class = Memo::new(move |_| {
+        if is_hovered.get() {
+            tracing::trace!("Hovering");
+            "ftml-symbol-hover ftml-symbol-hover-hovered".to_string()
+        } else {
+            "ftml-symbol-hover ftml-symbol-hover-hidden".to_string()
+        }
+    });
+    let style = FtmlConfig::highlight_style();
+    let is_var = matches!(head, VarOrSym::Var(_));
+    let class = Memo::new(move |_| {
+        super::terms::comp_class(is_hovered.get(), is_var, style.get()).to_string()
+    });
+    let top_term = if top_term && allow_formals {
+        crate::Views::<B>::current_top_term()
+    } else {
+        None
+    };
+    let on_click = move |_| {
+        on_click.click(allow_formals, top_term.clone());
+    };
+    view! {
+        <Popover
+            class=top_class
+            size=PopoverSize::Small
+            on_open=move || is_hovered.set(true)
+            on_close=move || is_hovered.set(false)
+            //on_click_signal=ocp
+        >
+            <PopoverTrigger slot>{
+            children().attr("class",move || class)
+            .add_any_attr(leptos::ev::on(
+                leptos::ev::click,
+                Box::new(on_click)
+            ))
+            }</PopoverTrigger>
+            {term_popover::<B>(head)}
+        </Popover>
+    }
 }
 
 //#[component]

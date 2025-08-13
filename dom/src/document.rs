@@ -2,7 +2,7 @@ use crate::{
     counters::{LogicalLevel, SectionCounters},
     extractor::DomExtractor,
     markers::{InputrefInfo, ParagraphInfo, SectionInfo},
-    toc::{CurrentId, NavElems, TOCElem},
+    toc::{CurrentId, CurrentTOC, NavElems, TocSource},
     utils::{ContextChain, owned},
 };
 use ftml_core::extraction::ArgumentPosition;
@@ -15,7 +15,6 @@ use ftml_ontology::{
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, NarrativeUri, SymbolUri};
 use leptos::prelude::*;
-use smallvec::SmallVec;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -56,7 +55,22 @@ pub fn setup_document<Ch: IntoView + 'static>(
     provide_context(CurrentUri(uri.clone().into()));
     provide_context(ContextUri(uri.into()));
     provide_context(SectionCounters::default());
-    provide_context(RwSignal::new(CurrentTOC::default()));
+
+    let current_toc = match with_context::<TocSource, _>(|c| {
+        if let TocSource::Ready(r) = c {
+            Some(r.clone())
+        } else {
+            None
+        }
+    }) {
+        Some(Some(c)) => CurrentTOC { toc: Some(c) },
+        Some(None) => CurrentTOC::default(),
+        None => {
+            provide_context(TocSource::default());
+            CurrentTOC::default()
+        }
+    };
+    provide_context(RwSignal::new(current_toc));
     provide_context(RwSignal::new(NavElems::new()));
     children()
 }
@@ -132,6 +146,10 @@ impl DocumentState {
         let (id, replace, replacing_done) = NavElems::new_inpuref(uri.name.last());
         let counters = SectionCounters::inputref(target.clone(), id.clone());
         let title = NavElems::get_title(target.clone());
+        if with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract)).is_some_and(|b| b) {
+            let current_toc = expect_context::<RwSignal<CurrentTOC>>();
+            current_toc.update(|t| t.insert_inputref(id.clone(), target.clone()));
+        }
         provide_context(counters);
         provide_context(InInputref(true));
         provide_context(CurrentId(id.clone()));
@@ -184,6 +202,10 @@ impl DocumentState {
         let mut counters: SectionCounters = expect_context();
         let (style, class) = counters.next_section();
         let lvl = counters.current_level();
+        if with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract)).is_some_and(|b| b) {
+            let current_toc = expect_context::<RwSignal<CurrentTOC>>();
+            current_toc.update(|t| t.insert_section(id.clone(), uri.clone()));
+        }
         provide_context(counters);
         provide_context(CurrentId(id.clone()));
         f(SectionInfo {
@@ -193,6 +215,10 @@ impl DocumentState {
             lvl,
             id,
         })
+    }
+
+    pub fn get_toc() -> ReadSignal<CurrentTOC> {
+        expect_context::<RwSignal<CurrentTOC>>().read_only()
     }
 
     pub(crate) fn new_paragraph<V: IntoView>(
@@ -261,44 +287,5 @@ impl DocumentState {
 
     pub(crate) fn update_counters<R>(f: impl FnOnce(&mut SectionCounters) -> R) -> R {
         update_context::<SectionCounters, _>(f).expect("Not in a document context")
-    }
-}
-
-#[derive(Default)]
-pub struct CurrentTOC {
-    pub toc: Option<Vec<TOCElem>>,
-}
-impl CurrentTOC {
-    pub fn iter_dfs(&self) -> Option<impl Iterator<Item = &TOCElem>> {
-        struct TOCIterator<'b> {
-            curr: std::slice::Iter<'b, TOCElem>,
-            stack: SmallVec<std::slice::Iter<'b, TOCElem>, 2>,
-        }
-        impl<'b> Iterator for TOCIterator<'b> {
-            type Item = &'b TOCElem;
-            fn next(&mut self) -> Option<Self::Item> {
-                loop {
-                    if let Some(elem) = self.curr.next() {
-                        let children: &'b [_] = match elem {
-                            TOCElem::Section { children, .. }
-                            | TOCElem::Inputref { children, .. }
-                            | TOCElem::SkippedSection { children } => children,
-                            _ => return Some(elem),
-                        };
-                        self.stack
-                            .push(std::mem::replace(&mut self.curr, children.iter()));
-                        return Some(elem);
-                    } else if let Some(s) = self.stack.pop() {
-                        self.curr = s;
-                    } else {
-                        return None;
-                    }
-                }
-            }
-        }
-        self.toc.as_deref().map(|t| TOCIterator {
-            curr: t.iter(),
-            stack: SmallVec::new(),
-        })
     }
 }

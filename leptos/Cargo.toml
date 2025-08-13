@@ -75,7 +75,11 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 send_wrapper = { workspace = true }
 either = { workspace = true }
+icondata_ai = { workspace = true }
 icondata_bi = { workspace = true }
+icondata_bs = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+thaw_utils = { workspace = true }
 
 gloo-storage = { workspace = true, optional = true }
 

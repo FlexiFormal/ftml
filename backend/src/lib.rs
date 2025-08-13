@@ -119,6 +119,7 @@ pub trait FtmlBackend {
     }
 
     fn document_link_url(&self, uri: &DocumentUri) -> String;
+    fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String>;
 
     fn get_fragment(
         &self,
@@ -269,6 +270,7 @@ pub trait FtmlBackend {
 #[cfg(feature = "server_fn")]
 pub trait FlamsBackend {
     fn document_link_url(&self, uri: &DocumentUri) -> String;
+    fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String>;
 
     /// `/content/fragment`
     #[allow(clippy::too_many_arguments)]
@@ -358,6 +360,10 @@ where
     #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         <Self as FlamsBackend>::document_link_url(self, uri)
+    }
+    #[inline]
+    fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String> {
+        <Self as FlamsBackend>::resource_link_url(self, uri, kind)
     }
 
     fn get_fragment(

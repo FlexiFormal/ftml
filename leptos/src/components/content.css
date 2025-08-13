@@ -1,0 +1,4 @@
+.ftml-drawer-absolute-wide {
+    --thaw-drawer--size: 80vw !important;
+    z-index: 5;
+}

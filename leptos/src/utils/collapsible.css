@@ -1,0 +1,12 @@
+.ftml-collapsible--visible,
+.ftml-collapsible--invisible {
+    transition:
+        height 0.3s,
+        max-height 0.3s ease-in-out,
+        padding 0.3s ease-in-out;
+    overflow: hidden;
+}
+.ftml-collapsible--invisible {
+    max-height: 0px;
+    padding: 0;
+}

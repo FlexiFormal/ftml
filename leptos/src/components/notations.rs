@@ -1,4 +1,4 @@
-use crate::{config::FtmlConfigState, utils::LocalCacheExt};
+use crate::{config::FtmlConfig, utils::LocalCacheExt};
 use ftml_dom::{
     ClonableView,
     notations::NotationExt,
@@ -16,7 +16,7 @@ pub fn has_notation<B: SendBackend>(
     arguments: Option<ReadSignal<ReactiveApplication>>,
 ) -> impl IntoView + use<B> + 'static {
     use leptos::either::Either::{Left, Right};
-    let notation = FtmlConfigState::notation_preference(&uri);
+    let notation = FtmlConfig::notation_preference(&uri);
     let finished = RwSignal::new(false);
     let _ = Effect::new(move || finished.set(true));
 
@@ -55,7 +55,7 @@ pub fn with_notation<B: SendBackend>(
     use leptos::either::Either::{Left, Right};
     let h = head.clone();
     LocalCache::with_or_toast::<B, _, _, _, _>(
-        |c| c.get_notation(h, notation),
+        |c| c.get_notation(Some(h), notation),
         move |n| {
             match arguments {
                 None => Left(n.as_op::<crate::Views<B>>(&head.into(), None)),
@@ -79,7 +79,7 @@ pub fn with_notation<B: SendBackend>(
 pub fn notation_selector<Be: SendBackend>(uri: LeafUri) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     use thaw::Spinner;
-    if !FtmlConfigState::allow_notation_changes() {
+    if !FtmlConfig::allow_notation_changes() {
         tracing::trace!("No notation changes");
         return Left(());
     }
@@ -126,7 +126,7 @@ fn do_notation_selector<Be: SendBackend, E: std::fmt::Display>(
             }
         }
     }
-    let current = FtmlConfigState::notation_preference_signal(uri);
+    let current = FtmlConfig::notation_preference_signal(uri);
     let string_signal = RwSignal::new(String::new());
     let mut has_changed = false;
     let _ = Effect::new(move || {
@@ -159,7 +159,7 @@ fn do_notation_selector<Be: SendBackend, E: std::fmt::Display>(
                 <ComboboxOption text="None" value="none">"None"</ComboboxOption>
                 {all.into_iter().map(|(not_uri,not)| {
                     let head = head.clone();
-                    let notation = FtmlConfigState::disable_hovers(move ||
+                    let notation = FtmlConfig::disable_hovers(move ||
                         not.as_view_safe::<crate::Views<Be>>(&head.into(),None)
                     );
                     view!(<ComboboxOption text="" value=not_uri.to_string()>

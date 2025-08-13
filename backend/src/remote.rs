@@ -49,6 +49,7 @@ pub struct RemoteBackend<
     pub paragraphs_url: Url,
     pub modules_url: Url,
     pub documents_url: Url,
+    pub resources_url: Option<Url>,
     pub redirects: Re,
     __phantom: PhantomData<E>,
 }
@@ -80,6 +81,7 @@ where
             paragraphs_url,
             modules_url,
             documents_url,
+            resources_url: None,
             redirects,
             __phantom: PhantomData,
         }
@@ -104,6 +106,7 @@ where
             paragraphs_url,
             modules_url,
             documents_url,
+            resources_url: None,
             redirects: NoRedirects,
             __phantom: PhantomData,
         }
@@ -148,6 +151,11 @@ where
             || format!("{}?uri={}", self.documents_url, uri.url_encoded()),
             |r| r.to_string(),
         )
+    }
+    fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String> {
+        self.resources_url
+            .as_ref()
+            .map(|s| format!("{s}?uri={}&format={kind}", uri.url_encoded()))
     }
 
     #[allow(clippy::similar_names)]
@@ -279,6 +287,13 @@ mod server_fn {
                 || format!("{}?uri={}", self.url, uri.url_encoded()),
                 |r| r.to_string(),
             )
+        }
+        fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String> {
+            Some(format!(
+                "{}/doc?uri={}&format={kind}",
+                self.url,
+                uri.url_encoded()
+            ))
         }
 
         ftml_uris::compfun! {!!

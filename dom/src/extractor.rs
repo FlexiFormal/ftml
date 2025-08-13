@@ -142,7 +142,16 @@ impl FtmlNode for FtmlDomElement {
     }
     #[inline]
     fn inner_string(&self) -> Cow<'_, str> {
-        self.0.inner_html().into()
+        // TODO this can probably be done smarter, but we need to eliminate spurious comments
+        let mut ret = String::new();
+        for c in self.children() {
+            match c {
+                None => (),
+                Some(Either::Right(r)) => ret.push_str(&r),
+                Some(Either::Left(n)) => ret.push_str(&n.0.outer_html()),
+            }
+        }
+        ret.into()
     }
     fn path_from(&self, ancestor: &Self) -> smallvec::SmallVec<u32, 4> {
         fn path_from_i(slf: &Element, ancestor: &Element) -> smallvec::SmallVec<u32, 4> {

@@ -161,9 +161,9 @@ impl<B: SendBackend> WithLocalCache<B> {
     > + Send
     + use<B> {
         let uri = uri.simple_module();
-        tracing::warn!("Getting {uri}");
+        //tracing::warn!("Getting {uri}");
         if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
-            tracing::warn!("Module {} found", uri.module);
+            //tracing::warn!("Module {} found", uri.module);
             let r = m
                 .get_as::<Symbol>(&uri.name)
                 .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
@@ -271,18 +271,38 @@ impl<B: SendBackend> WithLocalCache<B> {
 
     pub fn get_notation(
         &self,
-        symbol: LeafUri,
+        symbol: Option<LeafUri>,
         uri: DocumentElementUri,
     ) -> impl Future<Output = Result<Notation, BackendError<B::Error>>> + Send + use<B> {
         use either::Either::{Left, Right};
-        if let Some(v) = LOCAL_CACHE.notations.get(&symbol) {
-            for (u, n) in v.iter() {
-                if *u == uri {
-                    return Left(std::future::ready(Ok(n.clone())));
-                }
-            }
-        }
-        Right(B::get().get_notation(symbol, uri))
+        let local = symbol.as_ref().map_or_else(
+            || {
+                LOCAL_CACHE.notations.iter().find_map(|e| {
+                    e.value()
+                        .iter()
+                        .find_map(|(u, n)| if *u == uri { Some(n.clone()) } else { None })
+                })
+            },
+            |symbol| {
+                LOCAL_CACHE.notations.get(symbol).and_then(|v| {
+                    v.iter()
+                        .find_map(|(u, n)| if *u == uri { Some(n.clone()) } else { None })
+                })
+            },
+        );
+        local.map_or_else(
+            || {
+                symbol.map_or_else(
+                    || {
+                        Left(std::future::ready(Err(BackendError::NotFound(
+                            ftml_uris::UriKind::DocumentElement,
+                        ))))
+                    },
+                    |symbol| Right(B::get().get_notation(symbol, uri)),
+                )
+            },
+            |n| Left(std::future::ready(Ok(n))),
+        )
     }
 }
 

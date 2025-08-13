@@ -1,6 +1,9 @@
+use std::hint::unreachable_unchecked;
+
 use ftml_ontology::narrative::elements::paragraphs::ParagraphKind;
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri};
 use leptos::prelude::*;
+use smallvec::SmallVec;
 
 use crate::utils::actions::{OneShot, SetOneShotDone};
 
@@ -16,7 +19,7 @@ use crate::utils::actions::{OneShot, SetOneShotDone};
 pub enum TOCElem {
     /// A section; the title is assumed to be an HTML string
     Section {
-        title: Option<String>,
+        title: Option<Box<str>>,
         uri: DocumentElementUri,
         id: String,
         children: Vec<TOCElem>,
@@ -28,7 +31,7 @@ pub enum TOCElem {
     /// referenced Document.
     Inputref {
         uri: DocumentUri,
-        title: Option<String>,
+        title: Option<Box<str>>,
         id: String,
         children: Vec<TOCElem>,
     },
@@ -39,8 +42,152 @@ pub enum TOCElem {
     Slide, //{uri:DocumentElementUri}
 }
 
+#[derive(Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum TocSource {
+    None,
+    #[default]
+    Extract,
+    Ready(Vec<TOCElem>),
+    Get,
+}
+
+impl leptos::wasm_bindgen::convert::TryFromJsValue for TocSource {
+    type Error = serde_wasm_bindgen::Error;
+    fn try_from_js_value(value: leptos::wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        serde_wasm_bindgen::from_value(value)
+    }
+}
+
+#[derive(Default)]
+pub struct CurrentTOC {
+    pub toc: Option<Vec<TOCElem>>,
+}
+impl CurrentTOC {
+    pub(crate) fn set_title(&mut self, uri: &DocumentElementUri, title: Box<str>) {
+        if let Some(e) = self.find_mut(|e| matches!(e,TOCElem::Section { uri:u, .. } if u == uri)) {
+            let TOCElem::Section { title: t, .. } = e else {
+                // SAFETY: match above
+                unsafe { unreachable_unchecked() }
+            };
+            *t = Some(title);
+            return;
+        }
+        tracing::warn!("Entry with uri {uri} not found!");
+    }
+
+    fn get_toc_at<'t>(&'t mut self, id: &str) -> Option<&'t mut Vec<TOCElem>> {
+        let mut path = id.split('/');
+        let _ = path.next_back()?;
+        let mut toc = match &mut self.toc {
+            Some(toc) => toc,
+            n @ None => {
+                *n = Some(Vec::new());
+                // SAFETY we literally just made it Some()
+                unsafe { n.as_mut().unwrap_unchecked() }
+            }
+        };
+        loop {
+            let Some(next) = path.next() else {
+                return Some(toc);
+            };
+            if let Some(next) = toc.iter_mut().find_map(|t| match t {
+                TOCElem::Section { id, children, .. } | TOCElem::Inputref { id, children, .. }
+                    if id.rsplit_once('/').is_some_and(|(_, last)| last == next) || id == next =>
+                {
+                    Some(children)
+                }
+                _ => None,
+            }) {
+                toc = next;
+            } else {
+                return None;
+            }
+        }
+    }
+    pub(crate) fn insert_section(&mut self, id: String, uri: DocumentElementUri) {
+        let Some(ch) = self.get_toc_at(&id) else {
+            tracing::warn!("Entry with id {id} not found!");
+            return;
+        };
+        ch.push(TOCElem::Section {
+            title: None,
+            uri,
+            id,
+            children: Vec::new(),
+        });
+    }
+    pub(crate) fn insert_inputref(&mut self, id: String, uri: DocumentUri) {
+        let Some(ch) = self.get_toc_at(&id) else {
+            return;
+        };
+        ch.push(TOCElem::Inputref {
+            uri,
+            title: None,
+            id,
+            children: Vec::new(),
+        });
+    }
+    pub fn iter_dfs(&self) -> Option<impl Iterator<Item = &TOCElem>> {
+        struct TOCIterator<'b> {
+            curr: std::slice::Iter<'b, TOCElem>,
+            stack: SmallVec<std::slice::Iter<'b, TOCElem>, 2>,
+        }
+        impl<'b> Iterator for TOCIterator<'b> {
+            type Item = &'b TOCElem;
+            fn next(&mut self) -> Option<Self::Item> {
+                loop {
+                    if let Some(elem) = self.curr.next() {
+                        let children: &'b [_] = match elem {
+                            TOCElem::Section { children, .. }
+                            | TOCElem::Inputref { children, .. }
+                            | TOCElem::SkippedSection { children } => children,
+                            _ => return Some(elem),
+                        };
+                        self.stack
+                            .push(std::mem::replace(&mut self.curr, children.iter()));
+                        return Some(elem);
+                    } else if let Some(s) = self.stack.pop() {
+                        self.curr = s;
+                    } else {
+                        return None;
+                    }
+                }
+            }
+        }
+        self.toc.as_deref().map(|t| TOCIterator {
+            curr: t.iter(),
+            stack: SmallVec::new(),
+        })
+    }
+
+    pub fn find_mut(&mut self, pred: impl Fn(&TOCElem) -> bool) -> Option<&mut TOCElem> {
+        let mut curr: std::slice::IterMut<TOCElem> = self.toc.as_mut()?.iter_mut();
+        let mut stack: SmallVec<std::slice::IterMut<TOCElem>, 2> = SmallVec::new();
+        loop {
+            if let Some(elem) = curr.next() {
+                if pred(elem) {
+                    return Some(elem);
+                }
+                let children: &mut [_] = match elem {
+                    TOCElem::Section { children, .. }
+                    | TOCElem::Inputref { children, .. }
+                    | TOCElem::SkippedSection { children } => children,
+                    _ => return Some(elem),
+                };
+                stack.push(std::mem::replace(&mut curr, children.iter_mut()));
+            } else if let Some(s) = stack.pop() {
+                curr = s;
+            } else {
+                return None;
+            }
+        }
+    }
+}
+
 pub struct NavElems {
-    initialized: RwSignal<bool>,
+    //initialized: RwSignal<bool>,
     ids: rustc_hash::FxHashMap<String, SectionOrInputref>,
     titles: rustc_hash::FxHashMap<DocumentUri, RwSignal<String>>,
 }
@@ -59,7 +206,7 @@ impl NavElems {
         Self {
             ids: std::collections::HashMap::default(),
             titles: std::collections::HashMap::default(),
-            initialized: RwSignal::new(false),
+            //initialized: RwSignal::new(false),
         }
     }
 
@@ -105,6 +252,7 @@ impl NavElems {
         })
         .unwrap_or_else(|| s.to_string())
     }
+
     pub fn get_title(uri: DocumentUri) -> RwSignal<String> {
         Self::update_untracked(|slf| match slf.titles.entry(uri) {
             std::collections::hash_map::Entry::Occupied(e) => *e.get(),
@@ -122,6 +270,7 @@ impl NavElems {
             }
         }
     }
+
     #[allow(clippy::missing_const_for_fn)]
     pub fn navigate_to(&self, _id: &str) {
         #[cfg(any(feature = "csr", feature = "hydrate"))]

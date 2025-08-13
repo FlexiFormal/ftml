@@ -1,4 +1,4 @@
-use ftml_dom::{DocumentState, counters::LogicalLevel, utils::JsDisplay};
+use ftml_dom::{DocumentState, counters::LogicalLevel, toc::TocSource, utils::JsDisplay};
 use ftml_ontology::narrative::elements::{SectionLevel, paragraphs::ParagraphKind};
 use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri};
 use leptos::context::Provider;
@@ -29,8 +29,20 @@ pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(default, rename = "highlightStyle"))]
     pub highlight_style: Option<HighlightStyle>,
 
+    #[cfg_attr(feature = "csr", serde(default, rename = "chooseHighlightStyle"))]
+    pub choose_highlight_style: Option<bool>,
+
+    #[cfg_attr(feature = "csr", serde(default))]
+    pub toc: Option<TocSource>,
+
     #[cfg_attr(feature = "csr", serde(default, rename = "autoexpandLimit"))]
     pub autoexpand_limit: Option<LogicalLevel>,
+
+    #[cfg_attr(feature = "csr", serde(default, rename = "showContent"))]
+    pub show_content: Option<bool>,
+
+    #[cfg_attr(feature = "csr", serde(default, rename = "pdfLink"))]
+    pub pdf_link: Option<bool>,
 
     #[cfg(feature = "callbacks")]
     #[serde(skip)]
@@ -49,12 +61,44 @@ pub enum HighlightStyle {
     Off,
     None,
 }
+impl HighlightStyle {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Colored => "colored",
+            Self::Subtle => "subtle",
+            Self::Off => "off",
+            Self::None => "none",
+        }
+    }
+
+    #[must_use]
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "colored" => Some(Self::Colored),
+            "subtle" => Some(Self::Subtle),
+            "off" => Some(Self::Off),
+            "none" => Some(Self::None),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct AllowHovers(pub bool);
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct AllowFormals(pub bool);
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct ShowContent(pub bool);
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct PdfLink(pub bool);
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct ChooseHighlightStyle(pub bool);
 
 #[derive(Copy, Clone)]
 pub struct AutoexpandLimit(pub LogicalLevel);
@@ -78,6 +122,7 @@ pub enum FtmlConfigParseError {
 #[cfg(feature = "csr")]
 impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
     type Error = (Self, Vec<FtmlConfigParseError>);
+    #[allow(clippy::cognitive_complexity)]
     fn try_from_js_value(value: leptos::wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
         macro_rules! fields {
             ($($stat:ident = $name:literal),* $(,)?) => {
@@ -144,8 +189,11 @@ impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
         }
 
         get!(v @ "allowHovers" = ALLOW_HOVERS as_bool { config.allow_hovers = Some(v)});
+        get!(v @ "showContent" = SHOW_CONTENT as_bool { config.show_content = Some(v)});
         get!(v @ "allowFormalInfo" = ALLOW_FORMAL_INFO as_bool { config.allow_formals = Some(v)});
+        get!(v @ "pdfLink" = PDF_LINK as_bool { config.pdf_link = Some(v)});
         get!(v @ "allowNotationChanges" = ALLOW_NOTATION_CHANGES as_bool { config.allow_notation_changes = Some(v)} );
+        get!(v @ "chooseHighlightStyle" = CHOOSE_HIGHLIGHT_STYLE as_bool { config.choose_highlight_style = Some(v)} );
         get!(v @ "documentUri" = DOCUMENT_URI as_string {
             match v.parse() {
                 Ok(url) => config.document_uri = Some(url),
@@ -156,6 +204,11 @@ impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
             j => HighlightStyle::try_from_js_value(j);
             e => FtmlConfigParseError::InvalidValue("highlightStyle", JsDisplay(e));
             {config.highlight_style = Some(v)}
+        );
+        get!(v @ "toc" = TOC ?
+            j => TocSource::try_from_js_value(j.clone());
+            _e => FtmlConfigParseError::InvalidValue("toc", JsDisplay(j));
+            {config.toc = Some(v)}
         );
         get!(v @ "autoexpandLimit" = AUTOEXPAND_LIMIT ?
             j => LogicalLevel::try_from_js_value(j.clone());
@@ -187,8 +240,17 @@ impl FtmlConfig {
         if let Some(b) = self.allow_hovers {
             provide_context(AllowHovers(b));
         }
+        if let Some(b) = self.show_content {
+            provide_context(ShowContent(b));
+        }
         if let Some(b) = self.allow_formals {
             provide_context(AllowFormals(b));
+        }
+        if let Some(b) = self.choose_highlight_style {
+            provide_context(ChooseHighlightStyle(b));
+        }
+        if let Some(b) = self.pdf_link {
+            provide_context(PdfLink(b));
         }
         if let Some(b) = self.allow_notation_changes {
             provide_context(AllowNotationChanges(b));
@@ -197,6 +259,11 @@ impl FtmlConfig {
             let style = RwSignal::new(h);
             provide_context(style);
             provide_context(style.read_only());
+        }
+        if let Some(toc) = self.toc {
+            //let toc = RwSignal::new(h);
+            //provide_context(toc);
+            provide_context(toc);
         }
         if let Some(limit) = self.autoexpand_limit {
             let sig = RwSignal::new(AutoexpandLimit(limit));
@@ -249,8 +316,7 @@ impl FtmlConfig {
     }
 }
 
-pub struct FtmlConfigState;
-impl FtmlConfigState {
+impl FtmlConfig {
     #[inline]
     #[must_use]
     pub fn allow_hovers() -> bool {
@@ -259,8 +325,50 @@ impl FtmlConfigState {
 
     #[inline]
     #[must_use]
+    pub fn show_content() -> bool {
+        use_context::<ShowContent>().is_none_or(|b| b.0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn pdf_link() -> bool {
+        use_context::<PdfLink>().is_none_or(|b| b.0)
+    }
+
+    #[inline]
+    #[must_use]
     pub fn allow_formal_info() -> bool {
         use_context::<AllowFormals>().is_none_or(|b| b.0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn allow_notation_changes() -> bool {
+        use_context::<AllowNotationChanges>().is_none_or(|b| b.0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn highlight_style() -> ReadSignal<HighlightStyle> {
+        expect_context()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn choose_highlight_style() -> bool {
+        use_context::<ChooseHighlightStyle>().is_none_or(|b| b.0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn autoexpand_limit() -> ReadSignal<AutoexpandLimit> {
+        expect_context()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn with_toc_source<R>(f: impl FnOnce(&TocSource) -> R) -> Option<R> {
+        with_context(f)
     }
 
     /// ### Panics
@@ -336,24 +444,6 @@ impl FtmlConfigState {
 
     #[inline]
     #[must_use]
-    pub fn allow_notation_changes() -> bool {
-        use_context::<AllowNotationChanges>().is_none_or(|b| b.0)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn highlight_style() -> ReadSignal<HighlightStyle> {
-        expect_context()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn autoexpand_limit() -> ReadSignal<AutoexpandLimit> {
-        expect_context()
-    }
-
-    #[inline]
-    #[must_use]
     pub fn with_allow_hovers<V: IntoView + 'static>(
         value: bool,
         children: TypedChildren<V>,
@@ -405,6 +495,7 @@ impl FtmlConfigState {
         }
     }
 
+    #[must_use]
     pub fn insert_section_title(lvl: SectionLevel) -> impl IntoView + use<> {
         #[cfg(not(feature = "callbacks"))]
         {

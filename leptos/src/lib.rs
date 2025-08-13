@@ -12,7 +12,33 @@ pub mod components;
 pub mod config;
 pub mod utils;
 
-use ftml_dom::utils::local_cache::SendBackend;
+use ftml_dom::{toc::TocSource, utils::local_cache::SendBackend};
+use leptos::IntoView;
 use std::marker::PhantomData;
 
+use crate::config::FtmlConfig;
+
 pub struct Views<B: SendBackend>(PhantomData<B>);
+impl<B: SendBackend> Views<B> {
+    pub fn document<Ch: IntoView + 'static>(children: impl FnOnce() -> Ch) -> impl IntoView {
+        use leptos::either::Either::{Left, Right};
+        let show_content = FtmlConfig::show_content();
+        let pdf_link = FtmlConfig::pdf_link();
+        let choose_highlight_style = FtmlConfig::choose_highlight_style();
+        let do_sidebar = show_content
+            || pdf_link
+            || choose_highlight_style
+            || FtmlConfig::with_toc_source(|toc| !matches!(toc, TocSource::None))
+                .is_some_and(|b| b);
+        if do_sidebar {
+            Left(components::sidebar::do_sidebar::<B, _>(
+                show_content,
+                pdf_link,
+                choose_highlight_style,
+                children,
+            ))
+        } else {
+            Right(children())
+        }
+    }
+}

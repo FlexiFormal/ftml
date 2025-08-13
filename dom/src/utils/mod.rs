@@ -25,6 +25,20 @@ impl std::fmt::Display for JsDisplay {
     }
 }
 
+pub fn get_true_rect(elem: &leptos::web_sys::Element) -> leptos::web_sys::DomRect {
+    let rect = elem.get_bounding_client_rect();
+    let Some(window) = leptos::web_sys::window() else {
+        return rect;
+    };
+    if let Ok(s) = window.scroll_x() {
+        rect.set_x(rect.x() + s);
+    }
+    if let Ok(s) = window.scroll_y() {
+        rect.set_y(rect.y() + s);
+    }
+    rect
+}
+
 /// ### Panics
 pub fn owned<V: leptos::prelude::IntoView>(
     f: impl FnOnce() -> V,

@@ -1,6 +1,6 @@
 use crate::{
     components::content::FtmlViewable,
-    config::FtmlConfigState,
+    config::FtmlConfig,
     utils::{
         Header, LocalCacheExt,
         block::{Block, HeaderLeft, HeaderRight},
@@ -16,12 +16,12 @@ use ftml_dom::{
 };
 use ftml_ontology::{
     domain::declarations::symbols::{ArgumentSpec, Symbol, SymbolData},
-    narrative::elements::Notation,
+    narrative::elements::{Notation, VariableDeclaration, variables::VariableData},
     terms::{VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, IsNarrativeUri, LeafUri, SymbolUri};
 use leptos::{html::span, prelude::*};
-use thaw::{Text, TextTag};
+use thaw::{Caption1Strong, Text, TextTag};
 
 impl super::FtmlViewable for Symbol {
     fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> {
@@ -58,7 +58,7 @@ impl super::FtmlViewable for Symbol {
             view! {"Definiens: "<math style="white-space:nowrap;">{t}</math>}
         });
         let header = view! {
-            <b>{symbol_str}{name}</b>
+            <Caption1Strong>{symbol_str}{name}</Caption1Strong>
             {macroname}
             {tp}
         };
@@ -70,6 +70,83 @@ impl super::FtmlViewable for Symbol {
                 <HeaderLeft slot>{notations}</HeaderLeft>
                 <HeaderRight slot>{df}</HeaderRight>
                 {paragraphs}
+                //<Footer slot>"moar"</Footer>
+            </Block>
+        }
+        /*
+        let uriclone = uri.clone();
+        let uriclone_b = uri.clone();
+        view! {
+            <Block show_separator>
+                <Header slot><span>
+                    <b>{symbol_str}{super::symbol_name(&uri, uri.name().last_name().as_ref())}</b>
+                    {macro_name.map(|name| view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>))}
+                    {tp.map(|t| view! {
+                        " of type "{
+                            crate::remote::get!(present(t.clone()) = html => {
+                                view!(<FTMLStringMath html/>)
+                            })
+                        }
+                    })}
+                </span></Header>
+                <HeaderLeft slot>{do_notations(URI::Content(uriclone_b.into()),arity)}</HeaderLeft>
+                <HeaderRight slot><span style="white-space:nowrap;">{df.map(|t| view! {
+                    "Definiens: "{
+                        crate::remote::get!(present(t.clone()) = html => {
+                            view!(<FTMLStringMath html/>)
+                        })
+                    }
+                })}</span></HeaderRight>
+                {do_los(uriclone)}
+            </Block>
+        }
+         */
+    }
+}
+
+impl super::FtmlViewable for VariableDeclaration {
+    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
+        let Self { uri, data } = self;
+        let VariableData {
+            arity,
+            macroname,
+            role,
+            tp,
+            df,
+            //return_type,
+            //argument_types,
+            assoctype,
+            reordering,
+            bind,
+            is_seq,
+        } = &**data;
+        let name = span()
+            .child(uri.name().last().to_string())
+            .title(uri.to_string());
+        let macroname = macroname.as_ref().map(|name| {
+            let name = name.to_string();
+            view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
+        });
+        let tp = tp.as_ref().map(|t| {
+            let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+            view! {" of type "<math>{t}</math>}
+        });
+        let df = df.as_ref().map(|t| {
+            let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+            view! {"Definiens: "<math style="white-space:nowrap;">{t}</math>}
+        });
+        let header = view! {
+            <Caption1Strong>"Variable "{name}</Caption1Strong>
+            {macroname}
+            {tp}
+        };
+        let notations = do_notations::<Be>(LeafUri::Element(uri.clone()), arity.clone());
+        view! {
+            <Block>
+                <Header slot>{header}</Header>
+                <HeaderLeft slot>{notations}</HeaderLeft>
+                <HeaderRight slot>{df}</HeaderRight>
+                ""
                 //<Footer slot>"moar"</Footer>
             </Block>
         }
@@ -122,9 +199,9 @@ pub(super) fn do_paragraphs<Be: SendBackend>(uri: SymbolUri) -> impl IntoView {
                     }
                 }
                 view! {
-                    {super::CommaSep("Definitions",definitions).into_view::<Be>()}
+                    {super::CommaSep("Definitions",definitions.into_iter().map(|e| e.as_view::<Be>())).into_view()}
                     <br/>
-                    {super::CommaSep("Examples",examples).into_view::<Be>()}
+                    {super::CommaSep("Examples",examples.into_iter().map(|e| e.as_view::<Be>())).into_view()}
                 }
             },
             || "(errored)",
@@ -234,7 +311,7 @@ fn do_table<Be: SendBackend, E>(
             </Popover>
         </TableCell>}
     }
-    FtmlConfigState::disable_hovers(move || {
+    FtmlConfig::disable_hovers(move || {
         let notations = nots
             .into_iter()
             .map(|(k, v)| render_not::<Be>(&head, &arity, k, &v))

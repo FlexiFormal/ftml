@@ -19,7 +19,7 @@ use ftml_ontology::{
         DataBuffer, DocumentRange,
         documents::{Document, DocumentCounter, DocumentData, DocumentStyle, DocumentStyles},
         elements::{
-            DocumentElement, DocumentTerm, LogicalParagraph, Notation, Section,
+            DocumentElement, DocumentTerm, LogicalParagraph, Notation, Section, SectionLevel,
             VariableDeclaration,
             notations::{NotationComponent, NotationNode},
             paragraphs::{ParagraphFormatting, ParagraphKind},
@@ -125,6 +125,7 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     pub notations: Vec<(LeafUri, DocumentElementUri, Notation)>,
     pub domain: StackVec<OpenDomainElement<N>>,
     pub narrative: StackVec<OpenNarrativeElement<N>>,
+    top_section_level: Option<SectionLevel>,
     ids: IdCounter,
     #[allow(dead_code)]
     do_rdf: bool,
@@ -173,6 +174,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             #[cfg(feature = "rdf")]
             iri: document.to_iri(),
             document,
+            top_section_level: None,
             title: None,
             ids: IdCounter::default(),
             counters: Vec::new(),
@@ -194,6 +196,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             uri: self.document.clone(),
             title: take(&mut self.title), // todo
             elements: take(&mut self.top).into_boxed_slice(),
+            top_section_level: self.top_section_level.unwrap_or_default(),
             styles: DocumentStyles {
                 // clone instead of take because DomExtractor
                 // still needs them
@@ -265,7 +268,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     self.push_elem(DocumentElement::DocumentReference { uri, target });
                 }
                 MetaDatum::SetSectionLevel(lvl) => {
-                    self.push_elem(DocumentElement::SetSectionLevel(lvl));
+                    self.top_section_level = Some(lvl);
                 }
                 MetaDatum::UseModule(uri) => self.push_elem(DocumentElement::UseModule(uri)),
                 MetaDatum::ImportModule(uri) => {
@@ -745,11 +748,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
 
     fn close_symbol(&mut self, uri: SymbolUri, data: Box<SymbolData>) -> super::Result<()> {
         //get_module!(parent,parent_uri <- self);
+        let uricl = uri.clone();
         let symbol = Symbol { uri, data };
         tracing::info!("New symbol {symbol:#?}");
         self.push_domain(symbol, Declaration::Symbol, |s| {
             Ok(StructureDeclaration::Symbol(s))
         })?;
+        self.push_elem(DocumentElement::SymbolDeclaration(uricl));
         //add_triples!(DOM self,symbol -> parent_uri);
         //parent.push(Declaration::Symbol(symbol));
         Ok(())
@@ -785,7 +790,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     fn close_section(
         &mut self,
         uri: DocumentElementUri,
-        title: Option<DocumentRange>,
+        title: Option<Box<str>>,
         range: DocumentRange,
         children: Vec<DocumentElement>,
     ) {
@@ -807,7 +812,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         formatting: ParagraphFormatting,
         styles: Box<[Id]>,
         children: Vec<DocumentElement>,
-        title: Option<DocumentRange>,
+        title: Option<Box<str>>,
         range: DocumentRange,
     ) {
         let p = LogicalParagraph {
@@ -1010,7 +1015,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         for e in self.narrative.iter_mut() {
             match e {
                 OpenNarrativeElement::Section { title, .. } if title.is_none() => {
-                    *title = Some(node.range());
+                    let str = node.inner_string();
+                    if !str.is_empty() {
+                        *title = Some(node.inner_string().into_owned().into_boxed_str());
+                    }
                     return Ok(());
                 }
                 OpenNarrativeElement::Section { title, .. } => {
@@ -1038,7 +1046,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         for e in self.narrative.iter_mut() {
             match e {
                 OpenNarrativeElement::Paragraph { title, .. } if title.is_none() => {
-                    *title = Some(node.range());
+                    let str = node.inner_string();
+                    if !str.is_empty() {
+                        *title = Some(node.inner_string().into_owned().into_boxed_str());
+                    }
                     return Ok(());
                 }
                 OpenNarrativeElement::Paragraph { title, .. } => {

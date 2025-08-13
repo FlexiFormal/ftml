@@ -93,6 +93,10 @@ where
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         self.inner.document_link_url(uri)
     }
+    #[inline]
+    fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String> {
+        self.inner.resource_link_url(uri, kind)
+    }
 
     fn get_fragment(
         &self,

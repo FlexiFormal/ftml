@@ -13,7 +13,7 @@ pub struct Section {
     pub range: DocumentRange,
     pub uri: DocumentElementUri,
     //pub level: SectionLevel,
-    pub title: Option<DocumentRange>,
+    pub title: Option<Box<str>>,
     pub children: Box<[DocumentElement]>,
 }
 impl crate::__private::Sealed for Section {}
@@ -61,13 +61,14 @@ impl IsDocumentElement for Section {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[repr(u8)]
 pub enum SectionLevel {
+    #[default]
     Part = 0,
     Chapter = 1,
     Section = 2,
@@ -172,9 +173,11 @@ impl From<SectionLevel> for u8 {
 #[cfg(feature = "deepsize")]
 impl deepsize::DeepSizeOf for Section {
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
-        self.children
-            .iter()
-            .map(|e| std::mem::size_of_val(e) + e.deep_size_of_children(context))
-            .sum::<usize>()
+        self.title.as_ref().map(|t| t.len()).unwrap_or_default()
+            + self
+                .children
+                .iter()
+                .map(|e| std::mem::size_of_val(e) + e.deep_size_of_children(context))
+                .sum::<usize>()
     }
 }

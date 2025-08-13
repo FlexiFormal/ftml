@@ -1,5 +1,6 @@
 #![allow(clippy::must_use_candidate)]
 
+use ftml_dom::utils::css::inject_css;
 use leptos::{html::Details, prelude::*};
 
 #[component]
@@ -77,4 +78,42 @@ pub fn lazy_collapsible<H: IntoView, V: IntoView + 'static>(
           Some(children())
         } else { None }}</div>
     </details>}
+}
+
+pub fn fancy_collapsible<V: IntoView>(
+    body: impl FnOnce() -> V,
+    visible: RwSignal<bool>,
+    class: &'static str,
+    style: &'static str,
+) -> impl IntoView {
+    inject_css("ftml-collapsible", include_str!("collapsible.css"));
+    let style = Memo::new(move |_| {
+        if !style.is_empty() && visible.get() {
+            Some(style)
+        } else {
+            None
+        }
+    });
+    let class = Memo::new(move |_| {
+        if visible.get() {
+            if class.is_empty() {
+                "ftml-collapsible--visible".to_string()
+            } else {
+                format!("ftml-collapsible--visible {class}")
+            }
+        } else {
+            "ftml-collapsible--invisible".to_string()
+        }
+    });
+    view!(<div class=class style=style>{body()}</div>)
+}
+
+pub fn collapse_marker(signal: RwSignal<bool>) -> impl IntoView {
+    move || {
+        leptos::html::span()
+            .child(if signal.get() { "▾ " } else { "▸ " })
+            .style(
+                "cursor:pointer;position:relative;bottom:0.65ex;left:-1.3ex;margin-right:-1.3ex;",
+            )
+    }
 }

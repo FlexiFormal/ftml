@@ -1,0 +1,40 @@
+.ftml-sidebar-visible,
+.ftml-sidebar-invisible {
+    transition:
+        height 0.3s,
+        max-height 0.3s ease-in-out,
+        padding 0.3s ease-in-out;
+    overflow: hidden;
+    background-color: var(--colorNeutralBackground1);
+    border-radius: 10px;
+}
+.ftml-sidebar-visible {
+    max-height: 100vh;
+    padding: 0 5px 5px;
+}
+.ftml-sidebar-invisible {
+    max-height: 0px;
+    padding: 0;
+}
+
+.ftml-sidebar-inner {
+    max-height: 100vh;
+    padding: 0 5px 5px;
+    background-color: var(--colorNeutralBackground1);
+    border-radius: 10px;
+}
+
+.ftml-sidebar {
+    color: var(--colorNeutralForeground1);
+    background-color: var(--colorNeutralBackground1);
+    height: 0;
+    width: 100%;
+    &:first-child {
+        position: sticky;
+        inset: 0;
+        height: min-content;
+        min-width: 195px;
+        width: fit-content;
+        height: 0;
+    }
+}
