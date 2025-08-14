@@ -120,7 +120,7 @@ fn view_term<Be: ftml_dom::utils::local_cache::SendBackend>(
             <div style="min-width:150px;">
                 <Caption1Strong>"Term "{name}</Caption1Strong>
             </div>
-            <span><math>{tm}</math></span>
+            <span>{ftml_dom::utils::math(|| tm)}</span>
         </Flex>
         //</Block>
     }
@@ -156,7 +156,7 @@ fn view_notation<Be: ftml_dom::utils::local_cache::SendBackend>(
                 <Caption1Strong>"Notation "{name}</Caption1Strong>
             </div>
             <div style="min-width:100px;">
-                <span><math>{not}</math></span>
+                <span>{ftml_dom::utils::math(|| not)}</span>
             </div>
             <Text>" for "{target}</Text>
         </Flex>

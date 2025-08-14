@@ -15,6 +15,7 @@ use ftml_dom::{
 use ftml_ontology::narrative::elements::SectionLevel;
 use ftml_uris::{DocumentElementUri, Id};
 use leptos::prelude::*;
+use leptos_posthoc::OriginalNode;
 
 impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
@@ -49,11 +50,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     }
 
     #[inline]
-    fn section_title<V: IntoView>(
-        lvl: SectionLevel,
-        class: &'static str,
-        then: impl FnOnce() -> V + Send + 'static,
-    ) -> impl IntoView {
+    fn section_title(lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
         sections::section_title(lvl, class, then)
     }
 

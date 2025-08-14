@@ -80,6 +80,7 @@ body {
         display: block;
         font-weight: bold;
         line-height: initial;
+        font-size: inherit;
         &::before {
             content: counter(ftml-section) "." counter(ftml-subsection) "."
                 counter(ftml-subsubsection) " ";

@@ -2,7 +2,29 @@ pub mod actions;
 pub mod css;
 pub mod local_cache;
 
-use leptos::{IntoView, prelude::Suspend, wasm_bindgen::JsValue};
+use ftml_ontology::utils::Css;
+use leptos::{
+    IntoView,
+    html::ElementChild,
+    prelude::{StyleAttribute, Suspend},
+    wasm_bindgen::JsValue,
+};
+
+use crate::utils::css::CssExt;
+
+pub fn math<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
+    static CSS: std::sync::LazyLock<Css> = std::sync::LazyLock::new(|| {
+        Css::Link(
+            "https://fonts.googleapis.com/css2?family=STIX+Two+Math"
+                .to_string()
+                .into_boxed_str(),
+        )
+    });
+    CSS.clone().inject();
+    leptos::math::math()
+        .style("font-family:'STIX Two Math'")
+        .child(f())
+}
 
 #[derive(Debug)]
 pub struct JsDisplay(pub JsValue);

@@ -163,7 +163,7 @@ fn do_notation_selector<Be: SendBackend, E: std::fmt::Display>(
                         not.as_view_safe::<crate::Views<Be>>(&head.into(),None)
                     );
                     view!(<ComboboxOption text="" value=not_uri.to_string()>
-                        <math>{ notation}</math>
+                        {ftml_dom::utils::math(|| notation)}
                     </ComboboxOption>)
                 }).collect_view()}
             </Combobox>

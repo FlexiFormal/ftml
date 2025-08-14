@@ -100,7 +100,7 @@ impl FtmlViewable for LogicalParagraph {
                 let name = k.as_view::<Be>();
                 let t = t.clone().map(|t| {
                     let t = t.into_view_safe::<crate::Views<Be>, Be>();
-                    view!(<span>" as "<math>{t}</math></span>)
+                    view!(<span>" as "{ftml_dom::utils::math(|| t)}</span>)
                 });
                 view!({name}{t})
             }),

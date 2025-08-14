@@ -169,15 +169,9 @@ impl Marker {
                         current_toc.update(|toc| toc.set_title(&uri, title.into_boxed_str()));
                     }
                 }
-                Views::section_title(lvl, cls, move || {
-                    Self::apply::<Views>(markers, invisible, is_math, orig)
-                })
-                .into_any()
+                Views::section_title(lvl, cls, orig).into_any()
             }
-            Self::ParagraphTitle => Views::paragraph_title(move || {
-                Self::apply::<Views>(markers, invisible, is_math, orig)
-            })
-            .into_any(),
+            Self::ParagraphTitle => Views::paragraph_title(orig).into_any(),
             Self::InputRef { target, uri } => {
                 DocumentState::do_inputref(target, uri, Views::inputref).into_any()
             }

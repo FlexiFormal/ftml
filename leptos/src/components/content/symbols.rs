@@ -51,11 +51,11 @@ impl super::FtmlViewable for Symbol {
         });
         let tp = tp.as_ref().map(|t| {
             let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {" of type "<math>{t}</math>}
+            view! {" of type "{ftml_dom::utils::math(|| t)}}
         });
         let df = df.as_ref().map(|t| {
             let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {"Definiens: "<math style="white-space:nowrap;">{t}</math>}
+            view! {"Definiens: "{ftml_dom::utils::math(|| t).attr("style","white-space:nowrap;")}}
         });
         let header = view! {
             <Caption1Strong>{symbol_str}{name}</Caption1Strong>
@@ -129,11 +129,11 @@ impl super::FtmlViewable for VariableDeclaration {
         });
         let tp = tp.as_ref().map(|t| {
             let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {" of type "<math>{t}</math>}
+            view! {" of type "{ftml_dom::utils::math(|| t)}}
         });
         let df = df.as_ref().map(|t| {
             let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {"Definiens: "<math style="white-space:nowrap;">{t}</math>}
+            view! {"Definiens: "{ftml_dom::utils::math(|| t).attr("style","white-space:nowrap;")}}
         });
         let header = view! {
             <Caption1Strong>"Variable "{name}</Caption1Strong>

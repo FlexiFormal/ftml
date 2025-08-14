@@ -88,21 +88,13 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
-    fn section_title<V: IntoView>(
-        _lvl: SectionLevel,
-        class: &'static str,
-        then: impl FnOnce() -> V + Send + 'static,
-    ) -> impl IntoView {
-        view! {
-          <div class=class>{then()}</div>
-        }
+    fn section_title(_lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
+        then.attr("class", class)
     }
 
     #[inline]
-    fn paragraph_title<V: IntoView>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
-        view! {
-          <div class="ftml-title-paragraph">{then()}</div>
-        }
+    fn paragraph_title(then: OriginalNode) -> impl IntoView {
+        then.attr("class", "ftml-title-paragraph").attr("style", "")
     }
 
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
@@ -185,21 +177,13 @@ pub trait TermTrackedViews: 'static {
     }
 
     #[inline]
-    fn section_title<V: IntoView>(
-        _lvl: SectionLevel,
-        class: &'static str,
-        then: impl FnOnce() -> V + Send + 'static,
-    ) -> impl IntoView {
-        view! {
-          <div class=class>{then()}</div>
-        }
+    fn section_title(_lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
+        then.attr("class", class)
     }
 
     #[inline]
-    fn paragraph_title<V: IntoView>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
-        view! {
-          <div class="ftml-title-paragraph">{then()}</div>
-        }
+    fn paragraph_title(then: OriginalNode) -> impl IntoView {
+        then.attr("class", "ftml-title-paragraph").attr("style", "")
     }
 
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
@@ -267,16 +251,12 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     }
 
     #[inline]
-    fn section_title<V: IntoView>(
-        lvl: SectionLevel,
-        class: &'static str,
-        then: impl FnOnce() -> V + Send + 'static,
-    ) -> impl IntoView {
+    fn section_title(lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
         <T as TermTrackedViews>::section_title(lvl, class, then)
     }
 
     #[inline]
-    fn paragraph_title<V: IntoView>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
+    fn paragraph_title(then: OriginalNode) -> impl IntoView {
         <T as TermTrackedViews>::paragraph_title(then)
     }
 

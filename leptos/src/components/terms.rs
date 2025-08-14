@@ -417,13 +417,19 @@ pub fn resolved_var_popover<B: SendBackend>(
                 {df.map(|df| {
                     view!{<div><span>
                         "Defined as "
-                        <math>{df.clone().into_view::<crate::Views<B>,B>(false)}</math>
+                        {
+                            let t = df.clone().into_view::<crate::Views<B>,B>(false);
+                            ftml_dom::utils::math(move || t)
+                        }
                     </span></div>}
                 })}
                 {tp.map(|tp| {
                     view!{<div><span>
                         "Of type "
-                        <math>{tp.clone().into_view::<crate::Views<B>,B>(false)}</math>
+                        {
+                            let t = tp.clone().into_view::<crate::Views<B>,B>(false);
+                            ftml_dom::utils::math(move || t)
+                        }
                     </span></div>}
                 })}
             }
@@ -568,10 +574,16 @@ fn formals<Be: SendBackend>(
                let uri = u.clone();
                view!("In term: "{LocalCache::with_or_toast::<Be,_,_,_,_>(
                    |r| r.get_document_term(u),
-                   |t|  {tracing::warn!("Rendering term {t:?}");match t {
-                       ::either::Left(t) => ReactiveStore::render_term::<Be>(t.term),
-                       ::either::Right(t) => ReactiveStore::render_term::<Be>(t.term.clone()),
-                   }},
+                   |t|  {
+                       tracing::warn!("Rendering term {t:?}");
+                       ftml_dom::utils::math(|| ReactiveStore::render_term::<Be>(
+                           match t {
+                               ::either::Left(t) => t.term,
+                               ::either::Right(t) => t.term.clone(),
+                           }
+
+                       ))
+                   },
                    move || format!("error: {uri}")
                )})
             }
