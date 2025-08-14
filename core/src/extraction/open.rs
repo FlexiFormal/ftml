@@ -5,7 +5,6 @@ use either::Either::{self, Left, Right};
 use ftml_ontology::{
     domain::declarations::{Declaration, structures::StructureDeclaration, symbols::SymbolData},
     narrative::{
-        DocumentRange,
         documents::{DocumentCounter, DocumentStyle},
         elements::{
             DocumentElement,

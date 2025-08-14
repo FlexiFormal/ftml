@@ -14,17 +14,11 @@ workspace = true
 csr = [
     "leptos-posthoc/csr",
     "dep:wasm-bindgen",
-    "dep:web-sys",
     "leptos/csr",
     # "ftml-backend/wasm",
 ]
 ## Client-side in compbination with ssr
-hydrate = [
-    "leptos-posthoc/hydrate",
-    "dep:wasm-bindgen",
-    "dep:web-sys",
-    "leptos/hydrate",
-]
+hydrate = ["leptos-posthoc/hydrate", "dep:wasm-bindgen", "leptos/hydrate"]
 ## Server-side rendering
 ssr = ["leptos/ssr"]
 ## generate typescript bindings
@@ -81,14 +75,15 @@ thiserror = { workspace = true }
 either = { workspace = true }
 send_wrapper = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
+web-sys = { workspace = true, features = [
+    "Window",
+    "ScrollIntoViewOptions",
+    "ScrollLogicalPosition",
+    "DomRect",
+    "Element",
+] }
 
 bytesize = { workspace = true, optional = true }
 deepsize = { workspace = true, optional = true }
 tsify = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
-web-sys = { workspace = true, optional = true, features = [
-    "Window",
-    "ScrollIntoViewOptions",
-    "ScrollLogicalPosition",
-    "DomRect",
-] }

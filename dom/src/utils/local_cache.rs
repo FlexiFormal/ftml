@@ -174,6 +174,7 @@ impl<B: SendBackend> WithLocalCache<B> {
         either::Either::Right(B::get().get_symbol(uri))
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn get_structure(
         &self,
         uri: SymbolUri,
