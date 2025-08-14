@@ -22,6 +22,23 @@ pub trait FtmlViews: 'static {
             style: None::<String>.into(),
         })
     }
+    fn render_ftml_and_then(html: String, f: impl FnOnce() + 'static) -> impl IntoView {
+        use leptos_posthoc::{DomStringCont, DomStringContProps};
+        let sig = RwSignal::new(false);
+        let do_once = std::sync::LazyLock::new(f);
+        let _ = Effect::new(move || {
+            if sig.get() {
+                std::sync::LazyLock::force(&do_once);
+            }
+        });
+        DomStringCont(DomStringContProps {
+            html,
+            cont: super::iterate::<Self>,
+            on_load: Some(sig),
+            class: None::<String>.into(),
+            style: None::<String>.into(),
+        })
+    }
     fn render_math_ftml(html: String) -> impl IntoView {
         use leptos_posthoc::{DomStringContMath, DomStringContMathProps};
         DomStringContMath(DomStringContMathProps {

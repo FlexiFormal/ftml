@@ -72,6 +72,7 @@ pub fn setup_document<Ch: IntoView + 'static>(
     };
     provide_context(RwSignal::new(current_toc));
     provide_context(RwSignal::new(NavElems::new()));
+    NavElems::navigate_to_fragment();
     children()
 }
 

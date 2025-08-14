@@ -20,7 +20,7 @@ pub fn toc<Be: SendBackend>() -> impl IntoView {
         TocSource::Extract => {
             let toc = DocumentState::get_toc();
             C(wrap_toc(move |data| {
-                move || (toc.with(|toc| toc.toc.as_ref().map(|v| do_toc::<Be>(v, data))))
+                move || toc.with(|toc| toc.toc.as_ref().map(|v| do_toc::<Be>(v, data)))
             }))
         } // TODO
         TocSource::Ready(toc) => D(wrap_toc(move |data| do_toc::<Be>(&toc, data))), // TODO

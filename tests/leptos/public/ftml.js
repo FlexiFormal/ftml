@@ -275,16 +275,20 @@ let ftmlViewer;
         wasm.__wbindgen_export_7(arg0, arg1, addHeapObject(arg2));
     }
 
-    function __wbg_adapter_63(arg0, arg1) {
-        wasm.__wbindgen_export_8(arg0, arg1);
+    function __wbg_adapter_63(arg0, arg1, arg2) {
+        wasm.__wbindgen_export_8(arg0, arg1, addHeapObject(arg2));
     }
 
-    function __wbg_adapter_66(arg0, arg1, arg2) {
-        wasm.__wbindgen_export_9(arg0, arg1, addHeapObject(arg2));
+    function __wbg_adapter_66(arg0, arg1) {
+        wasm.__wbindgen_export_9(arg0, arg1);
     }
 
-    function __wbg_adapter_421(arg0, arg1, arg2, arg3) {
-        wasm.__wbindgen_export_10(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+    function __wbg_adapter_69(arg0, arg1, arg2) {
+        wasm.__wbindgen_export_10(arg0, arg1, addHeapObject(arg2));
+    }
+
+    function __wbg_adapter_434(arg0, arg1, arg2, arg3) {
+        wasm.__wbindgen_export_11(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
     }
 
     /**
@@ -298,6 +302,10 @@ let ftmlViewer;
     });
 
     const __wbindgen_enum_ReadableStreamType = ["bytes"];
+
+    const __wbindgen_enum_ScrollBehavior = ["auto", "instant", "smooth"];
+
+    const __wbindgen_enum_ScrollLogicalPosition = ["start", "center", "end", "nearest"];
 
     const IntoUnderlyingByteSourceFinalization = (typeof FinalizationRegistry === 'undefined')
         ? { register: () => {}, unregister: () => {} }
@@ -713,6 +721,13 @@ let ftmlViewer;
             const ret = getObject(arg0)[arg1 >>> 0];
             return isLikeNone(ret) ? 0 : addHeapObject(ret);
         };
+        imports.wbg.__wbg_hash_dd4b49269c385c8a = function() { return handleError(function (arg0, arg1) {
+            const ret = getObject(arg1).hash;
+            const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_export_1, wasm.__wbindgen_export_2);
+            const len1 = WASM_VECTOR_LEN;
+            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+        }, arguments) };
         imports.wbg.__wbg_head_fa0ce59b81a623f5 = function(arg0) {
             const ret = getObject(arg0).head;
             return isLikeNone(ret) ? 0 : addHeapObject(ret);
@@ -895,6 +910,10 @@ let ftmlViewer;
             const ret = getObject(arg0).localStorage;
             return isLikeNone(ret) ? 0 : addHeapObject(ret);
         }, arguments) };
+        imports.wbg.__wbg_location_350d99456c2f3693 = function(arg0) {
+            const ret = getObject(arg0).location;
+            return addHeapObject(ret);
+        };
         imports.wbg.__wbg_log_0cc1b7768397bcfe = function(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
             let deferred0_0;
             let deferred0_1;
@@ -962,7 +981,7 @@ let ftmlViewer;
                     const a = state0.a;
                     state0.a = 0;
                     try {
-                        return __wbg_adapter_421(a, state0.b, arg0, arg1);
+                        return __wbg_adapter_434(a, state0.b, arg0, arg1);
                     } finally {
                         state0.a = a;
                     }
@@ -1137,6 +1156,9 @@ let ftmlViewer;
         imports.wbg.__wbg_scrollIntoView_281bcffa62eea382 = function(arg0, arg1) {
             getObject(arg0).scrollIntoView(arg1 !== 0);
         };
+        imports.wbg.__wbg_scrollIntoView_c8c0faa10ba6968a = function(arg0, arg1) {
+            getObject(arg0).scrollIntoView(getObject(arg1));
+        };
         imports.wbg.__wbg_scrollIntoView_d13094450218e94b = function(arg0) {
             getObject(arg0).scrollIntoView();
         };
@@ -1178,6 +1200,12 @@ let ftmlViewer;
         }, arguments) };
         imports.wbg.__wbg_setacceptnode_e6c2cbf68b17a7a9 = function(arg0, arg1) {
             getObject(arg0).acceptNode = getObject(arg1);
+        };
+        imports.wbg.__wbg_setbehavior_7927939a0bc6d379 = function(arg0, arg1) {
+            getObject(arg0).behavior = __wbindgen_enum_ScrollBehavior[arg1];
+        };
+        imports.wbg.__wbg_setblock_63cb5ef6332c2d9f = function(arg0, arg1) {
+            getObject(arg0).block = __wbindgen_enum_ScrollLogicalPosition[arg1];
         };
         imports.wbg.__wbg_setcurrentNode_333ccad48529b94b = function(arg0, arg1) {
             getObject(arg0).currentNode = getObject(arg1);
@@ -1361,24 +1389,28 @@ let ftmlViewer;
             const ret = false;
             return ret;
         };
-        imports.wbg.__wbindgen_closure_wrapper17339 = function(arg0, arg1, arg2) {
-            const ret = makeClosure(arg0, arg1, 4594, __wbg_adapter_54);
+        imports.wbg.__wbindgen_closure_wrapper17379 = function(arg0, arg1, arg2) {
+            const ret = makeClosure(arg0, arg1, 4589, __wbg_adapter_54);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper26514 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 5774, __wbg_adapter_57);
+        imports.wbg.__wbindgen_closure_wrapper24082 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 5660, __wbg_adapter_57);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper27595 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 5915, __wbg_adapter_60);
+        imports.wbg.__wbindgen_closure_wrapper26641 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 5793, __wbg_adapter_60);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper27597 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 5915, __wbg_adapter_63);
+        imports.wbg.__wbindgen_closure_wrapper27722 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 5934, __wbg_adapter_63);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper27662 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 5921, __wbg_adapter_66);
+        imports.wbg.__wbindgen_closure_wrapper27724 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 5934, __wbg_adapter_66);
+            return addHeapObject(ret);
+        };
+        imports.wbg.__wbindgen_closure_wrapper27789 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 5940, __wbg_adapter_69);
             return addHeapObject(ret);
         };
         imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {

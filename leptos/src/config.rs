@@ -1,6 +1,6 @@
-use ftml_dom::{DocumentState, counters::LogicalLevel, toc::TocSource, utils::JsDisplay};
+use ftml_dom::{counters::LogicalLevel, toc::TocSource, utils::JsDisplay};
 use ftml_ontology::narrative::elements::{SectionLevel, paragraphs::ParagraphKind};
-use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri, NarrativeUri};
+use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri};
 use leptos::context::Provider;
 use leptos::prelude::*;
 
@@ -454,17 +454,18 @@ impl FtmlConfig {
         })
     }
 
+    #[allow(unused_variables)]
     pub fn wrap_section<V: IntoView, F: FnOnce() -> V>(
         uri: &DocumentElementUri,
         children: F,
     ) -> impl IntoView + use<V, F> {
-        use leptos::either::Either::{Left, Right};
         #[cfg(not(feature = "callbacks"))]
         {
             children()
         }
         #[cfg(feature = "callbacks")]
         {
+            use leptos::either::Either::{Left, Right};
             if let Some(Some(w)) = use_context::<Option<SectionWrap>>() {
                 Left(w.wrap(uri, children))
             } else {
@@ -473,12 +474,12 @@ impl FtmlConfig {
         }
     }
 
+    #[allow(unused_variables)]
     pub fn wrap_paragraph<V: IntoView, F: FnOnce() -> V>(
         uri: &DocumentElementUri,
         kind: ParagraphKind,
         children: F,
     ) -> impl IntoView + use<V, F> {
-        use leptos::either::Either::{Left, Right};
         #[cfg(not(feature = "callbacks"))]
         {
             children()
@@ -486,6 +487,7 @@ impl FtmlConfig {
         #[cfg(feature = "callbacks")]
         {
             use crate::callbacks::ParagraphWrap;
+            use leptos::either::Either::{Left, Right};
 
             if let Some(Some(w)) = use_context::<Option<ParagraphWrap>>() {
                 Left(w.wrap(uri, &kind, children))
@@ -496,6 +498,7 @@ impl FtmlConfig {
     }
 
     #[must_use]
+    #[allow(unused_variables)]
     pub fn insert_section_title(lvl: SectionLevel) -> impl IntoView + use<> {
         #[cfg(not(feature = "callbacks"))]
         {
@@ -503,6 +506,8 @@ impl FtmlConfig {
         }
         #[cfg(feature = "callbacks")]
         {
+            use ftml_dom::DocumentState;
+            use ftml_uris::NarrativeUri;
             if let Some(Some(w)) = use_context::<Option<OnSectionTitle>>() {
                 let NarrativeUri::Element(uri) = DocumentState::current_uri() else {
                     tracing::error!("Could not determine URI for current section");

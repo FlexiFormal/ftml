@@ -48,6 +48,7 @@ pub fn Themer<Ch: IntoView + 'static>(children: TypedChildren<Ch>) -> impl IntoV
         }
     });
     Effect::new(move || {
+        #[allow(unused_variables)]
         theme.with(|theme| {
             #[cfg(any(feature = "csr", feature = "hydrate"))]
             {

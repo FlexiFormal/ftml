@@ -272,46 +272,83 @@ impl NavElems {
     }
 
     #[allow(clippy::missing_const_for_fn)]
-    pub fn navigate_to(&self, _id: &str) {
-        #[cfg(any(feature = "csr", feature = "hydrate"))]
-        {
-            #[allow(clippy::used_underscore_binding)]
-            let id = _id;
-            tracing::trace!("Looking for #{id}");
-            let mut curr = id;
-            loop {
-                match self.ids.get(curr) {
-                    None => (),
-                    Some(SectionOrInputref::Section) => {
-                        tracing::trace!("Navigating to #{curr}");
-                        #[allow(unused_variables)]
-                        if let Some(e) = document().get_element_by_id(curr) {
-                            #[cfg(target_family = "wasm")]
-                            {
-                                let options = web_sys::ScrollIntoViewOptions::new();
-                                options.set_behavior(web_sys::ScrollBehavior::Smooth);
-                                options.set_block(web_sys::ScrollLogicalPosition::Start);
-                                e.scroll_into_view_with_scroll_into_view_options(&options);
+    pub fn navigate_to(selfie: RwSignal<Self>, _id: &str) {
+        selfie.with_untracked(|slf| {
+            #[cfg(any(feature = "csr", feature = "hydrate"))]
+            {
+                #[allow(clippy::used_underscore_binding)]
+                let id = _id;
+                tracing::trace!("Looking for #{id}");
+                let mut curr = id;
+                loop {
+                    match slf.ids.get(curr) {
+                        None => {
+                            tracing::warn!("navigation id {curr} not known (yet)!");
+                        }
+                        Some(SectionOrInputref::Section) => {
+                            tracing::warn!("Navigating to #{curr}");
+                            #[allow(unused_variables)]
+                            if let Some(e) = document().get_element_by_id(curr) {
+                                tracing::trace!("scrolling to #{curr}");
+                                #[cfg(target_family = "wasm")]
+                                {
+                                    let options = web_sys::ScrollIntoViewOptions::new();
+                                    options.set_behavior(web_sys::ScrollBehavior::Smooth);
+                                    options.set_block(web_sys::ScrollLogicalPosition::Start);
+                                    e.scroll_into_view_with_scroll_into_view_options(&options);
+                                }
+                            } else {
+                                tracing::warn!("section with id {curr} not found!");
+                            }
+                            return;
+                        }
+                        Some(SectionOrInputref::Inputref(a)) => {
+                            if !a.is_done_untracked() {
+                                tracing::trace!("expanding inputref {curr}");
+                                let id = id.to_string();
+                                a.on_set(move || {
+                                    tracing::trace!("resuming navigation to {id}");
+                                    Self::navigate_to(selfie, &id);
+                                });
+                                a.activate();
                             }
                         }
+                    }
+                    if let Some((a, _)) = curr.rsplit_once('/') {
+                        curr = a;
+                    } else {
                         return;
                     }
-                    Some(SectionOrInputref::Inputref(a)) => {
-                        if !a.is_done_untracked() {
-                            a.activate();
-                            if a.is_done() {
-                                return self.navigate_to(id);
-                            }
-                        }
-                    }
-                }
-                if let Some((a, _)) = curr.rsplit_once('/') {
-                    curr = a;
-                } else {
-                    return;
                 }
             }
+        });
+    }
+
+    pub fn navigate_to_fragment() {
+        let fragment = RwSignal::new(String::new());
+        let selfie = expect_context::<RwSignal<Self>>();
+
+        #[cfg(any(feature = "csr", feature = "hydrate"))]
+        {
+            if let Ok(mut frag) = window().location().hash()
+                && frag.starts_with('#')
+            {
+                frag.remove(0);
+                fragment.set(frag);
+            }
         }
+
+        #[cfg(feature = "csr")]
+        {
+            fragment_listener(fragment);
+        }
+
+        Effect::new(move || {
+            let fragment = fragment.get();
+            if !fragment.is_empty() && document().get_element_by_id(&fragment).is_none() {
+                Self::navigate_to(selfie, &fragment);
+            }
+        });
     }
 
     /*
@@ -321,4 +358,60 @@ impl NavElems {
             .expect("this should not happen")
     }
      */
+}
+
+#[cfg(feature = "csr")]
+fn fragment_listener(signal: RwSignal<String>) {
+    use leptos::wasm_bindgen::JsCast;
+    fn get_anchor(e: leptos::web_sys::Element) -> Option<leptos::web_sys::Element> {
+        let mut curr = e;
+        loop {
+            if curr.tag_name().to_uppercase() == "A" {
+                return Some(curr);
+            }
+            if curr.tag_name().to_uppercase() == "BODY" {
+                return None;
+            }
+            if let Some(parent) = curr.parent_element() {
+                curr = parent;
+            } else {
+                return None;
+            }
+        }
+    }
+    let on_hash_change =
+        leptos::wasm_bindgen::prelude::Closure::wrap(Box::new(move |_e: leptos::web_sys::Event| {
+            if let Ok(mut frag) = window().location().hash()
+                && frag.starts_with('#')
+            {
+                frag.remove(0);
+                tracing::trace!("Updating URL fragment to {frag}");
+                signal.set(frag);
+            }
+        }) as Box<dyn FnMut(_)>);
+
+    let on_anchor_click = leptos::wasm_bindgen::prelude::Closure::wrap(Box::new(
+        move |e: leptos::web_sys::MouseEvent| {
+            if let Some(e) = e
+                .target()
+                .and_then(|t| t.dyn_into::<leptos::web_sys::Element>().ok())
+                && let Some(e) = get_anchor(e)
+                && let Some(mut href) = e.get_attribute("href")
+                && href.starts_with('#')
+            {
+                href.remove(0);
+                tracing::trace!("Updating URL fragment as {href}");
+                signal.set(href);
+            }
+        },
+    ) as Box<dyn FnMut(_)>);
+
+    let _ = window()
+        .add_event_listener_with_callback("hashchange", on_hash_change.as_ref().unchecked_ref());
+    let _ = window()
+        .add_event_listener_with_callback("popstate", on_hash_change.as_ref().unchecked_ref());
+    let _ = window()
+        .add_event_listener_with_callback("click", on_anchor_click.as_ref().unchecked_ref());
+    on_hash_change.forget();
+    on_anchor_click.forget();
 }

@@ -62,11 +62,12 @@ fn do_replace<B: SendBackend>(
             for c in css {
                 c.inject();
             }
-            let r = DocumentState::inner_document(uri, &inputref, || {
-                crate::Views::<B>::render_ftml(html)
-            });
-            let _ = on_load.set();
-            r
+            DocumentState::inner_document(uri.clone(), &inputref, move || {
+                crate::Views::<B>::render_ftml_and_then(html, move || {
+                    tracing::debug!("inputref expansion for {uri} finished!");
+                    let _ = on_load.set();
+                })
+            })
         },
     )
 }
