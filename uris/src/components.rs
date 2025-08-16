@@ -24,7 +24,7 @@ use strum::IntoDiscriminant;
 
 use crate::{
     ArchiveId, ArchiveUri, DocumentElementUri, DocumentUri, FtmlUri, Language, ModuleUri,
-    SymbolUri, Uri, UriComponentKind, UriKind, UriPath,
+    SymbolUri, Uri, UriComponentKind, UriKind, UriName, UriPath,
     errors::{SegmentParseError, UriParseError},
 };
 
@@ -743,7 +743,7 @@ impl UriComponents {
         s: &str,
         get: impl FnOnce(&ArchiveId) -> Option<ArchiveUri>,
     ) -> Result<SymbolUri, ComponentError> {
-        Ok(Self::get_mod_uri(a, p, m, get)? | s.parse()?)
+        Ok(Self::get_mod_uri(a, p, m, get)? | s.parse::<UriName>()?)
     }
 
     #[allow(clippy::many_single_char_names)]

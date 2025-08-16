@@ -10,6 +10,7 @@ use ftml_ontology::{
     domain::{
         declarations::{
             Declaration,
+            morphisms::{Assignment, Morphism},
             structures::{MathStructure, StructureDeclaration, StructureExtension},
             symbols::{Symbol, SymbolData},
         },
@@ -277,6 +278,34 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     })?;
                     self.push_elem(DocumentElement::ImportModule(uri));
                 }
+                MetaDatum::Rename {
+                    source,
+                    name,
+                    macroname,
+                } => {
+                    if let Some(OpenDomainElement::Morphism { children, uri, .. }) =
+                        self.domain.last_mut()
+                    {
+                        if let Some(e) = children.iter_mut().find(|e| e.original == source) {
+                            e.new_name = name;
+                            e.macroname = macroname;
+                        } else {
+                            children.push(Assignment {
+                                original: source,
+                                morphism: uri.clone(),
+                                definiens: None,
+                                refined_type: None,
+                                new_name: name,
+                                macroname,
+                            });
+                        }
+                    } else {
+                        return Err(FtmlExtractionError::InvalidIn(
+                            FtmlKey::Rename,
+                            "outside of morphisms",
+                        ));
+                    }
+                }
                 MetaDatum::IfInputref(_) => (),
             },
             AnyOpen::None => (),
@@ -306,6 +335,15 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     children,
                 }) => self.close_structure(uri, macroname, children, node),
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::MathStructure)),
+            },
+            CloseFtmlElement::Morphism => match self.domain.pop() {
+                Some(OpenDomainElement::Morphism {
+                    uri,
+                    domain,
+                    total,
+                    children,
+                }) => self.close_morphism(uri, domain, total, children, node),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Morphism)),
             },
             CloseFtmlElement::Comp => match self.domain.pop() {
                 Some(OpenDomainElement::Comp) => Ok(()),
@@ -368,6 +406,14 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     Ok(())
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Paragraph)),
+            },
+            CloseFtmlElement::Assign => match self.domain.pop() {
+                Some(OpenDomainElement::Assign {
+                    source,
+                    refined_type,
+                    definiens,
+                }) => self.close_assignment(source, refined_type, definiens),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Assign)),
             },
             CloseFtmlElement::SkipSection => match self.narrative.pop() {
                 Some(OpenNarrativeElement::SkipSection { children }) => {
@@ -458,12 +504,12 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
             }
             CloseFtmlElement::OML => {
-                if let Some(OpenDomainElement::OML { name }) = self.domain.pop() {
+                if let Some(OpenDomainElement::OML { name, df, tp }) = self.domain.pop() {
                     self.close_term(
                         Term::Label {
                             name,
-                            df: None,
-                            tp: None,
+                            df: df.map(Box::new),
+                            tp: tp.map(Box::new),
                         },
                         node,
                         |_, _| Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term)),
@@ -576,6 +622,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             match d {
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::MathStructure { children, .. }
+                | OpenNarrativeElement::Morphism { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::Paragraph { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => {
@@ -639,6 +686,70 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         })?;
 
         Ok(())
+    }
+
+    fn close_morphism(
+        &mut self,
+        uri: SymbolUri,
+        domain: ModuleUri,
+        total: bool,
+        children: Vec<Assignment>,
+        node: &N,
+    ) -> Result<(), FtmlExtractionError> {
+        let morphism = Morphism {
+            uri,
+            domain,
+            total,
+            elements: children.into_boxed_slice(),
+        };
+        tracing::trace!("New morphism {morphism:?}");
+        let parent_uri = self.push_domain(morphism, Declaration::Morphism, |m| {
+            Ok(StructureDeclaration::Morphism(m))
+        })?;
+
+        let Some(OpenNarrativeElement::Morphism { uri, children }) = self.narrative.pop() else {
+            return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Morphism));
+        };
+        //add_triples!(DOM self,uri -> parent_uri);
+        self.push_elem(DocumentElement::Morphism {
+            range: node.range(),
+            morphism: uri,
+            children: children.into_boxed_slice(),
+        });
+        Ok(())
+    }
+
+    fn close_assignment(
+        &mut self,
+        source: SymbolUri,
+        refined_type: Option<Term>,
+        definiens: Option<Term>,
+    ) -> Result<(), FtmlExtractionError> {
+        if let Some(OpenDomainElement::Morphism { children, uri, .. }) = self.domain.last_mut() {
+            if let Some(e) = children.iter_mut().find(|e| e.original == source) {
+                if let Some(d) = definiens {
+                    e.definiens = Some(d);
+                }
+                if let Some(t) = refined_type {
+                    e.refined_type = Some(t);
+                }
+            } else {
+                children.push(Assignment {
+                    original: source,
+                    morphism: uri.clone(),
+                    definiens,
+                    refined_type,
+                    new_name: None,
+                    macroname: None,
+                });
+            }
+            Ok(())
+        } else {
+            Err(FtmlExtractionError::InvalidIn(
+                FtmlKey::Assign,
+                "outside of morphisms",
+            ))
+        }
     }
 
     fn close_structure(
@@ -1036,6 +1147,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. }
                 | OpenNarrativeElement::Invisible => (),
             }
         }
@@ -1067,6 +1179,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. }
                 | OpenNarrativeElement::Invisible => (),
             }
         }
@@ -1091,11 +1204,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             | Some(
                 OpenDomainElement::Argument { .. }
                 | OpenDomainElement::HeadTerm { .. }
+                | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::Module { .. }
                 | OpenDomainElement::MathStructure { .. }
+                | OpenDomainElement::Morphism { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::ComplexTerm { .. }
@@ -1114,10 +1229,19 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 data.tp = Some(term);
                 return Ok(());
             }
+            Some(OpenDomainElement::OML { tp, .. }) if tp.is_none() => {
+                *tp = Some(term);
+                return Ok(());
+            }
+            Some(OpenDomainElement::Assign { refined_type, .. }) if refined_type.is_none() => {
+                *refined_type = Some(term);
+                return Ok(());
+            }
             None
             | Some(
                 OpenDomainElement::Argument { .. }
                 | OpenDomainElement::HeadTerm { .. }
+                | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
@@ -1127,6 +1251,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::OML { .. }
                 | OpenDomainElement::Module { .. }
                 | OpenDomainElement::MathStructure { .. }
+                | OpenDomainElement::Morphism { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::Comp
@@ -1151,7 +1276,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::NotationArg(_)
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Module { .. }
-                | OpenNarrativeElement::MathStructure { .. } => {
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
             }
@@ -1176,6 +1302,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             | Some(
                 OpenDomainElement::Argument { .. }
                 | OpenDomainElement::HeadTerm { .. }
+                | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
@@ -1185,6 +1312,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::OML { .. }
                 | OpenDomainElement::Module { .. }
                 | OpenDomainElement::MathStructure { .. }
+                | OpenDomainElement::Morphism { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::Comp
@@ -1209,7 +1337,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::NotationArg(_)
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Module { .. }
-                | OpenNarrativeElement::MathStructure { .. } => {
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
             }
@@ -1229,11 +1358,20 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 data.df = Some(term);
                 return Ok(());
             }
+            Some(OpenDomainElement::OML { df, .. }) if df.is_none() => {
+                *df = Some(term);
+                return Ok(());
+            }
+            Some(OpenDomainElement::Assign { definiens, .. }) if definiens.is_none() => {
+                *definiens = Some(term);
+                return Ok(());
+            }
             None
             | Some(
                 OpenDomainElement::Argument { .. }
                 | OpenDomainElement::HeadTerm { .. }
                 | OpenDomainElement::Type { .. }
+                | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::OMA { .. }
@@ -1242,6 +1380,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ComplexTerm { .. }
                 | OpenDomainElement::Module { .. }
                 | OpenDomainElement::MathStructure { .. }
+                | OpenDomainElement::Morphism { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::Comp
@@ -1293,7 +1432,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::NotationArg(_)
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Module { .. }
-                | OpenNarrativeElement::MathStructure { .. } => {
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens));
                 }
             }
@@ -1321,7 +1461,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenDomainElement::SymbolDeclaration { data, uri: u } if *u == *uri => {
                     return Some(data);
                 }
-                OpenDomainElement::Argument { .. }
+                OpenDomainElement::Morphism { .. }
+                | OpenDomainElement::Argument { .. }
+                | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::Comp
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::ComplexTerm { .. }
@@ -1339,6 +1481,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         }
         None
     }
+
     fn find_content_i<'a>(
         domain: &'a mut [Declaration],
         uri: &SymbolUri,
@@ -1420,9 +1563,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             Some(
                 OpenDomainElement::Module { .. }
                 | OpenDomainElement::MathStructure { .. }
+                | OpenDomainElement::Morphism { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
                 | OpenDomainElement::OML { .. }
+                | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::VariableReference { .. },

@@ -1,4 +1,5 @@
 pub mod documents;
+pub mod domain;
 pub mod paragraphs;
 pub mod symbols;
 
@@ -7,12 +8,12 @@ use ftml_backend::{FtmlBackend, GlobalBackend};
 use ftml_dom::{
     FtmlViews,
     utils::{
-        css::CssExt,
+        css::{CssExt, inject_css},
         local_cache::{LocalCache, SendBackend},
     },
 };
 use ftml_ontology::terms::VarOrSym;
-use ftml_uris::{DocumentElementUri, DocumentUri, IsDomainUri, ModuleUri, SymbolUri, Uri};
+use ftml_uris::{DocumentElementUri, DocumentUri, IsDomainUri, ModuleUri, SymbolUri};
 use leptos::prelude::*;
 
 pub trait FtmlViewable {
@@ -155,21 +156,26 @@ impl FtmlViewable for ModuleUri {
 
 impl FtmlViewable for SymbolUri {
     fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
-        use leptos::either::Either::{Left, Right};
-        use thaw::Text;
-
-        let name = self.name().last().to_string();
-        if !FtmlConfig::allow_hovers() {
-            tracing::trace!("hovers disabled");
-            return Left(view!(<Text class="ftml-comp">{name}</Text>));
-        }
-        let vos = VarOrSym::Sym(self.clone());
-
-        Right(super::terms::comp_like::<Be, _>(
-            vos,
-            None,
-            false,
-            move || view!(<Text>{name}</Text>),
-        ))
+        symbol_uri::<Be>(self.name().last().to_string(), self)
     }
+}
+
+pub fn symbol_uri<Be: SendBackend>(
+    name: String,
+    uri: &SymbolUri,
+) -> impl IntoView + use<Be> + 'static {
+    use leptos::either::Either::{Left, Right};
+    use thaw::Text;
+    inject_css("ftml-comp", include_str!("../comp.css"));
+    if !FtmlConfig::allow_hovers() {
+        tracing::trace!("hovers disabled");
+        return Left(view!(<Text class="ftml-comp">{name}</Text>));
+    }
+    let vos = VarOrSym::Sym(uri.clone());
+    Right(super::terms::comp_like::<Be, _>(
+        vos,
+        None,
+        false,
+        move || view!(<Text>{name}</Text>),
+    ))
 }

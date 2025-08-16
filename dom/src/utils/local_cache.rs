@@ -4,6 +4,7 @@ use ftml_ontology::{
     domain::{
         SharedDeclaration,
         declarations::{
+            morphisms::Morphism,
             structures::{MathStructure, StructureExtension},
             symbols::Symbol,
         },
@@ -161,9 +162,7 @@ impl<B: SendBackend> WithLocalCache<B> {
     > + Send
     + use<B> {
         let uri = uri.simple_module();
-        //tracing::warn!("Getting {uri}");
         if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
-            //tracing::warn!("Module {} found", uri.module);
             let r = m
                 .get_as::<Symbol>(&uri.name)
                 .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
@@ -172,6 +171,25 @@ impl<B: SendBackend> WithLocalCache<B> {
             return either::Either::Left(std::future::ready(r));
         }
         either::Either::Right(B::get().get_symbol(uri))
+    }
+
+    pub fn get_morphism(
+        &self,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<Either<Morphism, SharedDeclaration<Morphism>>, BackendError<B::Error>>,
+    > + Send
+    + use<B> {
+        let uri = uri.simple_module();
+        if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
+            let r = m
+                .get_as::<Morphism>(&uri.name)
+                .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
+                    Ok(either::Either::Right(d))
+                });
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(B::get().get_morphism(uri))
     }
 
     #[allow(clippy::type_complexity)]

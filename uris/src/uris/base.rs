@@ -73,7 +73,15 @@ impl FtmlUri for BaseUri {
 impl PartialEq<str> for BaseUri {
     #[inline]
     fn eq(&self, other: &str) -> bool {
-        self.0.as_str().eq_ignore_ascii_case(other)
+        other.strip_prefix("https://").map_or_else(
+            || self.0.as_str().eq_ignore_ascii_case(other),
+            |other_r| {
+                let slf_str = self.0.as_str();
+                slf_str
+                    .strip_prefix("http://")
+                    .is_some_and(|self_r| self_r.eq_ignore_ascii_case(other_r))
+            },
+        )
     }
 }
 
@@ -130,6 +138,9 @@ impl BaseUri {
 
     /// Creates a new base URI from a [`url::Url`].
     ///
+    /// Base URIs are normalized wrt the scheme in that `http` is always
+    /// used in favor of `https`.
+    ///
     /// # Errors
     ///
     /// Returns an error if the URL:
@@ -141,7 +152,7 @@ impl BaseUri {
     /// ```
     /// # use ftml_uris::prelude::*;
     /// # use url::Url;
-    /// let url = Url::parse("http://example.com/path").unwrap();
+    /// let url = Url::parse("https://example.com/path").unwrap();
     /// let base_uri = BaseUri::new(url).unwrap();
     /// assert_eq!(base_uri.as_str(), "http://example.com/path");
     ///
@@ -149,7 +160,10 @@ impl BaseUri {
     /// let bad_url = Url::parse("http://example.com?query=value").unwrap();
     /// assert!(BaseUri::new(bad_url).is_err());
     /// ```
-    pub fn new(url: url::Url) -> Result<Self, UriParseError> {
+    pub fn new(mut url: url::Url) -> Result<Self, UriParseError> {
+        if url.scheme() == "https" {
+            let _ = url.set_scheme("http");
+        }
         #[cfg(feature = "interned")]
         {
             let mut base = unsafe { get_base_uris() }.lock();
@@ -167,7 +181,10 @@ impl BaseUri {
     }
 
     #[cfg(not(feature = "interned"))]
-    fn make_new(url: url::Url) -> Result<Self, UriParseError> {
+    fn make_new(mut url: url::Url) -> Result<Self, UriParseError> {
+        if url.scheme() == "https" {
+            let _ = url.set_scheme("http");
+        }
         if url.fragment().is_some() || url.query().is_some() {
             return Err(UriParseError::HasQueryOrFragment);
         }
@@ -178,7 +195,13 @@ impl BaseUri {
     }
 
     #[cfg(feature = "interned")]
-    fn make_new(url: url::Url, cache: &mut Vec<InternedBaseURI>) -> Result<Self, UriParseError> {
+    fn make_new(
+        mut url: url::Url,
+        cache: &mut Vec<InternedBaseURI>,
+    ) -> Result<Self, UriParseError> {
+        if url.scheme() == "https" {
+            let _ = url.set_scheme("http");
+        }
         if url.fragment().is_some() || url.query().is_some() {
             return Err(UriParseError::HasQueryOrFragment);
         }
@@ -261,11 +284,25 @@ impl FromStr for BaseUri {
     #[cfg(feature = "interned")]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim().trim_end_matches('/');
+        if let Some(rest) = s.strip_prefix("https://") {
+            let mut base = unsafe { get_base_uris() }.lock();
+            #[allow(clippy::map_unwrap_or)]
+            return base
+                .iter()
+                .rev()
+                .find(|e| {
+                    e.string
+                        .strip_prefix("http://")
+                        .is_some_and(|r| r.eq_ignore_ascii_case(rest))
+                })
+                .map(|e| Ok(Self(e.url.clone())))
+                .unwrap_or_else(|| Self::make_new(url::Url::parse(s)?, &mut base));
+        }
         let mut base = unsafe { get_base_uris() }.lock();
         #[allow(clippy::map_unwrap_or)]
         base.iter()
             .rev()
-            .find(|e| **e == *s)
+            .find(|e| e.string.eq_ignore_ascii_case(s))
             .map(|e| Ok(Self(e.url.clone())))
             .unwrap_or_else(|| Self::make_new(url::Url::parse(s)?, &mut base))
     }
@@ -291,7 +328,10 @@ pub struct InternedBaseURI {
 
 #[cfg(feature = "interned")]
 impl From<url::Url> for InternedBaseURI {
-    fn from(url: url::Url) -> Self {
+    fn from(mut url: url::Url) -> Self {
+        if url.scheme() == "https" {
+            let _ = url.set_scheme("http");
+        }
         let string = url.as_str().trim_end_matches('/').into();
         let hash = rustc_hash::FxBuildHasher.hash_one(&string);
         Self {
@@ -299,15 +339,6 @@ impl From<url::Url> for InternedBaseURI {
             string,
             url: url.into(),
         }
-    }
-}
-
-#[cfg(feature = "interned")]
-impl PartialEq<str> for InternedBaseURI {
-    #[inline]
-    fn eq(&self, other: &str) -> bool {
-        let h = rustc_hash::FxBuildHasher.hash_one(other);
-        h == self.hash && *other == *self.string
     }
 }
 
@@ -361,9 +392,9 @@ crate::tests! {
         let s = BaseUri::unknown().as_str();
         assert_eq!(s, "http://unknown.source");
         let test = BaseUri::from_str("https://mathhub.info/foo/bar/").expect("works");
-        assert_eq!(test.as_str(), "https://mathhub.info/foo/bar");
-        let test = BaseUri::from_str("https://mathhub.info/foo/bar").expect("works");
-        assert_eq!(test.as_str(), "https://mathhub.info/foo/bar");
+        assert_eq!(test.as_str(), "http://mathhub.info/foo/bar");
+        let test = BaseUri::from_str("http://mathhub.info/foo/bar").expect("works");
+        assert_eq!(test.as_str(), "http://mathhub.info/foo/bar");
     };
     base_uris_parsing {
         // Test various malformed URIs

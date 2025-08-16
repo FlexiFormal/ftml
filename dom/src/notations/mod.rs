@@ -14,7 +14,10 @@ use ftml_ontology::{
     },
     terms::ArgumentMode,
 };
+use leptos::attr::AttributeValue;
+use leptos::attr::custom::CustomAttributeKey;
 use leptos::math::mtext;
+use leptos::tachys::view::any_view::AnyViewWithAttrs;
 use leptos::{either::Either, prelude::*};
 use std::num::NonZeroU8;
 pub use terms::*;
@@ -218,27 +221,34 @@ impl NotationExt for Notation {
         head: &VarOrSym,
         this: Option<&ClonableView>,
     ) -> impl IntoView + use<Views> {
-        self.op
-            .as_ref()
-            .map_or_else(
-                || view_component_with_args::<Views>(&self.component, &DummyRender, this),
-                |op| {
-                    let op = op.clone();
-                    if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                        Views::comp(
-                            false,
-                            ClonableView::new(true, move || {
-                                view_node(&op).attr("data-ftml-comp", "")
-                            }),
-                        )
-                        .into_any()
-                    } else {
-                        view_node(&op).attr("data-ftml-comp", "").into_any()
-                    }
-                },
-            )
-            .attr(FtmlKey::Term.attr_name(), "OMID")
-            .attr(FtmlKey::Head.attr_name(), head.to_string())
+        use leptos::either::Either::Left;
+        attr(
+            attr(
+                self.op.as_ref().map_or_else(
+                    || view_component_with_args::<Views>(&self.component, &DummyRender, this),
+                    |op| {
+                        let op = op.clone();
+                        if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                            Left(
+                                Views::comp(
+                                    false,
+                                    ClonableView::new(true, move || {
+                                        attr(view_node(&op), "data-ftml-comp", "")
+                                    }),
+                                )
+                                .into_any(),
+                            )
+                        } else {
+                            attr(view_node(&op), "data-ftml-comp", "")
+                        }
+                    },
+                ),
+                FtmlKey::Term.attr_name(),
+                "OMID",
+            ),
+            FtmlKey::Head.attr_name(),
+            head.to_string(),
+        )
     }
 
     fn as_view<Views: FtmlViews>(
@@ -249,33 +259,52 @@ impl NotationExt for Notation {
         //owned(move || {
         let h = head.to_string();
         //provide_context(WithHead(Some(head.clone())));
-        view_component_with_args::<Views>(&self.component, &DummyRender, this)
-            .attr(FtmlKey::Term.attr_name(), "OMID")
-            .attr(FtmlKey::Head.attr_name(), h)
+        attr(
+            attr(
+                view_component_with_args::<Views>(&self.component, &DummyRender, this),
+                FtmlKey::Term.attr_name(),
+                "OMID",
+            ),
+            FtmlKey::Head.attr_name(),
+            h,
+        )
         //})
     }
+}
+
+fn attr(
+    e: leptos::either::Either<AnyView, AnyViewWithAttrs>,
+    k: impl CustomAttributeKey,
+    v: impl AttributeValue,
+) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
+    use leptos::either::Either::{Left, Right};
+    Right(match e {
+        Left(a) => a.attr(k, v),
+        Right(a) => a.attr(k, v),
+    })
 }
 
 pub(crate) fn view_component_with_args<Views: FtmlViews>(
     comp: &NotationComponent,
     args: &(impl ArgumentRender + ?Sized),
     this: Option<&ClonableView>,
-) -> AnyView {
+) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
+    use leptos::either::Either::Left;
     match comp {
-        NotationComponent::Text(s) => s.to_string().into_any(),
+        NotationComponent::Text(s) => Left(s.to_string().into_any()),
         NotationComponent::Node {
             tag,
             attributes,
             children,
         } => attributes.iter().fold(
-            tachys_from_tag(
+            Left(html_from_tag(
                 tag.as_ref(),
                 children
                     .iter()
                     .map(|c| view_component_with_args::<Views>(c, args, this))
                     .collect_view(),
-            ),
-            |n, (k, v)| n.attr(k.to_string(), v.to_string()).into_any(),
+            )),
+            |n, (k, v)| attr(n, k.to_string(), v.to_string()),
         ),
         NotationComponent::MainComp(n) if this.is_some() => {
             // SAFETY: defined
@@ -289,31 +318,35 @@ pub(crate) fn view_component_with_args<Views: FtmlViews>(
             } else {
                 leptos::either::Either::Right(view_node(&n).attr("data-ftml-comp", ""))
             };
-            view!(<msub>{inner}{this.into_view::<Views>()}</msub>).into_any()
+            Left(view!(<msub>{inner}{this.into_view::<Views>()}</msub>).into_any())
         }
         NotationComponent::Comp(n) | NotationComponent::MainComp(n) => {
             let n = n.clone();
             if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                Views::comp(
-                    false,
-                    ClonableView::new(true, move || view_node(&n).attr("data-ftml-comp", "")),
+                Left(
+                    Views::comp(
+                        false,
+                        ClonableView::new(true, move || view_node(&n).attr("data-ftml-comp", "")),
+                    )
+                    .into_any(),
                 )
-                .into_any()
             } else {
-                view_node(&n).attr("data-ftml-comp", "").into_any()
+                Left(view_node(&n).attr("data-ftml-comp", "").into_any())
             }
         }
-        NotationComponent::Argument { index, mode } => args.render_arg::<Views>(*index, *mode),
+        NotationComponent::Argument { index, mode } => {
+            Left(args.render_arg::<Views>(*index, *mode))
+        }
         NotationComponent::ArgSep { index, mode, sep } => {
             let len = args.length_at(*index);
             if len == 0 {
-                return ().into_any();
+                return Left(().into_any());
             }
             if len == 1 {
-                return args.render_arg::<Views>(*index, *mode);
+                return Left(args.render_arg::<Views>(*index, *mode));
             }
 
-            view! {
+            Left(view! {
                 <mrow>
                     {args.render_arg_at::<Views>(*index, 0, *mode)}
                 {
@@ -324,7 +357,7 @@ pub(crate) fn view_component_with_args<Views: FtmlViews>(
                 }
                 </mrow>
             }
-            .into_any()
+            .into_any())
         }
         NotationComponent::ArgMap { .. } => todo!(),
     }
@@ -372,29 +405,30 @@ impl ArgumentRender for DummyRender {
     }
 }
 
-pub(crate) fn view_node(n: &NotationNode) -> AnyView {
+pub(crate) fn view_node(n: &NotationNode) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
+    use leptos::either::Either::Left;
     let NotationNode {
         tag,
         attributes,
         children,
     } = n;
     attributes.iter().fold(
-        tachys_from_tag(
+        Left(html_from_tag(
             tag.as_ref(),
             children.iter().map(node_or_text).collect_view(),
-        ),
-        |n, (k, v)| n.attr(k.to_string(), v.to_string()).into_any(),
+        )),
+        |n, (k, v)| attr(n, k.to_string(), v.to_string()),
     )
 }
 
-fn node_or_text(n: &NodeOrText) -> AnyView {
+fn node_or_text(n: &NodeOrText) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
     match n {
         NodeOrText::Node(n) => view_node(n),
-        NodeOrText::Text(t) => t.to_string().into_any(),
+        NodeOrText::Text(t) => leptos::either::Either::Left(t.to_string().into_any()),
     }
 }
 
-pub(crate) fn tachys_from_tag(id: &str, children: impl IntoView) -> AnyView {
+pub(crate) fn html_from_tag(id: &str, children: impl IntoView) -> AnyView {
     macro_rules! tags {
         ( $(  {$($name:ident $($actual:ident)? ),* $(,)? } )*) => {
             match id {
@@ -443,3 +477,44 @@ pub(crate) fn tachys_from_tag(id: &str, children: impl IntoView) -> AnyView {
         }*/
     }
 }
+/*
+pub enum AnyV {
+    Any(AnyView),
+    Attr(AnyViewWithAttrs),
+}
+impl AnyV {
+    fn into_view(self) -> impl IntoView {
+        match self {
+            Self::Any(a) => leptos::either::Either::Left(a),
+            Self::Attr(a) => leptos::either::Either::Right(a),
+        }
+    }
+}
+impl AddAnyAttr for AnyV {
+    type Output<SomeNewAttr: leptos::attr::Attribute> = Self;
+    fn add_any_attr<NewAttr: leptos::attr::Attribute>(self, attr: NewAttr) -> Self::Output<NewAttr>
+    where
+        Self::Output<NewAttr>: RenderHtml,
+    {
+        Self::Attr(match self {
+            Self::Any(a) => a.add_any_attr(attr),
+            Self::Attr(a) => a.add_any_attr(attr),
+        })
+    }
+}
+impl From<AnyView> for AnyV {
+    #[inline]
+    fn from(value: AnyView) -> Self {
+        Self::Any(value)
+    }
+}
+impl RenderHtml for AnyV {
+    type AsyncOutput =
+    type State = leptos::either::Either<<AnyView as RenderHtml>::AsyncOutput,<AnyViewWithAttrs as RenderHtml>::AsyncOutput>;
+    type Owned =
+    type State = leptos::either::Either<<AnyView as RenderHtml>::Owned,<AnyViewWithAttrs as RenderHtml>::Owned>;
+}
+impl Render for AnyV {
+    type State = leptos::either::Either<<AnyView as Render>::State,<AnyViewWithAttrs as Render>::State>;
+}
+*/

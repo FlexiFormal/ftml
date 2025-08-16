@@ -385,6 +385,7 @@ impl Marker {
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::Module { .. }
             | OpenFtmlElement::MathStructure { .. }
+            | OpenFtmlElement::Morphism { .. }
             | OpenFtmlElement::Style(_)
             | OpenFtmlElement::NotationArg(_)
             | OpenFtmlElement::Type
@@ -398,7 +399,9 @@ impl Marker {
             | OpenFtmlElement::UseModule(_)
             | OpenFtmlElement::VariableDeclaration { .. }
             | OpenFtmlElement::None
+            | OpenFtmlElement::Assign(_)
             | OpenFtmlElement::OML { .. }
+            | OpenFtmlElement::Rename { .. }
             | OpenFtmlElement::HeadTerm => None,
         }
     }

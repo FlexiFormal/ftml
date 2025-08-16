@@ -12,7 +12,7 @@ macro_rules! uri {
     };
     (@go $name:ident = $l:literal) => {
             pub static $name: LazyLock<SymbolUri> = LazyLock::new(||
-                URI.clone() | $l.parse().expect("Is a valid URI")
+                URI.clone() | $l.parse::<crate::UriName>().expect("Is a valid URI")
             );
     };
     (@go $name:ident : $t:ty := $l:literal) => {
@@ -22,11 +22,11 @@ macro_rules! uri {
     }
 }
 
-pub static NAMESPACE: &str = "https://mathhub.info?a=FTML/meta";
+pub static NAMESPACE: &str = "http://mathhub.info?a=FTML/meta";
 
 uri! {
-    DOC_URI:DocumentUri := "https://mathhub.info?a=FTML/meta?d=Metatheory&l=en",
-    URI:ModuleUri := "https://mathhub.info?a=FTML/meta&m=Metatheory",
+    DOC_URI:DocumentUri := "http://mathhub.info?a=FTML/meta?d=Metatheory&l=en",
+    URI:ModuleUri := "http://mathhub.info?a=FTML/meta&m=Metatheory",
 
     OBJECT = "object",
     OF_TYPE = "of type",

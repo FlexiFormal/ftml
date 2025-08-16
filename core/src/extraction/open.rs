@@ -1,9 +1,10 @@
-use std::{hint::unreachable_unchecked, num::NonZeroU8};
-
 use crate::extraction::{FtmlExtractionError, nodes::FtmlNode};
+pub use crate::keys::OpenFtmlElement;
 use either::Either::{self, Left, Right};
 use ftml_ontology::{
-    domain::declarations::{Declaration, structures::StructureDeclaration, symbols::SymbolData},
+    domain::declarations::{
+        Declaration, morphisms::Assignment, structures::StructureDeclaration, symbols::SymbolData,
+    },
     narrative::{
         documents::{DocumentCounter, DocumentStyle},
         elements::{
@@ -16,100 +17,10 @@ use ftml_ontology::{
     },
     terms::{Argument, ArgumentMode, BoundArgument, Term, VarOrSym, Variable},
 };
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SymbolUri, UriName};
-
-pub use crate::keys::OpenFtmlElement;
-
-/*
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum OpenFtmlElement {
-    None,
-    Module {
-        uri: ModuleUri,
-        meta: Option<ModuleUri>,
-        signature: Option<Language>,
-    },
-    SymbolDeclaration {
-        uri: SymbolUri,
-        data: Box<SymbolData>,
-    },
-    MathStructure {
-        uri: SymbolUri,
-        macroname: Option<Id>,
-    },
-    VariableDeclaration {
-        uri: DocumentElementUri,
-        data: Box<VariableData>,
-    },
-    Section(DocumentElementUri),
-    SetSectionLevel(SectionLevel),
-    Style(DocumentStyle),
-    Counter(DocumentCounter),
-    Invisible,
-    SectionTitle,
-    ParagraphTitle,
-    SkipSection,
-    Comp,
-    DefComp,
-    InputRef {
-        target: DocumentUri,
-        uri: DocumentElementUri,
-    },
-    IfInputref(bool),
-    SymbolReference {
-        uri: SymbolUri,
-        notation: Option<Id>,
-    },
-    VariableReference {
-        var: Variable,
-        notation: Option<Id>,
-    },
-    OMA {
-        head: VarOrSym,
-        notation: Option<Id>,
-        uri: Option<DocumentElementUri>,
-    },
-    OMBIND {
-        head: VarOrSym,
-        notation: Option<Id>,
-        uri: Option<DocumentElementUri>,
-    },
-    ComplexTerm {
-        head: VarOrSym,
-        notation: Option<Id>,
-        uri: Option<DocumentElementUri>,
-    },
-    OML {
-        name: UriName,
-    },
-    Notation {
-        uri: DocumentElementUri,
-        id: Option<Id>,
-        head: VarOrSym,
-        prec: i64,
-        argprecs: Vec<i64>,
-    },
-    Paragraph {
-        uri: DocumentElementUri,
-        kind: ParagraphKind,
-        formatting: ParagraphFormatting,
-        styles: Box<[Id]>,
-        fors: Vec<(SymbolUri, Option<Term>)>,
-    },
-    Argument(ArgumentPosition),
-    NotationArg(ArgumentPosition),
-    Type,
-    ReturnType,
-    Definiens(Option<SymbolUri>),
-    NotationComp,
-    ArgSep,
-    CurrentSectionLevel(bool),
-    ImportModule(ModuleUri),
-    UseModule(ModuleUri),
-    Definiendum(SymbolUri),
-    HeadTerm,
-}
- */
+use ftml_uris::{
+    DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SimpleUriName, SymbolUri, UriName,
+};
+use std::{hint::unreachable_unchecked, num::NonZeroU8};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CloseFtmlElement {
@@ -145,6 +56,8 @@ pub enum CloseFtmlElement {
     ComplexTerm,
     HeadTerm,
     OML,
+    Morphism,
+    Assign,
 }
 
 #[derive(Debug, Clone)]
@@ -154,6 +67,12 @@ pub enum OpenDomainElement<N: FtmlNode> {
         meta: Option<ModuleUri>,
         signature: Option<Language>,
         children: Vec<Declaration>,
+    },
+    Morphism {
+        uri: SymbolUri,
+        domain: ModuleUri,
+        total: bool,
+        children: Vec<Assignment>,
     },
     MathStructure {
         uri: SymbolUri,
@@ -188,6 +107,8 @@ pub enum OpenDomainElement<N: FtmlNode> {
     },
     OML {
         name: UriName,
+        tp: Option<Term>,
+        df: Option<Term>,
     },
     ComplexTerm {
         head: VarOrSym,
@@ -219,6 +140,11 @@ pub enum OpenDomainElement<N: FtmlNode> {
     },
     Comp,
     DefComp,
+    Assign {
+        source: SymbolUri,
+        refined_type: Option<Term>,
+        definiens: Option<Term>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -228,6 +154,10 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
         children: Vec<DocumentElement>,
     },
     MathStructure {
+        uri: SymbolUri,
+        children: Vec<DocumentElement>,
+    },
+    Morphism {
         uri: SymbolUri,
         children: Vec<DocumentElement>,
     },
@@ -286,6 +216,11 @@ pub enum MetaDatum {
     SetSectionLevel(SectionLevel),
     ImportModule(ModuleUri),
     UseModule(ModuleUri),
+    Rename {
+        source: SymbolUri,
+        name: Option<SimpleUriName>,
+        macroname: Option<Id>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -610,6 +545,18 @@ impl OpenFtmlElement {
                     children: Vec::new(),
                 }),
             },
+            Self::Morphism { uri, domain, total } => AnyOpen::Open {
+                domain: Some(OpenDomainElement::Morphism {
+                    uri: uri.clone(),
+                    domain,
+                    total,
+                    children: Vec::new(),
+                }),
+                narrative: Some(OpenNarrativeElement::Morphism {
+                    uri,
+                    children: Vec::new(),
+                }),
+            },
             Self::SymbolDeclaration { uri, data } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::SymbolDeclaration { uri, data }),
                 narrative: None,
@@ -617,6 +564,14 @@ impl OpenFtmlElement {
             Self::VariableDeclaration { uri, data } => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::VariableDeclaration { uri, data }),
+            },
+            Self::Assign(uri) => AnyOpen::Open {
+                domain: Some(OpenDomainElement::Assign {
+                    source: uri,
+                    refined_type: None,
+                    definiens: None,
+                }),
+                narrative: None,
             },
             Self::Section(uri) => AnyOpen::Open {
                 domain: None,
@@ -669,7 +624,11 @@ impl OpenFtmlElement {
                 narrative: None,
             },
             Self::OML { name } => AnyOpen::Open {
-                domain: Some(OpenDomainElement::OML { name }),
+                domain: Some(OpenDomainElement::OML {
+                    name,
+                    tp: None,
+                    df: None,
+                }),
                 narrative: None,
             },
             Self::ComplexTerm {
@@ -805,6 +764,15 @@ impl OpenFtmlElement {
             Self::SetSectionLevel(lvl) => AnyOpen::Meta(MetaDatum::SetSectionLevel(lvl)),
             Self::ImportModule(uri) => AnyOpen::Meta(MetaDatum::ImportModule(uri)),
             Self::UseModule(uri) => AnyOpen::Meta(MetaDatum::UseModule(uri)),
+            Self::Rename {
+                source,
+                name,
+                macroname,
+            } => AnyOpen::Meta(MetaDatum::Rename {
+                source,
+                name,
+                macroname,
+            }),
             Self::None
             | Self::SectionTitle
             | Self::ParagraphTitle

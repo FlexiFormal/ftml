@@ -21,7 +21,7 @@ use ftml_ontology::{
 };
 use ftml_uris::{DocumentElementUri, IsNarrativeUri, LeafUri, SymbolUri};
 use leptos::{html::span, prelude::*};
-use thaw::{Caption1Strong, Text, TextTag};
+use thaw::{Caption1, Caption1Strong, Text, TextTag};
 
 impl super::FtmlViewable for Symbol {
     fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> {
@@ -51,24 +51,28 @@ impl super::FtmlViewable for Symbol {
         });
         let tp = tp.as_ref().map(|t| {
             let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {" of type "{ftml_dom::utils::math(|| t)}}
+            view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
         });
         let df = df.as_ref().map(|t| {
             let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {"Definiens: "{ftml_dom::utils::math(|| t).attr("style","white-space:nowrap;")}}
+            view! {<Caption1>
+                "Definiens: "{ftml_dom::utils::math(|| t)}
+                </Caption1>
+            }
+            .attr("style", "white-space:nowrap;")
         });
         let header = view! {
             <Caption1Strong>{symbol_str}{name}</Caption1Strong>
             {macroname}
-            {tp}
         };
         let notations = do_notations::<Be>(LeafUri::Symbol(uri.clone()), arity.clone());
         let paragraphs = do_paragraphs::<Be>(uri.clone());
         view! {
-            <Block show_separator = true>
+            <Block show_separator=true>
                 <Header slot>{header}</Header>
-                <HeaderLeft slot>{notations}</HeaderLeft>
+                <HeaderLeft slot>{tp}</HeaderLeft>
                 <HeaderRight slot>{df}</HeaderRight>
+                {notations}
                 {paragraphs}
                 //<Footer slot>"moar"</Footer>
             </Block>
@@ -133,20 +137,19 @@ impl super::FtmlViewable for VariableDeclaration {
         });
         let df = df.as_ref().map(|t| {
             let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {"Definiens: "{ftml_dom::utils::math(|| t).attr("style","white-space:nowrap;")}}
+            view! {"Definiens: "{ftml_dom::utils::math(|| t)}}.attr("style", "white-space:nowrap;")
         });
         let header = view! {
             <Caption1Strong>"Variable "{name}</Caption1Strong>
             {macroname}
-            {tp}
         };
         let notations = do_notations::<Be>(LeafUri::Element(uri.clone()), arity.clone());
         view! {
             <Block>
                 <Header slot>{header}</Header>
-                <HeaderLeft slot>{notations}</HeaderLeft>
+                <HeaderLeft slot>{tp}</HeaderLeft>
                 <HeaderRight slot>{df}</HeaderRight>
-                ""
+                {notations}
                 //<Footer slot>"moar"</Footer>
             </Block>
         }

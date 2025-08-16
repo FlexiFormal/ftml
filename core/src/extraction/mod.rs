@@ -47,9 +47,10 @@ pub trait FtmlExtractor: 'static + Sized {
     fn get_domain_uri(&self, in_elem: FtmlKey) -> Result<Cow<'_, ModuleUri>> {
         match self.iterate_domain().next() {
             Some(OpenDomainElement::Module { uri, .. }) => Ok(Cow::Borrowed(uri)),
-            Some(OpenDomainElement::MathStructure { uri, .. }) => {
-                Ok(Cow::Owned(uri.clone().into_module()))
-            }
+            Some(
+                OpenDomainElement::MathStructure { uri, .. }
+                | OpenDomainElement::Morphism { uri, .. },
+            ) => Ok(Cow::Owned(uri.clone().into_module())),
             Some(
                 OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
@@ -62,6 +63,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenDomainElement::HeadTerm { .. }
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
+                | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::Comp
                 | OpenDomainElement::DefComp,
@@ -85,6 +87,7 @@ pub trait FtmlExtractor: 'static + Sized {
             .find_map(|e| match e {
                 OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. }
                 | OpenNarrativeElement::SkipSection { .. }
                 | OpenNarrativeElement::Invisible
                 | OpenNarrativeElement::NotationComp { .. }
@@ -112,6 +115,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Invisible => (),
                 OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. }
                 | OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Paragraph { .. }
@@ -129,6 +133,8 @@ pub trait FtmlExtractor: 'static + Sized {
                 | Some(
                     OpenDomainElement::Module { .. }
                     | OpenDomainElement::MathStructure { .. }
+                    | OpenDomainElement::Morphism { .. }
+                    | OpenDomainElement::Assign { .. }
                     | OpenDomainElement::SymbolDeclaration { .. },
                 ) => false,
                 Some(
@@ -168,6 +174,7 @@ pub trait FtmlExtractor: 'static + Sized {
             let ch = match n {
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::MathStructure { children, .. }
+                | OpenNarrativeElement::Morphism { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::SkipSection { children }
                 | OpenNarrativeElement::Paragraph { children, .. } => children,
@@ -218,6 +225,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Invisible | OpenNarrativeElement::Definiendum(_) => (),
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::MathStructure { children, .. }
+                | OpenNarrativeElement::Morphism { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::Paragraph { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => match children.last() {
@@ -243,6 +251,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Invisible => (),
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::MathStructure { children, .. }
+                | OpenNarrativeElement::Morphism { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::Paragraph { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => match children.last() {
@@ -270,6 +279,8 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
             OpenDomainElement::Module { .. }
             | OpenDomainElement::MathStructure { .. }
+            | OpenDomainElement::Assign { .. }
+            | OpenDomainElement::Morphism { .. }
             | OpenDomainElement::OMA { .. }
             | OpenDomainElement::OMBIND { .. }
             | OpenDomainElement::OML { .. }
@@ -326,12 +337,14 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::Definiens { .. }
             | OpenDomainElement::Module { .. }
             | OpenDomainElement::MathStructure { .. }
+            | OpenDomainElement::Morphism { .. }
             | OpenDomainElement::OML { .. }
             | OpenDomainElement::SymbolDeclaration { .. }
             | OpenDomainElement::SymbolReference { .. }
             | OpenDomainElement::ComplexTerm { .. }
             | OpenDomainElement::Comp
             | OpenDomainElement::DefComp
+            | OpenDomainElement::Assign { .. }
             | OpenDomainElement::VariableReference { .. } => None,
         })
     }

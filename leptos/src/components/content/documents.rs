@@ -79,6 +79,36 @@ impl super::FtmlViewable for DocumentElement {
                 children,
                 ..
             } => view_structure::<Be>(structure, children).into_any(),
+            Self::Morphism {
+                morphism, children, ..
+            } => {
+                let children = children.clone();
+                let uri = morphism.clone();
+                LocalCache::with_or_toast::<Be, _, _, _, _>(
+                    |e| e.get_morphism(uri),
+                    move |s| {
+                        let s = match &s {
+                            either::Either::Left(s) => s,
+                            either::Either::Right(s) => s,
+                        };
+                        super::domain::morphism::<Be, _>(
+                            s,
+                            if children.is_empty() {
+                                None
+                            } else {
+                                Some(
+                                    children
+                                        .iter()
+                                        .map(FtmlViewable::as_view::<Be>)
+                                        .collect_view(),
+                                )
+                            },
+                        )
+                    },
+                    || "error",
+                )
+                .into_any()
+            }
             Self::Extension {
                 extension,
                 target,

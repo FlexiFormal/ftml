@@ -11,4 +11,6 @@
 .ftml-collapsible--invisible {
     max-height: 0px;
     padding: 0;
+    color: transparent;
+    background-color: transparent;
 }

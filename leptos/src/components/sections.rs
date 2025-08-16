@@ -1,9 +1,17 @@
-use crate::config::FtmlConfig;
-use ftml_dom::{counters::LogicalLevel, markers::SectionInfo, utils::css::inject_css};
+use crate::{
+    config::FtmlConfig,
+    utils::collapsible::{collapse_marker, fancy_collapsible},
+};
+use ftml_dom::{
+    counters::LogicalLevel,
+    markers::SectionInfo,
+    utils::{css::inject_css, get_true_rect},
+};
 use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
-
+use send_wrapper::SendWrapper;
+/*
 pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> impl IntoView {
     inject_css("ftml-sections", include_str!("sections.css"));
     let SectionInfo {
@@ -40,13 +48,13 @@ pub fn section_title(
       }
     }
 }
-
-/* Collapsible; needs debugging:
+ */
 
 #[derive(Default, Clone)]
 struct SectionTitle(Option<(&'static str, SendWrapper<OriginalNode>)>);
 
 pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
     inject_css("ftml-sections", include_str!("sections.css"));
     let SectionInfo {
         id,
@@ -60,6 +68,15 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
     provide_context(title);
     if let LogicalLevel::Section(lvl) = lvl {
         tracing::trace!("Section at level {lvl}");
+        if lvl <= SectionLevel::Paragraph {
+            return Left(view! {
+                <div id=id style=style class=class>
+                  {
+                    FtmlConfig::wrap_section(&uri,children)
+                  }
+                </div>
+            });
+        }
     }
     let visible = RwSignal::new(true);
     let inner = fancy_collapsible(
@@ -70,24 +87,34 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
     );
     let title = move || {
         title.get().0.map(|(class, title)| {
-            use thaw::Flex;
+            let pos_ref = NodeRef::new();
+            let marker_ref = NodeRef::new();
+            let _ = Effect::new(move || {
+                if let Some(pos) = pos_ref.get()
+                    && let Some(marker) = marker_ref.get()
+                {
+                    position_marker(&pos, &marker);
+                }
+            });
             view! {
-                <Flex>
-                    <a on:click=move |_| visible.set(!visible.get_untracked())>
-                        {collapse_marker(visible)}
-                    </a>
+                <div node_ref=marker_ref on:click=move |_| visible.set(!visible.get_untracked())
+                    style="width:fit-content;"
+                >
+                    {collapse_marker(visible)}
+                </div>
+                <div node_ref=pos_ref style="display:contents;">
                     {title.take().attr("class",class)}
-                </Flex>
+                </div>
             }
         })
     };
 
-    view! {
+    Right(view! {
         <div id=id style=style class=class>
             {title}
             {inner}
         </div>
-    }
+    })
 }
 
 pub fn section_title(
@@ -95,10 +122,53 @@ pub fn section_title(
     class: &'static str,
     children: OriginalNode,
 ) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
     tracing::debug!("section title at level {lvl:?}");
+    if lvl <= SectionLevel::Paragraph {
+        return Left(view! {
+          {children.attr("class",class)}
+          {
+              FtmlConfig::insert_section_title(lvl)
+          }
+        });
+    }
     let ttl = expect_context::<RwSignal<SectionTitle>>();
     ttl.set(SectionTitle(Some((class, SendWrapper::new(children)))));
-    FtmlConfig::insert_section_title(lvl)
+    Right(FtmlConfig::insert_section_title(lvl))
 }
 
- */
+use leptos::web_sys::HtmlDivElement;
+fn position_marker(pos: &HtmlDivElement, marker: &HtmlDivElement) {
+    let mut elem: leptos::web_sys::Element = (***pos).clone();
+    let ht = get_true_rect(marker).height();
+    let mut rect = get_true_rect(pos);
+    loop {
+        if rect.height() == 0.0 {
+            if let Some(fc) = elem.first_element_child() {
+                elem = fc;
+                rect = get_true_rect(&elem);
+                continue;
+            }
+            if let Some(fc) = elem.next_element_sibling() {
+                elem = fc;
+                rect = get_true_rect(&elem);
+                continue;
+            }
+        }
+        break;
+    }
+    let target_height = ((rect.height() - ht) / 2.0).max(0.0); //+ (rect.height() / 2.0);
+    let ht = target_height; //ht.max(target_height);
+    let font_size = rect.height().max(15.0);
+    let _ = marker.set_attribute(
+        "style",
+        &format!(
+            "display:block;\
+            position:absolute;\
+            width:fit-content;\
+            margin-top:{ht}px;\
+            margin-left:-1em;\
+            font-size:{font_size}px"
+        ),
+    );
+}

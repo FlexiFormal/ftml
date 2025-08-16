@@ -273,7 +273,7 @@ impl NavElems {
 
     #[allow(clippy::missing_const_for_fn)]
     pub fn navigate_to(selfie: RwSignal<Self>, _id: &str) {
-        selfie.with_untracked(|slf| {
+        selfie.with_untracked(|#[allow(unused_variables)] slf| {
             #[cfg(any(feature = "csr", feature = "hydrate"))]
             {
                 #[allow(clippy::used_underscore_binding)]

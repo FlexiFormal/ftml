@@ -89,7 +89,7 @@ fn position_sidebar(position: &HtmlDivElement, sidebar: &HtmlDivElement) {
         parent = fc;
     }
     // first, add it to the end; since width=100%, this will get us a reasonable actual width of
-    // the container, which we use as mragin-left
+    // the container, which we use as margin-left
     let _ = parent.append_child(sidebar);
     let rect = get_true_rect(sidebar);
     let _ = sidebar.set_attribute(

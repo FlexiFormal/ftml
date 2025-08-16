@@ -114,7 +114,7 @@ macro_rules! backend {
         }
     };
 }
-backend!( 5: ["sections","para","symbolsmodules","paragraphs","structures"]);
+backend!( 6: ["sections","para","symbolsmodules","paragraphs","structures","morphisms"]);
 
 type Views = ftml_leptos::Views<GlobalBackend>;
 
@@ -127,5 +127,5 @@ fn Ftml() -> impl IntoView {
     const HTML: &str = include_str!("../public/all.en.html");
     let html = extract_body_as_div(HTML);
     tracing::info!("Here");
-    Views::top(|| ftml_dom::setup_document(uri, || Views::render_ftml(html)))
+    Views::top(|| Views::document(uri, || Views::render_ftml(html)))
 }

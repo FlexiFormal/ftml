@@ -19,6 +19,7 @@ use ftml_uris::{DocumentElementUri, Id, LeafUri, NamedUri, SymbolUri};
 use leptos::{
     either::Either,
     math::{mi, mo},
+    tachys::view::any_view::AnyViewWithAttrs,
 };
 use leptos::{math::mtext, prelude::*};
 
@@ -102,7 +103,7 @@ impl TermExt for Term {
             Self::Var {
                 variable: Variable::Name { name, notated },
                 ..
-            } => var_name::<Views>(name, notated, in_term).into_any(),
+            } => var_name::<Views>(name, notated, None, in_term).into_any(),
             Self::Application {
                 head,
                 arguments,
@@ -189,7 +190,26 @@ impl TermExt for Term {
                     .into_iter()
                     .map(|t| Some(move || t.into_view::<Views, Be>(true)))
                     .collect::<Vec<_>>();
-                do_opaque(&tag, attributes, children, &mut terms)
+                do_opaque(&tag, attributes, children, &mut terms).into_any()
+            }
+            Self::Field {
+                record,
+                presentation: Some(pres),
+                ..
+            } => {
+                let record =
+                    ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
+                match pres {
+                    VarOrSym::Sym(uri) => sym::<Views, Be>(uri, Some(record), in_term).into_any(),
+                    VarOrSym::Var(Variable::Ref {
+                        declaration,
+                        is_sequence,
+                    }) => var_ref::<Views, Be>(declaration, is_sequence, Some(record), in_term)
+                        .into_any(),
+                    VarOrSym::Var(Variable::Name { name, notated }) => {
+                        var_name::<Views>(name, notated, Some(record), in_term).into_any()
+                    }
+                }
             }
 
             Self::Application {
@@ -439,7 +459,12 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
     )
 }
 
-fn var_name<Views: FtmlViews>(name: Id, notated: Option<Id>, in_term: bool) -> impl IntoView {
+fn var_name<Views: FtmlViews>(
+    name: Id,
+    notated: Option<Id>,
+    this: Option<ClonableView>,
+    in_term: bool,
+) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     let not = notated
         .as_ref()
@@ -450,7 +475,7 @@ fn var_name<Views: FtmlViews>(name: Id, notated: Option<Id>, in_term: bool) -> i
             notated: notated.clone(),
         }),
         move || {
-            if with_context::<CurrentUri, _>(|_| ()).is_some() {
+            let outer = if with_context::<CurrentUri, _>(|_| ()).is_some() {
                 let inner = ClonableView::new(true, move || mi().child(not.clone()));
                 Left(Views::variable_reference(
                     Variable::Name { name, notated },
@@ -460,6 +485,15 @@ fn var_name<Views: FtmlViews>(name: Id, notated: Option<Id>, in_term: bool) -> i
                 ))
             } else {
                 Right(mi().child(not))
+            };
+            if let Some(this) = this {
+                Left(
+                    leptos::math::msub()
+                        .child(outer)
+                        .child(this.into_view::<Views>()),
+                )
+            } else {
+                Right(outer)
             }
         },
     )
@@ -514,9 +548,13 @@ fn do_opaque(
     attributes: Box<[(Id, Box<str>)]>,
     children: Box<[Opaque]>,
     terms: &mut Vec<Option<impl FnOnce() -> AnyView>>,
-) -> AnyView {
-    use leptos::either::EitherOf4::{A, B, C, D};
-    let i = super::tachys_from_tag(
+) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
+    use leptos::either::{
+        Either::Left,
+        EitherOf4::{A, B, C, D},
+    };
+    let make_red = !children.iter().any(|e| matches!(e, Opaque::Term(_)));
+    let i = super::html_from_tag(
         tag.as_ref(),
         children
             .into_iter()
@@ -534,9 +572,14 @@ fn do_opaque(
             })
             .collect_view(),
     );
-    attributes.into_iter().fold(i, |i, (k, v)| {
-        i.attr(k.as_ref().to_string(), v.into_string()).into_any()
-    })
+    let r = attributes.into_iter().fold(Left(i), |i, (k, v)| {
+        super::attr(i, k.as_ref().to_string(), v.into_string())
+    });
+    if make_red {
+        super::attr(r, "style", "color:red")
+    } else {
+        r
+    }
 }
 
 fn do_bound_args<Views: FtmlViews, Be: SendBackend>(

@@ -89,10 +89,12 @@ where
     B::Error: Clone + Send + Sync + std::fmt::Debug,
 {
     type Error = CacheError<B::Error>;
+
     #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         self.inner.document_link_url(uri)
     }
+
     #[inline]
     fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String> {
         self.inner.resource_link_url(uri, kind)
@@ -109,6 +111,7 @@ where
             })
             .map_err(Into::into)
     }
+
     fn get_module(
         &self,
         uri: ModuleUri,
@@ -117,6 +120,7 @@ where
             .get(uri, |uri| self.inner.get_module(uri))
             .map_err(Into::into)
     }
+
     fn get_document(
         &self,
         uri: DocumentUri,
@@ -125,6 +129,7 @@ where
             .get(uri, |uri| self.inner.get_document(uri))
             .map_err(Into::into)
     }
+
     fn get_notations(
         &self,
         uri: LeafUri,
@@ -134,6 +139,7 @@ where
             .get(uri, |uri| self.inner.get_notations(uri))
             .map_err(Into::into)
     }
+
     fn get_logical_paragraphs(
         &self,
         uri: SymbolUri,

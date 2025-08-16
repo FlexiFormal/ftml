@@ -321,6 +321,28 @@ impl BitOr<UriName> for ModuleUri {
         }
     }
 }
+/// Adds a symbol [`SimpleUriName`] to a [`ModuleUri`] to create a [`SymbolUri`].
+///
+/// # Examples
+///
+/// ```
+/// # use ftml_uris::prelude::*;
+/// # use std::str::FromStr;
+/// let module_uri = ModuleUri::from_str("http://example.com?a=archive&p=folder&m=module").unwrap();
+/// let name = UriName::from_str("symbol").unwrap();
+/// let symbol_uri = module_uri | name;
+/// assert_eq!(symbol_uri.to_string(), "http://example.com?a=archive&p=folder&m=module&s=symbol");
+/// ```
+impl BitOr<SimpleUriName> for ModuleUri {
+    type Output = SymbolUri;
+    #[inline]
+    fn bitor(self, rhs: SimpleUriName) -> Self::Output {
+        SymbolUri {
+            module: self,
+            name: rhs.0,
+        }
+    }
+}
 
 /// Extends a [`SymbolUri`]'s name with an additional [`UriName`] segment.
 ///

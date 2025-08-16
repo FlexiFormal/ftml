@@ -26,6 +26,7 @@ use ftml_ontology::{
     domain::{
         SharedDeclaration,
         declarations::{
+            morphisms::Morphism,
             structures::{MathStructure, StructureExtension},
             symbols::Symbol,
         },
@@ -153,6 +154,23 @@ pub trait FtmlBackend {
         uri: SymbolUri,
     ) -> impl Future<
         Output = Result<Either<Symbol, SharedDeclaration<Symbol>>, BackendError<Self::Error>>,
+    > + Send {
+        let uri = uri.simple_module();
+        let name = uri.name;
+        self.get_module(uri.module).map(move |r| {
+            let m = r?;
+            m.get_as(&name).map_or_else(
+                || Err(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                |d| Ok(Either::Right(d)),
+            )
+        })
+    }
+
+    fn get_morphism(
+        &self,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<Either<Morphism, SharedDeclaration<Morphism>>, BackendError<Self::Error>>,
     > + Send {
         let uri = uri.simple_module();
         let name = uri.name;

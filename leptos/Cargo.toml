@@ -28,7 +28,7 @@ hydrate = [
     "dep:gloo-storage",
 ]
 ## Server-side rendering
-ssr = ["leptos/ssr", "thaw/ssr"]
+ssr = ["leptos/ssr", "thaw/ssr", "ftml-dom/ssr"]
 ## generate typescript bindings
 typescript = ["csr", "dep:tsify", "ftml-dom/typescript"]
 ## Adds javascript callbacks for some components

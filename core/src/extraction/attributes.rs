@@ -2,7 +2,7 @@ use std::{borrow::Cow, str::FromStr};
 
 use ftml_ontology::terms::{VarOrSym, Variable};
 use ftml_uris::{
-    DocumentElementUri, DocumentUri, DomainUri, Id, Language, ModuleUri, SymbolUri, Uri,
+    DocumentElementUri, DocumentUri, DomainUri, Id, Language, ModuleUri, SymbolUri, Uri, UriName,
 };
 
 use super::Result;
@@ -256,7 +256,7 @@ pub trait Attributes {
         let module = extractor.get_domain_uri(in_elem)?;
         v.as_ref()
             .parse()
-            .map(|v| module.into_owned() | v)
+            .map(|v: UriName| module.into_owned() | v)
             .map_err(|e| (key, e).into())
     }
 
@@ -272,7 +272,7 @@ pub trait Attributes {
         };
         let module = extractor.get_domain_uri(in_elem)?;
         v.parse()
-            .map(|v| module.into_owned() | v)
+            .map(|v: UriName| module.into_owned() | v)
             .map_err(|e| (key, e).into())
     }
 

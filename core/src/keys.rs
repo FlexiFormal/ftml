@@ -15,8 +15,8 @@ use ftml_ontology::{
     terms::{ArgumentMode, Term, VarOrSym, Variable},
 };
 use ftml_uris::{
-    DocumentElementUri, DocumentUri, Id, IsNarrativeUri, Language, ModuleUri, SymbolUri, UriName,
-    errors::SegmentParseError,
+    DocumentElementUri, DocumentUri, Id, IsNarrativeUri, Language, ModuleUri, SimpleUriName,
+    SymbolUri, UriName, errors::SegmentParseError,
 };
 use std::{borrow::Cow, num::NonZeroU8, str::FromStr};
 
@@ -738,6 +738,7 @@ do_keys! {
                     }
                     OpenNarrativeElement::Module { .. }
                     | OpenNarrativeElement::MathStructure { .. }
+                    | OpenNarrativeElement::Morphism { .. }
                     | OpenNarrativeElement::Invisible => (),
                 }
             }
@@ -821,18 +822,33 @@ do_keys! {
     /// from the referenced one.
     ImportModule = "import"
         { = "[ModuleUri]" !"in [`Module`]s or [`MathStructure`]s" }
-        := (ext,attrs,_keys,node) =>{
+        := (ext,attrs,_keys,node) => {
             let uri = attrs.take_symbol_or_module_uri(FtmlKey::ImportModule)?;
             ret!(ext,node <- ImportModule(uri))
         } => ImportModule(uri:ModuleUri),
 
     /// <div class="advanced">
     ///
-    /// <div class="ftml-wip">TODO</div>
     ///
     /// </div>
     Morphism = "feature-morphism"
-        := todo,
+        { = "[UriName]" !"in [`Module`]s or [`MathStructure`]s" +(MorphismDomain,MorphismTotal) &(Rename,Assign)}
+        := (ext,attrs,keys,node) => {
+            let uri = attrs.take_new_symbol_uri(FtmlKey::Morphism, FtmlKey::Morphism,ext)?;
+            let domain = attrs.take_module_uri(FtmlKey::MorphismDomain)?;
+            let total = attrs.take_bool(FtmlKey::MorphismTotal);
+            del!(keys - MorphismDomain,MorphismTotal);
+            ret!(ext,node <- Morphism{
+                uri,domain,total
+            } + Morphism)
+        } => Morphism{ uri:SymbolUri,domain:ModuleUri,total:bool},
+
+    MorphismDomain = "domain"
+        { = "[ModuleUri]" -(Morphism)}
+        := noop,
+    MorphismTotal = "total"
+        { = "[bool]" -(Morphism)}
+        := noop,
 
     /// Declares a new [`Symbol`] with the given name. Its [`SymbolUri`] is made up of the given
     /// name and the [`ModuleUri`] of the containing [`Module`] or [`MathStructure`].
@@ -895,8 +911,9 @@ do_keys! {
             +(Role,AssocType,Args,ArgumentReordering,Macroname,Bind)
             &(Type,Definiens,ReturnType,ArgTypes)
         }
-        := (ext,attrs,keys,node) => {do_vardef(ext, attrs, keys, node, FtmlKey::Vardef, false)}
-        => VariableDeclaration{uri:DocumentElementUri,data:Box<VariableData>},
+        := (ext,attrs,keys,node) => {
+            do_vardef(ext, attrs, keys, node, FtmlKey::Vardef, false)
+        } => VariableDeclaration{uri:DocumentElementUri,data:Box<VariableData>},
 
     /// Declares a new [`VariableDeclaration`] representing a *sequence* of arbitrary length
     /// with the given name.
@@ -907,11 +924,46 @@ do_keys! {
             +(Role,AssocType,Args,ArgumentReordering,Macroname,Bind)
             &(Type,Definiens,ReturnType,ArgTypes)
         }
-        := (ext,attrs,keys,node) => {do_vardef(ext, attrs, keys, node, FtmlKey::Varseq, true)},
+        := (ext,attrs,keys,node) => {
+            do_vardef(ext, attrs, keys, node, FtmlKey::Varseq, true)
+        },
+
+    /// Assigns a [`Symbol`] in the domain of a [`Morphism`] to a [`Term`]
+    /// provided as a [`Definiens`](FtmlKey::Definiens) child node, with the optional
+    /// refined type provided as a [`Type`](FtmlKey::Type) child.
+    Assign = "assign"
+        { = "[SymbolUri]" <=(Morphism) &(Definiens,Type)}
+        := (ext,attrs,_keys,node) => {
+            let source = attrs.take_symbol_uri(FtmlKey::Assign)?;
+            ret!(ext,node <- Assign(source) + Assign)
+        } => Assign(source:SymbolUri),
+
+    /// Renames a [`Symbol`] in the domain of a [`Morphism`] to the new provided name with
+    /// the optional provided new macroname.
+    Rename = "rename"
+        { = "[SymbolUri]" +(Macroname,RenameTo) <=(Morphism)}
+        := (ext,attrs,keys,node) => {
+            let source = attrs.take_symbol_uri(FtmlKey::Rename)?;
+            let name = opt!(attrs.take_typed(FtmlKey::RenameTo, str::parse));
+            let macroname = opt!(attrs.take_typed(FtmlKey::RenameTo, str::parse));
+            del!(keys -RenameTo,Macroname);
+            ret!(ext,node <- Rename { source, name, macroname})
+        } => Rename{source:SymbolUri,name:Option<SimpleUriName>,macroname:Option<Id>},
+
+    /// The new name in a [`FtmlKey::Rename`].
+    RenameTo = "to"
+        { ="[UriName]"}
+        := noop,
+
+
+    AssignMorphismFrom = "assignmorphismfrom"
+        := todo,
+    AssignMorphismTo = "assignmorphismto"
+        := todo,
 
     /// The (optional) macro name of a [`Symbol`] (e.g. in $s\TeX$).
     Macroname = "macroname"
-        {="[Id]" -(Symdecl,MathStructure,Vardef,Varseq)}
+        {="[Id]" -(Symdecl,MathStructure,Vardef,Varseq,Rename)}
         := noop,
 
     /// <div class="ftml-wip">TODO</div>
@@ -950,14 +1002,11 @@ do_keys! {
 
     // -------------------------------------------------------------------------------
 
-    /// Denotes the *type* of the current [`Symbol`] or [`Variable`]. This node (or its only child)
+    /// Denotes the *type* of the current [`Symbol`] or [`Variable`] or [`Term::Label`]. This node (or its only child)
     /// is interpreted to be a [`Term`].
     Type = "type"
-        {<=(Symdecl, Vardef, Varseq) }
+        {<=(Symdecl, Vardef, Varseq, Assign) }
         := (ext,_attrs,_keys,node) => {
-            if ext.in_term() {
-                return Err(FtmlExtractionError::InvalidIn(FtmlKey::Type, "terms"));
-            }
             ret!(ext,node <- Type + Type)
         } => Type,
 
@@ -981,18 +1030,15 @@ do_keys! {
         := todo,
 
     /// In a [`Symdecl`], [`Vardef`] or [`Varseq`], denotes the *definiens* of the current
-    /// [`Symbol`] or [`Variable`]. In a [`Definition`], a definition-like [`Paragraph`]
+    /// [`Symbol`] or [`Variable`] or [`Term::Label`]. In a [`Definition`], a definition-like [`Paragraph`]
     /// or an [`Assertion`], denotes the definiens of the *referenced* [`Symbol`] or the
     /// *first* [`Symbol`] in the paragraph's [`Fors`](FtmlKey::Fors)-list.
     ///
     /// This node (or its only child)
     /// is interpreted to be a [`Term`].
     Definiens = "definiens"
-        {="[Option]<[SymbolUri]>" <=(Definition, Paragraph, Assertion, Symdecl, Vardef, Varseq) }
+        {="[Option]<[SymbolUri]>" <=(Definition, Paragraph, Assertion, Symdecl, Vardef, Varseq, Assign) }
         := (ext,attrs,_keys,node) => {
-            if ext.in_term() {
-                return Err(FtmlExtractionError::InvalidIn(FtmlKey::Definiens, "terms"));
-            }
             let uri = opt!(attrs.get_symbol_uri(FtmlKey::Definiens));
             ret!(ext,node <- Definiens(uri) + Definiens)
             } => Definiens(def:Option<SymbolUri>),
@@ -1071,6 +1117,7 @@ do_keys! {
                         | Some(
                             OpenDomainElement::Module { .. }
                             | OpenDomainElement::MathStructure { .. }
+                            | OpenDomainElement::Morphism { .. }
                             | OpenDomainElement::SymbolDeclaration { .. }
                             | OpenDomainElement::SymbolReference { .. }
                             | OpenDomainElement::VariableReference { .. }
@@ -1080,9 +1127,10 @@ do_keys! {
                             | OpenDomainElement::ComplexTerm { .. }
                             | OpenDomainElement::Type { .. }
                             | OpenDomainElement::ReturnType { .. }
+                            | OpenDomainElement::Assign { .. }
                             | OpenDomainElement::Definiens { .. },
                         ) => false,
-                        Some(OpenDomainElement::Argument { .. } | OpenDomainElement::HeadTerm { .. }) => {
+                        Some(OpenDomainElement::Argument { .. } | OpenDomainElement::HeadTerm { .. } ) => {
                             true
                         }
                         Some(OpenDomainElement::Comp | OpenDomainElement::DefComp) => {
@@ -1424,12 +1472,14 @@ do_keys! {
                 | Some(
                     OpenDomainElement::Module { .. }
                     | OpenDomainElement::MathStructure { .. }
+                    | OpenDomainElement::Morphism { .. }
                     | OpenDomainElement::SymbolDeclaration { .. }
                     | OpenDomainElement::Argument { .. }
                     | OpenDomainElement::HeadTerm { .. }
                     | OpenDomainElement::Type { .. }
                     | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. }
+                    | OpenDomainElement::Assign { .. }
                     | OpenDomainElement::Comp
                     | OpenDomainElement::DefComp,
                 ) => {
@@ -1462,21 +1512,6 @@ do_keys! {
     SlideshowSlide = "slideshow-slide"
         := todo,
 
-    Assign = "assign"
-        := todo,
-    Rename = "rename"
-        := todo,
-    RenameTo = "to"
-        := todo,
-    AssignMorphismFrom = "assignmorphismfrom"
-        := todo,
-    AssignMorphismTo = "assignmorphismto"
-        := todo,
-
-    MorphismDomain = "domain"
-        := todo,
-    MorphismTotal = "total"
-        := todo,
 
     Language = "language"
         := noop,
@@ -1584,12 +1619,14 @@ fn do_comp<E: FtmlExtractor>(
         | Some(
             OpenDomainElement::Module { .. }
             | OpenDomainElement::MathStructure { .. }
+            | OpenDomainElement::Morphism { .. }
             | OpenDomainElement::SymbolDeclaration { .. }
             | OpenDomainElement::Argument { .. }
             | OpenDomainElement::HeadTerm { .. }
             | OpenDomainElement::Type { .. }
             | OpenDomainElement::ReturnType { .. }
             | OpenDomainElement::Definiens { .. }
+            | OpenDomainElement::Assign { .. }
             | OpenDomainElement::Comp
             | OpenDomainElement::DefComp,
         ) => {

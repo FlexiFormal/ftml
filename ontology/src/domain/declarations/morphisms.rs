@@ -1,8 +1,11 @@
-use ftml_uris::{DomainUriRef, ModuleUri, SymbolUri};
+use ftml_uris::{DomainUriRef, Id, ModuleUri, SimpleUriName, SymbolUri};
 
-use crate::domain::{
-    HasDeclarations,
-    declarations::{AnyDeclarationRef, Declaration, IsDeclaration},
+use crate::{
+    domain::{
+        HasDeclarations,
+        declarations::{AnyDeclarationRef, IsDeclaration},
+    },
+    terms::Term,
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -13,7 +16,7 @@ pub struct Morphism {
     pub uri: SymbolUri,
     pub domain: ModuleUri,
     pub total: bool,
-    pub elements: Box<[Declaration]>,
+    pub elements: Box<[Assignment]>,
 }
 
 impl crate::__private::Sealed for Morphism {}
@@ -54,11 +57,54 @@ impl HasDeclarations for Morphism {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
-        self.elements.iter().map(Declaration::as_ref)
+        std::iter::empty() //self.elements.iter().map(Declaration::as_ref)
     }
     #[inline]
     fn domain_uri(&self) -> DomainUriRef<'_> {
         DomainUriRef::Symbol(&self.uri)
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[allow(clippy::unsafe_derive_deserialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct Assignment {
+    pub original: SymbolUri,
+    pub morphism: SymbolUri,
+    pub definiens: Option<Term>,
+    pub refined_type: Option<Term>,
+    pub new_name: Option<SimpleUriName>,
+    pub macroname: Option<Id>,
+}
+impl Assignment {
+    #[must_use]
+    pub fn elaborated_uri(&self) -> SymbolUri {
+        self.new_name.as_ref().map_or_else(
+            || {
+                // SAFETY: segment already validated
+                unsafe {
+                    self.morphism.clone() / &self.original.name.last().parse().unwrap_unchecked()
+                }
+            },
+            |name| self.morphism.module.clone() | name.clone(),
+        )
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Assignment {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.definiens
+            .as_ref()
+            .map(|t| t.deep_size_of_children(context))
+            .unwrap_or_default()
+            + self
+                .refined_type
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
     }
 }
 
