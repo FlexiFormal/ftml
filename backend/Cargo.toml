@@ -22,7 +22,7 @@ wasm = [
 ## reqwest
 reqwest = ["dep:reqwest"]
 ## cached
-cached = ["dep:dashmap", "dep:parking_lot", "dep:kanal"]
+cached = ["dep:dashmap", "dep:parking_lot", "dep:kanal", "dep:rustc-hash"]
 ## Generates typescript exports for `wasm-pack`
 typescript = ["wasm", "dep:tsify", "ftml-ontology/typescript"]
 ## Adds memory monitoring for cached backends
@@ -75,3 +75,4 @@ parking_lot = { workspace = true, optional = true }
 kanal = { workspace = true, optional = true }
 bytesize = { workspace = true, optional = true }
 deepsize = { workspace = true, optional = true }
+rustc-hash = { workspace = true, optional = true }

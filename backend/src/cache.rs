@@ -66,19 +66,19 @@ where
         Self {
             inner,
             fragment_cache: Cache {
-                map: dashmap::DashMap::new(),
+                map: dashmap::DashMap::default(),
             },
             notations_cache: Cache {
-                map: dashmap::DashMap::new(),
+                map: dashmap::DashMap::default(),
             },
             paragraphs_cache: Cache {
-                map: dashmap::DashMap::new(),
+                map: dashmap::DashMap::default(),
             },
             modules_cache: Cache {
-                map: dashmap::DashMap::new(),
+                map: dashmap::DashMap::default(),
             },
             documents_cache: Cache {
-                map: dashmap::DashMap::new(),
+                map: dashmap::DashMap::default(),
             },
         }
     }
@@ -185,7 +185,7 @@ where
     K: std::hash::Hash + Clone + Eq,
     V: Clone + Send + Sync,
 {
-    map: dashmap::DashMap<K, Arc<RwLock<MaybeValue<V, E>>>>,
+    map: dashmap::DashMap<K, Arc<RwLock<MaybeValue<V, E>>>, rustc_hash::FxBuildHasher>,
 }
 impl<K, V, E> Cache<K, V, E>
 where

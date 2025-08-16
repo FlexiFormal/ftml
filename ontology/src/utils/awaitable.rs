@@ -9,7 +9,7 @@ pub struct AsyncCache<
     T: Clone + Send + Sync,
     E: Clone + From<ChannelError> + Send + Sync,
 > {
-    map: dashmap::DashMap<K, Awaitable<T, E>>,
+    map: dashmap::DashMap<K, Awaitable<T, E>, rustc_hash::FxBuildHasher>,
 }
 
 impl<
@@ -18,6 +18,13 @@ impl<
     E: Clone + From<ChannelError> + Send + Sync,
 > AsyncCache<K, T, E>
 {
+    pub fn retain(&self, mut keep: impl FnMut(&K, &Result<T, E>) -> bool) {
+        self.map.retain(|k, e| match &*e.inner.read() {
+            MaybeValue::Pending(_) => true,
+            MaybeValue::Done(v) => keep(k, v),
+        });
+    }
+
     pub fn get<Fut: Future<Output = Result<T, E>> + Send>(
         &self,
         k: K,
@@ -33,18 +40,30 @@ impl<
         }
     }
 
+    /// Assumes f blocks
     /// # Errors
-    pub fn get_sync<Fut: Future<Output = Result<T, E>> + Send>(
-        &self,
-        k: K,
-        f: impl FnOnce(K) -> Fut,
-    ) -> Result<T, E> {
+    pub fn get_sync(&self, k: K, f: impl FnOnce(K) -> Result<T, E>) -> Result<T, E> {
         match self.map.entry(k) {
             Entry::Occupied(a) => a.get().clone().get_sync(),
             Entry::Vacant(v) => {
-                let (a, ret) = Awaitable::new(f(v.key().clone()));
-                v.insert(a);
-                ret.get_sync()
+                let (sender, receiver) = flume::bounded(1);
+                let inner =
+                    std::sync::Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
+                let key = v.key().clone();
+                {
+                    v.insert(Awaitable {
+                        inner: inner.clone(),
+                    });
+                }
+                let res = f(key);
+                {
+                    let mut lock = inner.write();
+                    *lock = MaybeValue::Done(res.clone());
+                }
+                while sender.receiver_count() > 0 {
+                    let _ = sender.send(res.clone());
+                }
+                res
             }
         }
     }

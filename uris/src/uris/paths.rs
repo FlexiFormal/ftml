@@ -77,6 +77,8 @@ impl UriPath {
     ///
     /// The iterator supports both forward and backward iteration.
     ///
+    /// **Invariant:** guaranteed to be non-empty.
+    ///
     /// # Examples
     ///
     /// ```
@@ -93,6 +95,25 @@ impl UriPath {
     #[must_use]
     pub fn steps(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.segmented::<'/'>()
+    }
+
+    /// Returns `true` if this is a top-level path (contains no forward slashes).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let top = UriPath::from_str("math").unwrap();
+    /// assert!(top.is_simple());
+    ///
+    /// let nested = UriPath::from_str("math/algebra").unwrap();
+    /// assert!(!nested.is_simple());
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn is_simple(&self) -> bool {
+        !self.as_ref().contains('/')
     }
 }
 
