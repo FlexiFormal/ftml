@@ -71,6 +71,7 @@ smallvec = { workspace = true }
 regex = { workspace = true }
 parking_lot = { workspace = true }
 dashmap = { workspace = true }
+chrono = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
 
 #kanal = { workspace = true }

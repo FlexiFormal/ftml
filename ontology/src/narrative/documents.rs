@@ -21,6 +21,7 @@ pub struct DocumentData {
     pub elements: Box<[DocumentElement]>,
     pub styles: DocumentStyles,
     pub top_section_level: SectionLevel,
+    pub kind: DocumentKind,
 }
 impl DocumentData {
     #[must_use]
@@ -42,6 +43,8 @@ impl crate::Ftml for DocumentData {
             triple!(<(iri.clone())> : ulo:document),
             triple!(<(self.uri.archive_uri().to_iri())> ulo:contains <(iri)>),
         ]
+        .into_iter()
+        .chain(self.contains_triples())
     }
 }
 impl Narrative for DocumentData {
@@ -105,6 +108,42 @@ pub struct DocumentStyle {
     pub kind: ParagraphKind,
     pub name: Option<Id>,
     pub counter: Option<Id>,
+}
+
+#[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
+pub enum DocumentKind {
+    #[default]
+    Article,
+    Fragment,
+    Exam,
+    Homework,
+    Quiz,
+}
+impl std::str::FromStr for DocumentKind {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "article" => Self::Article,
+            "fragment" => Self::Fragment,
+            "exam" => Self::Exam,
+            "homework" => Self::Homework,
+            "quiz" => Self::Quiz,
+            _ => return Err(()),
+        })
+    }
+}
+impl std::fmt::Display for DocumentKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Article => "article",
+            Self::Fragment => "fragment",
+            Self::Exam => "exam",
+            Self::Homework => "homework",
+            Self::Quiz => "quiz",
+        })
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -10,3 +10,4 @@ mod css;
 pub use css::*;
 pub mod awaitable;
 pub mod regex;
+pub mod time;

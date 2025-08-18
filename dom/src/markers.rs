@@ -400,6 +400,7 @@ impl Marker {
             | OpenFtmlElement::VariableDeclaration { .. }
             | OpenFtmlElement::None
             | OpenFtmlElement::Assign(_)
+            | OpenFtmlElement::DocumentKind(_)
             | OpenFtmlElement::OML { .. }
             | OpenFtmlElement::Rename { .. }
             | OpenFtmlElement::HeadTerm => None,

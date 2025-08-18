@@ -55,7 +55,7 @@ pub trait Narrative: crate::Ftml {
                 .flat_map(|e| {
                     e.opaque_children().map_or_else(
                         || either::Either::Left(std::iter::once(e)),
-                        either::Either::Right,
+                        |ch| either::Either::Right(std::iter::once(e).chain(ch)),
                     )
                 })
                 .filter_map(move |e| match e {

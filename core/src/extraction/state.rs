@@ -18,7 +18,9 @@ use ftml_ontology::{
     },
     narrative::{
         DataBuffer, DocumentRange,
-        documents::{Document, DocumentCounter, DocumentData, DocumentStyle, DocumentStyles},
+        documents::{
+            Document, DocumentCounter, DocumentData, DocumentKind, DocumentStyle, DocumentStyles,
+        },
         elements::{
             DocumentElement, DocumentTerm, LogicalParagraph, Notation, Section, SectionLevel,
             VariableDeclaration,
@@ -29,8 +31,7 @@ use ftml_ontology::{
     },
     terms::{Term, VarOrSym, Variable},
 };
-#[cfg(feature = "rdf")]
-use ftml_uris::FtmlUri;
+
 use ftml_uris::{
     DocumentElementUri, DocumentUri, DomainUriRef, Id, IsDomainUri, Language, LeafUri, ModuleUri,
     SymbolUri,
@@ -126,16 +127,15 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     pub notations: Vec<(LeafUri, DocumentElementUri, Notation)>,
     pub domain: StackVec<OpenDomainElement<N>>,
     pub narrative: StackVec<OpenNarrativeElement<N>>,
+    pub kind: DocumentKind,
     top_section_level: Option<SectionLevel>,
     ids: IdCounter,
     #[allow(dead_code)]
     do_rdf: bool,
     #[cfg(feature = "rdf")]
     rdf: rustc_hash::FxHashSet<ulo::rdf_types::Triple>,
-    #[cfg(feature = "rdf")]
-    iri: ulo::rdf_types::NamedNode,
 }
-
+/*
 macro_rules! add_triples {
     (DOM $self:ident,$elem:ident -> $module:ident) => {
         add_triples!(NARR $self,$elem -> ($module.to_iri()) ulo:declares)
@@ -153,6 +153,7 @@ macro_rules! add_triples {
         }
     }
 }
+*/
 
 #[derive(Debug)]
 pub struct ExtractionResult {
@@ -172,8 +173,6 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     pub fn new(document: DocumentUri, do_rdf: bool) -> Self {
         Self {
             do_rdf,
-            #[cfg(feature = "rdf")]
-            iri: document.to_iri(),
             document,
             top_section_level: None,
             title: None,
@@ -184,6 +183,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             buffer: DataBuffer::default(),
             top: Vec::new(),
             modules: Vec::new(),
+            kind: DocumentKind::default(),
             domain: StackVec::default(),
             narrative: StackVec::default(),
             #[cfg(feature = "rdf")]
@@ -198,6 +198,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             title: take(&mut self.title), // todo
             elements: take(&mut self.top).into_boxed_slice(),
             top_section_level: self.top_section_level.unwrap_or_default(),
+            kind: self.kind,
             styles: DocumentStyles {
                 // clone instead of take because DomExtractor
                 // still needs them
@@ -206,6 +207,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             },
         }
         .close();
+        #[cfg(feature = "rdf")]
+        {
+            use ftml_ontology::Ftml;
+            self.rdf.extend(document.triples());
+        }
         tracing::info!("Finished document {document:#?}");
         let modules = take(&mut self.modules)
             .into_iter()
@@ -263,6 +269,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
             }
             AnyOpen::Meta(m) => match m {
+                MetaDatum::DocumentKind(k) => self.kind = k,
                 MetaDatum::Style(s) => self.styles.push(s),
                 MetaDatum::Counter(c) => self.counters.push(c),
                 MetaDatum::InputRef { target, uri } => {
@@ -600,11 +607,23 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     ) -> Result<DomainUriRef<'_>, FtmlExtractionError> {
         let uri = match self.domain.last_mut() {
             Some(OpenDomainElement::Module { uri, children, .. }) => {
-                children.push(module(data));
+                let elem = module(data);
+                #[cfg(feature = "rdf")]
+                {
+                    use ftml_ontology::Ftml;
+                    self.rdf.extend(elem.triples());
+                }
+                children.push(elem);
                 DomainUriRef::Module(uri)
             }
             Some(OpenDomainElement::MathStructure { uri, children, .. }) => {
-                children.push(structure(data)?);
+                let elem = structure(data)?;
+                #[cfg(feature = "rdf")]
+                {
+                    use ftml_ontology::Ftml;
+                    self.rdf.extend(elem.triples());
+                }
+                children.push(elem);
                 DomainUriRef::Symbol(uri)
             }
             _ => {
@@ -618,6 +637,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     }
 
     fn push_elem(&mut self, e: DocumentElement) {
+        #[cfg(feature = "rdf")]
+        {
+            use ftml_ontology::Ftml;
+            self.rdf.extend(e.triples());
+        }
         for d in self.narrative.iter_mut() {
             match d {
                 OpenNarrativeElement::Module { children, .. }
@@ -830,7 +854,12 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             signature,
             declarations: children.into_boxed_slice(),
         };
-        add_triples!(NARR self,module -> (self.iri.clone()) ulo:contains);
+        #[cfg(feature = "rdf")]
+        {
+            use ftml_ontology::Ftml;
+            self.rdf.extend(module.triples());
+        }
+        //add_triples!(NARR self,module -> (self.iri.clone()) ulo:contains);
         self.modules.push(module);
         Ok(())
     }

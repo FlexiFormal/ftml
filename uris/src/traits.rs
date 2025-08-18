@@ -55,6 +55,7 @@ pub trait FtmlUri:
                     '^' => "%5E",
                     '[' => "%5B",
                     ']' => "%5D",
+                    '|' => "%7C",
                     c => {
                         self.0.push(c);
                         return Ok(());

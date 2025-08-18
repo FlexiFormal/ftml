@@ -1,13 +1,14 @@
 use dashmap::Entry;
+use triomphe::Arc;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("internal channel error")]
 pub struct ChannelError;
 
 pub struct AsyncCache<
     K: std::hash::Hash + Clone + Eq,
-    T: Clone + Send + Sync,
-    E: Clone + From<ChannelError> + Send + Sync,
+    T: Clone + Send,
+    E: Clone + From<ChannelError> + Send,
 > {
     map: dashmap::DashMap<K, Awaitable<T, E>, rustc_hash::FxBuildHasher>,
 }
@@ -25,7 +26,7 @@ impl<
         });
     }
 
-    pub fn get<Fut: Future<Output = Result<T, E>> + Send>(
+    pub fn get<Fut: Future<Output = Result<T, E>> + Send + Sync>(
         &self,
         k: K,
         f: impl FnOnce(K) -> Fut,
@@ -47,8 +48,7 @@ impl<
             Entry::Occupied(a) => a.get().clone().get_sync(),
             Entry::Vacant(v) => {
                 let (sender, receiver) = flume::bounded(1);
-                let inner =
-                    std::sync::Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
+                let inner = Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
                 let key = v.key().clone();
                 {
                     v.insert(Awaitable {
@@ -70,16 +70,16 @@ impl<
 }
 
 #[derive(Clone)]
-pub struct Awaitable<T: Clone + Send + Sync, E: Clone + From<ChannelError> + Send + Sync> {
-    inner: std::sync::Arc<parking_lot::RwLock<MaybeValue<T, E>>>,
+pub struct Awaitable<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
+    inner: Arc<parking_lot::RwLock<MaybeValue<T, E>>>,
 }
 
 #[derive(Clone)]
-enum MaybeValue<T: Clone + Send + Sync, E: Clone + From<ChannelError> + Send + Sync> {
+enum MaybeValue<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
     Done(Result<T, E>),
     Pending(flume::Receiver<Result<T, E>>), //(kanal::AsyncReceiver<Result<T, E>>),
 }
-impl<T: Clone + Send + Sync, E: Clone + From<ChannelError> + Send + Sync> MaybeValue<T, E> {
+impl<T: Clone + Send, E: Clone + From<ChannelError> + Send> MaybeValue<T, E> {
     async fn get(self) -> Result<T, E> {
         match self {
             Self::Done(r) => r,
@@ -97,7 +97,7 @@ impl<T: Clone + Send + Sync, E: Clone + From<ChannelError> + Send + Sync> MaybeV
     }
 }
 
-impl<T: Clone + Send + Sync, E: Clone + From<ChannelError> + Send + Sync> Awaitable<T, E> {
+impl<T: Clone + Send, E: Clone + From<ChannelError> + Send> Awaitable<T, E> {
     pub fn get(self) -> impl Future<Output = Result<T, E>> {
         self.inner.read().clone().get()
     }
@@ -111,7 +111,7 @@ impl<T: Clone + Send + Sync, E: Clone + From<ChannelError> + Send + Sync> Awaita
         future: F,
     ) -> (Self, AwaitableSource<T, E, F>) {
         let (sender, receiver) = flume::bounded(1); //kanal::bounded_async(1);
-        let inner = std::sync::Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
+        let inner = Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
         (
             Self {
                 inner: inner.clone(),
@@ -126,11 +126,11 @@ impl<T: Clone + Send + Sync, E: Clone + From<ChannelError> + Send + Sync> Awaita
 }
 
 pub struct AwaitableSource<
-    T: Clone + Send + Sync,
-    E: Clone + From<ChannelError> + Send + Sync,
+    T: Clone + Send,
+    E: Clone + From<ChannelError> + Send,
     F: Future<Output = Result<T, E>> + Send,
 > {
-    inner: std::sync::Arc<parking_lot::RwLock<MaybeValue<T, E>>>,
+    inner: Arc<parking_lot::RwLock<MaybeValue<T, E>>>,
     sender: flume::Sender<Result<T, E>>, //kanal::AsyncSender<Result<T, E>>,
     future: F,
 }
@@ -138,7 +138,7 @@ pub struct AwaitableSource<
 impl<
     T: Clone + Send + Sync,
     E: Clone + From<ChannelError> + Send + Sync,
-    F: Future<Output = Result<T, E>> + Send,
+    F: Future<Output = Result<T, E>> + Send + Sync,
 > AwaitableSource<T, E, F>
 {
     /// # Errors

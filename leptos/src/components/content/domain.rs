@@ -11,7 +11,7 @@ use ftml_ontology::domain::declarations::{
     symbols::ArgumentSpec,
 };
 use leptos::prelude::*;
-use thaw::{Caption1, Caption1Strong, Divider, Text};
+use thaw::{Caption1, Caption1Strong, Divider};
 
 impl FtmlViewable for Morphism {
     #[inline]

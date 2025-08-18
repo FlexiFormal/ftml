@@ -5,7 +5,7 @@ use crate::extraction::{
 use ftml_ontology::{
     domain::declarations::symbols::{ArgumentSpec, AssocType, SymbolData},
     narrative::{
-        documents::{DocumentCounter, DocumentStyle},
+        documents::{DocumentCounter, DocumentKind, DocumentStyle},
         elements::{
             SectionLevel,
             paragraphs::{ParagraphFormatting, ParagraphKind},
@@ -32,7 +32,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 119;
+pub const NUM_KEYS: u8 = 120;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -381,6 +381,15 @@ do_keys! {
             ret!(ext, node <- None + DocTitle)
         },
 
+    /// The kind of the document (by default [`Article`](DocumentKind::Article)). Should
+    /// occur at most once
+    DocKind = "document-kind"
+        {="[DocumentKind]"}
+        := (ext,attrs,_keys,node) => {
+            let kind = attrs.get_typed(FtmlKey::DocKind, DocumentKind::from_str)?;
+            ret!(ext, node <- DocumentKind(kind) + DocTitle)
+        } => DocumentKind(kind:DocumentKind),
+
     /// Declares a new CSS style for a section or logical paragraph. May reference a counter
     /// used for numbering the paragraphs/sections of this style.
     Style = "style"
@@ -432,7 +441,8 @@ do_keys! {
             ret!(ext,node <- Counter(DocumentCounter { name, parent }))
         },
 
-    /// A [`DocumentReference`](DocumentElement::DocumentReference); Inserts the referenced [`Document`] here; loosely analogous to an iframe, but the referenced
+    /// A [`DocumentReference`](DocumentElement::DocumentReference); Inserts the referenced [`Document`]
+    /// here; loosely analogous to an iframe, but the referenced
     /// [`Document`] is adapted to the current document in various ways (e.g. wrt [`SectionLevel`]s).
     InputRef = "inputref"
         { ="[DocumentUri]" +(Id) }
@@ -444,9 +454,11 @@ do_keys! {
 
     /// If `true`, shows the node iff the current document is being rendered as an
     /// [`InputRef`](FtmlKey::InputRef) in some other (top-level) document;
-    /// conversely, if `false`, shows the node only iff the current document *is* the top-level document.
+    /// conversely, if `false`, shows the node only iff the current document *is* the
+    /// top-level document.
     ///
-    /// Useful to wrap e.g. lists of references, titles etc., so they are not shown when "inputreffed".
+    /// Useful to wrap e.g. lists of references, titles etc., so they are not shown when "
+    /// inputreffed".
     IfInputref = "ifinputref"
         { ="[bool]" }
         := (ext,attrs,_keys,node) => {
@@ -481,8 +493,8 @@ do_keys! {
             ret!(ext,node <- SkipSection + SkipSection)
         } => SkipSection,
 
-    /// Sets the top-most [`SectionLevel`] to use in this document. Should occur at most once and *before*
-    /// any section.
+    /// Sets the top-most [`SectionLevel`] to use in this document. Should occur at most once and
+    /// *before* any section.
     SetSectionLevel = "sectionlevel"
         { ="[SectionLevel] as [u8]" }
         := (ext,attrs,_keys,node) => {
@@ -495,7 +507,8 @@ do_keys! {
             ret!(ext,node <- SetSectionLevel(lvl))
         } => SetSectionLevel(lvl:SectionLevel),
 
-    /// Gets dynamically replaced by the current [`SectionLevel`]. If [`Capitalize`](FtmlKey::Capitalize)
+    /// Gets dynamically replaced by the current [`SectionLevel`]. If
+    /// [`Capitalize`](FtmlKey::Capitalize)
     /// is `true`, the first letter gets capitalized ("Chapter"), otherwise not ("chapter").
     /// Outside of any section, yields "document".
     CurrentSectionLevel = "currentsectionlevel"
@@ -506,9 +519,10 @@ do_keys! {
             ret!(ext,node <- CurrentSectionLevel(cap))
         } => CurrentSectionLevel(cap:bool),
 
+    /// Whether to capitalize in [`CurrentSectionLevel`](FtmlKey::CurrentSectionLevel)
     Capitalize = "capitalize"
         {-(CurrentSectionLevel)}
-        := todo,
+        := noop,
 
     // ------------------------------------------------------------------------------------
 

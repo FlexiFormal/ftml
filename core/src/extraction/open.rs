@@ -6,7 +6,7 @@ use ftml_ontology::{
         Declaration, morphisms::Assignment, structures::StructureDeclaration, symbols::SymbolData,
     },
     narrative::{
-        documents::{DocumentCounter, DocumentStyle},
+        documents::{DocumentCounter, DocumentKind, DocumentStyle},
         elements::{
             DocumentElement,
             notations::{NotationComponent, NotationNode},
@@ -221,6 +221,7 @@ pub enum MetaDatum {
         name: Option<SimpleUriName>,
         macroname: Option<Id>,
     },
+    DocumentKind(DocumentKind),
 }
 
 #[derive(Debug, Clone)]
@@ -758,6 +759,7 @@ impl OpenFtmlElement {
                 target: uri,
                 uri: id,
             }),
+            Self::DocumentKind(k) => AnyOpen::Meta(MetaDatum::DocumentKind(k)),
             Self::IfInputref(b) => AnyOpen::Meta(MetaDatum::IfInputref(b)),
             Self::Style(s) => AnyOpen::Meta(MetaDatum::Style(s)),
             Self::Counter(c) => AnyOpen::Meta(MetaDatum::Counter(c)),
