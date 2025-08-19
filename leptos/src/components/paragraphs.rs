@@ -76,9 +76,9 @@ impl Slides {
         let current = RwSignal::new(None);
         let all = RwSignal::new(Vec::new());
         let top = NodeRef::new();
-        Self::do_effect(all, current, top);
+        Self::update_slide(all, current, top);
         #[cfg(target_family = "wasm")]
-        let closure = Self::do_ev(all, current, top);
+        let closure = Self::arrow_keys(all, current, top);
         (
             view!(<div node_ref=top class="ftml-slide" style="display:none;"/>),
             Self {
@@ -91,7 +91,7 @@ impl Slides {
         )
     }
 
-    fn do_effect(
+    fn update_slide(
         all: RwSignal<Vec<SlideData>>,
         current: RwSignal<Option<usize>>,
         top: NodeRef<leptos::html::Div>,
@@ -168,7 +168,7 @@ impl Slides {
     }
 
     #[allow(dead_code)]
-    fn do_ev(
+    fn arrow_keys(
         all: RwSignal<Vec<SlideData>>,
         current: RwSignal<Option<usize>>,
         top: NodeRef<leptos::html::Div>,
