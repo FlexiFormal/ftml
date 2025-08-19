@@ -243,6 +243,11 @@ impl DocumentState {
         })
     }
 
+    pub(crate) fn new_slide() {
+        let counters = SectionCounters::slide_inc();
+        provide_context(counters);
+    }
+
     pub fn current_section_level() -> LogicalLevel {
         with_context(|cntrs: &SectionCounters| cntrs.current_level()).unwrap_or(LogicalLevel::None)
     }

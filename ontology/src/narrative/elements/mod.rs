@@ -67,6 +67,7 @@ pub enum DocumentElement {
     Slide {
         range: DocumentRange,
         uri: DocumentElementUri,
+        title: Option<Box<str>>,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
         children: Box<[Self]>,
     },
@@ -294,6 +295,7 @@ pub enum DocumentElementRef<'d> {
     Slide {
         range: DocumentRange,
         uri: &'d DocumentElementUri,
+        title: Option<&'d str>,
         children: &'d [DocumentElement],
     },
     DocumentReference {
@@ -549,10 +551,12 @@ impl DocumentElement {
             Self::Slide {
                 range,
                 uri,
+                title,
                 children,
             } => DocumentElementRef::Slide {
                 range: *range,
                 uri,
+                title: title.as_deref(),
                 children,
             },
             Self::DocumentReference { uri, target } => {

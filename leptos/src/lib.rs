@@ -17,7 +17,7 @@ use ftml_uris::DocumentUri;
 use leptos::IntoView;
 use std::marker::PhantomData;
 
-use crate::config::FtmlConfig;
+use crate::{components::paragraphs::Slides, config::FtmlConfig};
 
 pub struct Views<B: SendBackend>(PhantomData<B>);
 impl<B: SendBackend> Views<B> {
@@ -25,8 +25,14 @@ impl<B: SendBackend> Views<B> {
         uri: DocumentUri,
         children: impl FnOnce() -> Ch + 'static,
     ) -> impl IntoView {
-        use leptos::either::Either::{Left, Right};
+        use leptos::{
+            either::Either::{Left, Right},
+            prelude::*,
+        };
         ftml_dom::setup_document(uri, move || {
+            let (v, s) = Slides::new();
+            provide_context(s);
+            let children = move || view! {{children()}{v}};
             let show_content = FtmlConfig::show_content();
             let pdf_link = FtmlConfig::pdf_link();
             let choose_highlight_style = FtmlConfig::choose_highlight_style();

@@ -7,7 +7,7 @@ use leptos::prelude::*;
 use crate::utils::ReactiveStore;
 
 #[cfg(feature = "callbacks")]
-use crate::callbacks::{OnSectionTitle, SectionWrap};
+use crate::callbacks::{OnSectionTitle, ParagraphWrap, SectionWrap, SlideWrap};
 
 #[derive(Clone, Default)]
 #[cfg_attr(feature = "csr", derive(serde::Serialize, serde::Deserialize))]
@@ -16,6 +16,9 @@ use crate::callbacks::{OnSectionTitle, SectionWrap};
 pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(default, rename = "allowHovers"))]
     pub allow_hovers: Option<bool>,
+
+    #[cfg_attr(feature = "csr", serde(default, rename = "allowFullscreen"))]
+    pub allow_fullscreen: Option<bool>,
 
     #[cfg_attr(feature = "csr", serde(default, rename = "allowFormalInfo"))]
     pub allow_formals: Option<bool>,
@@ -47,6 +50,14 @@ pub struct FtmlConfig {
     #[cfg(feature = "callbacks")]
     #[serde(skip)]
     pub section_wrap: Option<SectionWrap>,
+
+    #[cfg(feature = "callbacks")]
+    #[serde(skip)]
+    pub paragraph_wrap: Option<ParagraphWrap>,
+
+    #[cfg(feature = "callbacks")]
+    #[serde(skip)]
+    pub slide_wrap: Option<SlideWrap>,
 
     #[cfg(feature = "callbacks")]
     #[serde(skip)]
@@ -89,6 +100,9 @@ impl HighlightStyle {
 pub struct AllowHovers(pub bool);
 
 #[derive(Copy, Clone, PartialEq, Eq)]
+pub struct AllowFullscreen(pub bool);
+
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct AllowFormals(pub bool);
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -123,6 +137,7 @@ pub enum FtmlConfigParseError {
 impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
     type Error = (Self, Vec<FtmlConfigParseError>);
     #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::too_many_lines)]
     fn try_from_js_value(value: leptos::wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
         macro_rules! fields {
             ($($stat:ident = $name:literal),* $(,)?) => {
@@ -190,6 +205,7 @@ impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
 
         get!(v @ "allowHovers" = ALLOW_HOVERS as_bool { config.allow_hovers = Some(v)});
         get!(v @ "showContent" = SHOW_CONTENT as_bool { config.show_content = Some(v)});
+        get!(v @ "allowFullscreen" = ALLOW_FULLSCREEN as_bool { config.allow_fullscreen = Some(v)});
         get!(v @ "allowFormalInfo" = ALLOW_FORMAL_INFO as_bool { config.allow_formals = Some(v)});
         get!(v @ "pdfLink" = PDF_LINK as_bool { config.pdf_link = Some(v)});
         get!(v @ "allowNotationChanges" = ALLOW_NOTATION_CHANGES as_bool { config.allow_notation_changes = Some(v)} );
@@ -217,6 +233,10 @@ impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
         );
         #[cfg(feature = "callbacks")]
         get!(v @ "sectionWrap" = SECTION_WRAP ?F { config.section_wrap = Some(v) });
+        #[cfg(feature = "callbacks")]
+        get!(v @ "paragraphWrap" = PARAGRAPH_WRAP ?F { config.paragraph_wrap = Some(v) });
+        #[cfg(feature = "callbacks")]
+        get!(v @ "slideWrap" = SLIDE_WRAP ?F { config.slide_wrap = Some(v) });
         #[cfg(feature = "callbacks")]
         get!(v @ "onSectionTitle" = ON_SECTION_TITLE ?F { config.on_section_title = Some(v) });
         /*
@@ -246,6 +266,9 @@ impl FtmlConfig {
         if let Some(b) = self.allow_formals {
             provide_context(AllowFormals(b));
         }
+        if let Some(b) = self.allow_fullscreen {
+            provide_context(AllowFullscreen(b));
+        }
         if let Some(b) = self.choose_highlight_style {
             provide_context(ChooseHighlightStyle(b));
         }
@@ -272,6 +295,14 @@ impl FtmlConfig {
         }
         #[cfg(feature = "callbacks")]
         if let Some(b) = self.section_wrap {
+            provide_context(Some(b));
+        }
+        #[cfg(feature = "callbacks")]
+        if let Some(b) = self.paragraph_wrap {
+            provide_context(Some(b));
+        }
+        #[cfg(feature = "callbacks")]
+        if let Some(b) = self.slide_wrap {
             provide_context(Some(b));
         }
         #[cfg(feature = "callbacks")]
@@ -327,6 +358,12 @@ impl FtmlConfig {
     #[must_use]
     pub fn show_content() -> bool {
         use_context::<ShowContent>().is_none_or(|b| b.0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn allow_fullscreen() -> bool {
+        use_context::<AllowFullscreen>().is_none_or(|b| b.0)
     }
 
     #[inline]
@@ -491,6 +528,28 @@ impl FtmlConfig {
 
             if let Some(Some(w)) = use_context::<Option<ParagraphWrap>>() {
                 Left(w.wrap(uri, &kind, children))
+            } else {
+                Right(children())
+            }
+        }
+    }
+
+    #[allow(unused_variables)]
+    pub fn wrap_slide<V: IntoView, F: FnOnce() -> V>(
+        uri: &DocumentElementUri,
+        children: F,
+    ) -> impl IntoView + use<V, F> {
+        #[cfg(not(feature = "callbacks"))]
+        {
+            children()
+        }
+        #[cfg(feature = "callbacks")]
+        {
+            use crate::callbacks::SlideWrap;
+            use leptos::either::Either::{Left, Right};
+
+            if let Some(Some(w)) = use_context::<Option<SlideWrap>>() {
+                Left(w.wrap(uri, children))
             } else {
                 Right(children())
             }

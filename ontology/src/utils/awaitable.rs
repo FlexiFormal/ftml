@@ -164,3 +164,38 @@ impl<
         futures::executor::block_on(self.get())
     }
 }
+
+#[cfg(feature = "deepsize")]
+impl<T: Clone + Send + deepsize::DeepSizeOf, E: Clone + From<ChannelError> + Send>
+    deepsize::DeepSizeOf for MaybeValue<T, E>
+{
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        match self {
+            Self::Done(Ok(v)) => v.deep_size_of_children(context),
+            _ => 0,
+        }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl<
+    K: std::hash::Hash + Clone + Eq,
+    T: Clone + Send + deepsize::DeepSizeOf,
+    E: Clone + From<ChannelError> + Send,
+> deepsize::DeepSizeOf for AsyncCache<K, T, E>
+{
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.map
+            .iter()
+            .map(|e| {
+                std::mem::size_of::<K>() + std::mem::size_of_val(e.value()) + {
+                    let value = e.value();
+                    let value = value.inner.read();
+                    // urgh, what's the overhead of a dashmap bucket...? Let's just add 8 bytes
+                    // for good measure...
+                    8 + std::mem::size_of_val(&*value) + value.deep_size_of_children(context)
+                }
+            })
+            .sum()
+    }
+}

@@ -169,8 +169,8 @@ fn close_things(
                 | SymbolReference | VariableReference | Argument | Type | Definiens | Notation
                 | CompInNotation | NotationOpComp | NotationComp | ArgSep | MainCompInNotation
                 | NotationArg | DocTitle | ReturnType | VariableDeclaration | Comp | DefComp
-                | ParagraphTitle | Definiendum | MathStructure | ComplexTerm | HeadTerm | OML
-                | Morphism | Assign => (),
+                | ParagraphTitle | SlideTitle | Slide | Definiendum | MathStructure
+                | ComplexTerm | HeadTerm | OML | Morphism | Assign => (),
             }
         }
     }

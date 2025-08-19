@@ -31,6 +31,7 @@ pub enum CloseFtmlElement {
     Section,
     SectionTitle,
     ParagraphTitle,
+    SlideTitle,
     SkipSection,
     SymbolReference,
     VariableReference,
@@ -58,6 +59,7 @@ pub enum CloseFtmlElement {
     OML,
     Morphism,
     Assign,
+    Slide,
 }
 
 #[derive(Debug, Clone)]
@@ -202,6 +204,11 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
     NotationArg(ArgumentPosition),
     Invisible,
     Definiendum(SymbolUri),
+    Slide {
+        uri: DocumentElementUri,
+        children: Vec<DocumentElement>,
+        title: Option<Box<str>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -645,6 +652,14 @@ impl OpenFtmlElement {
                 }),
                 narrative: None,
             },
+            Self::Slide(uri) => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::Slide {
+                    uri,
+                    children: Vec::new(),
+                    title: None,
+                }),
+            },
             Self::Invisible => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Invisible),
@@ -778,6 +793,8 @@ impl OpenFtmlElement {
             Self::None
             | Self::SectionTitle
             | Self::ParagraphTitle
+            | Self::SlideTitle
+            | Self::SlideNumber
             | Self::CurrentSectionLevel(_) => AnyOpen::None,
         }
     }

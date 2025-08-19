@@ -319,6 +319,7 @@ macro_rules! do_keys {
             },
             SectionTitle,
             ParagraphTitle,
+            SlideTitle,
             None,
         }
         impl<N: crate::extraction::nodes::FtmlNode + std::fmt::Debug> crate::extraction::state::ExtractorState<N> {
@@ -726,7 +727,7 @@ do_keys! {
 
     /// Denotes the title of the current [`Section`] or [`LogicalParagraph`]
     Title = "title"
-        { <=(Section,Definition,Assertion,Example,Paragraph) }
+        { <=(Section,Definition,Assertion,Example,Paragraph,Slide) }
         := (ext,attrs,keys,node) => {
             del!(keys - Invisible);
             attrs.remove(FtmlKey::Invisible);
@@ -740,6 +741,10 @@ do_keys! {
                     OpenNarrativeElement::Paragraph { .. } => {
                         drop(iter);
                         return ret!(ext,node <- ParagraphTitle + ParagraphTitle);
+                    }
+                    OpenNarrativeElement::Slide { .. } => {
+                        drop(iter);
+                        return ret!(ext,node <- SlideTitle + ParagraphTitle);
                     }
                     OpenNarrativeElement::SkipSection { .. }
                     | OpenNarrativeElement::Notation { .. }
@@ -768,14 +773,19 @@ do_keys! {
     /// Denotes a [`Slide`], implying that the [`Document`] is (or contains in some sense)
     /// a presentation.
     Slide = "slide"
-        {+(Id) -!"in [LogicalParagraph]s, [Problem]s or [Slide]s" }
-        := todo,
+        {+(Id) -!"in [LogicalParagraph]s, [Problem]s or [Slide]s" &(Title,SlideNumber) }
+        := (ext,attrs,_keys,node) => {
+            let uri = attrs.get_elem_uri_from_id(ext, Cow::Borrowed("slide"))?;
+            ret!(ext,node <- Slide(uri) + Slide)
+        } => Slide(uri:DocumentElementUri),
 
     /// A (possibly empty) node that, when being rendered, should be replaced by the
     /// current slide number.
     SlideNumber = "slide-number"
         { !"in [Slide](DocumentElement::Slide)s" }
-        := todo,
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- SlideNumber)
+        } => SlideNumber,
 
     // ------------------------------------------------------------------------------------
 

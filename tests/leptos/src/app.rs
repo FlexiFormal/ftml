@@ -114,7 +114,7 @@ macro_rules! backend {
         }
     };
 }
-backend!( 6: ["sections","para","symbolsmodules","paragraphs","structures","morphisms"]);
+backend!( 7: ["sections","para","symbolsmodules","paragraphs","structures","morphisms","slides"]);
 
 type Views = ftml_leptos::Views<GlobalBackend>;
 

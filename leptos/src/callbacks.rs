@@ -47,4 +47,5 @@ macro_rules! callback {
 
 callback!(Wrap SectionWrap(u:DocumentElementUri));
 callback!(Wrap ParagraphWrap(u:DocumentElementUri,kind:ParagraphKind));
+callback!(Wrap SlideWrap(u:DocumentElementUri));
 callback!(Insert OnSectionTitle(u:DocumentElementUri,lvl: SectionLevel));

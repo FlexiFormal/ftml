@@ -88,6 +88,14 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
+    fn slide<V: IntoView>(
+        _uri: DocumentElementUri,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
     fn section_title(_lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
         then.attr("class", class)
     }
@@ -95,6 +103,11 @@ pub trait FtmlViews: 'static {
     #[inline]
     fn paragraph_title(then: OriginalNode) -> impl IntoView {
         then.attr("class", "ftml-title-paragraph").attr("style", "")
+    }
+
+    #[inline]
+    fn slide_title(then: OriginalNode) -> impl IntoView {
+        then.attr("class", "ftml-title-slide")
     }
 
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
@@ -177,6 +190,14 @@ pub trait TermTrackedViews: 'static {
     }
 
     #[inline]
+    fn slide<V: IntoView>(
+        _uri: DocumentElementUri,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
     fn section_title(_lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
         then.attr("class", class)
     }
@@ -184,6 +205,10 @@ pub trait TermTrackedViews: 'static {
     #[inline]
     fn paragraph_title(then: OriginalNode) -> impl IntoView {
         then.attr("class", "ftml-title-paragraph").attr("style", "")
+    }
+    #[inline]
+    fn slide_title(then: OriginalNode) -> impl IntoView {
+        then.attr("class", "ftml-title-slide")
     }
 
     fn inputref(_info: InputrefInfo) -> impl IntoView {}
@@ -251,6 +276,14 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     }
 
     #[inline]
+    fn slide<V: IntoView>(
+        uri: DocumentElementUri,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::slide(uri, then)
+    }
+
+    #[inline]
     fn section_title(lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
         <T as TermTrackedViews>::section_title(lvl, class, then)
     }
@@ -258,6 +291,11 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     #[inline]
     fn paragraph_title(then: OriginalNode) -> impl IntoView {
         <T as TermTrackedViews>::paragraph_title(then)
+    }
+
+    #[inline]
+    fn slide_title(then: OriginalNode) -> impl IntoView {
+        <T as TermTrackedViews>::slide_title(then)
     }
 
     #[inline]

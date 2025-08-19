@@ -63,6 +63,14 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     }
 
     #[inline]
+    fn slide<V: IntoView>(
+        uri: DocumentElementUri,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        paragraphs::slide(uri, then)
+    }
+
+    #[inline]
     fn inputref(info: ftml_dom::markers::InputrefInfo) -> impl IntoView {
         inputref::inputref::<B>(info)
     }

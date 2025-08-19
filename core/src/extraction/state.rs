@@ -414,6 +414,17 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Paragraph)),
             },
+            CloseFtmlElement::Slide => match self.narrative.pop() {
+                Some(OpenNarrativeElement::Slide {
+                    uri,
+                    children,
+                    title,
+                }) => {
+                    self.close_slide(uri, children, title, node.range());
+                    Ok(())
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Slide)),
+            },
             CloseFtmlElement::Assign => match self.domain.pop() {
                 Some(OpenDomainElement::Assign {
                     source,
@@ -584,6 +595,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             },
             CloseFtmlElement::SectionTitle => self.close_section_title(node),
             CloseFtmlElement::ParagraphTitle => self.close_paragraph_title(node),
+            CloseFtmlElement::SlideTitle => self.close_slide_title(node),
             CloseFtmlElement::DocTitle => {
                 self.title = Some(node.inner_string().into_owned().into_boxed_str());
                 Ok(())
@@ -649,6 +661,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::Morphism { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::Paragraph { children, .. }
+                | OpenNarrativeElement::Slide { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => {
                     children.push(e);
                     return;
@@ -970,6 +983,24 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn close_slide(
+        &mut self,
+        uri: DocumentElementUri,
+        children: Vec<DocumentElement>,
+        title: Option<Box<str>>,
+        range: DocumentRange,
+    ) {
+        let p = DocumentElement::Slide {
+            uri,
+            title,
+            range,
+            children: children.into_boxed_slice(),
+        };
+        tracing::info!("Adding slide {p:#?}");
+        self.push_elem(p);
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn close_notation(
         &mut self,
         uri: DocumentElementUri,
@@ -1167,6 +1198,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenNarrativeElement::SkipSection { .. }
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Slide { .. }
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
@@ -1199,6 +1231,40 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenNarrativeElement::SkipSection { .. }
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::Slide { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::NotationArg(_) => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
+                }
+                OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. }
+                | OpenNarrativeElement::Invisible => (),
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title))
+    }
+
+    fn close_slide_title(&mut self, node: &N) -> super::Result<()> {
+        for e in self.narrative.iter_mut() {
+            match e {
+                OpenNarrativeElement::Slide { title, .. } if title.is_none() => {
+                    let str = node.inner_string();
+                    if !str.is_empty() {
+                        *title = Some(node.inner_string().into_owned().into_boxed_str());
+                    }
+                    return Ok(());
+                }
+                OpenNarrativeElement::Slide { title, .. } => {
+                    return Err(FtmlExtractionError::DuplicateValue(FtmlKey::Title));
+                }
+                OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
@@ -1299,6 +1365,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Slide { .. }
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
@@ -1358,6 +1425,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenNarrativeElement::Invisible => (),
                 OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Slide { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::SkipSection { .. }
                 | OpenNarrativeElement::Notation { .. }
@@ -1454,6 +1522,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Slide { .. }
                 | OpenNarrativeElement::SkipSection { .. }
                 | OpenNarrativeElement::Notation { .. }
                 | OpenNarrativeElement::NotationComp { .. }

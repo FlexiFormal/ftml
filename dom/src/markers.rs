@@ -1,7 +1,7 @@
 use crate::{
     FtmlViews,
     clonable_views::MarkedNode,
-    counters::LogicalLevel,
+    counters::{LogicalLevel, SectionCounters},
     document::{CurrentUri, DocumentState, WithHead},
     extractor::{DomExtractor, FtmlDomElement},
     terms::ReactiveTerm,
@@ -46,7 +46,9 @@ pub enum Marker {
     },
     SkipSection,
     SectionTitle,
+    SlideNumber,
     ParagraphTitle,
+    SlideTitle,
     Comp,
     DefComp,
     OMA {
@@ -68,6 +70,7 @@ pub enum Marker {
         styles: Box<[Id]>,
         fors: Vec<SymbolUri>,
     },
+    Slide(DocumentElementUri),
     IfInputref(bool),
 }
 
@@ -130,6 +133,7 @@ impl Marker {
             | Self::Argument(_)
             | Self::OMA { .. }
             | Self::SymbolReference { .. }
+            | Self::SlideNumber
             | Self::VariableReference { .. }
                 if invisible =>
             {
@@ -152,6 +156,34 @@ impl Marker {
                 Self::apply::<Views>(markers, invisible, is_math, orig)
             })
             .into_any(),
+            Self::Paragraph {
+                uri,
+                kind,
+                formatting,
+                styles,
+                fors,
+            } => {
+                provide_context(CurrentUri(uri.clone().into()));
+                if *uri.document_uri() != *DocumentUri::no_doc() {
+                    LOCAL_CACHE
+                        .paragraphs
+                        .insert(uri.clone(), orig.html_string());
+                }
+                DocumentState::new_paragraph(uri, kind, formatting, styles, fors, move |info| {
+                    Views::paragraph(info, move || {
+                        Self::apply::<Views>(markers, invisible, is_math, orig)
+                    })
+                })
+                .into_any()
+            }
+            Self::Slide(uri) => {
+                provide_context(CurrentUri(uri.clone().into()));
+                DocumentState::new_slide();
+                Views::slide(uri, move || {
+                    Self::apply::<Views>(markers, invisible, is_math, orig)
+                })
+                .into_any()
+            }
             Self::SectionTitle => {
                 let (LogicalLevel::Section(lvl), cls) = DocumentState::title_class() else {
                     tracing::error!("Unexpected section title");
@@ -172,6 +204,7 @@ impl Marker {
                 Views::section_title(lvl, cls, orig).into_any()
             }
             Self::ParagraphTitle => Views::paragraph_title(orig).into_any(),
+            Self::SlideTitle => Views::slide_title(orig).into_any(),
             Self::InputRef { target, uri } => {
                 DocumentState::do_inputref(target, uri, Views::inputref).into_any()
             }
@@ -207,6 +240,7 @@ impl Marker {
                 }
                 .into_any()
             }
+            Self::SlideNumber => SectionCounters::get_slide().into_any(),
             Self::Comp => {
                 Views::comp(false, MarkedNode::new(markers, orig, is_math, true).into()).into_any()
             }
@@ -275,26 +309,6 @@ impl Marker {
                 )
                 .into_any()
             }
-            Self::Paragraph {
-                uri,
-                kind,
-                formatting,
-                styles,
-                fors,
-            } => {
-                provide_context(CurrentUri(uri.clone().into()));
-                if *uri.document_uri() != *DocumentUri::no_doc() {
-                    LOCAL_CACHE
-                        .paragraphs
-                        .insert(uri.clone(), orig.html_string());
-                }
-                DocumentState::new_paragraph(uri, kind, formatting, styles, fors, move |info| {
-                    Views::paragraph(info, move || {
-                        Self::apply::<Views>(markers, invisible, is_math, orig)
-                    })
-                })
-                .into_any()
-            }
         }
     }
 
@@ -325,6 +339,7 @@ impl Marker {
             OpenFtmlElement::SkipSection => Some(Self::SkipSection),
             OpenFtmlElement::SectionTitle => Some(Self::SectionTitle),
             OpenFtmlElement::ParagraphTitle => Some(Self::ParagraphTitle),
+            OpenFtmlElement::SlideTitle => Some(Self::SlideTitle),
             OpenFtmlElement::Section(uri) => Some(Self::Section(uri.clone())),
             OpenFtmlElement::ComplexTerm { head, notation, .. } => match head {
                 VarOrSym::Sym(s) => Some(Self::SymbolReference {
@@ -379,8 +394,10 @@ impl Marker {
                 styles: styles.clone(),
                 fors: fors.iter().map(|(u, _)| u.clone()).collect(),
             }),
+            OpenFtmlElement::Slide(uri) => Some(Self::Slide(uri.clone())),
             OpenFtmlElement::Argument(pos) => Some(Self::Argument(*pos)),
             OpenFtmlElement::CurrentSectionLevel(b) => Some(Self::CurrentSectionLevel(*b)),
+            OpenFtmlElement::SlideNumber => Some(Self::SlideNumber),
             OpenFtmlElement::Counter(_)
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::Module { .. }

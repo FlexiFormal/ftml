@@ -97,6 +97,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 OpenNarrativeElement::Section { uri, .. }
                 | OpenNarrativeElement::Notation { uri, .. }
                 | OpenNarrativeElement::VariableDeclaration { uri, .. }
+                | OpenNarrativeElement::Slide { uri, .. }
                 | OpenNarrativeElement::Paragraph { uri, .. } => Some(uri),
             })
             .map_or_else(
@@ -120,6 +121,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::Slide { .. }
                 | OpenNarrativeElement::SkipSection { .. } => return false,
             }
         }
@@ -177,6 +179,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::Morphism { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::SkipSection { children }
+                | OpenNarrativeElement::Slide { children, .. }
                 | OpenNarrativeElement::Paragraph { children, .. } => children,
                 OpenNarrativeElement::Invisible
                 | OpenNarrativeElement::Notation { .. }
@@ -228,6 +231,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::Morphism { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::Paragraph { children, .. }
+                | OpenNarrativeElement::Slide { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => match children.last() {
                     Some(DocumentElement::Paragraph(p)) => return Some(p),
                     _ => break,
@@ -254,6 +258,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::Morphism { children, .. }
                 | OpenNarrativeElement::Section { children, .. }
                 | OpenNarrativeElement::Paragraph { children, .. }
+                | OpenNarrativeElement::Slide { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => match children.last() {
                     Some(DocumentElement::Term(DocumentTerm { term, .. })) => return Some(term),
                     _ => break,
