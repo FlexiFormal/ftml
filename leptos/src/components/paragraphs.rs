@@ -29,7 +29,7 @@ pub fn slide<V: IntoView>(
         let inner = NodeRef::new();
         let slides: crate::Slides = expect_context();
         let index = slides.all.update_untracked(|v| {
-            v.push(SlideData {
+            v.push(Slide {
                 div,
                 inner,
                 #[cfg(target_family = "wasm")]
@@ -60,7 +60,7 @@ pub fn slide<V: IntoView>(
 #[derive(Debug, Clone, Copy)]
 #[allow(clippy::type_complexity)]
 pub(crate) struct Slides {
-    all: RwSignal<Vec<SlideData>>,
+    all: RwSignal<Vec<Slide>>,
     current: RwSignal<Option<usize>>,
     #[cfg(target_family = "wasm")]
     closure: StoredValue<
@@ -92,7 +92,7 @@ impl Slides {
     }
 
     fn update_slide(
-        all: RwSignal<Vec<SlideData>>,
+        all: RwSignal<Vec<Slide>>,
         current: RwSignal<Option<usize>>,
         top: NodeRef<leptos::html::Div>,
     ) {
@@ -109,18 +109,7 @@ impl Slides {
                     all.with_untracked(|all| {
                         tracing::trace!("fullscreen: Move target node");
                         let current = all.get(index).expect("this is a bug");
-                        let inner_e = current.inner.get_untracked().expect("this is a bug");
-                        let original_width = inner_e.client_width();
-                        let new_width = top.client_width() - 15; // padding
-                        let scale = new_width / original_width;
-                        let _ = inner_e.set_attribute(
-                            "style",
-                            &format!(
-                                "transform-origin:top left;scale:{scale};width:{original_width}px;"
-                            ),
-                        );
-                        tracing::trace!("fullscreen listener: appending to top");
-                        let _ = top.append_child(&inner_e);
+                        current.mount(&top);
                     });
                 } else {
                     tracing::trace!("fullscreen: remove target node");
@@ -128,10 +117,7 @@ impl Slides {
                     is_fullscreen.update_untracked(|o| *o = None);
                     all.with_untracked(|all| {
                         let current = all.get(index).expect("this is a bug");
-                        let inner_e = current.inner.get_untracked().expect("this is a bug");
-                        let div_e = current.div.get_untracked().expect("this is a bug");
-                        let _ = div_e.append_child(&inner_e);
-                        let _ = inner_e.set_attribute("style", "");
+                        current.unmount();
                     });
                 }
             }
@@ -169,7 +155,7 @@ impl Slides {
 
     #[allow(dead_code)]
     fn arrow_keys(
-        all: RwSignal<Vec<SlideData>>,
+        all: RwSignal<Vec<Slide>>,
         current: RwSignal<Option<usize>>,
         top: NodeRef<leptos::html::Div>,
     ) -> leptos::wasm_bindgen::closure::Closure<dyn Fn(leptos::web_sys::Event)> {
@@ -183,8 +169,8 @@ impl Slides {
                     match keyboard_event.key_code() {
                         ARROW_LEFT if i > 0 => {
                             let has_next = all.with_untracked(|all| {
-                                all.get(i).is_some_and(|d: &SlideData| {
-                                    d.move_back();
+                                all.get(i).is_some_and(|d: &Slide| {
+                                    d.unmount();
                                     true
                                 })
                             });
@@ -195,8 +181,8 @@ impl Slides {
                         ARROW_RIGHT => {
                             let has_next = all.with_untracked(|all| {
                                 if all.len() > i + 1 {
-                                    all.get(i).is_some_and(|d: &SlideData| {
-                                        d.move_back();
+                                    all.get(i).is_some_and(|d: &Slide| {
+                                        d.unmount();
                                         true
                                     })
                                 } else {
@@ -219,7 +205,7 @@ impl Slides {
 
 #[allow(clippy::type_complexity)]
 #[allow(dead_code)]
-pub(crate) struct SlideData {
+pub(crate) struct Slide {
     div: NodeRef<leptos::html::Div>,
     inner: NodeRef<leptos::html::Div>,
     #[cfg(target_family = "wasm")]
@@ -231,21 +217,24 @@ pub(crate) struct SlideData {
         >,
     >,
 }
-impl SlideData {
-    #[allow(dead_code)]
-    pub fn move_back(&self) {
-        Self::move_back_i(self.inner, self.div);
+impl Slide {
+    pub fn mount(&self, top: &leptos::web_sys::HtmlDivElement) {
+        let inner_e = self.inner.get_untracked().expect("this is a bug");
+        let original_width = inner_e.client_width();
+        let new_width = top.client_width() - 15; // padding
+        let scale = new_width / original_width;
+        let _ = inner_e.set_attribute(
+            "style",
+            &format!("transform-origin:top left;scale:{scale};width:{original_width}px;"),
+        );
+        tracing::trace!("fullscreen listener: appending to top");
+        let _ = top.append_child(&inner_e);
     }
-
-    fn move_back_i(inner: NodeRef<leptos::html::Div>, div: NodeRef<leptos::html::Div>) {
-        let Some(e) = inner.get_untracked() else {
-            return;
-        };
-        let Some(orig) = div.get_untracked() else {
-            return;
-        };
-        let _ = e.set_attribute("style", "");
-        let _ = orig.append_child(&e);
+    pub fn unmount(&self) {
+        let inner_e = self.inner.get_untracked().expect("this is a bug");
+        let div_e = self.div.get_untracked().expect("this is a bug");
+        let _ = div_e.append_child(&inner_e);
+        let _ = inner_e.set_attribute("style", "");
     }
 }
 
@@ -260,7 +249,7 @@ impl Slides {
     #[allow(clippy::missing_const_for_fn)]
     fn go_i(
         index: usize,
-        all: RwSignal<Vec<SlideData>>,
+        all: RwSignal<Vec<Slide>>,
         current: RwSignal<Option<usize>>,
         top: NodeRef<leptos::html::Div>,
     ) {
@@ -278,10 +267,7 @@ impl Slides {
         } else if let Some(old) = current.get_untracked() {
             all.with_untracked(|all| {
                 let current = all.get(index).expect("this is a bug");
-                let inner_e = current.inner.get_untracked().expect("this is a bug");
-                let div_e = current.div.get_untracked().expect("this is a bug");
-                let _ = div_e.append_child(&inner_e);
-                let _ = inner_e.set_attribute("style", "");
+                current.unmount();
             });
             current.set(Some(index));
         }
