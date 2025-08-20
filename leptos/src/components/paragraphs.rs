@@ -63,6 +63,7 @@ pub(crate) struct Slides {
     all: RwSignal<Vec<Slide>>,
     current: RwSignal<Option<usize>>,
     #[cfg(target_family = "wasm")]
+    #[allow(dead_code)]
     closure: StoredValue<
         send_wrapper::SendWrapper<
             leptos::wasm_bindgen::closure::Closure<dyn Fn(leptos::web_sys::Event)>,
@@ -218,11 +219,24 @@ pub(crate) struct Slide {
     >,
 }
 impl Slide {
+    // may only be run *after* fullscreen is in effect; otherwise the scaling
+    // will be screwed up
     pub fn mount(&self, top: &leptos::web_sys::HtmlDivElement) {
         let inner_e = self.inner.get_untracked().expect("this is a bug");
         let original_width = inner_e.client_width();
         let new_width = top.client_width() - 15; // padding
         let scale = new_width / original_width;
+        /*
+        let div_e = self.div.get_untracked().expect("this is a bug");
+        (**top).style().set_css_text(
+            &document()
+                .default_view()
+                .expect("this is a bug")
+                .get_computed_style_with_pseudo_elt(&div_e, "")
+                .expect("this is a bug")
+                .expect("this is a bug")
+                .css_text(),
+        ); */
         let _ = inner_e.set_attribute(
             "style",
             &format!("transform-origin:top left;scale:{scale};width:{original_width}px;"),
@@ -260,7 +274,6 @@ impl Slides {
                 return;
             };
             tracing::trace!("Requesting fullscreen");
-            let _ = top.set_attribute("style", "");
             if top.request_fullscreen().is_err() {
                 tracing::error!("Error setting fullscreen!");
             }

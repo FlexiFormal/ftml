@@ -32,7 +32,7 @@ ssr = ["leptos/ssr", "thaw/ssr", "ftml-dom/ssr"]
 ## generate typescript bindings
 typescript = ["csr", "dep:tsify", "ftml-dom/typescript"]
 ## Adds javascript callbacks for some components
-callbacks = ["typescript", "dep:leptos-react"]
+callbacks = ["typescript", "dep:leptos-react", "leptos-react/typescript"]
 
 [package.metadata.docs.rs]
 all-features = true

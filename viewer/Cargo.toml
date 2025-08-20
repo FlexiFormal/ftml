@@ -11,7 +11,7 @@ workspace = true
 
 [features]
 ## Generates typescript bindings
-typescript = ["tsify"]
+typescript = ["tsify", "ftml-leptos/typescript", "ftml-leptos/callbacks"]
 
 [package.metadata.docs.rs]
 all-features = true

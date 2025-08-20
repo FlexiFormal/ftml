@@ -9,10 +9,32 @@ use crate::utils::ReactiveStore;
 #[cfg(feature = "callbacks")]
 use crate::callbacks::{OnSectionTitle, ParagraphWrap, SectionWrap, SlideWrap};
 
+#[cfg(feature = "typescript")]
+#[leptos::wasm_bindgen::prelude::wasm_bindgen(typescript_custom_section)]
+const FTML_CONFIG: &str = r#"
+export interface FtmlConfig {
+    allowHovers?:boolean;
+    allowFullscreen?:boolean;
+    allowFormalInfo?:boolean;
+    allowNotationChanges?:boolean;
+    chooseHighlightStyle?:boolean;
+    showContent?:boolean;
+    pdfLink?:boolean;
+    documentUri?:DocumentUri;
+    highlightStyle?:HighlightStyle;
+    toc?:TocSource;
+    autoexpandLimit?:LogicalLevel;
+    sectionWrap?:SectionWrap;
+    paragraphWrap?:ParagraphWrap;
+    slideWrap?:SlideWrap;
+    onSectionTitle?:OnSectionTitle;
+}
+"#;
+
 #[derive(Clone, Default)]
 #[cfg_attr(feature = "csr", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+//#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+//#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(default, rename = "allowHovers"))]
     pub allow_hovers: Option<bool>,
@@ -26,26 +48,26 @@ pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(default, rename = "allowNotationChanges"))]
     pub allow_notation_changes: Option<bool>,
 
-    #[cfg_attr(feature = "csr", serde(default, rename = "documentUri"))]
-    pub document_uri: Option<DocumentUri>,
-
-    #[cfg_attr(feature = "csr", serde(default, rename = "highlightStyle"))]
-    pub highlight_style: Option<HighlightStyle>,
-
     #[cfg_attr(feature = "csr", serde(default, rename = "chooseHighlightStyle"))]
     pub choose_highlight_style: Option<bool>,
-
-    #[cfg_attr(feature = "csr", serde(default))]
-    pub toc: Option<TocSource>,
-
-    #[cfg_attr(feature = "csr", serde(default, rename = "autoexpandLimit"))]
-    pub autoexpand_limit: Option<LogicalLevel>,
 
     #[cfg_attr(feature = "csr", serde(default, rename = "showContent"))]
     pub show_content: Option<bool>,
 
     #[cfg_attr(feature = "csr", serde(default, rename = "pdfLink"))]
     pub pdf_link: Option<bool>,
+
+    #[cfg_attr(feature = "csr", serde(default, rename = "documentUri"))]
+    pub document_uri: Option<DocumentUri>,
+
+    #[cfg_attr(feature = "csr", serde(default, rename = "highlightStyle"))]
+    pub highlight_style: Option<HighlightStyle>,
+
+    #[cfg_attr(feature = "csr", serde(default))]
+    pub toc: Option<TocSource>,
+
+    #[cfg_attr(feature = "csr", serde(default, rename = "autoexpandLimit"))]
+    pub autoexpand_limit: Option<LogicalLevel>,
 
     #[cfg(feature = "callbacks")]
     #[serde(skip)]
@@ -504,7 +526,7 @@ impl FtmlConfig {
         {
             use leptos::either::Either::{Left, Right};
             if let Some(Some(w)) = use_context::<Option<SectionWrap>>() {
-                Left(w.wrap(uri, children))
+                Left(w.wrap(uri.clone(), children))
             } else {
                 Right(children())
             }
@@ -527,7 +549,7 @@ impl FtmlConfig {
             use leptos::either::Either::{Left, Right};
 
             if let Some(Some(w)) = use_context::<Option<ParagraphWrap>>() {
-                Left(w.wrap(uri, &kind, children))
+                Left(w.wrap(uri.clone(), kind, children))
             } else {
                 Right(children())
             }
@@ -549,7 +571,7 @@ impl FtmlConfig {
             use leptos::either::Either::{Left, Right};
 
             if let Some(Some(w)) = use_context::<Option<SlideWrap>>() {
-                Left(w.wrap(uri, children))
+                Left(w.wrap(uri.clone(), children))
             } else {
                 Right(children())
             }
@@ -572,7 +594,7 @@ impl FtmlConfig {
                     tracing::error!("Could not determine URI for current section");
                     return None;
                 };
-                Some(w.insert(&uri, &lvl))
+                Some(w.insert(uri, lvl))
             } else {
                 None
             }
