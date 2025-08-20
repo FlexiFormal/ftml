@@ -152,27 +152,23 @@ impl Solutions {
         self.as_hex_string().ok()
     }
 
-    #[inline]
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
     pub fn from_solutions(solutions: Box<[SolutionData]>) -> Self {
         Self(solutions)
     }
 
-    #[inline]
     #[must_use]
     pub fn to_solutions(&self) -> Box<[SolutionData]> {
         self.0.clone()
     }
 
     #[must_use]
-    #[inline]
     pub fn check_response(&self, response: &ProblemResponse) -> Option<ProblemFeedback> {
         self.check(response)
     }
 
     #[must_use]
-    #[inline]
     pub fn default_feedback(&self) -> ProblemFeedback {
         self.default()
     }

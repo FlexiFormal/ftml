@@ -46,7 +46,6 @@ impl ProblemFeedback {
         self.as_hex_string().ok()
     }
 
-    #[inline]
     #[must_use]
     pub fn from_json(
         ProblemFeedbackJson {
@@ -64,7 +63,6 @@ impl ProblemFeedback {
         }
     }
 
-    #[inline]
     #[must_use]
     pub fn to_json(&self) -> ProblemFeedbackJson {
         let Self {
