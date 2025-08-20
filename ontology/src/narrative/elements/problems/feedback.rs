@@ -8,8 +8,10 @@ use smallvec::SmallVec;
 pub struct ProblemFeedback {
     pub correct: bool,
     #[cfg_attr(feature = "typescript", wasm_bindgen(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub solutions: SmallVec<Box<str>, 1>,
     #[cfg_attr(feature = "typescript", wasm_bindgen(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub data: SmallVec<CheckedResult, 4>,
     pub score_fraction: f32,
 }
@@ -20,8 +22,10 @@ pub struct ProblemFeedback {
 pub struct ProblemFeedbackJson {
     pub correct: bool,
     #[tsify(type = "string[]")]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub solutions: SmallVec<Box<str>, 1>,
     #[tsify(type = "CheckedResult[]")]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub data: SmallVec<CheckedResult, 4>,
     pub score_fraction: f32,
 }
@@ -84,8 +88,8 @@ impl ProblemFeedback {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct BlockFeedback {
     pub is_correct: bool,
-    pub verdict_str: String,
-    pub feedback: String,
+    pub verdict_str: Box<str>,
+    pub feedback: Box<str>,
 }
 
 #[derive(Debug, Clone)]
@@ -94,7 +98,7 @@ pub struct BlockFeedback {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FillinFeedback {
     pub is_correct: bool,
-    pub feedback: String,
+    pub feedback: Box<str>,
     pub kind: FillinFeedbackKind,
 }
 
@@ -103,9 +107,9 @@ pub struct FillinFeedback {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum FillinFeedbackKind {
-    Exact(String),
+    Exact(Box<str>),
     NumRange { from: Option<f32>, to: Option<f32> },
-    Regex(String),
+    Regex(Box<str>),
 }
 
 #[derive(Debug, Clone)]
@@ -140,6 +144,7 @@ pub enum CheckedResult {
 pub struct ProblemResponse {
     pub uri: DocumentElementUri,
     #[cfg_attr(feature = "typescript", tsify(type = "ProblemResponseType[]"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub responses: SmallVec<ProblemResponseType, 4>,
 }
 

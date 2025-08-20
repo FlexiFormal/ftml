@@ -36,12 +36,14 @@ pub enum DocumentElement {
         range: DocumentRange,
         module: ModuleUri,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
+        #[cfg_attr(feature = "serde", serde(default))]
         children: Box<[Self]>,
     },
     MathStructure {
         range: DocumentRange,
         structure: SymbolUri,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
+        #[cfg_attr(feature = "serde", serde(default))]
         children: Box<[Self]>,
     },
     Extension {
@@ -49,24 +51,31 @@ pub enum DocumentElement {
         extension: SymbolUri,
         target: SymbolUri,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
+        #[cfg_attr(feature = "serde", serde(default))]
         children: Box<[Self]>,
     },
     Morphism {
         range: DocumentRange,
         morphism: SymbolUri,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
+        #[cfg_attr(feature = "serde", serde(default))]
         children: Box<[Self]>,
     },
     SymbolDeclaration(SymbolUri),
     ImportModule(ModuleUri),
 
     Section(Section),
-    SkipSection(#[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))] Box<[Self]>),
+    SkipSection(
+        #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
+        #[cfg_attr(feature = "serde", serde(default))]
+        Box<[Self]>,
+    ),
     Paragraph(LogicalParagraph),
     Problem(Problem),
     Slide {
         range: DocumentRange,
         uri: DocumentElementUri,
+        #[cfg_attr(feature = "serde", serde(default))]
         title: Option<Box<str>>,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
         children: Box<[Self]>,
@@ -95,11 +104,13 @@ pub enum DocumentElement {
     SymbolReference {
         range: DocumentRange,
         uri: SymbolUri,
+        #[cfg_attr(feature = "serde", serde(default))]
         notation: Option<Id>,
     },
     VariableReference {
         range: DocumentRange,
         uri: DocumentElementUri,
+        #[cfg_attr(feature = "serde", serde(default))]
         notation: Option<Id>,
     },
     Term(DocumentTerm),

@@ -22,13 +22,20 @@ pub struct Symbol {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SymbolData {
     pub arity: ArgumentSpec,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub macroname: Option<Id>,
     pub role: Box<[Id]>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub tp: Option<Term>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub df: Option<Term>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub return_type: Option<Term>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub argument_types: Box<[Term]>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub assoctype: Option<AssocType>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub reordering: Option<Id>,
 }
 

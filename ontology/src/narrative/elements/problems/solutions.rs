@@ -196,8 +196,8 @@ impl Solutions {
                         .iter()
                         .map(|c| BlockFeedback {
                             is_correct: c.correct,
-                            verdict_str: c.verdict.to_string(),
-                            feedback: c.feedback.to_string(),
+                            verdict_str: c.verdict.clone(),
+                            feedback: c.feedback.clone(),
                         })
                         .collect(),
                 }),
@@ -208,8 +208,8 @@ impl Solutions {
                             .iter()
                             .map(|c| BlockFeedback {
                                 is_correct: c.correct,
-                                verdict_str: c.verdict.to_string(),
-                                feedback: c.feedback.to_string(),
+                                verdict_str: c.verdict.clone(),
+                                feedback: c.feedback.clone(),
                             })
                             .collect(),
                     });
@@ -224,8 +224,8 @@ impl Solutions {
                                 feedback,
                             } => options.push(FillinFeedback {
                                 is_correct: *verdict,
-                                feedback: feedback.to_string(),
-                                kind: FillinFeedbackKind::Exact(value.to_string()),
+                                feedback: feedback.clone(),
+                                kind: FillinFeedbackKind::Exact(value.clone()),
                             }),
                             FillInSolOption::NumericalRange {
                                 from,
@@ -234,7 +234,7 @@ impl Solutions {
                                 feedback,
                             } => options.push(FillinFeedback {
                                 is_correct: *verdict,
-                                feedback: feedback.to_string(),
+                                feedback: feedback.clone(),
                                 kind: FillinFeedbackKind::NumRange {
                                     from: *from,
                                     to: *to,
@@ -246,8 +246,10 @@ impl Solutions {
                                 feedback,
                             } => options.push(FillinFeedback {
                                 is_correct: *verdict,
-                                feedback: feedback.to_string(),
-                                kind: FillinFeedbackKind::Regex(regex.as_str().to_string()),
+                                feedback: feedback.clone(),
+                                kind: FillinFeedbackKind::Regex(
+                                    regex.as_str().to_string().into_boxed_str(),
+                                ),
                             }),
                         }
                     }
@@ -325,8 +327,8 @@ impl Solutions {
                                 }
                                 BlockFeedback {
                                     is_correct: *cr,
-                                    verdict_str: verdict.to_string(),
-                                    feedback: feedback.to_string(),
+                                    verdict_str: verdict.clone(),
+                                    feedback: feedback.clone(),
                                 }
                             },
                         )
@@ -367,8 +369,8 @@ impl Solutions {
                                     correct = correct && (selected[i] == *cr);
                                     BlockFeedback {
                                         is_correct: *cr,
-                                        verdict_str: verdict.to_string(),
-                                        feedback: feedback.to_string(),
+                                        verdict_str: verdict.clone(),
+                                        feedback: feedback.clone(),
                                     }
                                 },
                             )
@@ -398,8 +400,8 @@ impl Solutions {
                                 }
                                 options.push(FillinFeedback {
                                     is_correct: *verdict,
-                                    feedback: feedback.to_string(),
-                                    kind: FillinFeedbackKind::Exact(string.to_string()),
+                                    feedback: feedback.clone(),
+                                    kind: FillinFeedbackKind::Exact(string.clone()),
                                 });
                             }
                             FillInSolOption::NumericalRange {
@@ -427,7 +429,7 @@ impl Solutions {
                                 }
                                 options.push(FillinFeedback {
                                     is_correct: *verdict,
-                                    feedback: feedback.to_string(),
+                                    feedback: feedback.clone(),
                                     kind: FillinFeedbackKind::NumRange {
                                         from: *from,
                                         to: *to,
@@ -448,8 +450,10 @@ impl Solutions {
                                 }
                                 options.push(FillinFeedback {
                                     is_correct: *verdict,
-                                    feedback: feedback.to_string(),
-                                    kind: FillinFeedbackKind::Regex(regex.as_str().to_string()),
+                                    feedback: feedback.clone(),
+                                    kind: FillinFeedbackKind::Regex(
+                                        regex.as_str().to_string().into_boxed_str(),
+                                    ),
                                 });
                             }
                         }

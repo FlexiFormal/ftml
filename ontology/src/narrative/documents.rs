@@ -17,7 +17,9 @@ use crate::narrative::{
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentData {
     pub uri: DocumentUri,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub title: Option<Box<str>>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub elements: Box<[DocumentElement]>,
     pub styles: DocumentStyles,
     pub top_section_level: SectionLevel,

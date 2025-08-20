@@ -33,6 +33,7 @@ pub enum Term {
         #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
         head: Box<Self>,
         arguments: Box<[Argument]>,
+        #[cfg_attr(feature = "serde", serde(default))]
         presentation: Option<VarOrSym>,
     },
     /// A *binding* application with `head` as operator, `arguments`
@@ -45,6 +46,7 @@ pub enum Term {
         arguments: Box<[BoundArgument]>,
         #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
         body: Box<Self>,
+        #[cfg_attr(feature = "serde", serde(default))]
         presentation: Option<VarOrSym>,
     },
     /// Record projection; the field named `key` in the record `record`.
@@ -56,15 +58,19 @@ pub enum Term {
         key: UriName,
         /// does not count as a subterm
         #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
+        #[cfg_attr(feature = "serde", serde(default))]
         record_type: Option<Box<Self>>,
+        #[cfg_attr(feature = "serde", serde(default))]
         presentation: Option<VarOrSym>,
     },
     /// A non-alpha-renamable variable
     Label {
         name: UriName,
         #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
+        #[cfg_attr(feature = "serde", serde(default))]
         df: Option<Box<Self>>,
         #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
+        #[cfg_attr(feature = "serde", serde(default))]
         tp: Option<Box<Self>>,
     },
     /// An opaque/informal expression; may contain formal islands, which are collected in

@@ -7,9 +7,12 @@ use ftml_uris::Id;
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Notation {
     pub precedence: i64,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub id: Option<Id>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub argprecs: Vec<i64>,
     pub component: NotationComponent,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub op: Option<NotationNode>,
 }
 impl Notation {

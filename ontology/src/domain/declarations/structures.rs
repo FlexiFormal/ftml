@@ -11,6 +11,7 @@ use ftml_uris::{DomainUriRef, Id, ModuleUri, SymbolUri};
 pub struct MathStructure {
     pub uri: SymbolUri,
     pub elements: Box<[StructureDeclaration]>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub macroname: Option<Id>,
 }
 impl crate::__private::Sealed for MathStructure {}

@@ -18,6 +18,7 @@ pub use solutions::*;
 pub struct Problem {
     pub uri: DocumentElementUri,
     pub range: DocumentRange,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub children: Box<[DocumentElement]>,
     pub data: Box<ProblemData>,
 }
@@ -33,13 +34,19 @@ pub struct ProblemData {
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
     pub solutions: DataRef<Solutions>, //State::Seq<SolutionData>,
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef[]"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub gnotes: Box<[DataRef<GradingNote>]>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub hints: Box<[DocumentRange]>,
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef[]"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub notes: Box<[DataRef<Box<str>>]>,
     pub title: Option<DocumentRange>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub styles: Box<[Id]>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub preconditions: Box<[(CognitiveDimension, SymbolUri)]>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub objectives: Box<[(CognitiveDimension, SymbolUri)]>,
 }
 
@@ -130,7 +137,8 @@ impl std::hash::Hash for Problem {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct GradingNote {
     pub html: Box<str>,
-    pub answer_classes: Vec<AnswerClass>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub answer_classes: Box<[AnswerClass]>,
 }
 
 #[derive(Debug, Clone)]

@@ -9,10 +9,12 @@ use ftml_uris::{DocumentElementUri, Id};
 pub enum Variable {
     Name {
         name: Id,
+        #[cfg_attr(feature = "serde", serde(default))]
         notated: Option<Id>,
     },
     Ref {
         declaration: DocumentElementUri,
+        #[cfg_attr(feature = "serde", serde(default))]
         is_sequence: Option<bool>,
     },
 }

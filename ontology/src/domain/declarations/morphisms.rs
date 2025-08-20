@@ -73,9 +73,13 @@ impl HasDeclarations for Morphism {
 pub struct Assignment {
     pub original: SymbolUri,
     pub morphism: SymbolUri,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub definiens: Option<Term>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub refined_type: Option<Term>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub new_name: Option<SimpleUriName>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub macroname: Option<Id>,
 }
 impl Assignment {
