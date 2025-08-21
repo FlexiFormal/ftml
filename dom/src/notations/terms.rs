@@ -13,7 +13,10 @@ use crate::{
 };
 use ftml_ontology::{
     narrative::elements::Notation,
-    terms::{Argument, BoundArgument, Term, VarOrSym, Variable, opaque::Opaque},
+    terms::{
+        Argument, BoundArgument, Term, VarOrSym, Variable,
+        opaque::{AnyOpaque, OpaqueNode},
+    },
 };
 use ftml_uris::{DocumentElementUri, Id, LeafUri, NamedUri, SymbolUri};
 use leptos::{
@@ -104,31 +107,60 @@ impl TermExt for Term {
                 variable: Variable::Name { name, notated },
                 ..
             } => var_name::<Views>(name, notated, None, in_term).into_any(),
-            Self::Application {
-                head,
-                arguments,
-                presentation: None,
-            } if matches!(
-                *head,
-                Self::Symbol { .. }
-                    | Self::Var {
-                        variable: Variable::Ref { .. },
-                        ..
-                    }
-            ) =>
+            Self::Application(app)
+                if app.presentation.is_none()
+                    && matches!(
+                        app.head,
+                        Self::Symbol { .. }
+                            | Self::Var {
+                                variable: Variable::Ref { .. },
+                                ..
+                            }
+                    ) =>
             {
                 // SAFETY: pattern match above
-                let (leaf, vos) = unsafe { do_head(*head) };
-                application::<Views, Be>(vos, leaf, None, arguments).into_any()
+                let (leaf, vos) = unsafe { do_head(app.head.clone()) };
+                application::<Views, Be>(vos, leaf, None, &app.arguments).into_any()
             }
-            Self::Application {
-                head,
-                arguments,
-                presentation: Some(pres),
-            } => {
-                let head = match *head {
-                    Self::Field { record, .. } => *record,
-                    t => t,
+            Self::Application(app) if app.presentation.is_some() => {
+                let head = match &app.head {
+                    Self::Field(f) => f.record.clone(),
+                    t => t.clone(),
+                };
+                let head =
+                    ClonableView::new(true, move || head.clone().into_view::<Views, Be>(true));
+                // SAFETY: app.presentation.is_some()
+                let pres = unsafe { app.presentation.as_ref().unwrap_unchecked() };
+                let uri = match pres {
+                    VarOrSym::Sym(s) => s.clone().into(),
+                    VarOrSym::Var(Variable::Ref { declaration, .. }) => declaration.clone().into(),
+                    VarOrSym::Var(Variable::Name { .. }) => {
+                        return "TODO: unresolved variable".into_any();
+                    }
+                };
+                application::<Views, Be>(pres.clone(), uri, Some(head), &app.arguments).into_any()
+            }
+            Self::Bound(b)
+                if b.presentation.is_none()
+                    && matches!(
+                        b.head,
+                        Self::Symbol { .. }
+                            | Self::Var {
+                                variable: Variable::Ref { .. },
+                                ..
+                            }
+                    ) =>
+            {
+                // SAFETY: pattern match above
+                let (leaf, vos) = unsafe { do_head(b.head.clone()) };
+                bound::<Views, Be>(vos, leaf, b.body.clone(), None, &b.arguments).into_any()
+            }
+            Self::Bound(b) if b.presentation.is_some() => {
+                // SAFETY: presentation.is_some();
+                let pres = unsafe { b.presentation.clone().unwrap_unchecked() };
+                let head = match &b.head {
+                    Self::Field(f) => f.record.clone(),
+                    t => t.clone(),
                 };
                 let head =
                     ClonableView::new(true, move || head.clone().into_view::<Views, Be>(true));
@@ -139,64 +171,23 @@ impl TermExt for Term {
                         return "TODO: unresolved variable".into_any();
                     }
                 };
-                application::<Views, Be>(pres, uri, Some(head), arguments).into_any()
+                bound::<Views, Be>(pres, uri, b.body.clone(), Some(head), &b.arguments).into_any()
             }
-            Self::Bound {
-                head,
-                arguments,
-                body,
-                presentation: None,
-            } if matches!(
-                *head,
-                Self::Symbol { .. }
-                    | Self::Var {
-                        variable: Variable::Ref { .. },
-                        ..
-                    }
-            ) =>
-            {
-                // SAFETY: pattern match above
-                let (leaf, vos) = unsafe { do_head(*head) };
-                bound::<Views, Be>(vos, leaf, *body, None, arguments).into_any()
-            }
-            Self::Bound {
-                head,
-                arguments,
-                body,
-                presentation: Some(pres),
-            } => {
-                let head = match *head {
-                    Self::Field { record, .. } => *record,
-                    t => t,
-                };
-                let head =
-                    ClonableView::new(true, move || head.clone().into_view::<Views, Be>(true));
-                let uri = match &pres {
-                    VarOrSym::Sym(s) => s.clone().into(),
-                    VarOrSym::Var(Variable::Ref { declaration, .. }) => declaration.clone().into(),
-                    VarOrSym::Var(Variable::Name { .. }) => {
-                        return "TODO: unresolved variable".into_any();
-                    }
-                };
-                bound::<Views, Be>(pres, uri, *body, Some(head), arguments).into_any()
-            }
-            Self::Opaque {
-                tag,
-                attributes,
-                children,
-                terms,
-            } => {
-                let mut terms = terms
-                    .into_iter()
-                    .map(|t| Some(move || t.into_view::<Views, Be>(true)))
+            Self::Opaque(o) => {
+                let mut terms = o
+                    .terms
+                    .iter()
+                    .map(|t| {
+                        let t = t.clone();
+                        Some(move || t.into_view::<Views, Be>(true))
+                    })
                     .collect::<Vec<_>>();
-                do_opaque(&tag, attributes, children, &mut terms).into_any()
+                do_opaque(&o.node, &mut terms).into_any()
             }
-            Self::Field {
-                record,
-                presentation: Some(pres),
-                ..
-            } => {
+            Self::Field(f) if f.presentation.is_some() => {
+                // SAFETY: presentation.is_some();
+                let pres = unsafe { f.presentation.clone().unwrap_unchecked() };
+                let record = f.record.clone();
                 let record =
                     ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
                 match pres {
@@ -212,47 +203,41 @@ impl TermExt for Term {
                 }
             }
 
-            Self::Application {
-                head,
-                arguments,
-                presentation: None,
-            } if matches!(
-                &*head,
-                Self::Field {
-                    record_type: Some(_),
-                    presentation: None,
-                    ..
-                }
-            ) =>
+            Self::Application(app)
+                if app.presentation.is_none()
+                    && matches!(
+                        &app.head,
+                        Self::Field(f)
+                        if f.presentation.is_none() && f.record_type.is_some()
+                    ) =>
             {
                 // let arguments = do_args::<Views, Be>(arguments);
-                let Self::Field {
-                    record,
-                    key,
-                    record_type: Some(tp),
-                    ..
-                } = *head
-                else {
+                let Self::Field(f) = &app.head else {
                     // SAFETY: pattern match above
                     unsafe { unreachable_unchecked() }
                 };
-                let tp = *tp;
+                // SAFETY: pattern match above
+                let tp = unsafe { f.record_type.clone().unwrap_unchecked() };
+                let record = f.record.clone();
+                let key = f.key.clone();
                 let record =
                     ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
+                // TODO I think this clone can be avoided
+                let arguments = app.arguments.clone();
                 FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
                             WithLocalCache::<Be>::default().get_structure(uri)
                         })
                     },
-                    |r| match r {
+                    move |r| match r {
                         Err(e) => Right(e.to_string()),
                         Ok(None) => Right("(Structure not found)".to_string()),
                         Ok(Some(r)) => Left(application::<Views, Be>(
                             VarOrSym::Sym(r.uri.clone()),
                             r.uri.clone().into(),
                             Some(record),
-                            arguments,
+                            &arguments,
                         )),
                     },
                 )
@@ -270,8 +255,8 @@ fn application<Views: FtmlViews, Be: SendBackend>(
     head: VarOrSym,
     uri: LeafUri,
     real_term: Option<ClonableView>,
-    arguments: Box<[Argument]>,
-) -> impl IntoView {
+    arguments: &[Argument],
+) -> impl IntoView + use<Views, Be> + 'static {
     use leptos::either::Either::{Left, Right};
     let arguments = do_args::<Views, Be>(arguments);
     DocumentState::with_head(head.clone(), move || {
@@ -296,7 +281,7 @@ fn bound<Views: FtmlViews, Be: SendBackend>(
     uri: LeafUri,
     body: Term,
     real_term: Option<ClonableView>,
-    arguments: Box<[BoundArgument]>,
+    arguments: &[BoundArgument],
 ) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
 
@@ -522,19 +507,21 @@ fn do_application_inner<Views: FtmlViews, Be: SendBackend>(
 }
 
 fn do_args<Views: FtmlViews, Be: SendBackend>(
-    arguments: Box<[Argument]>,
+    arguments: &[Argument],
 ) -> Vec<Either<ClonableView, Vec<ClonableView>>> {
     arguments
-        .into_iter()
+        .iter()
         .map(|a| match a {
             Argument::Simple(t) | Argument::Sequence(either::Left(t)) => {
+                let t = t.clone();
                 Either::Left(ClonableView::new(true, move || {
                     t.clone().into_view::<Views, Be>(true)
                 }))
             }
             Argument::Sequence(either::Right(s)) => Either::Right(
-                s.into_iter()
+                s.iter()
                     .map(|t| {
+                        let t = t.clone();
                         ClonableView::new(true, move || t.clone().into_view::<Views, Be>(true))
                     })
                     .collect::<Vec<_>>(),
@@ -544,36 +531,33 @@ fn do_args<Views: FtmlViews, Be: SendBackend>(
 }
 
 fn do_opaque(
-    tag: &Id,
-    attributes: Box<[(Id, Box<str>)]>,
-    children: Box<[Opaque]>,
+    node: &OpaqueNode,
     terms: &mut Vec<Option<impl FnOnce() -> AnyView>>,
 ) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
     use leptos::either::{
         Either::Left,
         EitherOf4::{A, B, C, D},
     };
-    let make_red = !children.iter().any(|e| matches!(e, Opaque::Term(_)));
+    let make_red = !node
+        .children
+        .iter()
+        .any(|e| matches!(e, AnyOpaque::Term(_)));
     let i = super::html_from_tag(
-        tag.as_ref(),
-        children
-            .into_iter()
+        node.tag.as_ref(),
+        node.children
+            .iter()
             .map(|e| match e {
-                Opaque::Node {
-                    tag,
-                    attributes,
-                    children,
-                } => A(do_opaque(&tag, attributes, children, terms)),
-                Opaque::Text(t) => B(t.into_string()),
-                Opaque::Term(i) => {
-                    let f = terms.get_mut(i as usize).and_then(Option::take);
+                AnyOpaque::Node(node) => A(do_opaque(node, terms)),
+                AnyOpaque::Text(t) => B(t.to_string()),
+                AnyOpaque::Term(i) => {
+                    let f = terms.get_mut(*i as usize).and_then(Option::take);
                     f.map_or_else(|| C(mtext().child("ERROR")), |f| D(f()))
                 }
             })
             .collect_view(),
     );
-    let r = attributes.into_iter().fold(Left(i), |i, (k, v)| {
-        super::attr(i, k.as_ref().to_string(), v.into_string())
+    let r = node.attributes.iter().fold(Left(i), |i, (k, v)| {
+        super::attr(i, k.as_ref().to_string(), v.to_string())
     });
     if make_red {
         super::attr(r, "style", "color:red")
@@ -583,20 +567,22 @@ fn do_opaque(
 }
 
 fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
-    arguments: Box<[BoundArgument]>,
+    arguments: &[BoundArgument],
 ) -> Vec<Either<ClonableView, Vec<ClonableView>>> {
     use leptos::either::Either::{Left, Right};
     arguments
-        .into_iter()
+        .iter()
         .map(|a| match a {
             BoundArgument::Simple(t) | BoundArgument::Sequence(either::Left(t)) => {
+                let t = t.clone();
                 Either::Left(ClonableView::new(true, move || {
                     t.clone().into_view::<Views, Be>(true)
                 }))
             }
             BoundArgument::Sequence(either::Right(s)) => Either::Right(
-                s.into_iter()
+                s.iter()
                     .map(|t| {
+                        let t = t.clone();
                         ClonableView::new(true, move || t.clone().into_view::<Views, Be>(true))
                     })
                     .collect::<Vec<_>>(),
@@ -608,25 +594,30 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
             | BoundArgument::BoundSeq(either::Left(Variable::Ref {
                 declaration,
                 is_sequence,
-            })) => Either::Left(ClonableView::new(true, move || {
+            })) => {
                 let declaration = declaration.clone();
-                with_notations::<Be, _, _>(declaration.clone().into(), move |t| {
-                    if let Some(n) = t {
-                        Left(n.as_view::<Views>(
-                            &VarOrSym::Var(Variable::Ref {
-                                declaration,
-                                is_sequence,
-                            }),
-                            None,
-                        ))
-                    } else {
-                        Right(mtext().child(format!("TODO: No notation for {declaration}")))
-                    }
-                })
-            })),
+                let is_sequence = *is_sequence;
+                Either::Left(ClonableView::new(true, move || {
+                    let declaration = declaration.clone();
+                    with_notations::<Be, _, _>(declaration.clone().into(), move |t| {
+                        if let Some(n) = t {
+                            Left(n.as_view::<Views>(
+                                &VarOrSym::Var(Variable::Ref {
+                                    declaration,
+                                    is_sequence,
+                                }),
+                                None,
+                            ))
+                        } else {
+                            Right(mtext().child(format!("TODO: No notation for {declaration}")))
+                        }
+                    })
+                }))
+            }
             BoundArgument::BoundSeq(either::Right(v)) => Either::Right(
-                v.into_iter()
+                v.iter()
                     .map(|v| {
+                        let v = v.clone();
                         ClonableView::new(true, move || {
                             if let Variable::Ref {
                                 declaration,
@@ -660,9 +651,12 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                     })
                     .collect(),
             ),
-            t => Either::Left(ClonableView::new(true, move || {
-                mtext().child(format!("{t:?}")).into_any()
-            })),
+            t => {
+                let t = t.clone();
+                Either::Left(ClonableView::new(true, move || {
+                    mtext().child(format!("{t:?}")).into_any()
+                }))
+            }
         })
         .collect::<Vec<_>>()
 }

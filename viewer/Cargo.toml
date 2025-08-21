@@ -47,6 +47,7 @@ ftml-backend = { workspace = true, features = [
 ] }
 ftml-uris = { workspace = true, features = ["interned"] }
 ftml-dom = { workspace = true, features = ["deepsize"] }
+ftml-ontology = { workspace = true, features = ["deepsize"] }
 
 serde_json = { workspace = true }
 parking_lot = { workspace = true }

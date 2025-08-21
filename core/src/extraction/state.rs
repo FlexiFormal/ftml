@@ -29,7 +29,7 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{Term, VarOrSym, Variable},
+    terms::{ApplicationTerm, BindingTerm, Term, VarOrSym, Variable},
 };
 
 use ftml_uris::{
@@ -1766,11 +1766,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 None,
             )
         };
-        let term = Term::Application {
-            head: Box::new(head),
-            arguments: args.into_boxed_slice(),
+        let term = Term::Application(ApplicationTerm::new(
+            head,
+            args.into_boxed_slice(),
             presentation,
-        }
+        ))
         .simplify();
         self.close_app_term(uri, term, node)
     }
@@ -1816,12 +1816,12 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 None,
             )
         };
-        let term = Term::Bound {
-            head: Box::new(head),
-            body: Box::new(body),
-            arguments: args.into_boxed_slice(),
+        let term = Term::Bound(BindingTerm::new(
+            head,
+            args.into_boxed_slice(),
+            body,
             presentation,
-        }
+        ))
         .simplify();
         self.close_app_term(uri, term, node)
     }

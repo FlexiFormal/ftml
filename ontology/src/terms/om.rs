@@ -166,25 +166,18 @@ impl openmath::ser::OMSerializable for Term {
                 )),
                 &Omv(declaration.name()),
             ),
-            Self::Application {
-                head, arguments, ..
-            } => serializer.oma(
-                &**head,
-                arguments.iter().map(|a| match a {
+            Self::Application(app) => serializer.oma(
+                &app.head,
+                app.arguments.iter().map(|a| match a {
                     Argument::Simple(a) => either_of::EitherOf3::A(a),
                     Argument::Sequence(either::Left(e)) => either_of::EitherOf3::B(AsSeq(e)),
                     Argument::Sequence(either::Right(e)) => either_of::EitherOf3::C(Seq(e)),
                 }),
             ),
-            Self::Bound {
-                head,
-                arguments,
-                body,
-                ..
-            } => Args {
-                head: &**head,
-                args: arguments,
-                bd: body,
+            Self::Bound(b) => Args {
+                head: &b.head,
+                args: &b.arguments,
+                bd: &b.body,
             }
             .as_openmath(serializer),
             _ => todo!(),

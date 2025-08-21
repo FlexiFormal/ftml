@@ -1,15 +1,23 @@
-mod term;
-use ftml_uris::{LeafUri, SymbolUri};
-pub use term::Term;
-mod variables;
-pub use variables::Variable;
 mod arguments;
-pub mod opaque;
-pub use arguments::{Argument, ArgumentMode, BoundArgument};
+mod bank;
 #[cfg(feature = "openmath")]
 pub mod om;
+pub mod opaque;
 pub mod records;
 pub mod simplify;
+mod term;
+mod variables;
+
+pub use arguments::{Argument, ArgumentMode, BoundArgument};
+pub use bank::clear_term_cache;
+#[cfg(feature = "deepsize")]
+pub use bank::{TermCacheSize, get_cache_size};
+use ftml_uris::{LeafUri, SymbolUri};
+pub use term::{
+    Application, ApplicationTerm, Binding, BindingTerm, Opaque, OpaqueTerm, RecordField,
+    RecordFieldTerm, Term,
+};
+pub use variables::Variable;
 
 //mod syn;
 

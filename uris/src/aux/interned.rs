@@ -119,6 +119,14 @@ pub fn get_memory_state() -> MemoryState {
         base_uris_bytes,
     }
 }
+pub fn clear_memory() {
+    super::IdStore::clear();
+    crate::uris::archive::IdStore::clear();
+    crate::uris::module::NameStore::clear();
+    crate::uris::paths::PathStore::clear();
+    let mut lock = crate::uris::base::BASE_URIS.lock();
+    lock.retain(|e| !e.url.is_unique());
+}
 
 pub type InternMap = (
     dashmap::DashSet<strumbra::SharedString, rustc_hash::FxBuildHasher>,
@@ -129,6 +137,30 @@ pub type InternMap = (
 pub trait InternStore {
     const LIMIT: usize;
     fn get() -> &'static InternMap;
+    fn clear()
+    where
+        Self: Sized,
+    {
+        let (_, len) = Self::get();
+        let mut len = len.lock();
+        let nlen = Self::clear_only();
+        *len = nlen;
+    }
+    fn clear_only() -> usize
+    where
+        Self: Sized,
+    {
+        let (store, _) = Self::get();
+        // SAFETY: store only contains heap-allocated strings (len > INLINE_LEN)
+        // so arc_count preconditions are satisfied
+        unsafe {
+            store.retain(|e| {
+                let impl_ref: &internals::UmbraStringImpl = &*(std::ptr::from_ref(e).cast());
+                InternedStr::<Self>::arc_count(impl_ref).get() > 1
+            });
+        };
+        store.len()
+    }
 }
 
 #[impl_tools::autoimpl(Clone, PartialOrd, Ord, Hash)]
@@ -265,16 +297,8 @@ impl<Store: InternStore> InternedStr<Store> {
                 store.insert(s.clone());
                 *len += 1;
                 if *len > Store::LIMIT {
-                    // SAFETY: store only contains heap-allocated strings (len > INLINE_LEN)
-                    // so arc_count preconditions are satisfied
-                    unsafe {
-                        store.retain(|e| {
-                            let impl_ref: &internals::UmbraStringImpl =
-                                &*(std::ptr::from_ref(e).cast());
-                            Self::arc_count(impl_ref).get() > 1
-                        });
-                    };
-                    *len = store.len();
+                    let nlen = Store::clear_only();
+                    *len = nlen;
                 }
                 drop(len);
                 Ok(Self(s, PhantomData))

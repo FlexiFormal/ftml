@@ -1,5 +1,3 @@
-use std::{borrow::Cow, hint::unreachable_unchecked};
-
 use crate::{FtmlKey, extraction::FtmlExtractionError};
 use either::Either::{Left, Right};
 use ftml_ontology::{
@@ -7,9 +5,13 @@ use ftml_ontology::{
         DocumentRange,
         elements::notations::{NodeOrText, NotationComponent, NotationNode},
     },
-    terms::{Term, opaque::Opaque},
+    terms::{
+        OpaqueTerm, Term,
+        opaque::{AnyOpaque, OpaqueNode},
+    },
 };
 use ftml_uris::Id;
+use std::{borrow::Cow, hint::unreachable_unchecked};
 
 pub trait FtmlNode: Clone + std::fmt::Debug {
     //type Ancestors<'a>: Iterator<Item = Self> where Self: 'a;
@@ -147,7 +149,7 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
             path: &mut crate::NodePath,
             paths: &[crate::NodePath],
             node: &N,
-        ) -> Result<(Id, Box<[(Id, Box<str>)]>, Box<[Opaque]>), FtmlExtractionError> {
+        ) -> Result<OpaqueNode, FtmlExtractionError> {
             let tag = node
                 .tag_id()
                 .map_err(FtmlExtractionError::InvalidInformal)?;
@@ -163,31 +165,27 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
                         && p.last().is_some_and(|j| *j == i as u32)
                 }) {
                     #[allow(clippy::cast_possible_truncation)]
-                    children.push(Opaque::Term(j as u32));
+                    children.push(AnyOpaque::Term(j as u32));
                     continue;
                 }
                 match c {
                     Some(Right(s)) if s.as_bytes().iter().all(u8::is_ascii_whitespace) => (),
-                    Some(Right(s)) => children.push(Opaque::Text(s.into_boxed_str())),
+                    Some(Right(s)) => children.push(AnyOpaque::Text(s.into_boxed_str())),
                     Some(Left(n)) => {
                         #[allow(clippy::cast_possible_truncation)]
                         path.push(i as u32);
-                        let (id, attrs, ch) = rec(path, paths, &n)?;
-                        children.push(Opaque::Node {
-                            tag: id,
-                            attributes: attrs,
-                            children: ch,
-                        });
+                        let node = rec(path, paths, &n)?;
+                        children.push(AnyOpaque::Node(node));
                         path.pop();
                     }
                     None => (),
                 }
             }
-            Ok((
+            Ok(OpaqueNode {
                 tag,
-                attributes.into_boxed_slice(),
-                children.into_boxed_slice(),
-            ))
+                attributes: attributes.into_boxed_slice(),
+                children: children.into_boxed_slice(),
+            })
         }
 
         let mut paths = Vec::with_capacity(termpairs.len());
@@ -199,13 +197,8 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
             })
             .collect();
         let mut path = crate::NodePath::new();
-        let (tag, attributes, children) = rec(&mut path, &paths, self)?;
-        Ok(Term::Opaque {
-            tag,
-            attributes,
-            terms,
-            children,
-        })
+        let node = rec(&mut path, &paths, self)?;
+        Ok(Term::Opaque(OpaqueTerm::new(node, terms)))
     }
 
     /// ### Errors

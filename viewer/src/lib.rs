@@ -67,14 +67,25 @@ pub fn iterate_body(cfg: config::FtmlViewerConfig) {
 pub fn print_cache() {
     use ftml_backend::GlobalBackend;
     let uris = ftml_uris::get_memory_state();
+    let terms = ftml_ontology::terms::get_cache_size();
     let local_cache = ftml_dom::utils::local_cache::cache_size();
     let remote_cache = backend::GlobalBackend::get().cache_size();
-    let total = uris.total_bytes() + local_cache.total_bytes() + remote_cache.total_bytes();
+    let total = uris.total_bytes()
+        + terms.total_bytes()
+        + local_cache.total_bytes()
+        + remote_cache.total_bytes();
     leptos::logging::log!(
-        "Uris: {uris}\nLocal Cache: {local_cache}\nRemote Cache: {remote_cache}\
+        "Uris: {uris}\nTerms: {terms}\nLocal Cache: {local_cache}\nRemote Cache: {remote_cache}\
         \n---------------------\nTotal: {}",
         bytesize::ByteSize::b(total as u64).display().iec_short()
     );
+}
+
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn clear_cache() {
+    ftml_uris::clear_memory();
+    ftml_ontology::terms::clear_term_cache();
+    print_cache();
 }
 
 /*

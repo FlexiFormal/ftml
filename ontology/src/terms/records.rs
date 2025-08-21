@@ -55,16 +55,15 @@ fn get(
 ) -> Option<SharedDeclaration<Symbol>> {
     match term {
         Term::Symbol { uri, .. } => from_structure(uri, dones, name, get_struct),
-        Term::Application {
-            head, arguments, ..
-        } if matches!(&**head,Term::Symbol{uri,..} if *uri == *metatheory::RECORD_TYPE_MERGE)
-            && matches!(&**arguments, [Argument::Sequence(_)]) =>
+        Term::Application(app)
+            if matches!(&app.head,Term::Symbol{uri,..} if *uri == *metatheory::RECORD_TYPE_MERGE)
+                && matches!(&*app.arguments, [Argument::Sequence(_)]) =>
         {
-            let Term::Application { arguments, .. } = term else {
+            let Term::Application(app) = term else {
                 // SAFETY: pattern match above
                 unsafe { unreachable_unchecked() }
             };
-            let Some(Argument::Sequence(s)) = arguments.first() else {
+            let Some(Argument::Sequence(s)) = app.arguments.first() else {
                 // SAFETY: pattern match above
                 unsafe { unreachable_unchecked() }
             };
@@ -97,19 +96,18 @@ fn get_async<
 ) -> Pin<Box<dyn Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>> + Send>> {
     match term {
         Term::Symbol { uri, .. } => from_structure_async(uri, dones, name, get_struct),
-        Term::Application {
-            head, arguments, ..
-        } if matches!(&*head,Term::Symbol{uri,..} if *uri == *metatheory::RECORD_TYPE_MERGE)
-            && matches!(&*arguments, [Argument::Sequence(_)]) =>
+        Term::Application(app)
+            if matches!(&app.head,Term::Symbol{uri,..} if *uri == *metatheory::RECORD_TYPE_MERGE)
+                && matches!(&*app.arguments, [Argument::Sequence(_)]) =>
         {
-            let mut arguments = arguments.into_iter();
+            let mut arguments = app.arguments.iter();
             let Some(Argument::Sequence(s)) = arguments.next() else {
                 // SAFETY: pattern match above
                 unsafe { unreachable_unchecked() }
             };
             match s {
-                Either::Left(t) => get_async(t, dones, name, get_struct),
-                Either::Right(s) => from_terms_async(s, dones, name, get_struct),
+                Either::Left(t) => get_async(t.clone(), dones, name, get_struct),
+                Either::Right(s) => from_terms_async(s.clone(), dones, name, get_struct),
             }
         }
         _ => Box::pin(std::future::ready(Ok(None))),

@@ -58,7 +58,7 @@ use std::str::FromStr;
 mod traits;
 
 #[cfg(feature = "interned")]
-pub use aux::interned::{MemoryState, get_memory_state};
+pub use aux::interned::{MemoryState, clear_memory, get_memory_state};
 pub(crate) use aux::macros::{debugdisplay, tests, ts};
 
 /// exports all Uri types and associated traits

@@ -379,7 +379,7 @@ const MAX: usize = 8;
 #[inline]
 fn clean(v: &mut Vec<InternedBaseURI>) {
     fn actually_clean(v: &mut Vec<InternedBaseURI>) {
-        v.retain(|e| Arc::strong_count(&e.url) > 1);
+        v.retain(|e| !e.url.is_unique());
     }
     if v.len() > MAX {
         actually_clean(v);

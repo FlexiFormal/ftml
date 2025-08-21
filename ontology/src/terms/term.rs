@@ -1,10 +1,9 @@
-use std::fmt::Write;
-
-use super::opaque::Opaque;
 use super::{BoundArgument, arguments::Argument, variables::Variable};
 use crate::terms::VarOrSym;
+use crate::terms::opaque::OpaqueNode;
 use crate::utils::TreeIter;
-use ftml_uris::{Id, SymbolUri, UriName};
+use ftml_uris::{SymbolUri, UriName};
+use std::fmt::Write;
 
 /// The type of FTML expressions.
 ///
@@ -29,40 +28,16 @@ pub enum Term {
         presentation: Option<VarOrSym>,
     },
     /// An application of `head` to `arguments` (e.g. $n + m$)
-    Application {
-        #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
-        head: Box<Self>,
-        arguments: Box<[Argument]>,
-        #[cfg_attr(feature = "serde", serde(default))]
-        presentation: Option<VarOrSym>,
-    },
+    Application(ApplicationTerm),
     /// A *binding* application with `head` as operator, `arguments`
     /// being either variable bindings or arbitrary expression arguments,
     /// and `body` being the (final) expression *in which* the variables are bound
     /// (e.g. $\int_{t=0}^\infty f(t) \mathrm dt$)
-    Bound {
-        #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
-        head: Box<Self>,
-        arguments: Box<[BoundArgument]>,
-        #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
-        body: Box<Self>,
-        #[cfg_attr(feature = "serde", serde(default))]
-        presentation: Option<VarOrSym>,
-    },
+    Bound(BindingTerm),
     /// Record projection; the field named `key` in the record `record`.
     /// The optional `record_type` ideally references the type in which field names
     /// can be looked up.
-    Field {
-        #[cfg_attr(feature = "typescript", tsify(type = "Term"))]
-        record: Box<Self>,
-        key: UriName,
-        /// does not count as a subterm
-        #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
-        #[cfg_attr(feature = "serde", serde(default))]
-        record_type: Option<Box<Self>>,
-        #[cfg_attr(feature = "serde", serde(default))]
-        presentation: Option<VarOrSym>,
-    },
+    Field(RecordFieldTerm),
     /// A non-alpha-renamable variable
     Label {
         name: UriName,
@@ -75,14 +50,84 @@ pub enum Term {
     },
     /// An opaque/informal expression; may contain formal islands, which are collected in
     /// `expressions`.
-    Opaque {
-        tag: Id,
-        attributes: Box<[(Id, Box<str>)]>,
-        children: Box<[Opaque]>,
-        #[cfg_attr(feature = "typescript", tsify(type = "Term[]"))]
-        terms: Box<[Self]>,
-    },
+    Opaque(OpaqueTerm),
 }
+
+#[derive(Clone)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct ApplicationTerm(pub(crate) triomphe::Arc<Application>);
+
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct Application {
+    pub head: Term,
+    pub arguments: Box<[Argument]>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub presentation: Option<VarOrSym>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub(crate) hash: u64,
+}
+
+#[derive(Clone)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct BindingTerm(pub(crate) triomphe::Arc<Binding>);
+
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct Binding {
+    pub head: Term,
+    pub arguments: Box<[BoundArgument]>,
+    pub body: Term,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub presentation: Option<VarOrSym>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub(crate) hash: u64,
+}
+
+#[derive(Clone)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct RecordFieldTerm(pub(crate) triomphe::Arc<RecordField>);
+
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct RecordField {
+    pub record: Term,
+    pub key: UriName,
+    /// does not count as a subterm
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub record_type: Option<Term>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub presentation: Option<VarOrSym>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub(crate) hash: u64,
+}
+
+#[derive(Clone)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct OpaqueTerm(pub(crate) triomphe::Arc<Opaque>);
+
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct Opaque {
+    pub node: OpaqueNode,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub terms: Box<[Term]>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub(crate) hash: u64,
+}
+
 impl Term {
     /*#[must_use]
     #[inline]
@@ -124,35 +169,23 @@ impl Term {
                     presentation: Some(pres),
                 }
             }
-            Self::Application {
-                head, arguments, ..
-            } => Self::Application {
-                head,
-                arguments,
-                presentation: Some(pres),
-            },
-            Self::Bound {
-                head,
-                arguments,
-                body,
-                ..
-            } => Self::Bound {
-                head,
-                arguments,
-                body,
-                presentation: Some(pres),
-            },
-            Self::Field {
-                record,
-                key,
-                record_type,
-                ..
-            } => Self::Field {
-                record,
-                key,
-                record_type,
-                presentation: Some(pres),
-            },
+            Self::Application(a) => Self::Application(ApplicationTerm::new(
+                a.head.clone(),
+                a.arguments.clone(),
+                Some(pres),
+            )),
+            Self::Bound(b) => Self::Bound(BindingTerm::new(
+                b.head.clone(),
+                b.arguments.clone(),
+                b.body.clone(),
+                Some(pres),
+            )),
+            Self::Field(f) => Self::Field(RecordFieldTerm::new(
+                f.record.clone(),
+                f.key.clone(),
+                f.record_type.clone(),
+                Some(pres),
+            )),
             o => o,
         }
     }
@@ -173,22 +206,18 @@ impl crate::utils::RefTree for Term {
             | Self::Label {
                 df: None, tp: None, ..
             } => ExprChildrenIter::E,
-            Self::Application { head, arguments,.. } => ExprChildrenIter::App(Some(head), arguments),
-            Self::Bound {
-                head,
-                arguments,
-                body,..
-            } => ExprChildrenIter::Bound(Some(head), arguments, body),
+            Self::Application(a) => ExprChildrenIter::App(Some(&a.head), &a.arguments),
+            Self::Bound(b) => ExprChildrenIter::Bound(Some(&b.head), &b.arguments, &b.body),
             Self::Label {
                 df: Some(df),
                 tp: Some(tp),
                 ..
             } => ExprChildrenIter::Two(tp, df),
-            Self::Field { record, .. } => ExprChildrenIter::One(record),
+            Self::Field(f) => ExprChildrenIter::One(&f.record),
             Self::Label { df: Some(t), .. } | Self::Label { tp: Some(t), .. } => {
                 ExprChildrenIter::One(t)
             }
-            Self::Opaque { terms, .. } => ExprChildrenIter::Slice(terms.iter()),
+            Self::Opaque(o) => ExprChildrenIter::Slice(o.terms.iter()),
         }
     }
 }
@@ -216,16 +245,17 @@ fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             variable: Variable::Ref { declaration, .. },
             ..
         } => write!(f, "Var({})", declaration.name()),
-        Term::Field {
-            record,
-            key,
-            record_type: None,
-            ..
-        } => {
-            fmt::<LONG>(record, f)?;
+        Term::Field(field) if field.record_type.is_none() => {
+            fmt::<LONG>(&field.record, f)?;
             f.write_char('.')?;
-            std::fmt::Debug::fmt(key, f)
+            std::fmt::Debug::fmt(&field.key, f)
         }
+        Term::Field(field) => f
+            .debug_struct("Field")
+            .field("name", &field.key)
+            .field("record", &field.record)
+            .field("type", &field.record_type)
+            .finish(),
         Term::Label {
             name,
             df: None,
@@ -279,56 +309,33 @@ fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             .field("", name)
             .field(":=", &df.debug_short())
             .finish(),
-        Term::Application {
-            head, arguments, ..
-        } => f
+        Term::Application(a) => f
             .debug_struct("OMA")
-            .field("head", head)
-            .field("arguments", arguments)
+            .field("head", &a.head)
+            .field("arguments", &a.arguments)
             .finish(),
-        Term::Bound {
-            head,
-            arguments,
-            body,
-            ..
-        } => f
+        Term::Bound(b) => f
             .debug_struct("OMBIND")
-            .field("head", head)
-            .field("arguments", arguments)
-            .field("body", body)
+            .field("head", &b.head)
+            .field("arguments", &b.arguments)
+            .field("body", &b.body)
             .finish(),
-        Term::Opaque {
-            tag,
-            attributes,
-            children,
-            terms,
-        } => {
-            write!(f, "<{tag}")?;
-            for (k, v) in attributes {
+        Term::Opaque(o) => {
+            write!(f, "<{}", o.node.tag)?;
+            for (k, v) in &o.node.attributes {
                 write!(f, " {k}=\"{v}\"")?;
             }
             f.write_str(">\n")?;
-            for t in children {
+            for t in &o.node.children {
                 writeln!(f, "{t}")?;
             }
             f.write_str("<terms>\n")?;
-            for t in terms {
+            for t in &o.terms {
                 fmt::<LONG>(t, f)?;
                 f.write_char('\n')?;
             }
-            write!(f, "</{tag}>")
+            write!(f, "</{}>", o.node.tag)
         }
-        Term::Field {
-            record,
-            key,
-            record_type,
-            ..
-        } => f
-            .debug_struct("Field")
-            .field("name", key)
-            .field("record", record)
-            .field("type", record_type)
-            .finish(),
     }
 }
 impl std::fmt::Debug for Term {
@@ -453,11 +460,18 @@ impl<'a> Iterator for ExprChildrenIter<'a> {
 
 #[cfg(feature = "deepsize")]
 impl deepsize::DeepSizeOf for Term {
+    #[allow(clippy::only_used_in_recursion)]
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
         match self {
-            Self::Application {
-                head, arguments, ..
-            } => {
+            Self::Label { df, tp, .. } => {
+                tp.as_ref()
+                    .map(|t| std::mem::size_of::<Self>() + (**t).deep_size_of_children(context))
+                    .unwrap_or_default()
+                    + df.as_ref()
+                        .map(|t| std::mem::size_of::<Self>() + (**t).deep_size_of_children(context))
+                        .unwrap_or_default()
+            }
+            /*Self::Application(a) => {
                 std::mem::size_of::<Self>()
                     + (**head).deep_size_of_children(context)
                     + arguments.iter().map(Argument::deep_size_of).sum::<usize>()
@@ -489,14 +503,6 @@ impl deepsize::DeepSizeOf for Term {
                         .map(|t| std::mem::size_of::<Self>() + (**t).deep_size_of_children(context))
                         .unwrap_or_default()
             }
-            Self::Label { df, tp, .. } => {
-                tp.as_ref()
-                    .map(|t| std::mem::size_of::<Self>() + (**t).deep_size_of_children(context))
-                    .unwrap_or_default()
-                    + df.as_ref()
-                        .map(|t| std::mem::size_of::<Self>() + (**t).deep_size_of_children(context))
-                        .unwrap_or_default()
-            }
             Self::Opaque {
                 attributes,
                 children,
@@ -516,6 +522,7 @@ impl deepsize::DeepSizeOf for Term {
                         .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
                         .sum::<usize>()
             }
+            */
             _ => 0,
         }
     }

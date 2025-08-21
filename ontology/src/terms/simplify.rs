@@ -2,13 +2,17 @@ use std::hint::unreachable_unchecked;
 
 use ftml_uris::{Id, metatheory};
 
-use crate::terms::{Argument, Term, Variable, opaque::Opaque};
+use crate::terms::{
+    Argument, Term, Variable,
+    opaque::AnyOpaque,
+    term::{OpaqueTerm, RecordFieldTerm},
+};
 
 macro_rules! destruct {
     ([$($p:pat),*] = $e:expr ) => {
-        let mut iter = $e.into_iter();
+        let mut iter = $e.iter();
         $(
-        let Some($p) = iter.next() else {
+        let Some($p) = iter.next().cloned() else {
             // SAFETY: pattern match above
             unsafe { unreachable_unchecked() }
         };
@@ -33,63 +37,40 @@ impl Term {
         ];
         match self {
             // Opaques
-            Self::Opaque {
-                tag,
-                attributes,
-                children,
-                terms,
-            } if (tag.as_ref() == "mrow" || tag.as_ref().eq_ignore_ascii_case("span"))
-                && terms.len() == 1
-                && *children == [Opaque::Term(0)]
-                && attributes
-                    .iter()
-                    .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
+            Self::Opaque(o)
+                if (o.node.tag.as_ref() == "mrow"
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("span"))
+                    && o.terms.len() == 1
+                    && *o.node.children == [AnyOpaque::Term(0)]
+                    && o.node
+                        .attributes
+                        .iter()
+                        .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
             {
-                destruct!([tm] = terms);
+                destruct!([tm] = o.terms);
                 tm
             }
-            Self::Opaque {
-                tag,
-                children,
-                terms,
-                attributes,
-            } if tag.as_ref() == "mi"
-                && terms.is_empty()
-                && matches!(*children, [Opaque::Text(_)]) =>
+            Self::Opaque(o)
+                if o.node.tag.as_ref() == "mi"
+                    && o.terms.is_empty()
+                    && matches!(*o.node.children, [AnyOpaque::Text(_)]) =>
             {
-                // SAFETY: we just matched
-                let txt = unsafe {
-                    if let Some(Opaque::Text(txt)) = children.first() {
-                        txt
-                    } else {
+                let Some(AnyOpaque::Text(txt)) = o.node.children.first() else {
+                    // SAFETY: we just matched
+                    unsafe {
                         unreachable_unchecked();
                     }
                 };
                 let txt = txt.trim();
                 let mut chars = txt.chars();
                 let Some(c) = chars.next() else {
-                    return Self::Opaque {
-                        tag,
-                        children,
-                        terms,
-                        attributes,
-                    };
+                    return Self::Opaque(o);
                 };
                 if chars.next().is_some() {
-                    return Self::Opaque {
-                        tag,
-                        children,
-                        terms,
-                        attributes,
-                    };
+                    return Self::Opaque(o);
                 }
                 let Some(name) = VAR_NAMES.get(&c) else {
-                    return Self::Opaque {
-                        tag,
-                        children,
-                        terms,
-                        attributes,
-                    };
+                    return Self::Opaque(o);
                 };
                 // SAFETY: name is in map
                 let name: Id = unsafe { name.parse().unwrap_unchecked() };
@@ -100,64 +81,33 @@ impl Term {
                     presentation: None,
                 }
             }
-            Self::Opaque {
-                tag,
-                attributes,
-                children,
-                terms,
-            } if (tag.as_ref() == "mrow" || tag.as_ref().eq_ignore_ascii_case("span"))
-                && matches!(*children, [Opaque::Node { .. }])
-                && attributes
-                    .iter()
-                    .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
+            Self::Opaque(o)
+                if (o.node.tag.as_ref() == "mrow"
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("span"))
+                    && matches!(*o.node.children, [AnyOpaque::Node { .. }])
+                    && o.node
+                        .attributes
+                        .iter()
+                        .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
             {
-                destruct!(
-                    [Opaque::Node {
-                        tag,
-                        attributes,
-                        children,
-                    }] = children
-                );
-                Self::Opaque {
-                    tag,
-                    attributes,
-                    children,
-                    terms,
-                }
-                .simplify()
+                destruct!([AnyOpaque::Node(node)] = o.node.children);
+                Self::Opaque(OpaqueTerm::new(node, o.terms.clone())).simplify()
             }
-            Self::Opaque {
-                tag,
-                children,
-                terms,
-                ..
-            } if tag.as_ref() == "math" && matches!(*children, [Opaque::Node { .. }]) => {
-                destruct!(
-                    [Opaque::Node {
-                        tag,
-                        attributes,
-                        children,
-                    }] = children
-                );
-                Self::Opaque {
-                    tag,
-                    attributes,
-                    children,
-                    terms,
-                }
-                .simplify()
+            Self::Opaque(o)
+                if o.node.tag.as_ref() == "math"
+                    && matches!(*o.node.children, [AnyOpaque::Node { .. }]) =>
+            {
+                destruct!([AnyOpaque::Node(node)] = o.node.children);
+                Self::Opaque(OpaqueTerm::new(node, o.terms.clone())).simplify()
             }
 
             // structure field projections:
-            Self::Application {
-                head,
-                arguments,
-                presentation,
-            } if matches!(&*head, Self::Symbol{uri,..} if uri == &*metatheory::FIELD_PROJECTION)
-                && matches!(
-                    &*arguments,
-                    [Argument::Simple(_), Argument::Simple(Self::Label { .. })]
-                ) =>
+            Self::Application(app)
+                if matches!(&app.head, Self::Symbol{uri,..} if uri == &*metatheory::FIELD_PROJECTION)
+                    && matches!(
+                        &*app.arguments,
+                        [Argument::Simple(_), Argument::Simple(Self::Label { .. })]
+                    ) =>
             {
                 destruct!(
                     [
@@ -167,37 +117,39 @@ impl Term {
                             df: None,
                             tp: None,
                         })
-                    ] = arguments
+                    ] = app.arguments
                 );
 
                 let (record, record_type) = match record {
-                    Self::Application {
-                        head, arguments, ..
-                    } if matches!(&*head, Self::Symbol{uri,..} if uri == &*metatheory::OF_TYPE)
-                        && matches!(&*arguments, [Argument::Simple(_), Argument::Simple(_)]) =>
+                    Self::Application(app)
+                        if matches!(&app.head, Self::Symbol{uri,..} if uri == &*metatheory::OF_TYPE)
+                            && matches!(
+                                &*app.arguments,
+                                [Argument::Simple(_), Argument::Simple(_)]
+                            ) =>
                     {
                         destruct!(
-                            [Argument::Simple(record), Argument::Simple(record_type)] = arguments
+                            [Argument::Simple(record), Argument::Simple(record_type)] =
+                                app.arguments
                         );
-                        (record, Some(Box::new(record_type)))
+                        (record, Some(record_type))
                     }
                     _ => (record, None),
                 };
-                Self::Field {
-                    record: Box::new(record),
+                Self::Field(RecordFieldTerm::new(
+                    record,
                     key,
                     record_type,
-                    presentation,
-                }
+                    app.presentation.clone(),
+                ))
             }
 
             // module type (redundant):
-            Self::Application {
-                head, arguments, ..
-            } if matches!(&*head, Self::Symbol{uri,..} if uri == &*metatheory::MODULE_TYPE)
-                && matches!(&*arguments, [Argument::Simple(Self::Symbol { .. })]) =>
+            Self::Application(app)
+                if matches!(&app.head, Self::Symbol{uri,..} if uri == &*metatheory::MODULE_TYPE)
+                    && matches!(&*app.arguments, [Argument::Simple(Self::Symbol { .. })]) =>
             {
-                destruct!([Argument::Simple(head)] = arguments);
+                destruct!([Argument::Simple(head)] = app.arguments);
                 head
             }
 
