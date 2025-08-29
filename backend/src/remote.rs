@@ -163,7 +163,7 @@ where
         &self,
         uri: ftml_uris::Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<E>>> {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<E>>> {
         let url = if let Uri::Document(d) = &uri {
             self.redirects.for_fragment(d).map_or_else(
                 || Self::make_url(&self.fragment_url, &uri, context.as_ref()),
@@ -179,9 +179,8 @@ where
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<
-        Output = Result<ftml_ontology::domain::modules::Module, BackendError<Self::Error>>,
-    > + Send {
+    ) -> impl Future<Output = Result<ftml_ontology::domain::modules::Module, BackendError<Self::Error>>>
+    {
         let url = self.redirects.for_modules(&uri).map_or_else(
             || Self::make_url(&self.modules_url, &uri.into(), None),
             |r| r.to_string(),
@@ -195,7 +194,7 @@ where
         uri: DocumentUri,
     ) -> impl Future<
         Output = Result<ftml_ontology::narrative::documents::Document, BackendError<Self::Error>>,
-    > + Send {
+    > {
         let url = self.redirects.for_documents(&uri).map_or_else(
             || Self::make_url(&self.documents_url, &uri.into(), None),
             |r| r.to_string(),
@@ -215,7 +214,7 @@ where
             )>,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > {
         let url = self.redirects.for_notations(&uri).map_or_else(
             || Self::make_url(&self.notations_url, &uri.into(), None),
             |r| r.to_string(),
@@ -233,7 +232,7 @@ where
             Vec<(ftml_uris::DocumentElementUri, crate::ParagraphOrProblemKind)>,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > {
         let url = self.redirects.for_paragraphs(&uri, problems).map_or_else(
             || Self::make_url(&self.paragraphs_url, &uri.into(), None),
             |r| r.to_string(),
@@ -298,7 +297,7 @@ mod server_fn {
 
         ftml_uris::compfun! {!!
             #[allow(clippy::similar_names)]
-            fn get_fragment(&self,uri:Uri,context:Option<NarrativeUri>) -> impl Future<Output=Result<(Uri, Vec<Css>,String), BackendError<ServerFnErrorErr>>> {
+            fn get_fragment(&self,uri:Uri,context:Option<NarrativeUri>) -> impl Future<Output=Result<(Uri, Box<[Css]>,Box<str>), BackendError<ServerFnErrorErr>>> {
                 fn make_url<D: std::fmt::Display>(
                     base: D,
                     uri: &UriComponentTuple,
@@ -341,7 +340,7 @@ mod server_fn {
                 ftml_ontology::domain::modules::Module,
                 BackendError<server_fn::error::ServerFnErrorErr>,
             >,
-        > + Send {
+        > {
             use std::fmt::Write;
             if let Some(uri) = &uri
                 && let Some(url) = self.redirects.for_modules(uri)
@@ -387,7 +386,7 @@ mod server_fn {
                 ftml_ontology::narrative::documents::Document,
                 BackendError<server_fn::error::ServerFnErrorErr>,
             >,
-        > + Send {
+        > {
             use std::fmt::Write;
             if let Some(uri) = &uri
                 && let Some(url) = self.redirects.for_documents(uri)
@@ -470,7 +469,7 @@ mod server_fn {
                     Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
                     BackendError<server_fn::error::ServerFnErrorErr>,
                 >,
-            > + Send {
+            > {
                 let url = uri.uri.as_ref().map_or_else(
                     || format!(
                         "{}/content/los{}&problems={problems}",

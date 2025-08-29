@@ -178,8 +178,7 @@ impl LocalCacheExt for LocalCache {
         R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + Send
-            + 'static,
+            > + 'static,
     {
         use leptos::prelude::*;
         let result = RwSignal::new(None);
@@ -251,26 +250,45 @@ impl LocalCacheExt for LocalCache {
         R: Send + Sync + 'static + Clone,
         Fut: Future<
                 Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + Send
-            + 'static,
+            >
+            + 'static
+            + Send,
     {
-        use leptos::{
-            either::Either::{Left, Right},
-            prelude::*,
-        };
-        use thaw::Spinner;
-        view! {
-            <Suspense fallback = || view!(<Spinner/>)>{move || {
-                let v = view.clone();
-                let err = error.clone();
-                let fut = (f.clone())(WithLocalCache::default());
-                Suspend::new(async move {
-                    match fut.await {
-                        Ok(r) => Left(v(r)),
-                        Err(e) => Right(err(e))
-                    }
-                })
-            }}</Suspense>
-        }
+        wait_and_then(move || f(WithLocalCache::default()), view, error)
+    }
+}
+
+pub fn wait_and_then<
+    R,
+    E: Send + Sync + 'static,
+    Fut,
+    V: IntoView + 'static,
+    V2: IntoView + 'static,
+>(
+    f: impl FnOnce() -> Fut + Send + Sync + 'static + Clone,
+    view: impl FnOnce(R) -> V + Clone + Send + 'static,
+    error: impl FnOnce(E) -> V2 + Clone + Send + 'static,
+) -> impl IntoView
+where
+    R: Send + Sync + 'static + Clone,
+    Fut: Future<Output = Result<R, E>> + Send + 'static,
+{
+    use leptos::{
+        either::Either::{Left, Right},
+        prelude::*,
+    };
+    use thaw::Spinner;
+    view! {
+        <Suspense fallback = || view!(<Spinner/>)>{move || {
+            let v = view.clone();
+            let err = error.clone();
+            let fut = (f.clone())();
+            Suspend::new(async move {
+                match fut.await {
+                    Ok(r) => Left(v(r)),
+                    Err(e) => Right(err(e))
+                }
+            })
+        }}</Suspense>
     }
 }

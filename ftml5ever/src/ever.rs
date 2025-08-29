@@ -415,13 +415,13 @@ impl NodeRef {
     pub fn append(&self, new_child: Self) {
         new_child.detach();
         new_child.parent.replace(Some(Rc::downgrade(&self.0)));
-        if let Some(last_child_weak) = self.last_child.replace(Some(Rc::downgrade(&new_child.0))) {
-            if let Some(last_child) = last_child_weak.upgrade() {
-                new_child.previous_sibling.replace(Some(last_child_weak));
-                debug_assert!(last_child.next_sibling.is_none());
-                last_child.next_sibling.replace(Some(new_child.0));
-                return;
-            }
+        if let Some(last_child_weak) = self.last_child.replace(Some(Rc::downgrade(&new_child.0)))
+            && let Some(last_child) = last_child_weak.upgrade()
+        {
+            new_child.previous_sibling.replace(Some(last_child_weak));
+            debug_assert!(last_child.next_sibling.is_none());
+            last_child.next_sibling.replace(Some(new_child.0));
+            return;
         }
         debug_assert!(self.first_child.is_none());
         self.first_child.replace(Some(new_child.0));
@@ -506,20 +506,20 @@ impl Node {
             next_sibling_ref
                 .previous_sibling
                 .replace(previous_sibling_weak);
-        } else if let Some(parent_ref) = parent_weak.as_ref() {
-            if let Some(parent_strong) = parent_ref.upgrade() {
-                parent_strong.last_child.replace(previous_sibling_weak);
-            }
+        } else if let Some(parent_ref) = parent_weak.as_ref()
+            && let Some(parent_strong) = parent_ref.upgrade()
+        {
+            parent_strong.last_child.replace(previous_sibling_weak);
         }
 
         if let Some(previous_sibling_strong) = previous_sibling_opt {
             previous_sibling_strong
                 .next_sibling
                 .replace(next_sibling_strong);
-        } else if let Some(parent_ref) = parent_weak.as_ref() {
-            if let Some(parent_strong) = parent_ref.upgrade() {
-                parent_strong.first_child.replace(next_sibling_strong);
-            }
+        } else if let Some(parent_ref) = parent_weak.as_ref()
+            && let Some(parent_strong) = parent_ref.upgrade()
+        {
+            parent_strong.first_child.replace(next_sibling_strong);
         }
     }
 }
@@ -611,7 +611,7 @@ pub fn escaped_len(str: &str, attr_mode: bool) -> usize {
         })
         .sum()
 }
-
+/*
 pub struct Ancestors(Option<NodeRef>);
 impl Iterator for Ancestors {
     type Item = NodeRef;
@@ -624,6 +624,7 @@ impl Iterator for Ancestors {
         }
     }
 }
+ */
 
 #[derive(Debug, Clone)]
 struct State<T> {

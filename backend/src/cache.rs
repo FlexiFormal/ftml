@@ -49,7 +49,8 @@ where
 {
     inner: B,
     #[allow(clippy::type_complexity)]
-    fragment_cache: Cache<(Uri, Option<NarrativeUri>), (String, Vec<Css>), BackendError<B::Error>>,
+    fragment_cache:
+        Cache<(Uri, Option<NarrativeUri>), (Box<str>, Box<[Css]>), BackendError<B::Error>>,
     notations_cache: Cache<LeafUri, Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
     paragraphs_cache:
         Cache<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
@@ -104,7 +105,7 @@ where
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> {
         self.fragment_cache
             .get((uri, context), |(uri, context)| {
                 self.inner.get_fragment(uri, context)
@@ -115,7 +116,7 @@ where
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<Module, BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<Module, BackendError<Self::Error>>> {
         self.modules_cache
             .get(uri, |uri| self.inner.get_module(uri))
             .map_err(Into::into)
@@ -124,7 +125,7 @@ where
     fn get_document(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> {
         self.documents_cache
             .get(uri, |uri| self.inner.get_document(uri))
             .map_err(Into::into)
@@ -134,7 +135,7 @@ where
         &self,
         uri: LeafUri,
     ) -> impl Future<Output = Result<Vec<(DocumentElementUri, Notation)>, BackendError<Self::Error>>>
-    + Send {
+    {
         self.notations_cache
             .get(uri, |uri| self.inner.get_notations(uri))
             .map_err(Into::into)
@@ -149,7 +150,7 @@ where
             Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > {
         self.paragraphs_cache
             .get(uri, move |uri| {
                 self.inner.get_logical_paragraphs(uri, problems)
@@ -160,7 +161,7 @@ where
         &self,
         symbol: LeafUri,
         uri: DocumentElementUri,
-    ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> {
         self.notations_cache
             .with(
                 symbol,
@@ -193,11 +194,11 @@ where
     V: Clone + Send + Sync,
     E: std::fmt::Debug + std::fmt::Display + Clone + Send + Sync,
 {
-    fn get<Fut: Future<Output = Result<V, E>> + Send>(
+    fn get<Fut: Future<Output = Result<V, E>>>(
         &self,
         k: K,
         f: impl FnOnce(K) -> Fut,
-    ) -> impl Future<Output = Result<V, CacheError<E>>> + Send {
+    ) -> impl Future<Output = Result<V, CacheError<E>>> {
         use either::Either::{Left, Right};
         match self.map.entry(k.clone()) {
             Entry::Occupied(lock) => {
@@ -218,12 +219,12 @@ where
         }
     }
 
-    fn with<Fut: Future<Output = Result<V, E>> + Send, R: Send>(
+    fn with<Fut: Future<Output = Result<V, E>>, R: Send>(
         &self,
         k: K,
         f: impl FnOnce(K) -> Fut,
         then: impl FnOnce(&V) -> R + Send,
-    ) -> impl Future<Output = Result<R, CacheError<E>>> + Send {
+    ) -> impl Future<Output = Result<R, CacheError<E>>> {
         use either::Either::{Left, Right};
         match self.map.entry(k.clone()) {
             Entry::Occupied(lock) => {

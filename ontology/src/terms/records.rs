@@ -25,19 +25,21 @@ impl Term {
         let mut dones = Vec::new();
         get(self, &mut dones, name, get_struct)
     }
+
+    #[allow(clippy::future_not_send)]
     pub fn get_in_record_type_async<
         Error: Send + 'static,
         Fut: Future<
-                Output = Result<
-                    Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
-                    Error,
-                >,
-            > + Send,
+            Output = Result<
+                Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
+                Error,
+            >,
+        >,
     >(
         self,
         name: UriName,
         get_struct: impl Fn(SymbolUri) -> Fut + Send + Clone + 'static,
-    ) -> impl Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>> + Send {
+    ) -> impl Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>> {
         let dones = std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
         get_async(self, dones, name, get_struct)
     }
@@ -83,17 +85,17 @@ fn get(
 fn get_async<
     Error: Send + 'static,
     Fut: Future<
-            Output = Result<
-                Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
-                Error,
-            >,
-        > + Send,
+        Output = Result<
+            Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
+            Error,
+        >,
+    >,
 >(
     term: Term,
     dones: std::sync::Arc<parking_lot::Mutex<Vec<SymbolUri>>>,
     name: UriName,
     get_struct: impl Fn(SymbolUri) -> Fut + Send + Clone + 'static,
-) -> Pin<Box<dyn Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>> + Send>> {
+) -> Pin<Box<dyn Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>>>> {
     match term {
         Term::Symbol { uri, .. } => from_structure_async(uri, dones, name, get_struct),
         Term::Application(app)
@@ -118,17 +120,17 @@ fn get_async<
 fn from_terms_async<
     Error: Send + 'static,
     Fut: Future<
-            Output = Result<
-                Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
-                Error,
-            >,
-        > + Send,
+        Output = Result<
+            Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
+            Error,
+        >,
+    >,
 >(
     terms: Box<[Term]>,
     dones: std::sync::Arc<parking_lot::Mutex<Vec<SymbolUri>>>,
     name: UriName,
     get_struct: impl Fn(SymbolUri) -> Fut + Send + Clone + 'static,
-) -> Pin<Box<dyn Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>> + Send>> {
+) -> Pin<Box<dyn Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>>>> {
     Box::pin(async move {
         for term in terms.into_iter().rev() {
             if let Some(r) =
@@ -199,17 +201,17 @@ fn from_structure(
 fn from_structure_async<
     Error: Send,
     Fut: Future<
-            Output = Result<
-                Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
-                Error,
-            >,
-        > + Send,
+        Output = Result<
+            Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
+            Error,
+        >,
+    >,
 >(
     s: SymbolUri,
     dones: std::sync::Arc<parking_lot::Mutex<Vec<SymbolUri>>>,
     name: UriName,
     get_struct: impl Fn(SymbolUri) -> Fut + Send + Clone + 'static,
-) -> Pin<Box<dyn Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>> + Send>> {
+) -> Pin<Box<dyn Future<Output = Result<Option<SharedDeclaration<Symbol>>, Error>>>> {
     Box::pin(async move {
         {
             let mut d = dones.lock();

@@ -2,7 +2,7 @@ use std::hint::unreachable_unchecked;
 
 #[allow(clippy::wildcard_imports)]
 use super::ever::*;
-use crate::HtmlExtractor;
+use crate::{FtmlResult, HtmlExtractor};
 use ftml_core::{
     FtmlKey,
     extraction::{
@@ -19,12 +19,12 @@ use html5ever::{
 use smallvec::SmallVec;
 
 pub struct HtmlParser<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> {
-    document_node: NodeRef,
+    pub(crate) document_node: NodeRef,
     //rel_path: &'p str,
-    extractor: std::cell::RefCell<HtmlExtractor>,
-    body: std::cell::Cell<(DocumentRange, usize)>,
-    errors: std::cell::RefCell<Vec<FtmlExtractionError>>,
-    img: Img,
+    pub(crate) extractor: std::cell::RefCell<HtmlExtractor>,
+    pub(crate) body: std::cell::Cell<(DocumentRange, usize)>,
+    pub(crate) errors: std::cell::RefCell<Vec<FtmlExtractionError>>,
+    pub(crate) img: Img,
     /*
     let path = std::path::Path::new(src);
     if let Some(newsrc) =
@@ -50,7 +50,7 @@ pub struct HtmlParser<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Bo
         }
     };
     */
-    css: CS,
+    pub(crate) css: CS,
     /*
     static CSS_SUBSTS: [(&str, &str); 1] = [(
         "https://raw.githack.com/Jazzpirate/RusTeX/main/rustex/src/resources/rustex.css",
@@ -63,65 +63,54 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
     for HtmlParser<Img, CS>
 {
     type Handle = NodeRef;
-    type Output = (); //Result<(OMDocResult, String), String>;
+    type Output = Result<FtmlResult, String>;
     type ElemName<'a>
         = &'a QualName
     where
         Self: 'a;
 
+    #[allow(clippy::cast_possible_truncation)]
     fn finish(self) -> Self::Output {
-        /*
         for c in self.document_node.children() {
             self.pop(&c);
         }
-        let mut html = Vec::new();
         let HtmlExtractor {
-            errors,
+            parse_errors,
             mut css,
-            refs,
-            title,
+            //refs,
+            //title,
             //triples,
-            state,
+            mut state,
             //backend,
             ..
         } = self.extractor.into_inner();
-        if !errors.is_empty() {
-            return (); //Err(errors);
+        if !parse_errors.is_empty() {
+            return Err(parse_errors);
         }
         css = Css::merge(std::mem::take(&mut css));
-        let Ok((uri, elems, modules, styles)) = state.take() else {
-            return Err("Unbalanced FTML document".to_string());
-        };
+        let res = state.finish();
 
-        let _ = html5ever::serialize(&mut html, &self.document_node, SerializeOpts::default());
-        let html = String::from_utf8_lossy(&html).into();
-        backend.submit_triples(&uri, self.rel_path, triples.into_iter());
+        let mut html = Vec::new();
+        let _ = html5ever::serialize(
+            &mut html,
+            &self.document_node,
+            html5ever::serialize::SerializeOpts::default(),
+        );
+        let ftml = String::from_utf8_lossy(&html).into_owned().into_boxed_str();
         let (body, inner_offset) = self.body.get();
-        Ok((
-            OMDocResult {
-                document: UncheckedDocument {
-                    uri,
-                    title,
-                    styles,
-                    elements: elems,
-                },
-                html: HTMLData {
-                    html,
-                    css,
-                    refs,
-                    body,
-                    inner_offset,
-                },
-                modules,
-            },
-            errors,
-        ))
-         */
+        Ok(FtmlResult {
+            ftml,
+            css: css.into_boxed_slice(),
+            errors: self.errors.take().into_boxed_slice(),
+            doc: res,
+            body,
+            inner_offset: inner_offset as _,
+        })
     }
 
     #[inline]
     fn parse_error(&self, msg: std::borrow::Cow<'static, str>) {
-        self.extractor.borrow_mut().errors.push_str(&msg);
+        self.extractor.borrow_mut().parse_errors.push_str(&msg);
     }
     #[inline]
     fn get_document(&self) -> Self::Handle {
@@ -180,13 +169,13 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                         unsafe { unreachable_unchecked() }
                     };
                     let mut attributes = child_elem.attributes.borrow_mut();
-                    if let Some(src) = attributes.value("src") {
-                        if let Some(newsrc) = (self.img)(src) {
-                            attributes.set("src", "");
-                            attributes.new_attr("data-ftml-src", newsrc);
-                            drop(attributes);
-                            NodeRef::update_len(child_elem);
-                        }
+                    if let Some(src) = attributes.value("src")
+                        && let Some(newsrc) = (self.img)(src)
+                    {
+                        attributes.set("src", "");
+                        attributes.new_attr("data-ftml-src", newsrc);
+                        drop(attributes);
+                        NodeRef::update_len(child_elem);
                     }
                 }
                 if parent.as_document().is_some() {
@@ -261,11 +250,11 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                     };
                     prolong(parent, len as isize);
                 }
-                if let Some(last_child) = parent.last_child() {
-                    if let Some(existing) = last_child.as_text() {
-                        existing.borrow_mut().extend(text.chars());
-                        return;
-                    }
+                if let Some(last_child) = parent.last_child()
+                    && let Some(existing) = last_child.as_text()
+                {
+                    existing.borrow_mut().extend(text.chars());
+                    return;
                 }
                 parent.append(NodeRef::new_text(text));
             }
@@ -315,40 +304,38 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
             };
             let off = elem.attributes.borrow().len();
             self.body.set((range, "<body>".len() + off));
-        } else if matches!(&*elem.name.local, "link" | "style") {
-            if let Some(p) = node.parent() {
-                if let Some(pe) = p.as_element() {
-                    if &pe.name.local == "head" {
-                        match &*elem.name.local {
-                            "link" => {
-                                let attrs = elem.attributes.borrow();
-                                if attrs.value("rel") == Some("stylesheet") {
-                                    if let Some(lnk) = attrs.value("href") {
-                                        let val = (self.css)(lnk)
-                                            .unwrap_or_else(|| lnk.to_string().into_boxed_str());
-                                        self.extractor.borrow_mut().css.push(Css::Link(val));
-                                        node.delete();
-                                        return;
-                                    }
-                                }
-                            }
-                            "style" => {
-                                let str = node
-                                    .children()
-                                    .filter_map(|c| c.as_text().map(|s| s.borrow().to_string()))
-                                    .collect::<String>();
-                                // update: will get sorted / processed in bulk later
-                                self.extractor
-                                    .borrow_mut()
-                                    .css
-                                    .push(Css::Inline(str.into())); //.extend(CSS::split(&str));
-                                node.delete();
-                                return;
-                            }
-                            _ => unreachable!(),
-                        }
+        } else if matches!(&*elem.name.local, "link" | "style")
+            && let Some(p) = node.parent()
+            && let Some(pe) = p.as_element()
+            && &pe.name.local == "head"
+        {
+            match &*elem.name.local {
+                "link" => {
+                    let attrs = elem.attributes.borrow();
+                    if attrs.value("rel") == Some("stylesheet")
+                        && let Some(lnk) = attrs.value("href")
+                    {
+                        let val =
+                            (self.css)(lnk).unwrap_or_else(|| lnk.to_string().into_boxed_str());
+                        self.extractor.borrow_mut().css.push(Css::Link(val));
+                        node.delete();
+                        return;
                     }
                 }
+                "style" => {
+                    let str = node
+                        .children()
+                        .filter_map(|c| c.as_text().map(|s| s.borrow().to_string()))
+                        .collect::<String>();
+                    // update: will get sorted / processed in bulk later
+                    self.extractor
+                        .borrow_mut()
+                        .css
+                        .push(Css::Inline(str.into())); //.extend(CSS::split(&str));
+                    node.delete();
+                    return;
+                }
+                _ => unreachable!(),
             }
         }
         let closes = elem.ftml.take();

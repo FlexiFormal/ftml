@@ -40,7 +40,7 @@ rustc_version = { workspace = true }
 document-features = { workspace = true }
 
 ftml-uris = { workspace = true }
-ftml-ontology = { workspace = true }
+ftml-ontology = { workspace = true, features = ["css_normalize"] }
 ftml-core = { workspace = true }
 
 html5ever = { workspace = true }

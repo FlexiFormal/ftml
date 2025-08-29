@@ -118,8 +118,8 @@ pub trait FutureExt {
         f: impl FnOnce(Self::T) -> V + Clone + Send + 'static,
     ) -> impl IntoView;
 }
-impl<T, Fut: std::future::Future<Output = T> + Send, F: Fn() -> Fut + Clone + Send + 'static>
-    FutureExt for F
+impl<T, Fut: std::future::Future<Output = T>, F: Fn() -> Fut + Clone + Send + 'static> FutureExt
+    for F
 {
     type T = T;
     fn into_view<V: IntoView + 'static>(
@@ -130,7 +130,8 @@ impl<T, Fut: std::future::Future<Output = T> + Send, F: Fn() -> Fut + Clone + Se
         view!(<Suspense fallback = || "…">{move || {
             let s = self.clone();
             let mut f = f.clone();
-            Suspend::new(async move {let ret = s().await;f(ret)})
+            let fut = send_wrapper::SendWrapper::new(async move {let ret = s().await;f(ret)});
+            Suspend::new(fut)
         }}</Suspense>)
     }
 }

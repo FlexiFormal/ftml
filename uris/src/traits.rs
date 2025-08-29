@@ -26,7 +26,7 @@ pub trait FtmlUri:
     Into<BaseUri>
     + Into<Uri>
     + PartialEq<str>
-    + FromStr
+    + FromStr<Err = crate::errors::UriParseError>
     + std::fmt::Debug
     + std::fmt::Display
     + std::hash::Hash
@@ -67,6 +67,44 @@ pub trait FtmlUri:
         let mut s = Writer(String::with_capacity(64));
         let _ = std::fmt::Write::write_fmt(&mut s, format_args!("{self}"));
         oxrdf::NamedNode::new(s.0).expect("All illegal characters are replaced")
+    }
+
+    #[cfg(feature = "rdf")]
+    /// Parses this URI from an RDF-IRI; possibly unescaping characters.
+    ///
+    /// # Errors
+    /// if the iri is not a valid `Self`.
+    fn from_iri(iri: oxrdf::NamedNodeRef) -> Result<Self, crate::errors::UriParseError> {
+        let mut s = iri.as_str();
+        if !s.contains('%') {
+            return s.parse();
+        }
+        let mut out = String::with_capacity(64);
+        while !s.is_empty() {
+            if s.len() > 3 {
+                match &s[..3] {
+                    "%20" => out.push(' '),
+                    "%5C" => out.push('\\'),
+                    "%5E" => out.push('^'),
+                    "%5B" => out.push('['),
+                    "%5D" => out.push(']'),
+                    "%7C" => out.push('|'),
+                    _ => {
+                        // SAFETY: !is_empty() + len > 3 even
+                        let next = unsafe { s.chars().next().unwrap_unchecked() };
+                        let len = next.len_utf8();
+                        out.push(next);
+                        s = &s[len..];
+                        continue;
+                    }
+                }
+                s = &s[3..];
+            } else {
+                out.push_str(s);
+                break;
+            }
+        }
+        out.parse()
     }
 
     /// Display as this Uri url-encoded

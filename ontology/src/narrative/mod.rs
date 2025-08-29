@@ -6,22 +6,25 @@ use std::marker::PhantomData;
 
 use crate::{
     narrative::{
-        documents::Document,
-        elements::{DocumentElementRef, DocumentTerm, IsDocumentElement},
+        documents::{Document, DocumentData},
+        elements::{
+            DocumentElement, DocumentElementRef, DocumentTerm, IsDocumentElement,
+            notations::{NotationReference, VariableNotationReference},
+        },
     },
     utils::SharedArc,
 };
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct SharedDocumentElement<T: IsDocumentElement>(SharedArc<Document, T>);
-impl<T: IsDocumentElement> std::ops::Deref for SharedDocumentElement<T> {
+pub struct SharedDocumentElement<T>(SharedArc<Document, T>);
+impl<T> std::ops::Deref for SharedDocumentElement<T> {
     type Target = T;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-impl<T: IsDocumentElement + std::fmt::Debug> std::fmt::Debug for SharedDocumentElement<T> {
+impl<T: std::fmt::Debug> std::fmt::Debug for SharedDocumentElement<T> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         (**self).fmt(f)
@@ -33,6 +36,104 @@ impl Document {
             .ok()
             .map(SharedDocumentElement)
     }
+    pub fn get(&self, name: &UriName) -> Option<SharedDocumentElement<DocumentElement>> {
+        SharedArc::opt_new(self, |m| &m.0, move |e| e.find_i(name.steps()).ok_or(()))
+            .ok()
+            .map(SharedDocumentElement)
+    }
+}
+
+impl DocumentData {
+    #[allow(clippy::too_many_lines)]
+    fn find_i<'s>(&self, steps: impl IntoIterator<Item = &'s str>) -> Option<&DocumentElement> {
+        fn find_e<'r, 's>(
+            slf: &'r DocumentElement,
+            mut steps: std::iter::Peekable<impl Iterator<Item = &'s str>>,
+        ) -> Option<&'r DocumentElement> {
+            let Some(step) = steps.next() else {
+                return Some(slf);
+            };
+            slf.children_lt()
+                .and_then(|i| find_inner(i.iter(), step, steps))
+        }
+        fn find_inner<'r, 's>(
+            mut iter: impl Iterator<Item = &'r DocumentElement>,
+            step: &'s str,
+            mut steps: std::iter::Peekable<impl Iterator<Item = &'s str>>,
+        ) -> Option<&'r DocumentElement> {
+            while let Some(c) = iter.next() {
+                match c {
+                    DocumentElement::Section(elements::Section { uri, .. })
+                    | DocumentElement::Paragraph(elements::LogicalParagraph { uri, .. })
+                    | DocumentElement::Problem(elements::Problem { uri, .. })
+                        if uri.name().last() == step =>
+                    {
+                        return if steps.peek().is_none() {
+                            Some(c)
+                        } else {
+                            find_e(c, steps)
+                        };
+                    }
+                    DocumentElement::Slide { uri, .. } if uri.name().last() == step => {
+                        return if steps.peek().is_none() {
+                            Some(c)
+                        } else {
+                            find_e(c, steps)
+                        };
+                    }
+                    DocumentElement::Module { children, .. }
+                    | DocumentElement::Morphism { children, .. }
+                    | DocumentElement::MathStructure { children, .. }
+                    | DocumentElement::Slide { children, .. }
+                    | DocumentElement::Extension { children, .. } => {
+                        return find_inner(
+                            Box::new(children.iter().chain(iter))
+                                as Box<dyn Iterator<Item = &'_ DocumentElement>>,
+                            step,
+                            steps,
+                        );
+                    }
+                    DocumentElement::Notation(NotationReference { uri, .. })
+                    | DocumentElement::VariableNotation(VariableNotationReference {
+                        uri, ..
+                    })
+                    | DocumentElement::VariableDeclaration(elements::VariableDeclaration {
+                        uri,
+                        ..
+                    })
+                    | DocumentElement::Term(DocumentTerm { uri, .. })
+                        if uri.name().last() == step =>
+                    {
+                        return if steps.peek().is_none() {
+                            Some(c)
+                        } else {
+                            None
+                        };
+                    }
+                    DocumentElement::Section(_)
+                    | DocumentElement::Paragraph(_)
+                    | DocumentElement::Problem(_)
+                    //| DocumentElementRef::SetSectionLevel(_)
+                    | DocumentElement::SymbolDeclaration(_)
+                    | DocumentElement::UseModule(_)
+                    | DocumentElement::ImportModule(_)
+                    | DocumentElement::SkipSection(_)
+                    | DocumentElement::VariableDeclaration(_)
+                    | DocumentElement::Definiendum { .. }
+                    | DocumentElement::SymbolReference { .. }
+                    | DocumentElement::VariableReference { .. }
+                    | DocumentElement::DocumentReference { .. }
+                    | DocumentElement::Notation { .. }
+                    | DocumentElement::VariableNotation { .. }
+                    | DocumentElement::Term { .. } => (),
+                }
+            }
+            None
+        }
+        let mut steps = steps.into_iter();
+        let step = steps.next()?;
+        find_inner(self.elements.iter(), step, steps.peekable())
+    }
 }
 
 pub trait Narrative: crate::Ftml {
@@ -43,7 +144,10 @@ pub trait Narrative: crate::Ftml {
 
     #[cfg(feature = "rdf")]
     fn contains_triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
-        use crate::narrative::elements::{LogicalParagraph, Problem, Section, VariableDeclaration};
+        use crate::narrative::elements::{
+            LogicalParagraph, Problem, Section, VariableDeclaration,
+            notations::{NotationReference, VariableNotationReference},
+        };
         use ftml_uris::FtmlUri;
         use ulo::triple;
 
@@ -76,18 +180,18 @@ pub trait Narrative: crate::Ftml {
                         uri, ..
                     })
                     | DocumentElementRef::Term(DocumentTerm { uri, .. })
-                    | DocumentElementRef::Notation { uri, .. }
-                    | DocumentElementRef::VariableNotation { uri, .. } => {
-                        Some(triple!(<(iri.clone())> ulo:contains <(uri.to_iri())>))
-                    }
+                    | DocumentElementRef::Notation(NotationReference { uri, .. })
+                    | DocumentElementRef::VariableNotation(VariableNotationReference {
+                        uri, ..
+                    }) => Some(triple!(<(iri.clone())> ulo:contains <(uri.to_iri())>)),
                     DocumentElementRef::MathStructure { structure: uri, .. }
                     | DocumentElementRef::Extension { extension: uri, .. }
                     | DocumentElementRef::Morphism { morphism: uri, .. }
                     | DocumentElementRef::SymbolDeclaration(uri) => {
                         Some(triple!(<(iri.clone())> ulo:contains <(uri.to_iri())>))
                     }
-                    DocumentElementRef::SetSectionLevel(_)
-                    | DocumentElementRef::SkipSection(_)
+                    //DocumentElementRef::SetSectionLevel(_)
+                    DocumentElementRef::SkipSection(_)
                     | DocumentElementRef::Definiendum { .. }
                     | DocumentElementRef::SymbolReference { .. }
                     | DocumentElementRef::VariableReference { .. } => None, //e.element_uri().map(|e| triple!(<(iri.clone())> ulo:contains <(e.to_iri())>))
@@ -150,8 +254,10 @@ pub trait Narrative: crate::Ftml {
                             steps,
                         );
                     }
-                    DocumentElementRef::Notation { uri, .. }
-                    | DocumentElementRef::VariableNotation { uri, .. }
+                    DocumentElementRef::Notation(NotationReference { uri, .. })
+                    | DocumentElementRef::VariableNotation(VariableNotationReference {
+                        uri, ..
+                    })
                     | DocumentElementRef::VariableDeclaration(elements::VariableDeclaration {
                         uri,
                         ..
@@ -168,7 +274,7 @@ pub trait Narrative: crate::Ftml {
                     DocumentElementRef::Section(_)
                     | DocumentElementRef::Paragraph(_)
                     | DocumentElementRef::Problem(_)
-                    | DocumentElementRef::SetSectionLevel(_)
+                    //| DocumentElementRef::SetSectionLevel(_)
                     | DocumentElementRef::SymbolDeclaration(_)
                     | DocumentElementRef::UseModule(_)
                     | DocumentElementRef::ImportModule(_)
@@ -218,6 +324,17 @@ pub struct DataRef<T> {
     pub start: usize,
     pub end: usize,
     phantom_data: PhantomData<T>,
+}
+impl<T> DataRef<T> {
+    #[must_use]
+    pub const fn with_doc(self, uri: DocumentUri) -> DocDataRef<T> {
+        DocDataRef {
+            start: self.start,
+            end: self.end,
+            in_doc: uri,
+            phantom_data: PhantomData,
+        }
+    }
 }
 impl<T> std::fmt::Debug for DataRef<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

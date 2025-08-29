@@ -283,24 +283,20 @@ let ftmlViewer;
         wasm.__wbindgen_export_8(arg0, arg1, addHeapObject(arg2));
     }
 
-    function __wbg_adapter_66(arg0, arg1, arg2) {
-        wasm.__wbindgen_export_9(arg0, arg1, addHeapObject(arg2));
+    function __wbg_adapter_66(arg0, arg1) {
+        wasm.__wbindgen_export_9(arg0, arg1);
     }
 
-    function __wbg_adapter_69(arg0, arg1) {
-        wasm.__wbindgen_export_10(arg0, arg1);
+    function __wbg_adapter_69(arg0, arg1, arg2) {
+        wasm.__wbindgen_export_10(arg0, arg1, addHeapObject(arg2));
     }
 
-    function __wbg_adapter_72(arg0, arg1) {
-        wasm.__wbindgen_export_11(arg0, arg1);
+    function __wbg_adapter_72(arg0, arg1, arg2) {
+        wasm.__wbindgen_export_11(arg0, arg1, addHeapObject(arg2));
     }
 
-    function __wbg_adapter_75(arg0, arg1, arg2) {
-        wasm.__wbindgen_export_12(arg0, arg1, addHeapObject(arg2));
-    }
-
-    function __wbg_adapter_453(arg0, arg1, arg2, arg3) {
-        wasm.__wbindgen_export_13(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+    function __wbg_adapter_420(arg0, arg1, arg2, arg3) {
+        wasm.__wbindgen_export_12(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
     }
 
     /**
@@ -337,13 +333,6 @@ let ftmlViewer;
             wasm.__wbg_intounderlyingbytesource_free(ptr, 0);
         }
         /**
-         * @returns {ReadableStreamType}
-         */
-        get type() {
-            const ret = wasm.intounderlyingbytesource_type(this.__wbg_ptr);
-            return __wbindgen_enum_ReadableStreamType[ret];
-        }
-        /**
          * @returns {number}
          */
         get autoAllocateChunkSize() {
@@ -352,17 +341,24 @@ let ftmlViewer;
         }
         /**
          * @param {ReadableByteStreamController} controller
-         */
-        start(controller) {
-            wasm.intounderlyingbytesource_start(this.__wbg_ptr, addHeapObject(controller));
-        }
-        /**
-         * @param {ReadableByteStreamController} controller
          * @returns {Promise<any>}
          */
         pull(controller) {
             const ret = wasm.intounderlyingbytesource_pull(this.__wbg_ptr, addHeapObject(controller));
             return takeObject(ret);
+        }
+        /**
+         * @param {ReadableByteStreamController} controller
+         */
+        start(controller) {
+            wasm.intounderlyingbytesource_start(this.__wbg_ptr, addHeapObject(controller));
+        }
+        /**
+         * @returns {ReadableStreamType}
+         */
+        get type() {
+            const ret = wasm.intounderlyingbytesource_type(this.__wbg_ptr);
+            return __wbindgen_enum_ReadableStreamType[ret];
         }
         cancel() {
             const ptr = this.__destroy_into_raw();
@@ -389,11 +385,12 @@ let ftmlViewer;
             wasm.__wbg_intounderlyingsink_free(ptr, 0);
         }
         /**
-         * @param {any} chunk
+         * @param {any} reason
          * @returns {Promise<any>}
          */
-        write(chunk) {
-            const ret = wasm.intounderlyingsink_write(this.__wbg_ptr, addHeapObject(chunk));
+        abort(reason) {
+            const ptr = this.__destroy_into_raw();
+            const ret = wasm.intounderlyingsink_abort(ptr, addHeapObject(reason));
             return takeObject(ret);
         }
         /**
@@ -405,12 +402,11 @@ let ftmlViewer;
             return takeObject(ret);
         }
         /**
-         * @param {any} reason
+         * @param {any} chunk
          * @returns {Promise<any>}
          */
-        abort(reason) {
-            const ptr = this.__destroy_into_raw();
-            const ret = wasm.intounderlyingsink_abort(ptr, addHeapObject(reason));
+        write(chunk) {
+            const ret = wasm.intounderlyingsink_write(this.__wbg_ptr, addHeapObject(chunk));
             return takeObject(ret);
         }
     }
@@ -1015,7 +1011,7 @@ let ftmlViewer;
                     const a = state0.a;
                     state0.a = 0;
                     try {
-                        return __wbg_adapter_453(a, state0.b, arg0, arg1);
+                        return __wbg_adapter_420(a, state0.b, arg0, arg1);
                     } finally {
                         state0.a = a;
                     }
@@ -1430,36 +1426,32 @@ let ftmlViewer;
             const ret = false;
             return ret;
         };
-        imports.wbg.__wbindgen_closure_wrapper16536 = function(arg0, arg1, arg2) {
-            const ret = makeClosure(arg0, arg1, 3989, __wbg_adapter_54);
+        imports.wbg.__wbindgen_closure_wrapper16596 = function(arg0, arg1, arg2) {
+            const ret = makeClosure(arg0, arg1, 4002, __wbg_adapter_54);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper19678 = function(arg0, arg1, arg2) {
-            const ret = makeClosure(arg0, arg1, 4901, __wbg_adapter_57);
+        imports.wbg.__wbindgen_closure_wrapper22067 = function(arg0, arg1, arg2) {
+            const ret = makeClosure(arg0, arg1, 5039, __wbg_adapter_57);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper24727 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 5780, __wbg_adapter_60);
+        imports.wbg.__wbindgen_closure_wrapper24992 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 5900, __wbg_adapter_60);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper27545 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 6071, __wbg_adapter_63);
+        imports.wbg.__wbindgen_closure_wrapper27761 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 6108, __wbg_adapter_63);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper28412 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 6180, __wbg_adapter_66);
+        imports.wbg.__wbindgen_closure_wrapper28764 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 6246, __wbg_adapter_66);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper28414 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 6180, __wbg_adapter_69);
+        imports.wbg.__wbindgen_closure_wrapper28766 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 6246, __wbg_adapter_69);
             return addHeapObject(ret);
         };
-        imports.wbg.__wbindgen_closure_wrapper28615 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 6217, __wbg_adapter_72);
-            return addHeapObject(ret);
-        };
-        imports.wbg.__wbindgen_closure_wrapper28674 = function(arg0, arg1, arg2) {
-            const ret = makeMutClosure(arg0, arg1, 6221, __wbg_adapter_75);
+        imports.wbg.__wbindgen_closure_wrapper28822 = function(arg0, arg1, arg2) {
+            const ret = makeMutClosure(arg0, arg1, 6257, __wbg_adapter_72);
             return addHeapObject(ret);
         };
         imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {

@@ -102,7 +102,7 @@ pub fn hover_paragraph<Be: SendBackend>(
                       for c in css {
                           c.inject();
                       }
-                      crate::Views::<Be>::render_ftml(html)
+                      crate::Views::<Be>::render_ftml(html.into_string())
                   },
                   |e| view!(<code>{e.to_string()}</code>)
               )

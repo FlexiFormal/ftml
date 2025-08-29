@@ -25,7 +25,7 @@ macro_rules! uri {
 pub static NAMESPACE: &str = "http://mathhub.info?a=FTML/meta";
 
 uri! {
-    DOC_URI:DocumentUri := "http://mathhub.info?a=FTML/meta?d=Metatheory&l=en",
+    DOC_URI:DocumentUri := "http://mathhub.info?a=FTML/meta&d=Metatheory&l=en",
     URI:ModuleUri := "http://mathhub.info?a=FTML/meta&m=Metatheory",
 
     OBJECT = "object",

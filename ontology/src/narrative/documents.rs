@@ -2,13 +2,16 @@ use std::borrow::Borrow;
 
 use ftml_uris::{DocumentUri, Id, NarrativeUriRef, errors::SegmentParseError};
 
-use crate::narrative::{
-    Narrative,
-    elements::{
-        DocumentElement, DocumentElementRef,
-        paragraphs::{InvalidParagraphKind, ParagraphKind},
-        sections::SectionLevel,
+use crate::{
+    narrative::{
+        Narrative,
+        elements::{
+            DocumentElement, DocumentElementRef,
+            paragraphs::{InvalidParagraphKind, ParagraphKind},
+            sections::SectionLevel,
+        },
     },
+    utils::{RefTree, TreeChild},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -176,6 +179,24 @@ impl std::str::FromStr for DocumentStyle {
         })
     }
 }
+
+impl RefTree for Document {
+    type Child<'a>
+        = DocumentElementRef<'a>
+    where
+        Self: 'a;
+    #[inline]
+    fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
+        self.children()
+    }
+}
+impl<'a> TreeChild<'a> for DocumentElementRef<'a> {
+    #[inline]
+    fn tree_children(self) -> impl Iterator<Item = Self> {
+        self.children_lt()
+    }
+}
+
 #[cfg(feature = "serde")]
 mod serde_impl {
     use crate::narrative::documents::DocumentData;

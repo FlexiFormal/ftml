@@ -75,7 +75,7 @@ chrono = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
 
 #kanal = { workspace = true }
-futures = { workspace = true }
+pollster = { workspace = true }
 flume = { workspace = true }
 # syntree = { workspace = true }
 

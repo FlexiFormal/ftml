@@ -10,7 +10,10 @@ use ftml_dom::{FtmlViews, notations::NotationExt, utils::local_cache::LocalCache
 use ftml_ontology::{
     narrative::{
         documents::Document,
-        elements::{DocumentElement, DocumentTerm, FlatIterable},
+        elements::{
+            DocumentElement, DocumentTerm, FlatIterable,
+            notations::{NotationReference, VariableNotationReference},
+        },
     },
     terms::{Term, VarOrSym, Variable},
 };
@@ -116,17 +119,19 @@ impl super::FtmlViewable for DocumentElement {
                 ..
             } => view_extension::<Be>(extension, target, children).into_any(),
             Self::VariableDeclaration(v) => v.as_view::<Be>().into_any(),
-            Self::Notation { symbol, uri, .. } => {
+            Self::Notation(NotationReference { symbol, uri, .. }) => {
                 view_notation::<Be>(uri.clone(), VarOrSym::Sym(symbol.clone())).into_any()
             }
-            Self::VariableNotation { variable, uri, .. } => view_notation::<Be>(
-                uri.clone(),
-                VarOrSym::Var(Variable::Ref {
-                    declaration: variable.clone(),
-                    is_sequence: None,
-                }),
-            )
-            .into_any(),
+            Self::VariableNotation(VariableNotationReference { variable, uri, .. }) => {
+                view_notation::<Be>(
+                    uri.clone(),
+                    VarOrSym::Var(Variable::Ref {
+                        declaration: variable.clone(),
+                        is_sequence: None,
+                    }),
+                )
+                .into_any()
+            }
             Self::Paragraph(p) => p.as_view::<Be>().into_any(),
             Self::Section(s) => s.as_view::<Be>().into_any(),
             Self::Term(DocumentTerm { uri, term }) => view_term::<Be>(uri, term.clone()).into_any(),

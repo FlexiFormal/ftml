@@ -6,7 +6,10 @@ pub mod variables;
 
 use crate::{
     Ftml,
-    narrative::{DataRef, DocumentRange},
+    narrative::{
+        DocumentRange,
+        elements::notations::{NotationReference, VariableNotationReference},
+    },
     terms::Term,
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, ModuleUri, SymbolUri};
@@ -15,6 +18,42 @@ pub use paragraphs::LogicalParagraph;
 pub use problems::Problem;
 pub use sections::{Section, SectionLevel};
 pub use variables::VariableDeclaration;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
+pub enum ParagraphOrProblemKind {
+    Definition,
+    Example,
+    Problem(problems::CognitiveDimension),
+    SubProblem(problems::CognitiveDimension),
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
+pub enum SlideElement {
+    Slide {
+        html: Box<str>,
+        uri: DocumentElementUri,
+    },
+    Paragraph {
+        html: Box<str>,
+        uri: DocumentElementUri,
+    },
+    Inputref {
+        uri: DocumentUri,
+    },
+    Section {
+        uri: DocumentElementUri,
+        title: Option<Box<str>>,
+        children: Vec<SlideElement>,
+    },
+}
 
 pub trait IsDocumentElement: super::Narrative {
     fn as_ref(&self) -> DocumentElementRef<'_>;
@@ -84,19 +123,9 @@ pub enum DocumentElement {
         uri: DocumentElementUri,
         target: DocumentUri,
     },
-    Notation {
-        symbol: SymbolUri,
-        uri: DocumentElementUri,
-        #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
-        notation: DataRef<Notation>,
-    },
+    Notation(NotationReference),
     VariableDeclaration(VariableDeclaration),
-    VariableNotation {
-        variable: DocumentElementUri,
-        uri: DocumentElementUri,
-        #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
-        notation: DataRef<Notation>,
-    },
+    VariableNotation(VariableNotationReference),
     Definiendum {
         range: DocumentRange,
         uri: SymbolUri,
@@ -214,14 +243,6 @@ impl super::Narrative for DocumentElement {
 impl Ftml for DocumentElement {
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
-        use ftml_uris::FtmlUri;
-        use ulo::triple;
-        /*macro_rules! syms {
-            ($iri:ident $e:expr) => {{
-                $e.symbols().collect::<rustc_hash::FxHashSet<_>>().into_iter()
-                    .map(move |s| triple!(<($iri.clone())> dc:hasPart <(s.to_iri())>))
-            }};
-        }*/
         match self {
             //Self::SetSectionLevel(_) |
             Self::UseModule(_)
@@ -243,27 +264,37 @@ impl Ftml for DocumentElement {
             Self::Paragraph(s) => RdfIterator::Paragraph(s.triples().into_iter()),
             Self::Problem(s) => RdfIterator::Problem(s.triples().into_iter()),
             Self::VariableDeclaration(v) => RdfIterator::Var(v.triples().into_iter()),
-            Self::Notation { symbol, uri, .. } => {
-                let iri = uri.to_iri();
-                RdfIterator::Not(
-                    [
-                        triple!(<(iri.clone())>: ulo:notation),
-                        triple!(<(iri)> ulo:notation_for <(symbol.to_iri())>),
-                    ]
-                    .into_iter(),
-                )
-            }
-            Self::VariableNotation { variable, uri, .. } => {
-                let iri = uri.to_iri();
-                RdfIterator::Not(
-                    [
-                        triple!(<(iri.clone())>: ulo:notation),
-                        triple!(<(iri)> ulo:notation_for <(variable.to_iri())>),
-                    ]
-                    .into_iter(),
-                )
-            }
+            Self::Notation(n) => RdfIterator::Notation(n.triples().into_iter()),
+            Self::VariableNotation(n) => RdfIterator::VarNotation(n.triples().into_iter()),
             Self::Term(t) => RdfIterator::Term(t.triples().into_iter()),
+        }
+    }
+}
+impl DocumentElement {
+    #[must_use]
+    pub fn children_lt(&self) -> Option<&[Self]> {
+        match self {
+            //Self::SetSectionLevel(_) |
+            Self::UseModule(_)
+            | Self::SymbolDeclaration(_)
+            | Self::ImportModule(_)
+            | Self::VariableDeclaration(_)
+            | Self::DocumentReference { .. }
+            | Self::Definiendum { .. }
+            | Self::SymbolReference { .. }
+            | Self::VariableReference { .. }
+            | Self::Notation { .. }
+            | Self::VariableNotation { .. }
+            | Self::Term { .. } => None,
+            Self::Module { children, .. }
+            | Self::MathStructure { children, .. }
+            | Self::Extension { children, .. }
+            | Self::Morphism { children, .. }
+            | Self::Slide { children, .. }
+            | Self::SkipSection(children) => Some(&**children),
+            Self::Section(s) => Some(&*s.children),
+            Self::Paragraph(s) => Some(&*s.children),
+            Self::Problem(s) => Some(&*s.children),
         }
     }
 }
@@ -272,7 +303,7 @@ impl Ftml for DocumentElement {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum DocumentElementRef<'d> {
-    SetSectionLevel(SectionLevel),
+    //SetSectionLevel(SectionLevel),
     UseModule(&'d ModuleUri),
 
     Module {
@@ -313,17 +344,9 @@ pub enum DocumentElementRef<'d> {
         uri: &'d DocumentElementUri,
         target: &'d DocumentUri,
     },
-    Notation {
-        symbol: &'d SymbolUri,
-        uri: &'d DocumentElementUri,
-        notation: DataRef<Notation>,
-    },
+    Notation(&'d NotationReference),
     VariableDeclaration(&'d VariableDeclaration),
-    VariableNotation {
-        variable: &'d DocumentElementUri,
-        uri: &'d DocumentElementUri,
-        notation: DataRef<Notation>,
-    },
+    VariableNotation(&'d VariableNotationReference),
     Definiendum {
         range: DocumentRange,
         uri: &'d SymbolUri,
@@ -343,14 +366,14 @@ pub enum DocumentElementRef<'d> {
 
 impl<'r> DocumentElementRef<'r> {
     pub fn children_lt(
-        &self,
+        self,
     ) -> impl ExactSizeIterator<Item = DocumentElementRef<'r>> + DoubleEndedIterator {
         use super::Narrative;
         #[allow(clippy::enum_glob_use)]
         use either_of::EitherOf5::*;
         match self {
-            Self::SetSectionLevel(_)
-            | Self::UseModule(_)
+            //Self::SetSectionLevel(_) |
+            Self::UseModule(_)
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::VariableDeclaration(_)
@@ -390,11 +413,9 @@ impl super::Narrative for DocumentElementRef<'_> {
 impl crate::Ftml for DocumentElementRef<'_> {
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
-        use ftml_uris::FtmlUri;
-        use ulo::triple;
         match self {
-            Self::SetSectionLevel(_)
-            | Self::UseModule(_)
+            //Self::SetSectionLevel(_)
+            Self::UseModule(_)
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::DocumentReference { .. }
@@ -413,26 +434,8 @@ impl crate::Ftml for DocumentElementRef<'_> {
             Self::Paragraph(s) => RdfIterator::Paragraph(s.triples().into_iter()),
             Self::Problem(s) => RdfIterator::Problem(s.triples().into_iter()),
             Self::VariableDeclaration(v) => RdfIterator::Var(v.triples().into_iter()),
-            Self::Notation { symbol, uri, .. } => {
-                let iri = uri.to_iri();
-                RdfIterator::Not(
-                    [
-                        triple!(<(iri.clone())>: ulo:notation),
-                        triple!(<(iri)> ulo:notation_for <(symbol.to_iri())>),
-                    ]
-                    .into_iter(),
-                )
-            }
-            Self::VariableNotation { variable, uri, .. } => {
-                let iri = uri.to_iri();
-                RdfIterator::Not(
-                    [
-                        triple!(<(iri.clone())>: ulo:notation),
-                        triple!(<(iri)> ulo:notation_for <(variable.to_iri())>),
-                    ]
-                    .into_iter(),
-                )
-            }
+            Self::Notation(n) => RdfIterator::Notation(n.triples().into_iter()),
+            Self::VariableNotation(n) => RdfIterator::VarNotation(n.triples().into_iter()),
             Self::Term(t) => RdfIterator::Term(t.triples().into_iter()),
         }
     }
@@ -504,8 +507,8 @@ impl DocumentElement {
             Self::VariableDeclaration(s) => &s.uri,
             Self::Slide { uri, .. }
             | Self::DocumentReference { uri, .. }
-            | Self::Notation { uri, .. }
-            | Self::VariableNotation { uri, .. }
+            | Self::Notation(NotationReference { uri, .. })
+            | Self::VariableNotation(VariableNotationReference { uri, .. })
             | Self::Term(DocumentTerm { uri, .. }) => uri,
         })
     }
@@ -573,25 +576,9 @@ impl DocumentElement {
             Self::DocumentReference { uri, target } => {
                 DocumentElementRef::DocumentReference { uri, target }
             }
-            Self::Notation {
-                symbol,
-                uri,
-                notation,
-            } => DocumentElementRef::Notation {
-                symbol,
-                uri,
-                notation: *notation,
-            },
+            Self::Notation(n) => DocumentElementRef::Notation(n),
             Self::VariableDeclaration(v) => DocumentElementRef::VariableDeclaration(v),
-            Self::VariableNotation {
-                variable,
-                uri,
-                notation,
-            } => DocumentElementRef::VariableNotation {
-                variable,
-                uri,
-                notation: *notation,
-            },
+            Self::VariableNotation(n) => DocumentElementRef::VariableNotation(n),
             Self::Definiendum { range, uri } => {
                 DocumentElementRef::Definiendum { range: *range, uri }
             }
@@ -625,8 +612,8 @@ impl<'e> DocumentElementRef<'e> {
     ) -> Option<impl ExactSizeIterator<Item = DocumentElementRef<'e>> + DoubleEndedIterator + use<'e>>
     {
         match self {
-            Self::SetSectionLevel(_)
-            | Self::UseModule(_)
+            //Self::SetSectionLevel(_)
+            Self::UseModule(_)
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::Definiendum { .. }
@@ -651,8 +638,8 @@ impl<'e> DocumentElementRef<'e> {
     #[must_use]
     pub const fn element_uri(self) -> Option<&'e DocumentElementUri> {
         Some(match self {
-            Self::SetSectionLevel(_)
-            | Self::UseModule(_)
+            //Self::SetSectionLevel(_)
+            Self::UseModule(_)
             | Self::Module { .. }
             | Self::MathStructure { .. }
             | Self::Extension { .. }
@@ -669,8 +656,8 @@ impl<'e> DocumentElementRef<'e> {
             Self::VariableDeclaration(s) => &s.uri,
             Self::Slide { uri, .. }
             | Self::DocumentReference { uri, .. }
-            | Self::Notation { uri, .. }
-            | Self::VariableNotation { uri, .. }
+            | Self::Notation(NotationReference { uri, .. })
+            | Self::VariableNotation(VariableNotationReference { uri, .. })
             | Self::Term(DocumentTerm { uri, .. }) => uri,
         })
     }
@@ -684,6 +671,8 @@ enum RdfIterator<
     Pa: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     Pr: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     V: Iterator<Item = ulo::rdf_types::Triple> + 'e,
+    VN: Iterator<Item = ulo::rdf_types::Triple> + 'e,
+    N: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     T: Iterator<Item = ulo::rdf_types::Triple> + 'e,
 > {
     #[allow(dead_code)]
@@ -692,8 +681,9 @@ enum RdfIterator<
     Section(S),
     Paragraph(Pa),
     Problem(Pr),
+    Notation(N),
+    VarNotation(VN),
     Var(V),
-    Not(std::array::IntoIter<ulo::rdf_types::Triple, 2>),
     Term(T),
 }
 #[cfg(feature = "rdf")]
@@ -703,8 +693,10 @@ impl<
     Pa: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     Pr: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     V: Iterator<Item = ulo::rdf_types::Triple> + 'e,
+    VN: Iterator<Item = ulo::rdf_types::Triple> + 'e,
+    N: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     T: Iterator<Item = ulo::rdf_types::Triple> + 'e,
-> Iterator for RdfIterator<'e, S, Pa, Pr, V, T>
+> Iterator for RdfIterator<'e, S, Pa, Pr, V, VN, N, T>
 {
     type Item = ulo::rdf_types::Triple;
     fn next(&mut self) -> Option<Self::Item> {
@@ -715,7 +707,8 @@ impl<
             Self::Paragraph(p) => p.next(),
             Self::Problem(p) => p.next(),
             Self::Var(v) => v.next(),
-            Self::Not(n) => n.next(),
+            Self::Notation(n) => n.next(),
+            Self::VarNotation(n) => n.next(),
             Self::Term(t) => t.next(),
         }
     }

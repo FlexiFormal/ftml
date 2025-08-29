@@ -1,5 +1,5 @@
 mod feedback;
-//mod quizzes;
+pub mod quizzes;
 mod solutions;
 
 use crate::narrative::{

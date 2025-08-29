@@ -1,5 +1,35 @@
-use crate::{terms::ArgumentMode, utils::RefTree};
-use ftml_uris::Id;
+use crate::{
+    Ftml,
+    narrative::{
+        DataRef, Narrative,
+        elements::{DocumentElementRef, IsDocumentElement},
+    },
+    terms::ArgumentMode,
+    utils::RefTree,
+};
+use ftml_uris::{DocumentElementUri, Id, NarrativeUriRef, SymbolUri};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct NotationReference {
+    pub symbol: SymbolUri,
+    pub uri: DocumentElementUri,
+    #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
+    pub notation: DataRef<Notation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct VariableNotationReference {
+    pub variable: DocumentElementUri,
+    pub uri: DocumentElementUri,
+    #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
+    pub notation: DataRef<Notation>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -62,6 +92,90 @@ pub enum NotationComponent {
     Comp(NotationNode),
     #[cfg_attr(feature = "serde", serde(untagged))]
     Text(Box<str>),
+}
+impl crate::__private::Sealed for NotationReference {}
+impl Ftml for NotationReference {
+    #[cfg(feature = "rdf")]
+    fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use ftml_uris::FtmlUri;
+        use ulo::triple;
+        let iri = self.uri.to_iri();
+        [
+            triple!(<(iri.clone())>: ulo:notation),
+            triple!(<(iri)> ulo:notation_for <(self.symbol.to_iri())>),
+        ]
+    }
+}
+impl Narrative for NotationReference {
+    fn narrative_uri(&self) -> Option<NarrativeUriRef<'_>> {
+        Some(NarrativeUriRef::Element(&self.uri))
+    }
+    #[inline]
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        std::iter::empty()
+    }
+}
+impl IsDocumentElement for NotationReference {
+    fn as_ref(&self) -> DocumentElementRef<'_> {
+        DocumentElementRef::Notation(self)
+    }
+    fn from_element(e: DocumentElementRef<'_>) -> Option<&Self>
+    where
+        Self: Sized,
+    {
+        if let DocumentElementRef::Notation(n) = e {
+            Some(n)
+        } else {
+            None
+        }
+    }
+    fn element_uri(&self) -> Option<&DocumentElementUri> {
+        Some(&self.uri)
+    }
+}
+impl crate::__private::Sealed for VariableNotationReference {}
+impl Ftml for VariableNotationReference {
+    #[cfg(feature = "rdf")]
+    fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use ftml_uris::FtmlUri;
+        use ulo::triple;
+        let iri = self.uri.to_iri();
+        [
+            triple!(<(iri.clone())>: ulo:notation),
+            triple!(<(iri)> ulo:notation_for <(self.variable.to_iri())>),
+        ]
+    }
+}
+impl Narrative for VariableNotationReference {
+    fn narrative_uri(&self) -> Option<NarrativeUriRef<'_>> {
+        Some(NarrativeUriRef::Element(&self.uri))
+    }
+    #[inline]
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        std::iter::empty()
+    }
+}
+impl IsDocumentElement for VariableNotationReference {
+    fn as_ref(&self) -> DocumentElementRef<'_> {
+        DocumentElementRef::VariableNotation(self)
+    }
+    fn from_element(e: DocumentElementRef<'_>) -> Option<&Self>
+    where
+        Self: Sized,
+    {
+        if let DocumentElementRef::VariableNotation(n) = e {
+            Some(n)
+        } else {
+            None
+        }
+    }
+    fn element_uri(&self) -> Option<&DocumentElementUri> {
+        Some(&self.uri)
+    }
 }
 
 impl crate::utils::RefTree for NotationComponent {

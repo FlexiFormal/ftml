@@ -5,12 +5,22 @@ use triomphe::Arc;
 #[error("internal channel error")]
 pub struct ChannelError;
 
+#[derive(Debug)]
 pub struct AsyncCache<
     K: std::hash::Hash + Clone + Eq,
     T: Clone + Send,
     E: Clone + From<ChannelError> + Send,
 > {
     map: dashmap::DashMap<K, Awaitable<T, E>, rustc_hash::FxBuildHasher>,
+}
+impl<K: std::hash::Hash + Clone + Eq, T: Clone + Send, E: Clone + From<ChannelError> + Send> Default
+    for AsyncCache<K, T, E>
+{
+    fn default() -> Self {
+        Self {
+            map: dashmap::DashMap::default(),
+        }
+    }
 }
 
 impl<
@@ -19,6 +29,11 @@ impl<
     E: Clone + From<ChannelError> + Send + Sync,
 > AsyncCache<K, T, E>
 {
+    #[inline]
+    pub fn clear(&self) {
+        self.map.clear();
+    }
+
     pub fn retain(&self, mut keep: impl FnMut(&K, &Result<T, E>) -> bool) {
         self.map.retain(|k, e| match &*e.inner.read() {
             MaybeValue::Pending(_) => true,
@@ -26,11 +41,11 @@ impl<
         });
     }
 
-    pub fn get<Fut: Future<Output = Result<T, E>> + Send + Sync>(
+    pub fn get<Fut: Future<Output = Result<T, E>> + Send + Sync, F: FnOnce(K) -> Fut>(
         &self,
         k: K,
-        f: impl FnOnce(K) -> Fut,
-    ) -> impl Future<Output = Result<T, E>> {
+        f: F,
+    ) -> impl Future<Output = Result<T, E>> + Send + use<Fut, T, E, K, F> {
         match self.map.entry(k) {
             Entry::Occupied(a) => either::Left(a.get().clone().get()),
             Entry::Vacant(v) => {
@@ -39,6 +54,14 @@ impl<
                 either::Right(ret.get())
             }
         }
+    }
+
+    /// blocks
+    pub fn has<Q: std::hash::Hash + Eq + ?Sized>(&self, k: &Q) -> Option<Result<T, E>>
+    where
+        K: std::borrow::Borrow<Q>,
+    {
+        self.map.get(k).map(|r| r.inner.read().clone().get_sync())
     }
 
     /// Assumes f blocks
@@ -69,12 +92,12 @@ impl<
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Awaitable<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
     inner: Arc<parking_lot::RwLock<MaybeValue<T, E>>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum MaybeValue<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
     Done(Result<T, E>),
     Pending(flume::Receiver<Result<T, E>>), //(kanal::AsyncReceiver<Result<T, E>>),
@@ -161,7 +184,7 @@ impl<
 
     /// # Errors
     pub fn get_sync(self) -> Result<T, E> {
-        futures::executor::block_on(self.get())
+        pollster::FutureExt::block_on(self.get())
     }
 }
 

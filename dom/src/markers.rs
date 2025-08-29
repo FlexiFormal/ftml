@@ -167,7 +167,7 @@ impl Marker {
                 if *uri.document_uri() != *DocumentUri::no_doc() {
                     LOCAL_CACHE
                         .paragraphs
-                        .insert(uri.clone(), orig.html_string());
+                        .insert(uri.clone(), orig.html_string().into_boxed_str());
                 }
                 DocumentState::new_paragraph(uri, kind, formatting, styles, fors, move |info| {
                     Views::paragraph(info, move || {

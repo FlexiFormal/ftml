@@ -7,18 +7,53 @@
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
 use ftml_core::extraction::{
-    FtmlExtractionError, FtmlStateExtractor, OpenFtmlElement, state::ExtractorState,
+    FtmlExtractionError, FtmlStateExtractor, OpenFtmlElement,
+    state::{ExtractionResult, ExtractorState},
 };
-use ftml_ontology::utils::Css;
+use ftml_ontology::{narrative::DocumentRange, utils::Css};
+use ftml_uris::DocumentUri;
 
 mod ever;
 mod parser;
 
+pub struct FtmlResult {
+    pub ftml: Box<str>,
+    pub css: Box<[Css]>,
+    pub errors: Box<[FtmlExtractionError]>,
+    pub doc: ExtractionResult,
+    pub body: DocumentRange,
+    pub inner_offset: u32,
+}
+
+/// # Errors
+pub fn run(
+    ftml: &str,
+    img: impl Fn(&str) -> Option<String>,
+    css: impl Fn(&str) -> Option<Box<str>>,
+    uri: DocumentUri,
+    rdf: bool,
+) -> Result<FtmlResult, String> {
+    use html5ever::tendril::{SliceExt, TendrilSink};
+    let parser = parser::HtmlParser {
+        document_node: ever::NodeRef::new_document(),
+        body: std::cell::Cell::new((DocumentRange::default(), 0)),
+        errors: std::cell::RefCell::new(Vec::new()),
+        img,
+        css,
+        extractor: std::cell::RefCell::new(HtmlExtractor {
+            parse_errors: String::new(),
+            css: Vec::new(),
+            state: ExtractorState::new(uri, rdf),
+        }),
+    };
+    html5ever::parse_document(parser, html5ever::ParseOpts::default())
+        .from_utf8()
+        .one(ftml.as_bytes().to_tendril())
+}
+
 pub struct HtmlExtractor {
-    errors: String,
+    parse_errors: String,
     css: Vec<Css>,
-    refs: Vec<u8>,
-    title: Option<Box<str>>,
     //document:UncheckedDocument,
     //backend: &'a AnyBackend,
     state: ExtractorState<ever::NodeRef>,

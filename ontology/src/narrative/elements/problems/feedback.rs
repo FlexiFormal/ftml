@@ -16,36 +16,24 @@ pub struct ProblemFeedback {
     pub score_fraction: f32,
 }
 
-#[cfg(feature = "typescript")]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, tsify::Tsify)]
-#[tsify(from_wasm_abi, into_wasm_abi)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ProblemFeedbackJson {
     pub correct: bool,
-    #[tsify(type = "string[]")]
+    #[cfg_attr(feature = "typescript", tsify(type = "string[]"))]
     #[cfg_attr(feature = "serde", serde(default))]
     pub solutions: SmallVec<Box<str>, 1>,
-    #[tsify(type = "CheckedResult[]")]
+    #[cfg_attr(feature = "typescript", tsify(type = "CheckedResult[]"))]
     #[cfg_attr(feature = "serde", serde(default))]
     pub data: SmallVec<CheckedResult, 4>,
     pub score_fraction: f32,
 }
 
-#[cfg(feature = "typescript")]
-#[wasm_bindgen::prelude::wasm_bindgen]
+#[cfg(feature = "serde")]
+#[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
 impl ProblemFeedback {
-    #[must_use]
-    pub fn from_jstring(s: &str) -> Option<Self> {
-        use crate::utils::Hexable;
-        Self::from_hex(s).ok()
-    }
-
-    #[cfg(feature = "serde")]
-    #[must_use]
-    pub fn to_jstring(&self) -> Option<String> {
-        use crate::utils::Hexable;
-        self.as_hex_string().ok()
-    }
-
     #[must_use]
     pub fn from_json(
         ProblemFeedbackJson {
@@ -77,6 +65,18 @@ impl ProblemFeedback {
             data,
             score_fraction,
         }
+    }
+    #[must_use]
+    pub fn from_jstring(s: &str) -> Option<Self> {
+        use crate::utils::Hexable;
+        Self::from_hex(s).ok()
+    }
+
+    #[cfg(feature = "serde")]
+    #[must_use]
+    pub fn to_jstring(&self) -> Option<String> {
+        use crate::utils::Hexable;
+        self.as_hex_string().ok()
     }
 }
 

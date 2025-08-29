@@ -63,7 +63,7 @@ fn do_replace<B: SendBackend>(
                 c.inject();
             }
             DocumentState::inner_document(uri.clone(), &inputref, move || {
-                crate::Views::<B>::render_ftml_and_then(html, move || {
+                crate::Views::<B>::render_ftml_and_then(html.into_string(), move || {
                     tracing::debug!("inputref expansion for {uri} finished!");
                     let _ = on_load.set();
                 })

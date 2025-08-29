@@ -450,7 +450,7 @@ pub fn symbol_popover<B: SendBackend>(uri: SymbolUri) -> impl IntoView {
               <div class="ftml-symbol-popup">
                 {
                     DocumentState::no_document(
-                        || crate::Views::<B>::render_ftml(html)
+                        || crate::Views::<B>::render_ftml(html.into_string())
                     )
                 }
               </div>

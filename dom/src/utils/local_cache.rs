@@ -1,5 +1,5 @@
 use either::Either;
-use ftml_backend::{BackendError, FtmlBackend, GlobalBackend, ParagraphOrProblemKind};
+use ftml_backend::{BackendError, FtmlBackend, GlobalBackend};
 use ftml_ontology::{
     domain::{
         SharedDeclaration,
@@ -13,7 +13,7 @@ use ftml_ontology::{
     narrative::{
         SharedDocumentElement,
         documents::Document,
-        elements::{DocumentTerm, Notation, VariableDeclaration},
+        elements::{DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration},
     },
     utils::Css,
 };
@@ -39,7 +39,7 @@ pub struct LocalCache {
     pub(crate) documents: Set<Document>,
     pub(crate) modules: Set<Module>,
     pub(crate) fors: Map<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>>,
-    pub(crate) paragraphs: Map<DocumentElementUri, String>,
+    pub(crate) paragraphs: Map<DocumentElementUri, Box<str>>,
 }
 
 pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
@@ -84,12 +84,12 @@ impl<B: SendBackend> WithLocalCache<B> {
         &self,
         uri: ftml_uris::Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<B::Error>>> + Send + use<B>
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<B::Error>>> + Send + use<B>
     {
         if let Uri::DocumentElement(uri) = &uri
             && let Some(s) = LOCAL_CACHE.paragraphs.get(uri)
         {
-            either::Either::Left(std::future::ready(Ok((s.clone(), Vec::new()))))
+            either::Either::Left(std::future::ready(Ok((s.clone(), Box::new([]) as _))))
         } else {
             either::Either::Right(B::get().get_fragment(uri, context))
         }
@@ -100,7 +100,7 @@ impl<B: SendBackend> WithLocalCache<B> {
         &self,
         uri: SymbolUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<B::Error>>> + Send + use<B>
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<B::Error>>> + Send + use<B>
     {
         if let Some(v) = LOCAL_CACHE.fors.get(&uri)
             && let Some((uri, _)) = v
@@ -108,7 +108,7 @@ impl<B: SendBackend> WithLocalCache<B> {
                 .find(|(_, k)| matches!(k, ParagraphOrProblemKind::Definition))
             && let Some(s) = LOCAL_CACHE.paragraphs.get(uri)
         {
-            return either::Either::Left(std::future::ready(Ok((s.clone(), Vec::new()))));
+            return either::Either::Left(std::future::ready(Ok((s.clone(), Box::new([]) as _))));
         }
         either::Either::Right(self.get_fragment(uri.into(), context))
     }
@@ -245,7 +245,7 @@ impl<B: SendBackend> WithLocalCache<B> {
         &self,
         uri: DocumentUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<B::Error>>> + Send + use<B>
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<B::Error>>> + Send + use<B>
     {
         self.get_fragment(uri.into(), context)
     }

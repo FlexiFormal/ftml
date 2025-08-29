@@ -24,14 +24,15 @@ use ftml_ontology::{
         elements::{
             DocumentElement, DocumentTerm, LogicalParagraph, Notation, Section, SectionLevel,
             VariableDeclaration,
-            notations::{NotationComponent, NotationNode},
+            notations::{
+                NotationComponent, NotationNode, NotationReference, VariableNotationReference,
+            },
             paragraphs::{ParagraphFormatting, ParagraphKind},
             variables::VariableData,
         },
     },
     terms::{ApplicationTerm, BindingTerm, Term, VarOrSym, Variable},
 };
-
 use ftml_uris::{
     DocumentElementUri, DocumentUri, DomainUriRef, Id, IsDomainUri, Language, LeafUri, ModuleUri,
     SymbolUri,
@@ -133,27 +134,8 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     #[allow(dead_code)]
     do_rdf: bool,
     #[cfg(feature = "rdf")]
-    rdf: rustc_hash::FxHashSet<ulo::rdf_types::Triple>,
+    rdf: Vec<ulo::rdf_types::Triple>,
 }
-/*
-macro_rules! add_triples {
-    (DOM $self:ident,$elem:ident -> $module:ident) => {
-        add_triples!(NARR $self,$elem -> ($module.to_iri()) ulo:declares)
-    };
-    (NARR $self:ident,$elem:ident -> ($module:expr) $p:ident:$r:ident) => {
-        #[cfg(feature = "rdf")]
-        if $self.do_rdf {
-            use ftml_ontology::Ftml;
-            use ftml_uris::FtmlUri;
-            use ulo::triple;
-            $self.rdf
-                .extend($elem.triples().into_iter().chain(std::iter::once(
-                    triple!(<($module)> $p:$r <($elem.uri.to_iri())>),
-                )));
-        }
-    }
-}
-*/
 
 #[derive(Debug)]
 pub struct ExtractionResult {
@@ -161,7 +143,7 @@ pub struct ExtractionResult {
     pub modules: Vec<Module>,
     pub data: Box<[u8]>,
     #[cfg(feature = "rdf")]
-    pub triples: rustc_hash::FxHashSet<ulo::rdf_types::Triple>,
+    pub triples: Vec<ulo::rdf_types::Triple>,
     pub notations: Vec<(LeafUri, DocumentElementUri, Notation)>,
 }
 
@@ -187,7 +169,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             domain: StackVec::default(),
             narrative: StackVec::default(),
             #[cfg(feature = "rdf")]
-            rdf: rustc_hash::FxHashSet::default(),
+            rdf: Vec::new(),
         }
     }
 
@@ -1029,19 +1011,19 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
 
         let (e, leaf) = match head {
             VarOrSym::Sym(s) => (
-                DocumentElement::Notation {
+                DocumentElement::Notation(NotationReference {
                     symbol: s.clone(),
                     uri: uri.clone(),
                     notation,
-                },
+                }),
                 s.into(),
             ),
             VarOrSym::Var(Variable::Ref { declaration, .. }) => (
-                DocumentElement::VariableNotation {
+                DocumentElement::VariableNotation(VariableNotationReference {
                     variable: declaration.clone(),
                     uri: uri.clone(),
                     notation,
-                },
+                }),
                 declaration.into(),
             ),
             VarOrSym::Var(_) => {

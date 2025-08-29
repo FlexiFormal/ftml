@@ -35,7 +35,7 @@ use ftml_ontology::{
     narrative::{
         SharedDocumentElement,
         documents::Document,
-        elements::{DocumentTerm, Notation, VariableDeclaration, problems::CognitiveDimension},
+        elements::{DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration},
     },
     utils::Css,
 };
@@ -89,17 +89,6 @@ macro_rules! new_global {
     (@NEW Cached($($rest:tt)*) ) => { $crate::FtmlBackend::cached($crate::new_global!(@NEW $($rest)*)) };
 }
 
-#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[serde(tag = "type")]
-pub enum ParagraphOrProblemKind {
-    Definition,
-    Example,
-    Problem(CognitiveDimension),
-    SubProblem(CognitiveDimension),
-}
-
 pub trait GlobalBackend: 'static {
     type Error: std::fmt::Display + std::fmt::Debug;
     type Backend: FtmlBackend<Error = Self::Error>;
@@ -126,7 +115,7 @@ pub trait FtmlBackend {
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send;
 
     fn get_logical_paragraphs(
         &self,
@@ -252,7 +241,8 @@ pub trait FtmlBackend {
         &self,
         uri: SymbolUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send
+    {
         self.get_fragment(uri.into(), context)
     }
 
@@ -261,7 +251,8 @@ pub trait FtmlBackend {
         &self,
         uri: DocumentUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send
+    {
         self.get_fragment(uri.into(), context)
     }
 
@@ -305,7 +296,10 @@ pub trait FlamsBackend {
         s: Option<String>,
         context: Option<NarrativeUri>,
     ) -> impl Future<
-        Output = Result<(Uri, Vec<Css>, String), BackendError<server_fn::error::ServerFnErrorErr>>,
+        Output = Result<
+            (Uri, Box<[Css]>, Box<str>),
+            BackendError<server_fn::error::ServerFnErrorErr>,
+        >,
     > + Send;
 
     /// `/content/module`
@@ -388,7 +382,8 @@ where
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(String, Vec<Css>), BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send
+    {
         <Self as FlamsBackend>::get_fragment(
             self,
             Some(uri),

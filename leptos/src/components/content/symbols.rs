@@ -6,7 +6,6 @@ use crate::{
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
-use ftml_backend::ParagraphOrProblemKind;
 use ftml_dom::{
     notations::{NotationExt, TermExt},
     utils::{
@@ -16,7 +15,9 @@ use ftml_dom::{
 };
 use ftml_ontology::{
     domain::declarations::symbols::{ArgumentSpec, Symbol, SymbolData},
-    narrative::elements::{Notation, VariableDeclaration, variables::VariableData},
+    narrative::elements::{
+        Notation, ParagraphOrProblemKind, VariableDeclaration, variables::VariableData,
+    },
     terms::{VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, IsNarrativeUri, LeafUri, SymbolUri};
