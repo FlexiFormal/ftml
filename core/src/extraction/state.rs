@@ -1051,7 +1051,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     fn close_notation_arg(&mut self, node: &N, position: ArgumentPosition) -> super::Result<()> {
         let mode = position.mode();
         let index = position.index();
-        if let Some(
+        let Some((components, ancestor)) = self.narrative.iter_mut().find_map(|e| match e {
             OpenNarrativeElement::NotationComp {
                 components,
                 node: ancestor,
@@ -1059,15 +1059,14 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             | OpenNarrativeElement::ArgSep {
                 components,
                 node: ancestor,
-            },
-        ) = self.narrative.last_mut()
-        {
-            let path = node.path_from(ancestor);
-            components.push((NotationComponent::Argument { index, mode }, path));
-            Ok(())
-        } else {
-            Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg))
-        }
+            } => Some((components, ancestor)),
+            _ => None,
+        }) else {
+            return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg));
+        };
+        let path = node.path_from(ancestor);
+        components.push((NotationComponent::Argument { index, mode }, path));
+        Ok(())
     }
 
     fn close_argsep(

@@ -744,7 +744,7 @@ do_keys! {
                     }
                     OpenNarrativeElement::Slide { .. } => {
                         drop(iter);
-                        return ret!(ext,node <- SlideTitle + ParagraphTitle);
+                        return ret!(ext,node <- SlideTitle + SlideTitle);
                     }
                     OpenNarrativeElement::SkipSection { .. }
                     | OpenNarrativeElement::Notation { .. }
