@@ -116,7 +116,7 @@ macro_rules! backend {
 }
 backend!(8: ["sections","para","symbolsmodules","paragraphs","structures","morphisms","slides","metatheory"]);
 
-type Views = ftml_leptos::Views<GlobalBackend>;
+type Views = ftml_components::Views<GlobalBackend>;
 
 #[component]
 fn Ftml() -> impl IntoView {

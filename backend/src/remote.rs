@@ -163,7 +163,7 @@ where
         &self,
         uri: ftml_uris::Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<E>>> {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<E>>> {
         let url = if let Uri::Document(d) = &uri {
             self.redirects.for_fragment(d).map_or_else(
                 || Self::make_url(&self.fragment_url, &uri, context.as_ref()),

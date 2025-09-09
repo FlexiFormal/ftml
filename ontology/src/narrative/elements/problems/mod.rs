@@ -12,7 +12,10 @@ use ftml_uris::{DocumentElementUri, Id, SymbolUri};
 pub use solutions::*;
 
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Problem {
@@ -24,24 +27,29 @@ pub struct Problem {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ProblemData {
     pub sub_problem: bool,
     pub autogradable: bool,
     pub points: Option<f32>,
+    pub minutes: Option<f32>,
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
     pub solutions: DataRef<Solutions>, //State::Seq<SolutionData>,
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef[]"))]
     #[cfg_attr(feature = "serde", serde(default))]
     pub gnotes: Box<[DataRef<GradingNote>]>,
+    #[cfg_attr(feature = "typescript", tsify(type = "DataRef[]"))]
     #[cfg_attr(feature = "serde", serde(default))]
-    pub hints: Box<[DocumentRange]>,
+    pub hints: Box<[DataRef<Box<str>>]>,
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef[]"))]
     #[cfg_attr(feature = "serde", serde(default))]
     pub notes: Box<[DataRef<Box<str>>]>,
-    pub title: Option<DocumentRange>,
+    pub title: Option<Box<str>>,
     #[cfg_attr(feature = "serde", serde(default))]
     pub styles: Box<[Id]>,
     #[cfg_attr(feature = "serde", serde(default))]
@@ -132,7 +140,10 @@ impl std::hash::Hash for Problem {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct GradingNote {
@@ -142,7 +153,10 @@ pub struct GradingNote {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct AnswerClass {
@@ -165,7 +179,10 @@ impl std::hash::Hash for AnswerClass {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
@@ -204,7 +221,10 @@ impl std::str::FromStr for AnswerKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum CognitiveDimension {

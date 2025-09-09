@@ -15,7 +15,10 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentData {
@@ -88,7 +91,10 @@ impl Borrow<DocumentUri> for Document {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentStyles {
@@ -97,7 +103,10 @@ pub struct DocumentStyles {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentCounter {
@@ -106,7 +115,10 @@ pub struct DocumentCounter {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentStyle {
@@ -116,7 +128,10 @@ pub struct DocumentStyle {
 }
 
 #[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum DocumentKind {
     #[default]
@@ -200,6 +215,22 @@ impl<'a> TreeChild<'a> for DocumentElementRef<'a> {
 #[cfg(feature = "serde")]
 mod serde_impl {
     use crate::narrative::documents::DocumentData;
+
+    impl<Context> bincode::Decode<Context> for super::Document {
+        fn decode<D: bincode::de::Decoder<Context = Context>>(
+            decoder: &mut D,
+        ) -> Result<Self, bincode::error::DecodeError> {
+            DocumentData::decode(decoder).map(|d| Self(triomphe::Arc::new(d)))
+        }
+    }
+    impl bincode::Encode for super::Document {
+        fn encode<E: bincode::enc::Encoder>(
+            &self,
+            encoder: &mut E,
+        ) -> Result<(), bincode::error::EncodeError> {
+            self.0.encode(encoder)
+        }
+    }
 
     impl serde::Serialize for super::Document {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

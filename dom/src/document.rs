@@ -5,7 +5,6 @@ use crate::{
     toc::{CurrentId, CurrentTOC, NavElems, TocSource},
     utils::{ContextChain, owned},
 };
-use ftml_core::extraction::ArgumentPosition;
 use ftml_ontology::{
     narrative::elements::{
         SectionLevel,
@@ -13,6 +12,7 @@ use ftml_ontology::{
     },
     terms::VarOrSym,
 };
+use ftml_parser::extraction::ArgumentPosition;
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, Language, NarrativeUri, SymbolUri};
 use leptos::prelude::*;
 use std::str::FromStr;
@@ -45,11 +45,13 @@ impl DocumentMeta {
 
 pub fn setup_document<Ch: IntoView + 'static>(
     uri: DocumentUri,
+    is_stripped: bool,
     children: impl FnOnce() -> Ch,
 ) -> impl IntoView {
     provide_context(RwSignal::new(DomExtractor::new(
         uri.clone(),
         uri.clone().into(),
+        is_stripped,
     )));
     provide_context(InDocument(uri.clone()));
     provide_context(CurrentUri(uri.clone().into()));
@@ -167,12 +169,14 @@ impl DocumentState {
     pub fn inner_document<V: IntoView, F: FnOnce() -> V>(
         target: DocumentUri,
         uri: &DocumentElementUri,
+        is_stripped: bool,
         f: F,
     ) -> impl IntoView + use<V, F> {
         let context = Self::context_uri() & uri.name();
         provide_context(RwSignal::new(DomExtractor::new(
             target.clone(),
             context.clone().into(),
+            is_stripped,
         )));
         provide_context(CurrentUri(target.clone().into()));
         provide_context(InDocument(target));
@@ -184,6 +188,7 @@ impl DocumentState {
         provide_context(RwSignal::new(DomExtractor::new(
             DocumentUri::no_doc().clone(),
             DocumentUri::no_doc().clone().into(),
+            true,
         )));
         provide_context(InDocument(DocumentUri::no_doc().clone()));
         provide_context(ContextUri(DocumentUri::no_doc().clone().into()));
@@ -241,6 +246,11 @@ impl DocumentState {
             styles,
             fors,
         })
+    }
+
+    pub(crate) fn new_problem(styles: &[Id]) -> (Memo<String>, String) {
+        let mut counters: SectionCounters = expect_context();
+        counters.get_problem(styles)
     }
 
     pub(crate) fn new_slide() {

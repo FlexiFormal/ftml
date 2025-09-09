@@ -6,7 +6,7 @@ use crate::{
             symbols::Symbol,
         },
     },
-    terms::{Argument, Term},
+    terms::{Argument, Term, arguments::MaybeSequence},
 };
 use either::Either;
 use ftml_uris::{SymbolUri, UriName, metatheory};
@@ -70,8 +70,8 @@ fn get(
                 unsafe { unreachable_unchecked() }
             };
             match s {
-                Either::Left(t) => get(t, dones, name, get_struct),
-                Either::Right(s) => s
+                MaybeSequence::One(t) => get(t, dones, name, get_struct),
+                MaybeSequence::Seq(s) => s
                     .iter()
                     .rev()
                     .find_map(|s| get(s, dones, name, &get_struct)),
@@ -108,8 +108,8 @@ fn get_async<
                 unsafe { unreachable_unchecked() }
             };
             match s {
-                Either::Left(t) => get_async(t.clone(), dones, name, get_struct),
-                Either::Right(s) => from_terms_async(s.clone(), dones, name, get_struct),
+                MaybeSequence::One(t) => get_async(t.clone(), dones, name, get_struct),
+                MaybeSequence::Seq(s) => from_terms_async(s.clone(), dones, name, get_struct),
             }
         }
         _ => Box::pin(std::future::ready(Ok(None))),

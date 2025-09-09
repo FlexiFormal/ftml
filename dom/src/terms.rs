@@ -1,6 +1,6 @@
 use crate::{ClonableView, FtmlViews};
-use ftml_core::extraction::ArgumentPosition;
 use ftml_ontology::terms::VarOrSym;
+use ftml_parser::extraction::ArgumentPosition;
 use ftml_uris::DocumentElementUri;
 use leptos::either::Either::{self, Left, Right};
 use leptos::prelude::*;

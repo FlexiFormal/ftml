@@ -55,6 +55,8 @@ pub mod errors {
 pub mod components;
 pub mod metatheory;
 use std::str::FromStr;
+#[cfg(feature = "serde")]
+mod bincode_impl;
 mod traits;
 
 #[cfg(feature = "interned")]
@@ -116,11 +118,21 @@ pub(crate) mod sealed {
 #[strum_discriminants(derive(strum::Display))]
 #[cfg_attr(
     feature = "serde",
-    strum_discriminants(derive(serde::Serialize, serde::Deserialize))
+    strum_discriminants(derive(
+        serde::Serialize,
+        serde::Deserialize,
+        bincode::Decode,
+        bincode::Encode
+    ))
 )]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub enum Uri {
     /// A base URI with no additional components.
@@ -182,7 +194,12 @@ impl UriRef<'_> {
 )]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 #[allow(non_camel_case_types)]
 pub enum UriComponentKind {
@@ -227,7 +244,12 @@ pub enum UriComponentKind {
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub enum DomainUri {
     /// A module URI identifying a specific module within an archive.
@@ -241,7 +263,10 @@ impl crate::sealed::Sealed for DomainUri {}
 
 /// Like [`DomainUri`] but wrapping around references
 #[derive(Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_with::SerializeDisplay, bincode::Encode)
+)]
 pub enum DomainUriRef<'u> {
     /// A module URI identifying a specific module within an archive.
     Module(&'u ModuleUri),
@@ -252,7 +277,10 @@ impl crate::sealed::Sealed for DomainUriRef<'_> {}
 
 /// Like [`NarrativeUri`] but wrapping around references
 #[derive(Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde_with::SerializeDisplay))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde_with::SerializeDisplay, bincode::Encode)
+)]
 pub enum NarrativeUriRef<'u> {
     /// A document URI identifying a specific document within an archive.
     Document(&'u DocumentUri),
@@ -289,7 +317,12 @@ impl NarrativeUriRef<'_> {
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub enum NarrativeUri {
     /// A document URI identifying a specific document within an archive.
@@ -321,7 +354,12 @@ impl crate::sealed::Sealed for NarrativeUri {}
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub enum LeafUri {
     /// A symbol URI identifying a specific concept.

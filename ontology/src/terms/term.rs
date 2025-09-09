@@ -1,6 +1,6 @@
 use super::{BoundArgument, arguments::Argument, variables::Variable};
-use crate::terms::VarOrSym;
 use crate::terms::opaque::OpaqueNode;
+use crate::terms::{VarOrSym, arguments::MaybeSequence};
 use crate::utils::TreeIter;
 use ftml_uris::{SymbolUri, UriName};
 use std::fmt::Write;
@@ -13,7 +13,10 @@ use std::fmt::Write;
 /// [Theories-as-Types]()-like record "types".
 #[derive(Clone, Hash, PartialEq, Eq)]
 #[allow(clippy::unsafe_derive_deserialize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Term {
@@ -59,7 +62,10 @@ pub enum Term {
 pub struct ApplicationTerm(pub(crate) triomphe::Arc<Application>);
 
 #[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Application {
@@ -77,7 +83,10 @@ pub struct Application {
 pub struct BindingTerm(pub(crate) triomphe::Arc<Binding>);
 
 #[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Binding {
@@ -96,7 +105,10 @@ pub struct Binding {
 pub struct RecordFieldTerm(pub(crate) triomphe::Arc<RecordField>);
 
 #[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RecordField {
@@ -117,7 +129,10 @@ pub struct RecordField {
 pub struct OpaqueTerm(pub(crate) triomphe::Arc<Opaque>);
 
 #[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Opaque {
@@ -387,10 +402,10 @@ impl<'a> Iterator for ExprChildrenIter<'a> {
                     let next = args.first()?;
                     *args = &args[1..];
                     match next {
-                        Argument::Simple(tm) | Argument::Sequence(either::Left(tm)) => {
+                        Argument::Simple(tm) | Argument::Sequence(MaybeSequence::One(tm)) => {
                             return Some(tm);
                         }
-                        Argument::Sequence(either::Right(seq)) => {
+                        Argument::Sequence(MaybeSequence::Seq(seq)) => {
                             if let Some(f) = seq.first() {
                                 if seq.len() > 1 {
                                     *self = Self::Arg(&seq[1..], args);
@@ -413,10 +428,11 @@ impl<'a> Iterator for ExprChildrenIter<'a> {
                     };
                     *args = &args[1..];
                     match next {
-                        BoundArgument::Simple(f) | BoundArgument::Sequence(either::Left(f)) => {
+                        BoundArgument::Simple(f)
+                        | BoundArgument::Sequence(MaybeSequence::One(f)) => {
                             return Some(f);
                         }
-                        BoundArgument::Sequence(either::Right(seq)) => {
+                        BoundArgument::Sequence(MaybeSequence::Seq(seq)) => {
                             if let Some(f) = seq.first() {
                                 if seq.len() > 1 {
                                     while matches!(

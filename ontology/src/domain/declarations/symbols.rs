@@ -8,7 +8,10 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Symbol {
@@ -17,7 +20,10 @@ pub struct Symbol {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SymbolData {
@@ -97,7 +103,10 @@ impl IsDeclaration for Symbol {
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[non_exhaustive]
@@ -134,6 +143,37 @@ impl FromStr for AssocType {
 pub struct ArgumentSpec(
     #[cfg_attr(feature = "typescript", tsify(type = "ArgumentMode[]"))] SmallVec<ArgumentMode, 8>,
 );
+
+#[cfg(feature = "serde")]
+mod bincode_impl {
+    use super::{ArgumentMode, ArgumentSpec};
+
+    impl<Context> bincode::Decode<Context> for ArgumentSpec {
+        fn decode<D: bincode::de::Decoder<Context = Context>>(
+            decoder: &mut D,
+        ) -> Result<Self, bincode::error::DecodeError> {
+            let v: Vec<ArgumentMode> = Vec::decode(decoder)?;
+            Ok(Self(v.into()))
+        }
+    }
+    impl<'de, Context> bincode::BorrowDecode<'de, Context> for ArgumentSpec {
+        fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Context>>(
+            decoder: &mut D,
+        ) -> Result<Self, bincode::error::DecodeError> {
+            let v: Vec<ArgumentMode> = Vec::borrow_decode(decoder)?;
+            Ok(Self(v.into()))
+        }
+    }
+    impl bincode::Encode for ArgumentSpec {
+        fn encode<E: bincode::enc::Encoder>(
+            &self,
+            encoder: &mut E,
+        ) -> Result<(), bincode::error::EncodeError> {
+            self.0.as_slice().encode(encoder)
+        }
+    }
+}
+
 impl IntoIterator for ArgumentSpec {
     type Item = ArgumentMode;
     type IntoIter = smallvec::IntoIter<ArgumentMode, 8>;

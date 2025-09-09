@@ -31,7 +31,12 @@ use crate::{
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub struct DocumentElementUri {
     /// The hierarchical name of the symbol.

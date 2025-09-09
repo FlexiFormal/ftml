@@ -35,7 +35,7 @@ macro_rules! ts {
                 <String as ::wasm_bindgen::describe::WasmDescribe>::describe();
             }
         }
-        #[cfg(feature = "typescript")]
+        #[cfg(feature = "js")]
         impl$(<$($a$(:$guard)?),+>)? ::wasm_bindgen::convert::TryFromJsValue for $name$(<$($a),+>)? {
             type Error = Option<$crate::errors::UriParseError>;
             fn try_from_js_value(value: ::wasm_bindgen::JsValue) -> Result<Self,Self::Error> {
@@ -46,8 +46,27 @@ macro_rules! ts {
                 }
             }
         }
+        #[cfg(feature = "js")]
+        impl$(<$($a$(:$guard)?),+>)? ::ftml_js_utils::conversion::FromJs for $name$(<$($a),+>)? {
+            type Error = $crate::errors::UriParseError;
+            fn from_js(value: ::wasm_bindgen::JsValue) -> Result<Self,Self::Error> {
+                if let Some(s) = value.as_string() {
+                    s.parse().map_err($crate::errors::UriParseError::from)
+                } else {
+                    Err($crate::errors::UriParseError::NotAString)
+                }
+            }
+        }
 
-        #[cfg(feature = "typescript")]
+        #[cfg(feature = "js")]
+        impl$(<$($a$(:$guard)?),+>)? ::ftml_js_utils::conversion::ToJs for $name$(<$($a),+>)? {
+            type Error = ::std::convert::Infallible;
+            fn to_js(&self) -> Result<::wasm_bindgen::JsValue, Self::Error> {
+                Ok(::wasm_bindgen::JsValue::from_str(&self.to_string()))
+            }
+        }
+
+        #[cfg(feature = "js")]
         impl$(<$($a$(:$guard)?),+>)? From<$name$(<$($a),+>)?> for wasm_bindgen::JsValue {
             fn from(uri: $name$(<$($a),+>)?) -> Self {
                 Self::from_str(&uri.to_string())

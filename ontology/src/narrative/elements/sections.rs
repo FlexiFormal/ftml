@@ -6,7 +6,10 @@ use crate::narrative::{
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Section {
@@ -62,7 +65,10 @@ impl IsDocumentElement for Section {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
@@ -77,6 +83,9 @@ pub enum SectionLevel {
     Paragraph = 5,
     Subparagraph = 6,
 }
+#[cfg(feature = "typescript")]
+impl ftml_js_utils::conversion::SerdeToJs for SectionLevel {}
+
 #[cfg(feature = "typescript")]
 impl wasm_bindgen::convert::TryFromJsValue for SectionLevel {
     type Error = wasm_bindgen::JsValue;

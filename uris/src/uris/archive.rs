@@ -20,7 +20,12 @@ static NO_ARCHIVE_URI: std::sync::LazyLock<ArchiveUri> = std::sync::LazyLock::ne
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 /// A hierarchical identifier for an FTML archive.
 ///
@@ -195,7 +200,12 @@ crate::debugdisplay!(ArchiveId);
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 /// A URI that identifies a specific archive within an FTML system.
 ///

@@ -12,7 +12,7 @@ workspace = true
 [features]
 
 ## Enables RDF support
-rdf = ["ftml-core/rdf"]
+rdf = ["ftml-parser/rdf"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -41,7 +41,7 @@ document-features = { workspace = true }
 
 ftml-uris = { workspace = true }
 ftml-ontology = { workspace = true, features = ["css_normalize"] }
-ftml-core = { workspace = true }
+ftml-parser = { workspace = true }
 
 html5ever = { workspace = true }
 smallvec = { workspace = true }

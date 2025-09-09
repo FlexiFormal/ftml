@@ -11,7 +11,7 @@ workspace = true
 
 [features]
 ## Generates typescript bindings
-typescript = ["tsify", "ftml-leptos/typescript", "ftml-leptos/callbacks"]
+typescript = ["tsify", "ftml-components/typescript", "ftml-components/callbacks"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -38,13 +38,14 @@ rustc_version = { workspace = true }
 [dependencies]
 document-features = { workspace = true }
 
-ftml-leptos = { workspace = true, features = ["csr"] }
+ftml-components = { workspace = true, features = ["csr"] }
 ftml-backend = { workspace = true, features = [
     "wasm",
     "cached",
     "server_fn",
     "deepsize",
 ] }
+ftml-js-utils = {workspace = true}
 ftml-uris = { workspace = true, features = ["interned"] }
 ftml-dom = { workspace = true, features = ["deepsize"] }
 ftml-ontology = { workspace = true, features = ["deepsize"] }

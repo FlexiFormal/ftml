@@ -1,19 +1,16 @@
+use super::{Term, Variable};
 use std::fmt::Write;
 
-use either::Either;
-
-use super::{Term, Variable};
-
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Argument {
     Simple(Term),
-    Sequence(
-        #[cfg_attr(feature = "typescript", tsify(type = "{Left: Term}|{Right:Term[]}"))]
-        Either<Term, Box<[Term]>>,
-    ),
+    Sequence(MaybeSequence<Term>),
 }
 
 impl Argument {
@@ -27,24 +24,34 @@ impl Argument {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum BoundArgument {
     Simple(Term),
-    Sequence(
-        #[cfg_attr(feature = "typescript", tsify(type = "{Left: Term}|{Right:Term[]}"))]
-        Either<Term, Box<[Term]>>,
-    ),
+    Sequence(MaybeSequence<Term>),
     Bound(Variable),
-    BoundSeq(
-        #[cfg_attr(
-            feature = "typescript",
-            tsify(type = "{Left: Variable}|{Right:Variable[]}")
-        )]
-        Either<Variable, Box<[Variable]>>,
-    ),
+    BoundSeq(MaybeSequence<Variable>),
 }
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum MaybeSequence<T>
+where
+    T: 'static,
+{
+    One(T),
+    Seq(Box<[T]>),
+}
+
 impl BoundArgument {
     #[must_use]
     pub const fn mode(&self) -> ArgumentMode {
@@ -58,7 +65,10 @@ impl BoundArgument {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum ArgumentMode {
@@ -120,8 +130,8 @@ impl deepsize::DeepSizeOf for Argument {
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
         match self {
             Self::Simple(t) => t.deep_size_of_children(context),
-            Self::Sequence(Either::Left(l)) => l.deep_size_of_children(context),
-            Self::Sequence(Either::Right(r)) => r
+            Self::Sequence(MaybeSequence::One(l)) => l.deep_size_of_children(context),
+            Self::Sequence(MaybeSequence::Seq(r)) => r
                 .iter()
                 .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
                 .sum(),
@@ -135,14 +145,14 @@ impl deepsize::DeepSizeOf for BoundArgument {
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
         match self {
             Self::Simple(t) => t.deep_size_of_children(context),
-            Self::Sequence(Either::Left(l)) => l.deep_size_of_children(context),
-            Self::Sequence(Either::Right(r)) => r
+            Self::Sequence(MaybeSequence::One(l)) => l.deep_size_of_children(context),
+            Self::Sequence(MaybeSequence::Seq(r)) => r
                 .iter()
                 .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
                 .sum(),
             Self::Bound(v) => v.deep_size_of_children(context),
-            Self::BoundSeq(Either::Left(l)) => l.deep_size_of_children(context),
-            Self::BoundSeq(Either::Right(r)) => r
+            Self::BoundSeq(MaybeSequence::One(l)) => l.deep_size_of_children(context),
+            Self::BoundSeq(MaybeSequence::Seq(r)) => r
                 .iter()
                 .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
                 .sum(),

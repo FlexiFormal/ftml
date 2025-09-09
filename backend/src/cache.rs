@@ -50,7 +50,7 @@ where
     inner: B,
     #[allow(clippy::type_complexity)]
     fragment_cache:
-        Cache<(Uri, Option<NarrativeUri>), (Box<str>, Box<[Css]>), BackendError<B::Error>>,
+        Cache<(Uri, Option<NarrativeUri>), (Box<str>, Box<[Css]>, bool), BackendError<B::Error>>,
     notations_cache: Cache<LeafUri, Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
     paragraphs_cache:
         Cache<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
@@ -105,7 +105,7 @@ where
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> {
         self.fragment_cache
             .get((uri, context), |(uri, context)| {
                 self.inner.get_fragment(uri, context)
@@ -387,7 +387,7 @@ where
             let value = d.value().read();
             let value = &*value;
             fragments_bytes += std::mem::size_of_val(value);
-            if let MaybeValue::Done(Ok((s, c))) = value {
+            if let MaybeValue::Done(Ok((s, c, _))) = value {
                 fragments_bytes += s.len();
                 for c in c {
                     fragments_bytes += std::mem::size_of_val(c);

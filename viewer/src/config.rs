@@ -1,47 +1,43 @@
-#[cfg(not(feature = "typescript"))]
-use ftml_leptos::config::FtmlConfigParseError;
+use ftml_components::config::{FtmlConfigParseError, FtmlConfigParseErrors};
 use ftml_uris::DocumentUri;
-#[cfg(not(feature = "typescript"))]
-use wasm_bindgen::{JsValue, convert::TryFromJsValue};
+use wasm_bindgen::JsValue;
 
-#[cfg(not(feature = "typescript"))]
-pub(crate) fn parse_config() -> (FtmlViewerConfig, Vec<FtmlConfigParseError>) {
+pub fn parse_config() -> (FtmlViewerConfig, Vec<FtmlConfigParseError>) {
     let global = leptos::web_sys::js_sys::global();
     leptos::web_sys::js_sys::Reflect::get(&global, &JsValue::from_str("FTML_CONFIG"))
         .map_or_else(|_| (FtmlViewerConfig::default(), Vec::new()), parse)
 }
 
-#[cfg(not(feature = "typescript"))]
+#[allow(clippy::needless_pass_by_value)]
 fn parse(cfg: JsValue) -> (FtmlViewerConfig, Vec<FtmlConfigParseError>) {
-    let (r, v) = match ftml_leptos::config::FtmlConfig::try_from_js_value(cfg.clone()) {
+    use ftml_js_utils::conversion::FromJs;
+    let (r, v) = match ftml_components::config::FtmlConfig::from_js(cfg.clone()) {
         Ok(r) => (r, Vec::new()),
-        Err((r, v)) => (r, v),
+        Err(FtmlConfigParseErrors { config, errors }) => (config, errors),
     };
     let mut c: FtmlViewerConfig = r.into();
-    if let Ok(v) = leptos::web_sys::js_sys::Reflect::get(&cfg, &JsValue::from_str("backendUrl")) {
-        if let Some(s) = v.as_string() {
-            c.backend_url = Some(s.into_boxed_str());
-        }
+    if let Ok(v) = leptos::web_sys::js_sys::Reflect::get(&cfg, &JsValue::from_str("backendUrl"))
+        && let Some(s) = v.as_string()
+    {
+        c.backend_url = Some(s.into_boxed_str());
     }
-    if let Ok(v) = leptos::web_sys::js_sys::Reflect::get(&cfg, &JsValue::from_str("redirects")) {
-        if let Ok(s) = leptos::web_sys::js_sys::JSON::stringify(&v) {
-            if let Some(s) = s.as_string() {
-                if let Ok(v) = serde_json::from_str(&s) {
-                    c.redirects = v;
-                }
-            }
-        }
+    if let Ok(v) = leptos::web_sys::js_sys::Reflect::get(&cfg, &JsValue::from_str("redirects"))
+        && let Ok(s) = leptos::web_sys::js_sys::JSON::stringify(&v)
+        && let Some(s) = s.as_string()
+        && let Ok(v) = serde_json::from_str(&s)
+    {
+        c.redirects = v;
     }
-    if let Ok(v) = leptos::web_sys::js_sys::Reflect::get(&cfg, &JsValue::from_str("logLevel")) {
-        if let Some(s) = v.as_string() {
-            c.log_level = match &*s.to_ascii_uppercase() {
-                "TRACE" => LogLevel::TRACE,
-                "DEBUG" => LogLevel::DEBUG,
-                "INFO" => LogLevel::INFO,
-                "ERROR" => LogLevel::ERROR,
-                _ => LogLevel::WARN,
-            };
-        }
+    if let Ok(v) = leptos::web_sys::js_sys::Reflect::get(&cfg, &JsValue::from_str("logLevel"))
+        && let Some(s) = v.as_string()
+    {
+        c.log_level = match &*s.to_ascii_uppercase() {
+            "TRACE" => LogLevel::TRACE,
+            "DEBUG" => LogLevel::DEBUG,
+            "INFO" => LogLevel::INFO,
+            "ERROR" => LogLevel::ERROR,
+            _ => LogLevel::WARN,
+        };
     }
 
     (c, v)
@@ -76,7 +72,7 @@ impl From<LogLevel> for tracing::Level {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FtmlViewerConfig {
     #[serde(flatten)]
-    pub inner: ftml_leptos::config::FtmlConfig,
+    pub inner: ftml_components::config::FtmlConfig,
     #[serde(default)]
     pub redirects: Vec<(DocumentUri, Box<str>)>,
     #[serde(default, rename = "backendUrl")]
@@ -98,8 +94,8 @@ impl FtmlViewerConfig {
         self.inner.apply()
     }
 }
-impl From<ftml_leptos::config::FtmlConfig> for FtmlViewerConfig {
-    fn from(value: ftml_leptos::config::FtmlConfig) -> Self {
+impl From<ftml_components::config::FtmlConfig> for FtmlViewerConfig {
+    fn from(value: ftml_components::config::FtmlConfig) -> Self {
         Self {
             inner: value,
             redirects: Vec::new(),

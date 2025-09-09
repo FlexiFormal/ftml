@@ -80,4 +80,28 @@ mod regex_serde {
             Self::new(&s).map_err(serde::de::Error::custom)
         }
     }
+    impl bincode::Encode for Regex {
+        fn encode<E: bincode::enc::Encoder>(
+            &self,
+            encoder: &mut E,
+        ) -> Result<(), bincode::error::EncodeError> {
+            self.as_str().encode(encoder)
+        }
+    }
+    impl<'de, Context> bincode::BorrowDecode<'de, Context> for Regex {
+        fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Context>>(
+            decoder: &mut D,
+        ) -> Result<Self, bincode::error::DecodeError> {
+            Self::new(&String::borrow_decode(decoder)?)
+                .map_err(|e| bincode::error::DecodeError::OtherString(e.to_string()))
+        }
+    }
+    impl<Context> bincode::Decode<Context> for Regex {
+        fn decode<D: bincode::de::Decoder<Context = Context>>(
+            decoder: &mut D,
+        ) -> Result<Self, bincode::error::DecodeError> {
+            Self::new(&String::decode(decoder)?)
+                .map_err(|e| bincode::error::DecodeError::OtherString(e.to_string()))
+        }
+    }
 }

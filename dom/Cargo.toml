@@ -22,7 +22,7 @@ hydrate = ["leptos-posthoc/hydrate", "dep:wasm-bindgen", "leptos/hydrate"]
 ## Server-side rendering
 ssr = ["leptos/ssr"]
 ## generate typescript bindings
-typescript = ["csr", "dep:tsify", "ftml-core/typescript"]
+typescript = ["csr", "dep:tsify", "ftml-parser/typescript"]
 ## uses deepsize to compute RAM usage
 deepsize = [
     "ftml-ontology/deepsize",
@@ -56,10 +56,11 @@ rustc_version = { workspace = true }
 [dependencies]
 document-features = { workspace = true }
 
-ftml-core = { workspace = true }
+ftml-parser = { workspace = true }
 ftml-uris = { workspace = true, features = ["serde"] }
 ftml-ontology = { workspace = true, features = ["serde"] }
 ftml-backend = { workspace = true }
+ftml-js-utils = {workspace=true}
 
 leptos-posthoc = { workspace = true }
 serde = { workspace = true }
@@ -74,6 +75,7 @@ parking_lot = { workspace = true }
 thiserror = { workspace = true }
 either = { workspace = true }
 send_wrapper = { workspace = true }
+ordered-float = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 web-sys = { workspace = true, features = [
     "Window",

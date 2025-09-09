@@ -10,6 +10,11 @@ pub(crate) static BACKEND_URL: std::sync::LazyLock<std::sync::Arc<parking_lot::R
         ))
     });
 pub struct BackendUrlRef;
+impl BackendUrlRef {
+    pub fn set_url(url:&str) {
+        *BACKEND_URL.write() = url.to_string().into_boxed_str();
+    }
+}
 impl std::fmt::Display for BackendUrlRef {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

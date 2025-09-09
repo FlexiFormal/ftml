@@ -6,11 +6,11 @@
  */
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
-use ftml_core::extraction::{
+use ftml_ontology::{narrative::DocumentRange, utils::Css};
+use ftml_parser::extraction::{
     FtmlExtractionError, FtmlStateExtractor, OpenFtmlElement,
     state::{ExtractionResult, ExtractorState},
 };
-use ftml_ontology::{narrative::DocumentRange, utils::Css};
 use ftml_uris::DocumentUri;
 
 mod ever;
@@ -59,13 +59,13 @@ pub struct HtmlExtractor {
     state: ExtractorState<ever::NodeRef>,
 }
 
-static RULES: ftml_core::extraction::FtmlRuleSet<HtmlExtractor> =
-    ftml_core::extraction::FtmlRuleSet::new();
+static RULES: ftml_parser::extraction::FtmlRuleSet<HtmlExtractor> =
+    ftml_parser::extraction::FtmlRuleSet::new();
 impl FtmlStateExtractor for HtmlExtractor {
     type Attributes<'a> = ever::Attributes;
     type Node = ever::NodeRef;
     type Return = ();
-    const RULES: &'static ftml_core::extraction::FtmlRuleSet<Self> = &RULES;
+    const RULES: &'static ftml_parser::extraction::FtmlRuleSet<Self> = &RULES;
     #[cfg(feature = "rdf")]
     const DO_RDF: bool = true;
     #[cfg(not(feature = "rdf"))]

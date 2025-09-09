@@ -115,7 +115,7 @@ pub trait FtmlBackend {
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send;
 
     fn get_logical_paragraphs(
         &self,
@@ -237,13 +237,14 @@ pub trait FtmlBackend {
     }
 
     #[inline]
-    fn get_definition(
+    #[allow(async_fn_in_trait)]
+    async fn get_definition(
         &self,
         uri: SymbolUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send
-    {
-        self.get_fragment(uri.into(), context)
+    ) -> Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>> {
+        let (a, b, _) = self.get_fragment(uri.into(), context).await?;
+        Ok((a, b))
     }
 
     #[inline]
@@ -251,7 +252,7 @@ pub trait FtmlBackend {
         &self,
         uri: DocumentUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
     {
         self.get_fragment(uri.into(), context)
     }
@@ -382,7 +383,7 @@ where
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
     {
         <Self as FlamsBackend>::get_fragment(
             self,
@@ -397,7 +398,7 @@ where
             None,
             context,
         )
-        .map(|r| r.map(|(_, css, s)| (s, css)))
+        .map(|r| r.map(|(_, css, s)| (s, css, true)))
     }
 
     #[inline]

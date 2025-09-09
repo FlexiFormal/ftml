@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 hydrate = [
     "ftml-backend/wasm",
     "leptos/hydrate",
-    "ftml-leptos/hydrate",
+    "ftml-components/hydrate",
     "thaw/hydrate",
     "dep:tracing-wasm",
 ]
@@ -25,12 +25,12 @@ ssr = [
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
-    "ftml-leptos/ssr",
+    "ftml-components/ssr",
 ]
 
 [dependencies]
 
-ftml-leptos = { path = "../../leptos" }
+ftml-components = { path = "../../leptos" }
 ftml-dom = { path = "../../dom" }
 ftml-uris = { path = "../../uris", features = ["interned"] }
 ftml-ontology = { path = "../../ontology" }

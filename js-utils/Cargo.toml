@@ -1,0 +1,45 @@
+[package]
+name = "ftml-js-utils"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[features]
+
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--html-in-header",
+    "doc/katex-header.html",
+    "--html-in-header",
+    "doc/docs.html",
+]
+# cargo +nightly doc --no-deps --all-features --release --open
+
+[build-dependencies]
+rustc_version = { workspace = true }
+
+[dev-dependencies]
+#tracing-subscriber = { workspace = true }
+#rstest = { workspace = true }
+#criterion = { workspace = true }
+
+[dependencies]
+document-features = { workspace = true }
+wasm-bindgen = {workspace = true}
+web-sys = {workspace = true,features=["HtmlDivElement"]}
+serde = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+# either_of = {workspace=true}
+thiserror = {workspace = true}
+send_wrapper = {workspace=true}

@@ -34,7 +34,12 @@ crate::aux::macros::intern!(PATHS = PathStore:NonEmptyStr @ 1024);
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub struct UriPath(pub(crate) NonEmptyStr<PathStore>);
 crate::ts!(UriPath);
@@ -162,7 +167,12 @@ impl std::fmt::Display for UriPath {
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub struct PathUri {
     /// The optional path component within the archive.

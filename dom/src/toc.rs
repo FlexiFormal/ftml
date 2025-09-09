@@ -42,7 +42,7 @@ pub enum TOCElem {
     Slide, //{uri:DocumentElementUri}
 }
 
-#[derive(Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum TocSource {
@@ -52,6 +52,7 @@ pub enum TocSource {
     Ready(Vec<TOCElem>),
     Get,
 }
+impl ftml_js_utils::conversion::FromWasmBindgen for TocSource {}
 
 impl leptos::wasm_bindgen::convert::TryFromJsValue for TocSource {
     type Error = serde_wasm_bindgen::Error;

@@ -19,7 +19,10 @@ pub trait IsDeclaration: crate::Ftml {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Declaration {
@@ -76,7 +79,7 @@ impl crate::Ftml for Declaration {
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, bincode::Encode))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum AnyDeclarationRef<'d> {
     NestedModule(&'d NestedModule),

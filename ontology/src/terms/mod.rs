@@ -8,7 +8,7 @@ pub mod simplify;
 mod term;
 mod variables;
 
-pub use arguments::{Argument, ArgumentMode, BoundArgument};
+pub use arguments::{Argument, ArgumentMode, BoundArgument, MaybeSequence};
 pub use bank::clear_term_cache;
 #[cfg(feature = "deepsize")]
 pub use bank::{TermCacheSize, get_cache_size};
@@ -23,7 +23,10 @@ pub use variables::Variable;
 
 /// Either a variable or a symbol reference
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum VarOrSym {

@@ -1,3 +1,5 @@
+use crate::terms::arguments::MaybeSequence;
+
 use super::Variable;
 use super::{Argument, BoundArgument, Term};
 use ftml_uris::{Id, PathUri, UriName};
@@ -96,7 +98,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                     bd: self.bd,
                 },
             ),
-            Some(BoundArgument::BoundSeq(either::Left(v))) => serializer.ombind(
+            Some(BoundArgument::BoundSeq(MaybeSequence::One(v))) => serializer.ombind(
                 &self.head,
                 std::iter::once(Var(v)),
                 &Self {
@@ -105,7 +107,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                     bd: self.bd,
                 },
             ),
-            Some(BoundArgument::BoundSeq(either::Right(s))) => serializer.ombind(
+            Some(BoundArgument::BoundSeq(MaybeSequence::Seq(s))) => serializer.ombind(
                 &self.head,
                 s.iter(),
                 &Self {
@@ -123,7 +125,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                 bd: self.bd,
             }
             .as_openmath(serializer),
-            Some(BoundArgument::Sequence(either::Left(t))) => Args {
+            Some(BoundArgument::Sequence(MaybeSequence::One(t))) => Args {
                 head: &Oma {
                     head: &self.head,
                     args: &[AsSeq(t)],
@@ -132,7 +134,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                 bd: self.bd,
             }
             .as_openmath(serializer),
-            Some(BoundArgument::Sequence(either::Right(s))) => Args {
+            Some(BoundArgument::Sequence(MaybeSequence::Seq(s))) => Args {
                 head: &Oma {
                     head: &self.head,
                     args: s,
@@ -170,8 +172,8 @@ impl openmath::ser::OMSerializable for Term {
                 &app.head,
                 app.arguments.iter().map(|a| match a {
                     Argument::Simple(a) => either_of::EitherOf3::A(a),
-                    Argument::Sequence(either::Left(e)) => either_of::EitherOf3::B(AsSeq(e)),
-                    Argument::Sequence(either::Right(e)) => either_of::EitherOf3::C(Seq(e)),
+                    Argument::Sequence(MaybeSequence::One(e)) => either_of::EitherOf3::B(AsSeq(e)),
+                    Argument::Sequence(MaybeSequence::Seq(e)) => either_of::EitherOf3::C(Seq(e)),
                 }),
             ),
             Self::Bound(b) => Args {

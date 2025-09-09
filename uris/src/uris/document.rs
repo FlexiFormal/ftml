@@ -37,7 +37,12 @@ static NO_DOCUMENT: std::sync::LazyLock<DocumentUri> = std::sync::LazyLock::new(
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub struct SimpleUriName(pub(crate) UriName);
 crate::ts!(SimpleUriName);
@@ -92,7 +97,12 @@ impl std::fmt::Display for SimpleUriName {
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub struct DocumentUri {
     /// The name of the document.

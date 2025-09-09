@@ -48,6 +48,9 @@ pub enum UriParseError {
     /// <code>&[l](crate::UriComponentKind::l)=</code>-[`Language`](crate::Language) parameter
     #[error("invalid language parameter")]
     InvalidLanguage,
+    /// Tried to parse something that is not a string (e.g. non-string javascript object)
+    #[error("source is not a string")]
+    NotAString,
 }
 
 /// Error occuring when trying to parse a Uri segment

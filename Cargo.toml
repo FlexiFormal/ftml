@@ -3,11 +3,12 @@ members = [
     "uris",
     "ulo",
     "ontology",
-    "core",
+    "parser",
     "backend",
     "ftml5ever",
+    "js-utils",
     "dom",
-    "leptos",
+    "components",
     "viewer",
 ]
 exclude = ["tests"]
@@ -43,11 +44,12 @@ unwrap_used = "deny"
 ftml-uris = { path = "uris" }
 ulo = { path = "ulo" }
 ftml-ontology = { path = "ontology" }
-ftml-core = { path = "core" }
+ftml-parser = { path = "parser" }
 ftml-backend = { path = "backend" }
 ftml5ever = { path = "ftml5ever" }
 ftml-dom = { path = "dom" }
-ftml-leptos = { path = "leptos" }
+ftml-components = { path = "components" }
+ftml-js-utils = { path = "js-utils" }
 
 rustc_version = "0.4"
 
@@ -90,7 +92,7 @@ oxrdf = "0.2.3"
 reqwasm = { version = "0.5" }
 send_wrapper = "0.6.0"
 html5ever = "0.35"
-phf = "0.12"
+phf = "0.13"
 lightningcss = { version = "1.0.0-alpha.67", default-features = false }
 console_error_panic_hook = "0.1"
 tracing-wasm = { version = "0.2" }
@@ -107,6 +109,7 @@ nix = { version = "0.29" }
 ctor = { version = "0.4" }
 async-broadcast = { version = "0.7" }
 bincode = { version = "2", features = ["serde"] }
+#postcard = { version = "1.1", features = ["use-std"] }
 num-bigint = { version = "0.4" }
 ordered-float = { version = "5" }
 dyn-clone = { version = "1" }
@@ -116,7 +119,7 @@ tsify = { version = "0.5", features = ["js"] }
 derive_more = "2"
 base64 = "0.22"
 enum_dispatch = "0.3"
-tantivy = "0.24"
+tantivy = "0.25"
 syntree = "0.18"
 js-regexp = "0.2"
 regex = "1.10"
@@ -138,7 +141,7 @@ thaw_utils = { git = "https://github.com/thaw-ui/thaw" }
 impl-tools = { git = "https://github.com/kas-gui/impl-tools" }                                  #"0.11.2"
 leptos-posthoc = { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }
 #leptos-posthoc = { path = "../leptos-posthoc" }
-leptos-react = { path = "../leptos-react" } #{ git = "https://github.com/FlexiFormal/leptos-react.git" }
+leptos-react = { git = "https://github.com/FlexiFormal/leptos-react.git" }# { path = "../leptos-react" } #
 
 proc-macro2 = "1"
 quote = "1"

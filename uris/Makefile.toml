@@ -13,6 +13,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=serde"]
 
+[tasks.test-js]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=js"]
+
 [tasks.test-typescript]
 command = "cargo"
 install_crate = false
@@ -48,6 +53,7 @@ dependencies = [
     "test-no-features",
     "test-interned",
     "test-serde",
+    "test-js",
     "test-typescript",
     "test-components",
     "test-leptos",

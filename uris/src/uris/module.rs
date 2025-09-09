@@ -38,7 +38,12 @@ crate::aux::macros::intern!(NAMES = NameStore:NonEmptyStr @ 1024);
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub struct UriName(pub(crate) NonEmptyStr<NameStore>);
 crate::ts!(UriName);
@@ -238,7 +243,12 @@ impl std::fmt::Display for UriName {
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(
+        serde_with::DeserializeFromStr,
+        serde_with::SerializeDisplay,
+        bincode::Decode,
+        bincode::Encode
+    )
 )]
 pub struct ModuleUri {
     /// The hierarchical name of the module.

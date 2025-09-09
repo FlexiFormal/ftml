@@ -8,7 +8,10 @@ use crate::domain::{
 };
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ModuleData {
@@ -83,7 +86,10 @@ impl crate::Ftml for ModuleData {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct NestedModule {
@@ -134,6 +140,22 @@ impl IsDeclaration for NestedModule {
 #[cfg(feature = "serde")]
 mod serde_impl {
     use crate::domain::modules::ModuleData;
+
+    impl<Context> bincode::Decode<Context> for super::Module {
+        fn decode<D: bincode::de::Decoder<Context = Context>>(
+            decoder: &mut D,
+        ) -> Result<Self, bincode::error::DecodeError> {
+            ModuleData::decode(decoder).map(|d| Self(triomphe::Arc::new(d)))
+        }
+    }
+    impl bincode::Encode for super::Module {
+        fn encode<E: bincode::enc::Encoder>(
+            &self,
+            encoder: &mut E,
+        ) -> Result<(), bincode::error::EncodeError> {
+            self.0.encode(encoder)
+        }
+    }
 
     impl serde::Serialize for super::Module {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

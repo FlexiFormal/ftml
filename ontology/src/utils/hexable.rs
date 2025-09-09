@@ -3,14 +3,14 @@ pub enum FromHexError {
     #[error("incompatible string length")]
     IncompatibleStringLength,
     #[error("error decoding: {0}")]
-    Bincode(#[from] bincode::error::DecodeError),
+    Decode(#[from] bincode::error::DecodeError), //postcard::Error),
     #[error("invalid integer value: {0}")]
     Int(#[from] std::num::ParseIntError),
 }
 #[derive(Debug, thiserror::Error)]
 pub enum AsHexError {
     #[error("error enconding: {0}")]
-    Bincode(#[from] bincode::error::EncodeError),
+    Encode(#[from] bincode::error::EncodeError), //postcard::Error),
     #[error("formatting error: {0}")]
     Fmt(#[from] std::fmt::Error),
 }
@@ -25,6 +25,7 @@ pub trait Hexable: Sized {
 impl<T: Sized + serde::Serialize + for<'de> serde::Deserialize<'de>> Hexable for T {
     fn as_hex_string(&self) -> Result<String, AsHexError> {
         use std::fmt::Write;
+        //let bc = postcard::to_stdvec(self)?;
         let bc = bincode::serde::encode_to_vec(self, bincode::config::standard())?;
         let mut ret = String::with_capacity(bc.len() * 2);
         for b in bc {
@@ -42,6 +43,7 @@ impl<T: Sized + serde::Serialize + for<'de> serde::Deserialize<'de>> Hexable for
         } else {
             return Err(FromHexError::IncompatibleStringLength);
         };
+        //postcard::from_bytes(&bytes?)
         bincode::serde::decode_from_slice(&bytes?, bincode::config::standard())
             .map(|(r, _)| r)
             .map_err(Into::into)

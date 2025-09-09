@@ -3,14 +3,14 @@ use std::hint::unreachable_unchecked;
 #[allow(clippy::wildcard_imports)]
 use super::ever::*;
 use crate::{FtmlResult, HtmlExtractor};
-use ftml_core::{
+use ftml_ontology::{narrative::DocumentRange, utils::Css};
+use ftml_parser::{
     FtmlKey,
     extraction::{
         CloseFtmlElement, FtmlExtractionError, FtmlExtractor, KeyList, attributes::Attributes,
         nodes::FtmlNode,
     },
 };
-use ftml_ontology::{narrative::DocumentRange, utils::Css};
 use html5ever::{
     QualName,
     interface::{NodeOrText, TreeSink},
@@ -195,7 +195,7 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                                 .0
                                 .iter()
                                 .filter_map(|(k, _)| {
-                                    if k.local.starts_with(ftml_core::PREFIX) {
+                                    if k.local.starts_with(ftml_parser::PREFIX) {
                                         FtmlKey::from_attr(&k.local)
                                     } else {
                                         None

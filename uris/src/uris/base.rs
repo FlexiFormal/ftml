@@ -36,7 +36,7 @@ use triomphe::Arc;
 #[derive(Clone, PartialOrd, Ord)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay)
+    derive(serde_with::DeserializeFromStr, serde_with::SerializeDisplay,)
 )]
 pub struct BaseUri(Arc<url::Url>);
 crate::ts!(BaseUri);

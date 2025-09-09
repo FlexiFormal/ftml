@@ -1,0 +1,64 @@
+[package]
+name = "ftml-parser"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[features]
+## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
+## bound to `string`, but naming still allows to make intentions in APIs explicit.
+typescript = ["dep:wasm-bindgen", "dep:tsify", "ftml-ontology/typescript"]
+## Adds support for RDF triple extraction
+rdf = ["ftml-uris/rdf", "ftml-ontology/rdf", "dep:ulo"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--html-in-header",
+    "doc/katex-header.html",
+    "--html-in-header",
+    "doc/docs.html",
+]
+# cargo +nightly doc --no-deps --all-features --release --open
+
+[build-dependencies]
+rustc_version = { workspace = true }
+
+[dev-dependencies]
+#tracing-subscriber = { workspace = true }
+#rstest = { workspace = true }
+#criterion = { workspace = true }
+
+[dependencies]
+document-features = { workspace = true }
+
+ftml-ontology = { workspace = true, features = ["serde"] }
+ftml-uris = { workspace = true, features = ["serde"] }
+
+tracing = { workspace = true }
+paste = { workspace = true }
+triomphe = { workspace = true }
+either = { workspace = true }
+either_of = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true }
+
+# syntree = { workspace = true }
+
+ulo = { workspace = true, optional = true }
+
+#serde_with = { workspace = true, optional = true }
+
+wasm-bindgen = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }

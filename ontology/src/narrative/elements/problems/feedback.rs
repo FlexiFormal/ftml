@@ -8,10 +8,10 @@ use smallvec::SmallVec;
 pub struct ProblemFeedback {
     pub correct: bool,
     #[cfg_attr(feature = "typescript", wasm_bindgen(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    //#[cfg_attr(feature = "serde", serde(default))]
     pub solutions: SmallVec<Box<str>, 1>,
     #[cfg_attr(feature = "typescript", wasm_bindgen(skip))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    //#[cfg_attr(feature = "serde", serde(default))]
     pub data: SmallVec<CheckedResult, 4>,
     pub score_fraction: f32,
 }
@@ -23,10 +23,10 @@ pub struct ProblemFeedback {
 pub struct ProblemFeedbackJson {
     pub correct: bool,
     #[cfg_attr(feature = "typescript", tsify(type = "string[]"))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    //#[cfg_attr(feature = "serde", serde(default))]
     pub solutions: SmallVec<Box<str>, 1>,
     #[cfg_attr(feature = "typescript", tsify(type = "CheckedResult[]"))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    //#[cfg_attr(feature = "serde", serde(default))]
     pub data: SmallVec<CheckedResult, 4>,
     pub score_fraction: f32,
 }
@@ -142,7 +142,7 @@ pub enum CheckedResult {
 pub struct ProblemResponse {
     pub uri: DocumentElementUri,
     #[cfg_attr(feature = "typescript", tsify(type = "ProblemResponseType[]"))]
-    #[cfg_attr(feature = "serde", serde(default))]
+    //#[cfg_attr(feature = "serde", serde(default))]
     pub responses: SmallVec<ProblemResponseType, 4>,
 }
 

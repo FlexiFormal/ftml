@@ -16,7 +16,7 @@ pub enum LogicalLevel {
     Paragraph,
     BeamerSlide,
 }
-
+impl ftml_js_utils::conversion::FromWasmBindgen for LogicalLevel {}
 //#[cfg(feature = "typescript")]
 impl wasm_bindgen::convert::TryFromJsValue for LogicalLevel {
     type Error = serde_wasm_bindgen::Error;
@@ -588,10 +588,19 @@ impl SectionCounters {
         (memo, cls)
     }
 
-    pub fn get_problem(&mut self, _styles: &[Id]) -> Memo<String> {
+    pub fn get_problem(&mut self, styles: &[Id]) -> (Memo<String>, String) {
         self.init_paras();
         self.current = LogicalLevel::Paragraph;
-        Memo::new(|_| String::new())
+        let cls = {
+            let mut s = "ftml-problem".to_string();
+            for style in styles {
+                s.push(' ');
+                s.push_str("ftml-problem-");
+                s.push_str(style.as_ref());
+            }
+            s
+        };
+        (Memo::new(|_| String::new()), cls)
     }
 
     pub fn get_slide() -> Memo<u32> {

@@ -5,8 +5,8 @@ pub mod app;
 pub fn filter() -> tracing_subscriber::filter::Targets {
     tracing_subscriber::filter::Targets::new()
         .with_target("ftml_dom", tracing::Level::INFO)
-        .with_target("ftml_leptos", tracing::Level::WARN)
-        .with_target("ftml_core", tracing::Level::INFO)
+        .with_target("ftml_components", tracing::Level::WARN)
+        .with_target("ftml_parser", tracing::Level::INFO)
         .with_target("ftml_backend", tracing::Level::WARN)
         .with_target("ssr_example", tracing::Level::WARN)
         .with_target(

@@ -298,7 +298,10 @@ pub trait Narrative: crate::Ftml {
 }
 
 #[derive(Copy, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentRange {
@@ -387,12 +390,13 @@ mod serde_impl {
     pub struct DataBuffer(Vec<u8>);
     impl DataBuffer {
         /// ### Errors
-        pub fn push<T: serde::Serialize>(
+        pub fn push<T: bincode::Encode>(
             &mut self,
             t: &T,
         ) -> Result<DataRef<T>, bincode::error::EncodeError> {
             let curr = self.0.len();
-            bincode::serde::encode_into_std_write(t, &mut self.0, bincode::config::standard())?;
+            //postcard::to_io(t, &mut self.0)?;
+            bincode::encode_into_std_write(t, &mut self.0, bincode::config::standard())?;
             Ok(DataRef {
                 start: curr,
                 end: self.0.len(),
@@ -404,6 +408,40 @@ mod serde_impl {
         #[must_use]
         pub fn take(self) -> Box<[u8]> {
             self.0.into_boxed_slice()
+        }
+    }
+
+    impl<T> bincode::Encode for super::DataRef<T> {
+        fn encode<E: bincode::enc::Encoder>(
+            &self,
+            encoder: &mut E,
+        ) -> Result<(), bincode::error::EncodeError> {
+            (self.start, self.end).encode(encoder)
+        }
+    }
+    impl<Context, T> bincode::Decode<Context> for super::DataRef<T> {
+        fn decode<D: bincode::de::Decoder<Context = Context>>(
+            decoder: &mut D,
+        ) -> Result<Self, bincode::error::DecodeError> {
+            let (start, end) = bincode::Decode::<Context>::decode(decoder)?;
+            Ok(Self {
+                start,
+                end,
+                phantom_data: PhantomData,
+            })
+        }
+    }
+
+    impl<'de, Context, T> bincode::BorrowDecode<'de, Context> for super::DataRef<T> {
+        fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Context>>(
+            decoder: &mut D,
+        ) -> Result<Self, bincode::error::DecodeError> {
+            let (start, end) = bincode::BorrowDecode::<'de, Context>::borrow_decode(decoder)?;
+            Ok(Self {
+                start,
+                end,
+                phantom_data: PhantomData,
+            })
         }
     }
 

@@ -1,5 +1,5 @@
-use ftml_core::extraction::{CloseFtmlElement, nodes::FtmlNode};
 use ftml_ontology::narrative::DocumentRange;
+use ftml_parser::extraction::{CloseFtmlElement, nodes::FtmlNode};
 use html5ever::{
     LocalName, Namespace, QualName,
     interface::QuirksMode,
@@ -128,7 +128,7 @@ impl From<Vec<html5ever::Attribute>> for Attributes {
     }
 }
 
-impl ftml_core::extraction::attributes::Attributes for Attributes {
+impl ftml_parser::extraction::attributes::Attributes for Attributes {
     type Ext = super::HtmlExtractor;
     type Value<'a> = &'a str;
     fn value(&self, key: &str) -> Option<Self::Value<'_>> {

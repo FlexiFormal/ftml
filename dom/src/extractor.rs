@@ -1,7 +1,8 @@
 use crate::{extractor, markers::Marker};
 use dashmap::Entry;
 use either::Either;
-use ftml_core::{
+use ftml_ontology::narrative::DocumentRange;
+use ftml_parser::{
     FtmlKey,
     extraction::{
         FtmlExtractionError, FtmlRuleSet, FtmlStateExtractor, KeyList,
@@ -10,7 +11,6 @@ use ftml_core::{
         state::{ExtractionResult, ExtractorState},
     },
 };
-use ftml_ontology::narrative::DocumentRange;
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::{
     prelude::ReadSignal,
@@ -36,10 +36,11 @@ pub struct DomExtractor {
     pub mode: ExtractorMode,
     pub is_done: RwSignal<bool>,
     pub is_done_read: ReadSignal<bool>,
+    pub is_stripped: bool,
 }
 impl DomExtractor {
     #[inline]
-    pub fn new(uri: DocumentUri, context: NarrativeUri) -> Self {
+    pub fn new(uri: DocumentUri, context: NarrativeUri, is_stripped: bool) -> Self {
         let is_done = RwSignal::new(false);
         Self {
             state: ExtractorState::new(uri, false),
@@ -47,6 +48,7 @@ impl DomExtractor {
             mode: ExtractorMode::Pending,
             is_done_read: is_done.read_only(),
             is_done,
+            is_stripped,
         }
     }
 
@@ -108,7 +110,7 @@ impl FtmlStateExtractor for DomExtractor {
     #[inline]
     fn on_add(
         &mut self,
-        elem: &ftml_core::extraction::OpenFtmlElement,
+        elem: &ftml_parser::extraction::OpenFtmlElement,
     ) -> Result<Self::Return, FtmlExtractionError> {
         Ok(Marker::from(self, elem))
     }
@@ -225,11 +227,11 @@ pub struct NodeAttrs {
 
 std::thread_local! {
     static PREFIX : std::cell::LazyCell<JsString> = std::cell::LazyCell::new(||
-        JsValue::from_str(ftml_core::PREFIX).dyn_into().expect("is valid string")
+        JsValue::from_str(ftml_parser::PREFIX).dyn_into().expect("is valid string")
     );
 }
 #[allow(clippy::cast_possible_truncation)]
-const PREFIX_LEN: u32 = ftml_core::PREFIX.len() as u32;
+const PREFIX_LEN: u32 = ftml_parser::PREFIX.len() as u32;
 
 impl NodeAttrs {
     pub(crate) fn new(elem: &Element) -> Self {

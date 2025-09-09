@@ -12,12 +12,12 @@ use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
 pub trait FtmlViews: 'static {
-    fn render_ftml(html: String) -> impl IntoView {
+    fn render_ftml(html: String, on_load: Option<RwSignal<bool>>) -> impl IntoView {
         use leptos_posthoc::{DomStringCont, DomStringContProps};
         DomStringCont(DomStringContProps {
             html,
             cont: super::iterate::<Self>,
-            on_load: None,
+            on_load,
             class: None::<String>.into(),
             style: None::<String>.into(),
         })
@@ -85,6 +85,28 @@ pub trait FtmlViews: 'static {
         view! {
           <div class=info.class style=info.style>{then()}</div>
         }
+    }
+
+    #[inline]
+    fn problem<V: IntoView>(
+        _uri: DocumentElementUri,
+        _styles: Box<[Id]>,
+        style: Memo<String>,
+        class: String,
+        _is_subproblem: bool,
+        _autogradable: bool,
+        _points: Option<f32>,
+        _minutes: Option<f32>,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        view! {
+          <div class=class style=style>{then()}</div>
+        }
+    }
+
+    #[inline]
+    fn problem_title(then: OriginalNode) -> impl IntoView {
+        then.attr("class", "ftml-title-paragraph")
     }
 
     #[inline]
@@ -188,6 +210,27 @@ pub trait TermTrackedViews: 'static {
           <div class=info.class style=info.style>{then()}</div>
         }
     }
+    #[inline]
+    fn problem<V: IntoView>(
+        _uri: DocumentElementUri,
+        _styles: Box<[Id]>,
+        style: Memo<String>,
+        class: String,
+        _is_subproblem: bool,
+        _autogradable: bool,
+        _points: Option<f32>,
+        _minutes: Option<f32>,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        view! {
+          <div class=class style=style>{then()}</div>
+        }
+    }
+
+    #[inline]
+    fn problem_title(then: OriginalNode) -> impl IntoView {
+        then.attr("class", "ftml-title-paragraph")
+    }
 
     #[inline]
     fn slide<V: IntoView>(
@@ -273,6 +316,36 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         <T as TermTrackedViews>::paragraph(info, then)
+    }
+
+    #[inline]
+    fn problem<V: IntoView>(
+        uri: DocumentElementUri,
+        styles: Box<[Id]>,
+        style: Memo<String>,
+        class: String,
+        is_subproblem: bool,
+        autogradable: bool,
+        points: Option<f32>,
+        minutes: Option<f32>,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::problem(
+            uri,
+            styles,
+            style,
+            class,
+            is_subproblem,
+            autogradable,
+            points,
+            minutes,
+            then,
+        )
+    }
+
+    #[inline]
+    fn problem_title(then: OriginalNode) -> impl IntoView {
+        <T as TermTrackedViews>::problem_title(then)
     }
 
     #[inline]

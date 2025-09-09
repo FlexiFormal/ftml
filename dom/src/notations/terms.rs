@@ -14,7 +14,7 @@ use crate::{
 use ftml_ontology::{
     narrative::elements::Notation,
     terms::{
-        Argument, BoundArgument, Term, VarOrSym, Variable,
+        Argument, BoundArgument, MaybeSequence, Term, VarOrSym, Variable,
         opaque::{AnyOpaque, OpaqueNode},
     },
 };
@@ -512,13 +512,13 @@ fn do_args<Views: FtmlViews, Be: SendBackend>(
     arguments
         .iter()
         .map(|a| match a {
-            Argument::Simple(t) | Argument::Sequence(either::Left(t)) => {
+            Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
                 let t = t.clone();
                 Either::Left(ClonableView::new(true, move || {
                     t.clone().into_view::<Views, Be>(true)
                 }))
             }
-            Argument::Sequence(either::Right(s)) => Either::Right(
+            Argument::Sequence(MaybeSequence::Seq(s)) => Either::Right(
                 s.iter()
                     .map(|t| {
                         let t = t.clone();
@@ -573,13 +573,13 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
     arguments
         .iter()
         .map(|a| match a {
-            BoundArgument::Simple(t) | BoundArgument::Sequence(either::Left(t)) => {
+            BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
                 let t = t.clone();
                 Either::Left(ClonableView::new(true, move || {
                     t.clone().into_view::<Views, Be>(true)
                 }))
             }
-            BoundArgument::Sequence(either::Right(s)) => Either::Right(
+            BoundArgument::Sequence(MaybeSequence::Seq(s)) => Either::Right(
                 s.iter()
                     .map(|t| {
                         let t = t.clone();
@@ -591,7 +591,7 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                 declaration,
                 is_sequence,
             })
-            | BoundArgument::BoundSeq(either::Left(Variable::Ref {
+            | BoundArgument::BoundSeq(MaybeSequence::One(Variable::Ref {
                 declaration,
                 is_sequence,
             })) => {
@@ -614,7 +614,7 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                     })
                 }))
             }
-            BoundArgument::BoundSeq(either::Right(v)) => Either::Right(
+            BoundArgument::BoundSeq(MaybeSequence::Seq(v)) => Either::Right(
                 v.iter()
                     .map(|v| {
                         let v = v.clone();

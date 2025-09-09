@@ -7,10 +7,10 @@ use crate::{
     terms::ReactiveTerm,
     utils::ContextChain,
 };
-use ftml_core::extraction::{
+use ftml_ontology::{narrative::elements::SectionLevel, terms::VarOrSym};
+use ftml_parser::extraction::{
     ArgumentPosition, FtmlExtractor, OpenDomainElement, OpenNarrativeElement,
 };
-use ftml_ontology::{narrative::elements::SectionLevel, terms::VarOrSym};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
@@ -156,7 +156,7 @@ impl MarkedNode {
             }
             Marker::Comp => Views::comp(false, child(true)).into_any(),
             Marker::DefComp => Views::comp(true, child(true)).into_any(),
-            _ => ftml_core::TODO!(),
+            _ => ftml_parser::TODO!(),
         }
         .into_any()
     }

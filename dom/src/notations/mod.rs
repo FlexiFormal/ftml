@@ -4,8 +4,6 @@ use crate::ClonableView;
 use crate::document::CurrentUri;
 use crate::terms::{ReactiveApplication, ReactiveTerm, TopTerm};
 use crate::{DocumentState, FtmlViews};
-use ftml_core::FtmlKey;
-use ftml_core::extraction::ArgumentPosition;
 use ftml_ontology::terms::VarOrSym;
 use ftml_ontology::{
     narrative::elements::{
@@ -14,6 +12,8 @@ use ftml_ontology::{
     },
     terms::ArgumentMode,
 };
+use ftml_parser::FtmlKey;
+use ftml_parser::extraction::ArgumentPosition;
 use leptos::attr::AttributeValue;
 use leptos::attr::custom::CustomAttributeKey;
 use leptos::math::mtext;

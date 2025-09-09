@@ -7,7 +7,6 @@ use leptos::{
     IntoView,
     html::ElementChild,
     prelude::{StyleAttribute, Suspend},
-    wasm_bindgen::JsValue,
 };
 
 use crate::utils::css::CssExt;
@@ -24,27 +23,6 @@ pub fn math<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
     leptos::math::math()
         .style("font-family:'STIX Two Math'")
         .child(f())
-}
-
-#[derive(Debug)]
-pub struct JsDisplay(pub JsValue);
-impl std::fmt::Display for JsDisplay {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(v) = self.0.as_string() {
-            return f.write_str(&v);
-        }
-        if let Some(v) = self.0.as_f64() {
-            return write!(f, "num {v}");
-        }
-        if let Some(v) = self.0.as_bool() {
-            return write!(f, "boolean {v}");
-        }
-        if let Ok(js) = leptos::web_sys::js_sys::JSON::stringify(&self.0) {
-            let s: String = js.into();
-            return f.write_str(&s);
-        }
-        write!(f, "object {:?}", self.0)
-    }
 }
 
 pub fn get_true_rect(elem: &leptos::web_sys::Element) -> leptos::web_sys::DomRect {

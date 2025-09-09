@@ -30,7 +30,7 @@ use crate::{
     utils::local_cache::LOCAL_CACHE,
 };
 pub use document::{DocumentMeta, DocumentState, setup_document};
-use ftml_core::extraction::{CloseFtmlElement, FtmlExtractor};
+use ftml_parser::extraction::{CloseFtmlElement, FtmlExtractor};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 pub use views::*;
@@ -42,20 +42,7 @@ pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
     f()
 }
 
-/*
-pub(crate) static OWNER_IDS: std::sync::LazyLock<std::sync::Arc<std::sync::atomic::AtomicU64>> =
-    std::sync::LazyLock::new(|| std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)));
-
-#[derive(Clone)]
-pub(crate) struct OwnerId(pub u64);
-impl OwnerId {
-    pub fn new() -> Self {
-        Self(OWNER_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
-    }
-}
- */
-
-fn iterate<Views: FtmlViews + ?Sized>(
+pub fn iterate<Views: FtmlViews + ?Sized>(
     e: &leptos::web_sys::Element,
 ) -> (
     Option<impl FnOnce() -> AnyView + use<Views>>,
@@ -169,12 +156,19 @@ fn close_things(
                 | CompInNotation | NotationOpComp | NotationComp | ArgSep | MainCompInNotation
                 | NotationArg | DocTitle | ReturnType | VariableDeclaration | Comp | DefComp
                 | ParagraphTitle | SlideTitle | Slide | Definiendum | MathStructure
-                | ComplexTerm | HeadTerm | OML | Morphism | Assign => (),
+                | ComplexTerm | HeadTerm | OML | Morphism | Assign | ProblemTitle | Problem
+                | Solution => (),
             }
         }
     }
     if finish {
-        let r = sig.update_untracked(DomExtractor::finish);
+        let r = sig.update_untracked(|r| {
+            if r.is_stripped {
+                Some(r.is_done.write_only())
+            } else {
+                r.finish()
+            }
+        });
         if let Some(r) = r {
             r.set(true);
         }

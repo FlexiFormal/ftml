@@ -12,7 +12,6 @@ use crate::{
         local_cache::LOCAL_CACHE,
     },
 };
-use ftml_core::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, nodes::FtmlNode};
 use ftml_ontology::{
     narrative::elements::{
         SectionLevel,
@@ -20,6 +19,7 @@ use ftml_ontology::{
     },
     terms::{VarOrSym, Variable},
 };
+use ftml_parser::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, nodes::FtmlNode};
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, NarrativeUri, SymbolUri};
 use leptos::prelude::{
     AnyView, CustomAttribute, IntoAny, Memo, RwSignal, Update, expect_context, provide_context,
@@ -49,6 +49,7 @@ pub enum Marker {
     SlideNumber,
     ParagraphTitle,
     SlideTitle,
+    ProblemTitle,
     Comp,
     DefComp,
     OMA {
@@ -69,6 +70,14 @@ pub enum Marker {
         formatting: ParagraphFormatting,
         styles: Box<[Id]>,
         fors: Vec<SymbolUri>,
+    },
+    Problem {
+        is_subproblem: bool,
+        styles: Box<[Id]>,
+        uri: DocumentElementUri,
+        autogradable: bool,
+        points: Option<ordered_float::OrderedFloat<f32>>,
+        minutes: Option<ordered_float::OrderedFloat<f32>>,
     },
     Slide(DocumentElementUri),
     IfInputref(bool),
@@ -176,6 +185,29 @@ impl Marker {
                 })
                 .into_any()
             }
+            Self::Problem {
+                is_subproblem,
+                styles,
+                uri,
+                autogradable,
+                points,
+                minutes,
+            } => {
+                provide_context(CurrentUri(uri.clone().into()));
+                let (style, class) = DocumentState::new_problem(&styles);
+                Views::problem(
+                    uri,
+                    styles,
+                    style,
+                    class,
+                    is_subproblem,
+                    autogradable,
+                    points.map(|f| *f),
+                    minutes.map(|f| *f),
+                    move || Self::apply::<Views>(markers, invisible, is_math, orig),
+                )
+                .into_any()
+            }
             Self::Slide(uri) => {
                 provide_context(CurrentUri(uri.clone().into()));
                 DocumentState::new_slide();
@@ -205,6 +237,7 @@ impl Marker {
             }
             Self::ParagraphTitle => Views::paragraph_title(orig).into_any(),
             Self::SlideTitle => Views::slide_title(orig).into_any(),
+            Self::ProblemTitle => Views::problem_title(orig).into_any(),
             Self::InputRef { target, uri } => {
                 DocumentState::do_inputref(target, uri, Views::inputref).into_any()
             }
@@ -333,6 +366,21 @@ impl Marker {
                 target: target.clone(),
                 uri: uri.clone(),
             }),
+            OpenFtmlElement::Problem {
+                is_subproblem,
+                styles,
+                uri,
+                autogradable,
+                points,
+                minutes,
+            } => Some(Self::Problem {
+                is_subproblem: *is_subproblem,
+                styles: styles.clone(),
+                uri: uri.clone(),
+                autogradable: *autogradable,
+                points: points.map(Into::into),
+                minutes: minutes.map(Into::into),
+            }),
             OpenFtmlElement::IfInputref(b) => Some(Self::IfInputref(*b)),
             OpenFtmlElement::Comp => Some(Self::Comp),
             OpenFtmlElement::DefComp | OpenFtmlElement::Definiendum(_) => Some(Self::DefComp),
@@ -340,6 +388,7 @@ impl Marker {
             OpenFtmlElement::SectionTitle => Some(Self::SectionTitle),
             OpenFtmlElement::ParagraphTitle => Some(Self::ParagraphTitle),
             OpenFtmlElement::SlideTitle => Some(Self::SlideTitle),
+            OpenFtmlElement::ProblemTitle => Some(Self::ProblemTitle),
             OpenFtmlElement::Section(uri) => Some(Self::Section(uri.clone())),
             OpenFtmlElement::ComplexTerm { head, notation, .. } => match head {
                 VarOrSym::Sym(s) => Some(Self::SymbolReference {
@@ -399,6 +448,7 @@ impl Marker {
             OpenFtmlElement::CurrentSectionLevel(b) => Some(Self::CurrentSectionLevel(*b)),
             OpenFtmlElement::SlideNumber => Some(Self::SlideNumber),
             OpenFtmlElement::Counter(_)
+            | OpenFtmlElement::Solution(_)
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::Module { .. }
             | OpenFtmlElement::MathStructure { .. }
@@ -406,6 +456,8 @@ impl Marker {
             | OpenFtmlElement::Style(_)
             | OpenFtmlElement::NotationArg(_)
             | OpenFtmlElement::Type
+            | OpenFtmlElement::Precondition { .. }
+            | OpenFtmlElement::Objective { .. }
             | OpenFtmlElement::ReturnType
             | OpenFtmlElement::Definiens(_)
             | OpenFtmlElement::Notation { .. }

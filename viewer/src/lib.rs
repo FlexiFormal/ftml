@@ -6,6 +6,8 @@
  */
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
+use ftml_components::SidebarPosition;
+
 pub mod backend;
 pub mod config;
 
@@ -17,8 +19,8 @@ pub fn run() {
         let lvl: tracing::Level = lvl.into();
         tracing_subscriber::filter::Targets::new()
             .with_target("ftml_dom", lvl)
-            .with_target("ftml_leptos", lvl)
-            .with_target("ftml_core", lvl)
+            .with_target("ftml_components", lvl)
+            .with_target("ftml_parser", lvl)
             .with_target("ftml_backend", lvl)
             .with_target("ssr_example", lvl)
             .with_target(
@@ -55,10 +57,13 @@ pub fn iterate_body(cfg: config::FtmlViewerConfig) {
         use ftml_uris::DocumentUri;
 
         let uri = cfg.apply().unwrap_or_else(|| DocumentUri::no_doc().clone());
-        ftml_leptos::Views::<backend::GlobalBackend>::top(|| {
-            ftml_leptos::Views::<backend::GlobalBackend>::document(uri, || {
-                ftml_leptos::Views::<backend::GlobalBackend>::cont(orig, false)
-            })
+        ftml_components::Views::<backend::GlobalBackend>::top_safe(|| {
+            ftml_components::Views::<backend::GlobalBackend>::document(
+                uri,
+                SidebarPosition::Find,
+                false,
+                || ftml_components::Views::<backend::GlobalBackend>::cont(orig, false),
+            )
         })
     });
 }
@@ -87,17 +92,3 @@ pub fn clear_cache() {
     ftml_ontology::terms::clear_term_cache();
     print_cache();
 }
-
-/*
-
-#[cfg(feature = "deepsize")]
-{
-    let uris = ftml_uris::get_memory_state();
-    let cache = crate::utils::local_cache::cache_size();
-    let total = uris.total_bytes() + cache.total_bytes();
-    tracing::warn!(
-        "Uris: {uris}\nCache: {cache}\n---------------------\nTotal: {}",
-        bytesize::ByteSize::b(total as u64).display().iec_short()
-    );
-}
- */

@@ -17,13 +17,17 @@ workspace = true
 serde = [
     "dep:serde",
     "dep:serde_with",
+    "dep:bincode",
     "url/serde",
     "arrayvec/serde",
     "openmath/serde",
 ]
+
+## Generates converison from/to javascript
+js = ["serde","dep:ftml-js-utils","dep:wasm-bindgen"]
 ## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
 ## bound to `string`, but naming still allows to make intentions in APIs explicit.
-typescript = ["serde", "dep:wasm-bindgen"]
+typescript = ["serde","js"]
 ## Adds the [`components`](crate::components) module
 components = []
 ## Implements [`UriComponentsTrait`](crate::components::UriComponentsTrait) for
@@ -86,8 +90,10 @@ strum = { workspace = true }
 document-features = { workspace = true }
 urlencoding = { workspace = true }
 
+ftml-js-utils = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+bincode = { workspace = true, optional = true, features = ["derive"] }
 wasm-bindgen = { workspace = true, optional = true }
 leptos_router = { workspace = true, optional = true }
 tantivy = { workspace = true, optional = true }

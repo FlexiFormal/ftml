@@ -109,6 +109,34 @@ macro_rules! imp {
                 $inner::deserialize(deserializer).map(Self::from_inner)
             }
         }
+
+        #[cfg(feature = "serde")]
+        impl<Context> bincode::Decode<Context> for $outer {
+            fn decode<D: bincode::de::Decoder<Context = Context>>(
+                decoder: &mut D,
+            ) -> Result<Self, bincode::error::DecodeError> {
+                $inner::decode(decoder).map(Self::from_inner)
+            }
+        }
+
+        #[cfg(feature = "serde")]
+        impl<'de, Context> bincode::BorrowDecode<'de, Context> for $outer {
+            fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Context>>(
+                decoder: &mut D,
+            ) -> Result<Self, bincode::error::DecodeError> {
+                $inner::borrow_decode(decoder).map(Self::from_inner)
+            }
+        }
+
+        #[cfg(feature = "serde")]
+        impl bincode::Encode for $outer {
+            fn encode<E: bincode::enc::Encoder>(
+                &self,
+                encoder: &mut E,
+            ) -> Result<(), bincode::error::EncodeError> {
+                self.0.encode(encoder)
+            }
+        }
     };
 }
 

@@ -1,0 +1,4 @@
+[tasks.all-tests]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--all-features"]

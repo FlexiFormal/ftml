@@ -8,7 +8,10 @@ use crate::{
 use ftml_uris::{DocumentElementUri, Id, SymbolUri};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct LogicalParagraph {
@@ -79,7 +82,10 @@ impl IsDocumentElement for LogicalParagraph {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum ParagraphFormatting {
@@ -89,7 +95,10 @@ pub enum ParagraphFormatting {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[non_exhaustive]
@@ -159,6 +168,9 @@ impl std::fmt::Display for ParagraphKind {
         f.write_str(self.as_display_str())
     }
 }
+
+#[cfg(feature = "typescript")]
+impl ftml_js_utils::conversion::SerdeToJs for ParagraphKind {}
 
 #[derive(thiserror::Error, Debug)]
 #[error("invalid paragraph kind")]
