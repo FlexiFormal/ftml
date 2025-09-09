@@ -20,7 +20,7 @@ jobs:
       - name: tests
         run: cargo make all-tests
       - name: docs
-        run: cargo make docs
+        run: cargo clean && cargo make docs
       - name: Upload Docs
         uses: actions/upload-pages-artifact@v3
         with:
