@@ -10,6 +10,7 @@ members = [
     "dom",
     "components",
     "viewer",
+    "leptos-react"
 ]
 exclude = ["tests"]
 resolver = "3"
@@ -50,6 +51,8 @@ ftml5ever = { path = "ftml5ever" }
 ftml-dom = { path = "dom" }
 ftml-components = { path = "components" }
 ftml-js-utils = { path = "js-utils" }
+
+leptos-react = {path = "leptos-react"}
 
 rustc_version = "0.4"
 
@@ -141,7 +144,6 @@ thaw_utils = { git = "https://github.com/thaw-ui/thaw" }
 impl-tools = { git = "https://github.com/kas-gui/impl-tools" }                                  #"0.11.2"
 leptos-posthoc = { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }
 #leptos-posthoc = { path = "../leptos-posthoc" }
-leptos-react = { git = "https://github.com/FlexiFormal/leptos-react.git" }# { path = "../leptos-react" } #
 
 proc-macro2 = "1"
 quote = "1"
