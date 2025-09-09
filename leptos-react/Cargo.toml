@@ -1,0 +1,31 @@
+[package]
+name = "leptos-react"
+version = "0.1.0"
+edition = "2024"
+authors = ["Dennis Müller <d.mueller@kwarc.info>"]
+description = "interoparibility between leptos and react"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/FlexiFormal/leptos-react"
+keywords = ["leptos", "hydrate", "HTML"]
+readme = "README.md"
+exclude = [".idea/*", ".zed/*", "examples/*", "target/*"]
+
+[features]
+csr = ["leptos/csr"]
+hydrate = ["leptos/hydrate"]
+ssr = ["leptos/ssr"]
+react = ["typescript"]
+typescript = []
+
+[dependencies]
+web-sys = { workspace = true }
+leptos = { workspace = true }
+send_wrapper = { workspace = true }
+parking_lot = { workspace = true }
+wasm-bindgen = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+paste = { workspace = true }
+ftml-js-utils = { workspace = true }
+#ftml-js-utils = { path="../FTML/js-utils" }
+#leptos-posthoc = { path = "../leptos-posthoc" }
