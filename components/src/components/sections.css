@@ -108,24 +108,14 @@ body {
 
 .ftml-proof-title {
     display: inline-block;
+    &::before {
+        font-style: italic;
+        content: "Proof. ";
+        margin-left: -0.45em;
+    }
 }
 .ftml-subproof-title {
     display: inline-flex;
-}
-
-.ftml-proof-title.ftml-proof-title-expanded {
-    &::before {
-        font-style: italic;
-        content: "▾ Proof. ";
-        margin-left: -0.45em;
-    }
-}
-.ftml-proof-title.ftml-proof-title-collapsed {
-    &::before {
-        font-style: italic;
-        content: "▸ Proof. ";
-        margin-left: -0.45em;
-    }
 }
 
 .ftml-paragraph {

@@ -14,6 +14,9 @@ pub trait FromJs: Sized {
         let Ok(v) = web_sys::js_sys::Reflect::get(object, &JsValue::from_str(name)) else {
             return Ok(None);
         };
+        if v.is_undefined() {
+            return Ok(None);
+        }
         Self::from_js(v).map(Some)
     }
 }
@@ -160,6 +163,14 @@ impl ToJs for ::web_sys::Element {
 }
 
 impl ToJs for ::web_sys::HtmlDivElement {
+    type Error = Infallible;
+    fn to_js(&self) -> Result<JsValue, Self::Error> {
+        // SAFETY: infallible
+        Ok(unsafe { self.clone().dyn_into().unwrap_unchecked() })
+    }
+}
+
+impl ToJs for ::web_sys::HtmlElement {
     type Error = Infallible;
     fn to_js(&self) -> Result<JsValue, Self::Error> {
         // SAFETY: infallible

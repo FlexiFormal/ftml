@@ -72,7 +72,7 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
             return Left(view! {
                 <div id=id style=style class=class>
                   {
-                    FtmlConfig::wrap_section(&uri,children)
+                    FtmlConfig::wrap_section(&uri,Some(lvl),children)
                   }
                 </div>
             });
@@ -80,7 +80,17 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
     }
     let visible = RwSignal::new(true);
     let inner = fancy_collapsible(
-        move || FtmlConfig::wrap_section(&uri, children),
+        move || {
+            FtmlConfig::wrap_section(
+                &uri,
+                if let LogicalLevel::Section(lvl) = lvl {
+                    Some(lvl)
+                } else {
+                    None
+                },
+                children,
+            )
+        },
         visible,
         "",
         "",
@@ -100,7 +110,7 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
                 <div node_ref=marker_ref on:click=move |_| visible.set(!visible.get_untracked())
                     style="width:fit-content;"
                 >
-                    {collapse_marker(visible)}
+                    {collapse_marker(visible,true)}
                 </div>
                 <div node_ref=pos_ref style="display:contents;">
                     {title.take().attr("class",class)}
@@ -138,7 +148,7 @@ pub fn section_title(
 }
 
 use leptos::web_sys::HtmlDivElement;
-fn position_marker(pos: &HtmlDivElement, marker: &HtmlDivElement) {
+pub fn position_marker(pos: &HtmlDivElement, marker: &HtmlDivElement) {
     let mut elem: leptos::web_sys::Element = (***pos).clone();
     let ht = get_true_rect(marker).height();
     let mut rect = get_true_rect(pos);

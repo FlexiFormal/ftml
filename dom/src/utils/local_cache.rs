@@ -13,7 +13,10 @@ use ftml_ontology::{
     narrative::{
         SharedDocumentElement,
         documents::Document,
-        elements::{DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration},
+        elements::{
+            DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration,
+            problems::Solutions,
+        },
     },
     utils::Css,
 };
@@ -40,6 +43,8 @@ pub struct LocalCache {
     pub(crate) modules: Set<Module>,
     pub(crate) fors: Map<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>>,
     pub(crate) paragraphs: Map<DocumentElementUri, Box<str>>,
+    pub(crate) dochtmls: Map<DocumentUri, Box<str>>,
+    pub(crate) solutions: Map<DocumentElementUri, Solutions>,
 }
 
 pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
@@ -49,6 +54,8 @@ pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
         modules: Set::default(),
         fors: Map::default(),
         paragraphs: Map::default(),
+        dochtmls: Map::default(),
+        solutions: Map::default(),
     });
 
 pub struct WithLocalCache<B: SendBackend>(PhantomData<B>);
@@ -72,6 +79,17 @@ impl<T, E> GlobalLocal<Vec<T>, E> {
             .into_iter()
             .chain(if let Some(Ok(v)) = self.global {
                 either::Left(v.into_iter())
+            } else {
+                either::Right(std::iter::empty())
+            })
+    }
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.local
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .chain(if let Some(Ok(v)) = &self.global {
+                either::Left(v.iter())
             } else {
                 either::Right(std::iter::empty())
             })
@@ -251,7 +269,21 @@ impl<B: SendBackend> WithLocalCache<B> {
         context: Option<NarrativeUri>,
     ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<B::Error>>> + Send + use<B>
     {
-        self.get_fragment(uri.into(), context)
+        LOCAL_CACHE.dochtmls.get(&uri).map_or_else(
+            || either::Either::Right(B::get().get_document_html(uri, context)),
+            |s| either::Either::Left(std::future::ready(Ok((s.clone(), Box::new([]) as _, true)))),
+        )
+    }
+
+    #[allow(clippy::unused_self)]
+    pub fn get_solutions(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<Output = Result<Solutions, BackendError<B::Error>>> + Send + use<B> {
+        LOCAL_CACHE.solutions.get(&uri).map_or_else(
+            || either::Either::Right(B::get().get_solutions(uri)),
+            |s| either::Either::Left(std::future::ready(Ok(s.clone()))),
+        )
     }
 
     pub fn get_notations(

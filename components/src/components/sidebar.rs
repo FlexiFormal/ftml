@@ -83,7 +83,7 @@ fn flex_sidebar<B: SendBackend, Ch: IntoView + 'static>(
                     size=ButtonSize::Small
                     on_click=move |_| visible.set(!visible.get_untracked())
                 >
-                    <Caption1>{collapse_marker(visible)}"FTML"</Caption1>
+                    <Caption1>{collapse_marker(visible,true)}"FTML"</Caption1>
                 </Button>
                 {body}
             </div>
@@ -137,7 +137,7 @@ fn floating_sidebar<B: SendBackend, Ch: IntoView + 'static>(
                     size=ButtonSize::Small
                     on_click=move |_| visible.set(!visible.get_untracked())
                 >
-                    <Caption1>{collapse_marker(visible)}"FTML"</Caption1>
+                    <Caption1>{collapse_marker(visible,true)}"FTML"</Caption1>
                 </Button>
                 {body}
             </div>

@@ -1,6 +1,8 @@
+#![allow(clippy::cast_precision_loss)]
+
 use crate::extraction::{
     ArgumentPosition, FtmlExtractionError, FtmlExtractor, OpenDomainElement, OpenNarrativeElement,
-    attributes::Attributes,
+    attributes::Attributes, nodes::FtmlNode,
 };
 use ftml_ontology::{
     domain::declarations::symbols::{ArgumentSpec, AssocType, SymbolData},
@@ -9,7 +11,7 @@ use ftml_ontology::{
         elements::{
             SectionLevel,
             paragraphs::{ParagraphFormatting, ParagraphKind},
-            problems::CognitiveDimension,
+            problems::{AnswerKind, ChoiceBlockStyle, CognitiveDimension, FillInSolOption},
             variables::VariableData,
         },
     },
@@ -33,7 +35,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 120;
+pub const NUM_KEYS: u8 = 118;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -238,8 +240,8 @@ macro_rules! do_keys {
             )?
     ),* $(,)? ) => {
         #[allow(clippy::unsafe_derive_deserialize)]
-        #[derive(Copy,Clone,PartialEq, Eq,Hash,serde::Serialize, serde::Deserialize)]
-        #[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
+        #[derive(Copy,Clone,PartialEq, Eq,Hash)]//,serde::Serialize, serde::Deserialize)]
+        //#[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
         #[repr(u8)]
         pub enum FtmlKey {
             $(
@@ -408,23 +410,6 @@ do_keys! {
             ret!(ext,node <- Style(style))
         } => Style(style:DocumentStyle),
 
-    /// Declares the referenced counter to have this one as a parent; meaning, whenever
-    /// the parent is increased, the counter is reset to 0.
-    CounterParent = "counter-parent"
-        {="[Id]" +(Counter)}
-        := (ext,attrs,keys,node) => {
-            let name = attrs.get_typed(FtmlKey::Counter, Id::from_str)?;
-            let parent: SectionLevel = {
-                let lvl = attrs.get_typed(FtmlKey::CounterParent, |s| {
-                    u8::from_str(s).map_err(|_| ())
-                })?;
-                lvl.try_into()
-                    .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::CounterParent))?
-            };
-            del!(keys - Counter,CounterParent);
-            ret!(ext,node <- Counter(DocumentCounter { name, parent:Some(parent) }))
-        } => Counter(counter:DocumentCounter),
-
     /// Declares a new counter with an optional [`CounterParent`](FtmlKey::CounterParent)
     Counter = "counter"
         {="[Id]" +(CounterParent)}
@@ -443,6 +428,23 @@ do_keys! {
             del!(keys - Counter,CounterParent);
             ret!(ext,node <- Counter(DocumentCounter { name, parent }))
         },
+
+    /// Declares the referenced counter to have this one as a parent; meaning, whenever
+    /// the parent is increased, the counter is reset to 0.
+    CounterParent = "counter-parent"
+        {="[Id]" +(Counter)}
+        := (ext,attrs,keys,node) => {
+            let name = attrs.get_typed(FtmlKey::Counter, Id::from_str)?;
+            let parent: SectionLevel = {
+                let lvl = attrs.get_typed(FtmlKey::CounterParent, |s| {
+                    u8::from_str(s).map_err(|_| ())
+                })?;
+                lvl.try_into()
+                    .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::CounterParent))?
+            };
+            del!(keys - Counter,CounterParent);
+            ret!(ext,node <- Counter(DocumentCounter { name, parent:Some(parent) }))
+        } => Counter(counter:DocumentCounter),
 
     /// A [`DocumentReference`](DocumentElement::DocumentReference); Inserts the referenced [`Document`]
     /// here; loosely analogous to an iframe, but the referenced
@@ -556,7 +558,7 @@ do_keys! {
     /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Proof`]
     /// for the given [Symbol]s using the given styles.
     Proof = "proof"
-        {+(Id,Inline,Fors,Styles,ProofHide)}
+        {+(Id,Inline,Fors,Styles,ProofHide) &(ProofBody)}
         := (ext,attrs,keys,node) => {
             do_paragraph(ext, attrs, keys, node, ParagraphKind::Proof)
         },
@@ -564,7 +566,7 @@ do_keys! {
     /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::SubProof`]
     /// for the given [Symbol]s using the given styles.
     SubProof = "subproof"
-        {+(Id,Inline,Fors,Styles,ProofHide)}
+        {+(Id,Inline,Fors,Styles,ProofHide) &(ProofBody)}
         := (ext,attrs,keys,node) => {
             do_paragraph(ext, attrs, keys, node, ParagraphKind::SubProof)
         },
@@ -594,20 +596,16 @@ do_keys! {
         {="[SymbolUri]*" -(Definition, Paragraph, Assertion, Example, Proof, SubProof)}
         := noop,
 
-    /// The CSS styles to use to format this paragraph (in order of priority, if available)
-    Styles = "styles"
-        {-(Definition, Paragraph, Assertion, Example, Problem, SubProblem, Proof, SubProof) }
-        := noop,
-
     ProofHide = "proofhide"
         {-(Proof,SubProof) }
-        := todo,
+        := noop,
 
-    ProofTitle = "prooftitle"
-        := todo,
-
-    SubproofTitle = "subprooftitle"
-        := todo,
+    /// Demarcates the collapsible part of a structured proof
+    ProofBody = "proofbody"
+        { <=(Proof,SubProof)}
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- ProofBody)
+        } => ProofBody,
 
     ProofMethod = "proofmethod"
         := todo,
@@ -618,8 +616,6 @@ do_keys! {
     ProofTerm = "proofterm"
         := todo,
 
-    ProofBody = "proofbody"
-        := todo,
 
     ProofAssumption = "spfassumption"
         := todo,
@@ -645,7 +641,8 @@ do_keys! {
     Problem = "problem"
         {+(Id,Styles,Autogradable,ProblemPoints,ProblemMinutes)
             &(Title,PreconditionSymbol,ObjectiveSymbol,ProblemSolution,ProblemHint,
-                ProblemNote,ProblemGradingNote,AnswerClass
+                ProblemNote,ProblemGradingNote,AnswerClass,ProblemFillinsol,ProblemSingleChoiceBlock,
+                ProblemMultipleChoiceBlock
             )
         }
         := (ext,attrs,keys,node) => {
@@ -663,7 +660,8 @@ do_keys! {
     SubProblem = "subproblem"
         {+(Id,Styles,Autogradable,ProblemPoints,ProblemMinutes)
             &(Title,PreconditionSymbol,ObjectiveSymbol,ProblemSolution,ProblemHint,
-                ProblemNote,ProblemGradingNote,AnswerClass
+                ProblemNote,ProblemGradingNote,ProblemFillinsolProblemSingleChoiceBlock,
+                ProblemMultipleChoiceBlock
             )
         }
         := (ext,attrs,keys,node) => {
@@ -687,8 +685,11 @@ do_keys! {
         {="[bool]" -(Problem, SubProblem) }
         := noop,
 
+    /// A *precondition* of a problem, indicating that this problem requires
+    /// a user has the given [`CognitiveDimension`] for the given [`SymbolUri`]
+    /// mastered.
     PreconditionSymbol = "preconditionsymbol"
-        { +(PreconditionDimension) <=(Problem,SubProblem) }
+        { ="[SymbolUri]" +(PreconditionDimension) <=(Problem,SubProblem) }
         := (ext,attrs,keys,node) => {
             let uri = attrs.get_symbol_uri(FtmlKey::PreconditionSymbol)?;
             let dim = opt!(attrs.get_typed(FtmlKey::PreconditionDimension, |s|
@@ -701,10 +702,13 @@ do_keys! {
             dim:CognitiveDimension
         },
 
+    /// The [`CognitiveDimension`] of a precondition
     PreconditionDimension = "preconditiondimension"
-        { -(PreconditionSymbol) <=(Problem,SubProblem) }
+        {="[CognitiveDimension]" -(PreconditionSymbol) <=(Problem,SubProblem) }
         := noop,
 
+    /// An *objective* of a problem, indicating that this problem
+    /// tests for the given [`CognitiveDimension`] for the given [`SymbolUri`]
     ObjectiveSymbol = "objectivesymbol"
         { +(ObjectiveDimension) <=(Problem,SubProblem) }
         := (ext,attrs,keys,node) => {
@@ -719,70 +723,184 @@ do_keys! {
             dim:CognitiveDimension
         },
 
+    /// The [`CognitiveDimension`] of an objective
     ObjectiveDimension = "objectivedimension"
         { -(ObjectiveSymbol) <=(Problem,SubProblem) }
         := noop,
 
+    /// A reference solution for a problem; to be stripped from the HTML and selectively
+    /// shown e.g. after a user provides an answer for comparison
+    // TODO: something is wrong here wrt id/answer class
     ProblemSolution = "solution"
         { +(AnswerClass) <=(Problem,SubProblem) }
         := (ext,attrs,keys,node) => {
-            let id = opt!(attrs.take_typed(FtmlKey::AnswerClass,|s| Id::from_str(s).map_err(|_| ())));
+            let id = opt!(attrs.take_typed(FtmlKey::ProblemSolution,|s| Id::from_str(s).map_err(|_| ())));
             del!(keys - AnswerClass);
             ret!(ext,node <- Solution(id) + Solution)
         } => Solution(id:Option<Id>),
 
-    AnswerClass = "answerclass"
-        { -(ProblemSolution) <=(Problem,SubProblem) }
-        := noop,
-
+    /// A hint for a problem; can e.g. be hidden behind a collapsible
     ProblemHint = "problemhint"
         { <=(Problem,SubProblem) }
-        := todo,
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- ProblemHint + ProblemHint)
+        } => ProblemHint,
 
+    /// An exam note
     ProblemNote = "problemnote"
         { <=(Problem,SubProblem) }
-        := todo,
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- ProblemExNote + ProblemExNote)
+        } => ProblemExNote,
 
+    /// A grading note; serves as instructions for graders
     ProblemGradingNote = "problemgnote"
-        { <=(Problem,SubProblem) }
-        := todo,
+        { <=(Problem,SubProblem) &(AnswerClass) }
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- ProblemGradingNote + ProblemGradingNote)
+        } => ProblemGradingNote,
 
+    /// Denotes an *answer class*; i.e. a possible (expected) learner response to a question;
+    /// Either an additional attribute for [`ProblemSolution`](FtmlKey::ProblemSolution)s,
+    /// or a dedicated node within a [`ProblemGradingNote`](FtmlKey::ProblemGradingNote).
+    AnswerClass = "answerclass"
+        { -(ProblemSolution) +(AnswerClassPts,Id) <=(ProblemGradingNote) &(AnswerclassFeedback) }
+        := (ext,attrs,keys,node) => {
+            let id = attrs.get_elem_uri_from_id(ext, Cow::Borrowed("AC"))?.name;
+            // SAFETY: Name steps are valid IDs
+            let id = unsafe{Id::new(id.last()).unwrap_unchecked()};
+            let kind = opt!(
+                attrs.get_typed(FtmlKey::AnswerClassPts, |s| s.parse().map_err(|_| ()))
+            )
+            .unwrap_or(AnswerKind::Trait(0.0));
+            del!(keys -AnswerClassPts);
+            ret!(ext,node <- AnswerClass(id,kind) + AnswerClass)
+        } => AnswerClass(id:Id,kind:AnswerKind),
 
+    /// The number of points to give for an [`AnswerClass`](FtmlKey::AnswerClass);
+    /// either an absolute number (total points) or a modifier starting with `+` or `-`.
     AnswerClassPts = "answerclass-pts"
-        := todo,
+    {="(+|-)?[f32]" -(AnswerClass)}
+        := noop,
 
+    /// The feedback to show to a learner whose response to a problem falls into the current
+    /// answer class
     AnswerclassFeedback = "answerclass-feedback"
-        := todo,
+        {<=(AnwerClass)}
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- AnswerClassFeedback)
+        } => AnswerClassFeedback,
 
-    ProblemMultipleChoiceBlock = "multiple-choice-block"
-        := todo,
-
+    /// A single-choice-block
     ProblemSingleChoiceBlock = "single-choice-block"
-        := todo,
+        { +(Styles) <=(Problem,SubProblem) &(ProblemChoice) }
+        := (ext,attrs,keys,node) => {
+            let styles: Vec<Id> = opt!(
+                attrs.get_typed_vec::<FtmlExtractionError, _>(FtmlKey::Styles, |s| {
+                    s.trim()
+                        .parse()
+                        .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::Styles))
+                })
+            )
+            .unwrap_or_default();
+            let block_style = styles.iter().find_map(|s|
+                if s.as_ref() == "inline" {Some(ChoiceBlockStyle::Inline)}
+                else if s.as_ref() == "dropdown" {Some(ChoiceBlockStyle::Dropdown)}
+                else {None}
+            ).unwrap_or_default();
+            del!(keys - Styles);
+            ret!(ext,node <- ChoiceBlock{styles:styles.into_boxed_slice(),block_style,multiple:false} + ChoiceBlock)
+        } => ChoiceBlock{styles:Box<[Id]>,block_style:ChoiceBlockStyle,multiple:bool},
 
+    /// A multiple-choice-block
+    ProblemMultipleChoiceBlock = "multiple-choice-block"
+        { +(Styles) <=(Problem,SubProblem) &(ProblemChoice) }
+        := (ext,attrs,keys,node) => {
+            let styles: Vec<Id> = opt!(
+                attrs.get_typed_vec::<FtmlExtractionError, _>(FtmlKey::Styles, |s| {
+                    s.trim()
+                        .parse()
+                        .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::Styles))
+                })
+            )
+            .unwrap_or_default();
+            let block_style = styles.iter().find_map(|s|
+                if s.as_ref() == "inline" {Some(ChoiceBlockStyle::Inline)}
+                else if s.as_ref() == "dropdown" {Some(ChoiceBlockStyle::Dropdown)}
+                else {None}
+            ).unwrap_or_default();
+            del!(keys - Styles);
+            ret!(ext,node <- ChoiceBlock{styles:styles.into_boxed_slice(),block_style,multiple:true} + ChoiceBlock)
+        },
+
+    /// An answer option in a (multiple or single) choice block. Value indicates whether this choice is correct or not
     ProblemChoice = "problem-choice"
-        := todo,
+        { ="[bool]" <=(ProblemSingleChoiceBlock,ProblemMultipleChoiceBlock) &(ProblemChoiceVerdict,ProblemChoiceFeedback)}
+        := (ext,attrs,_keys,node) => {
+            let correct = attrs.get_bool(FtmlKey::Problem);
+            ret!(ext,node <- ProblemChoice(correct) + ProblemChoice)
+        } => ProblemChoice(correct:bool),
 
+    /// (Optional) learner verdict for this [`ProblemChoice`](FtmlKey::ProblemChoice); by default "correct" or
+    /// "wrong", depending on the value of the [`ProblemChoice`](FtmlKey::ProblemChoice).
     ProblemChoiceVerdict = "problem-choice-verdict"
-        := todo,
+        { <=(ProblemChoice) }
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- ProblemChoiceVerdict)
+        } => ProblemChoiceVerdict,
 
+    /// Learner feedback for when this [`ProblemChoice`](FtmlKey::ProblemChoice) was selected
     ProblemChoiceFeedback = "problem-choice-feedback"
-        := todo,
+        { <=(ProblemChoice) }
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- ProblemChoiceFeedback)
+        } => ProblemChoiceFeedback,
 
+    /// A fill-in-the-blanks element of an autogradable (sub)problem.
     ProblemFillinsol = "fillinsol"
-        := todo,
+        { +(ProblemFillinsolWidth) <=(Problem,SubProblem) &(ProblemFillinsolCase) }
+        := (ext,attrs,keys,node) => {
+            let val = attrs
+                .get_typed(FtmlKey::ProblemFillinsolWidth, |s| {
+                    if s.contains('.') {
+                        s.parse::<f32>().map_err(|_| ())
+                    } else {
+                        s.parse::<i32>().map(|i| i as f32).map_err(|_| ())
+                    }
+                })
+                .ok();
+            del!(keys - ProblemFillinsolWidth);
+            ret!(ext,node <- FillinSol(val) + FillinSol)
+        } => FillinSol(width:Option<f32>),
 
+    /// Thw width of the text input field for a fill-in-the-blanks element
     ProblemFillinsolWidth = "fillinsol-width"
-        := todo,
+        { -(ProblemFillinsol) }
+        := noop,
 
     ProblemFillinsolCase = "fillin-case"
-        := todo,
+        { ="exact | numrange | regex" <=(ProblemFillinsol) +(ProblemFillinsolCaseValue,ProblemFillinsolCaseVerdict) }
+        := (ext,attrs,keys,node) => {
+            let val = attrs.remove(FtmlKey::ProblemFillinsolCase).unwrap_or_default();
+            let verdict = attrs.take_bool(FtmlKey::ProblemFillinsolCaseVerdict);
+            del!(keys - ProblemFillinsolCaseValue,ProblemFillinsolCaseVerdict);
+            let Some(value) = attrs.remove(FtmlKey::ProblemFillinsolCaseValue) else {
+                return Err(FtmlExtractionError::MissingKey(FtmlKey::ProblemFillinsolCaseValue));
+            };
+            let Some(mut opt) = FillInSolOption::from_values(&val, &value, verdict) else {
+                return Err(FtmlExtractionError::InvalidValue(FtmlKey::ProblemFillinsolCase));
+            };
+            opt.add_feedback(node.string().into_owned().into_boxed_str());
+            ret!(ext,node <- FillinSolCase(opt))
+        } => FillinSolCase(opt:FillInSolOption),
 
     ProblemFillinsolCaseValue = "fillin-case-value"
-        := todo,
+        { ="[str]" -(ProblemFillinsolCase) }
+        := noop,
 
     ProblemFillinsolCaseVerdict = "fillin-case-verdict"
-        := todo,
+        { ="[bool]" -(ProblemFillinsolCase) }
+        := noop,
 
         // ------------------------------------------------------------------------------------
 
@@ -818,6 +936,13 @@ do_keys! {
                     | OpenNarrativeElement::VariableDeclaration { .. }
                     | OpenNarrativeElement::Definiendum(_)
                     | OpenNarrativeElement::Solution(_)
+                    | OpenNarrativeElement::FillinSol { .. }
+                    | OpenNarrativeElement::ChoiceBlock { .. }
+                    | OpenNarrativeElement::ProblemHint
+                    | OpenNarrativeElement::ProblemExNote
+                    | OpenNarrativeElement::ProblemGradingNote(_)
+                    | OpenNarrativeElement::AnswerClass{..}
+                    | OpenNarrativeElement::ProblemChoice{..}
                     | OpenNarrativeElement::NotationArg(_) => {
                         break;
                     }
@@ -852,6 +977,12 @@ do_keys! {
         := (ext,_attrs,_keys,node) => {
             ret!(ext,node <- SlideNumber)
         } => SlideNumber,
+
+
+    /// The CSS styles to use to format this paragraph (in order of priority, if available)
+    Styles = "styles"
+        {-(Definition, Paragraph, Assertion, Example, Problem, SubProblem, Proof, SubProof, ProblemSingleChoiceBlock, ProblemMultipleChoiceBlock) }
+        := noop,
 
     // ------------------------------------------------------------------------------------
 
@@ -1116,8 +1247,13 @@ do_keys! {
     /// [`Type`](FtmlKey::Type). In conjunction with [`ArgTypes`](FtmlKey::ArgTypes),
     /// the full type is assembled by binding the argument types.
     ArgTypes = "argtypes"
-        {<=(Symdecl, Vardef, Varseq) }
-        := todo,
+        {<=(Symdecl, Vardef, Varseq) &(Type) }
+        := (ext,_attrs,_keys,node) => {
+            if ext.in_term() {
+                return Err(FtmlExtractionError::InvalidIn(FtmlKey::ReturnType, "terms"));
+            }
+            ret!(ext,node <- ArgTypes + ArgTypes)
+        } => ArgTypes,
 
     /// In a [`Symdecl`], [`Vardef`] or [`Varseq`], denotes the *definiens* of the current
     /// [`Symbol`] or [`Variable`] or [`Term::Label`]. In a [`Definition`], a definition-like [`Paragraph`]
@@ -1218,6 +1354,7 @@ do_keys! {
                             | OpenDomainElement::Type { .. }
                             | OpenDomainElement::ReturnType { .. }
                             | OpenDomainElement::Assign { .. }
+                            | OpenDomainElement::ArgTypes(_)
                             | OpenDomainElement::Definiens { .. },
                         ) => false,
                         Some(OpenDomainElement::Argument { .. } | OpenDomainElement::HeadTerm { .. } ) => {
@@ -1566,6 +1703,7 @@ do_keys! {
                     | OpenDomainElement::SymbolDeclaration { .. }
                     | OpenDomainElement::Argument { .. }
                     | OpenDomainElement::HeadTerm { .. }
+                    | OpenDomainElement::ArgTypes(_)
                     | OpenDomainElement::Type { .. }
                     | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. }
@@ -1683,6 +1821,8 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
             reordering,
             bind,
             is_seq:is_sequence,
+            argument_types:Box::default(),
+            return_type:None,
             tp: None,
             df: None,
         }),
@@ -1696,13 +1836,14 @@ fn do_comp<E: FtmlExtractor>(
     (E::Return, Option<crate::extraction::CloseFtmlElement>),
     crate::extraction::FtmlExtractionError,
 > {
-    match ext.iterate_domain().next() {
+    /*match ext.iterate_domain().next() {
         Some(
             OpenDomainElement::SymbolReference { .. }
             | OpenDomainElement::OMA { .. }
             | OpenDomainElement::OMBIND { .. }
             | OpenDomainElement::ComplexTerm { .. }
             | OpenDomainElement::OML { .. }
+            | OpenDomainElement::Argument { .. } // <- technically not allowed, but occasionally occurs spuriously
             | OpenDomainElement::VariableReference { .. },
         ) => (),
         None
@@ -1711,7 +1852,6 @@ fn do_comp<E: FtmlExtractor>(
             | OpenDomainElement::MathStructure { .. }
             | OpenDomainElement::Morphism { .. }
             | OpenDomainElement::SymbolDeclaration { .. }
-            | OpenDomainElement::Argument { .. }
             | OpenDomainElement::HeadTerm { .. }
             | OpenDomainElement::Type { .. }
             | OpenDomainElement::ReturnType { .. }
@@ -1722,7 +1862,7 @@ fn do_comp<E: FtmlExtractor>(
         ) => {
             return Err(FtmlExtractionError::NotIn(FtmlKey::Comp, "a term"));
         }
-    }
+    }*/
     ret!(ext,node <- Comp + Comp)
 }
 

@@ -12,6 +12,10 @@ pub trait Redirects {
         None::<&str>
     }
     #[inline]
+    fn for_document_html<'s>(&'s self, _uri: &DocumentUri) -> Option<impl std::fmt::Display + 's> {
+        None::<&str>
+    }
+    #[inline]
     fn for_notations<'s>(&'s self, _uri: &LeafUri) -> Option<impl std::fmt::Display + 's> {
         None::<&str>
     }
@@ -45,6 +49,8 @@ pub struct RemoteBackend<
     Re: Redirects = NoRedirects,
 > {
     pub fragment_url: Url,
+    pub document_html_url: Url,
+    pub solutions_url: Url,
     pub notations_url: Url,
     pub paragraphs_url: Url,
     pub modules_url: Url,
@@ -69,7 +75,9 @@ where
 {
     pub const fn new_with_redirects(
         fragment_url: Url,
+        document_html_url: Url,
         notations_url: Url,
+        solutions_url: Url,
         paragraphs_url: Url,
         modules_url: Url,
         documents_url: Url,
@@ -77,9 +85,11 @@ where
     ) -> Self {
         Self {
             fragment_url,
+            document_html_url,
             notations_url,
             paragraphs_url,
             modules_url,
+            solutions_url,
             documents_url,
             resources_url: None,
             redirects,
@@ -95,15 +105,19 @@ where
 {
     pub const fn new(
         fragment_url: Url,
+        document_html_url: Url,
         notations_url: Url,
+        solutions_url: Url,
         paragraphs_url: Url,
         modules_url: Url,
         documents_url: Url,
     ) -> Self {
         Self {
             fragment_url,
+            document_html_url,
             notations_url,
             paragraphs_url,
+            solutions_url,
             modules_url,
             documents_url,
             resources_url: None,
@@ -172,6 +186,34 @@ where
         } else {
             Self::make_url(&self.fragment_url, &uri, context.as_ref())
         };
+        call(url)
+    }
+
+    #[allow(clippy::similar_names)]
+    fn get_document_html(
+        &self,
+        uri: DocumentUri,
+        context: Option<NarrativeUri>,
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
+    {
+        let url = self.redirects.for_document_html(&uri).map_or_else(
+            || Self::make_url(&self.document_html_url, &uri.into(), context.as_ref()),
+            |r| r.to_string(),
+        );
+        call(url)
+    }
+
+    #[allow(clippy::similar_names)]
+    fn get_solutions(
+        &self,
+        uri: ftml_uris::DocumentElementUri,
+    ) -> impl Future<
+        Output = Result<
+            ftml_ontology::narrative::elements::problems::Solutions,
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        let url = Self::make_url(&self.solutions_url, &uri.into(), None);
         call(url)
     }
 
@@ -245,6 +287,7 @@ where
 pub struct RemoteFlamsBackend<Url: std::fmt::Display, Re: Redirects = NoRedirects> {
     pub url: Url,
     pub redirects: Re,
+    pub stripped: bool,
 }
 
 #[cfg(feature = "server_fn")]
@@ -252,17 +295,22 @@ impl<Url, Re: Redirects> RemoteFlamsBackend<Url, Re>
 where
     Url: std::fmt::Display,
 {
-    pub const fn new_with_redirects(url: Url, redirects: Re) -> Self {
-        Self { url, redirects }
+    pub const fn new_with_redirects(url: Url, redirects: Re, stripped: bool) -> Self {
+        Self {
+            url,
+            redirects,
+            stripped,
+        }
     }
 }
 
 #[cfg(feature = "server_fn")]
 impl<Url: std::fmt::Display> RemoteFlamsBackend<Url> {
-    pub const fn new(url: Url) -> Self {
+    pub const fn new(url: Url, stripped: bool) -> Self {
         Self {
             url,
             redirects: NoRedirects,
+            stripped,
         }
     }
 }
@@ -273,7 +321,7 @@ mod server_fn {
         BackendError, FlamsBackend, ParagraphOrProblemKind, Redirects, RemoteFlamsBackend,
     };
     use ::server_fn::error::ServerFnErrorErr;
-    use ftml_ontology::utils::Css;
+    use ftml_ontology::{narrative::elements::problems::Solutions, utils::Css};
     use ftml_uris::{
         DocumentElementUri, DocumentUri, FtmlUri, LeafUri, NarrativeUri, Uri,
         components::UriComponentTuple,
@@ -281,6 +329,10 @@ mod server_fn {
     use futures_util::TryFutureExt;
 
     impl<Url: std::fmt::Display, Re: Redirects> FlamsBackend for RemoteFlamsBackend<Url, Re> {
+        #[inline]
+        fn stripped(&self) -> bool {
+            self.stripped
+        }
         fn document_link_url(&self, uri: &DocumentUri) -> String {
             self.redirects.for_documents(uri).map_or_else(
                 || format!("{}?uri={}", self.url, uri.url_encoded()),
@@ -329,6 +381,76 @@ mod server_fn {
         }
 
         #[allow(clippy::similar_names)]
+        fn get_solutions(
+            &self,
+            uri: DocumentElementUri,
+        ) -> impl Future<
+            Output = Result<
+                ftml_ontology::narrative::elements::problems::Solutions,
+                BackendError<ServerFnErrorErr>,
+            >,
+        > + Send {
+            let url = format!("{}/content/solution?uri={uri}", &self.url);
+            async move {
+                let s = super::call::<String, SFnE>(url)
+                    .await
+                    .map_err(BackendError::from_other)?;
+                Solutions::from_jstring(&s)
+                    .ok_or_else(|| BackendError::ToDo("illegal solution string".to_string()))
+            }
+        }
+
+        #[allow(clippy::similar_names)]
+        #[allow(clippy::many_single_char_names)]
+        fn get_document_html(
+            &self,
+            uri: Option<DocumentUri>,
+            rp: Option<String>,
+            a: Option<ftml_uris::ArchiveId>,
+            p: Option<String>,
+            d: Option<String>,
+            l: Option<ftml_uris::Language>,
+        ) -> impl Future<
+            Output = Result<(DocumentUri, Box<[Css]>, Box<str>), BackendError<ServerFnErrorErr>>,
+        > {
+            use std::fmt::Write;
+            if let Some(uri) = &uri
+                && let Some(url) = self.redirects.for_document_html(uri)
+            {
+                return super::call::<_, SFnE>(url.to_string()).map_err(BackendError::from_other);
+            }
+            let url = {
+                let mut s = String::with_capacity(64);
+                let _ = write!(&mut s, "{}/content/document", &self.url);
+                let mut sep = '?';
+                if let Some(uri) = uri {
+                    let _ = write!(&mut s, "?uri={}", uri.url_encoded());
+                    sep = '&';
+                }
+                if let Some(rp) = rp {
+                    let _ = write!(&mut s, "{sep}rp={rp}");
+                    sep = '&';
+                }
+                if let Some(a) = a {
+                    let _ = write!(&mut s, "{sep}a={a}");
+                    sep = '&';
+                }
+                if let Some(p) = p {
+                    let _ = write!(&mut s, "{sep}p={p}");
+                    sep = '&';
+                }
+                if let Some(d) = d {
+                    let _ = write!(&mut s, "{sep}d={d}");
+                }
+                if let Some(l) = l {
+                    let _ = write!(&mut s, "{sep}l={l}");
+                }
+                s
+            };
+            super::call::<_, SFnE>(url).map_err(BackendError::from_other)
+        }
+
+        #[allow(clippy::similar_names)]
         fn get_module(
             &self,
             uri: Option<ftml_uris::ModuleUri>,
@@ -349,7 +471,7 @@ mod server_fn {
             }
             let url = {
                 let mut s = String::with_capacity(64);
-                let _ = write!(&mut s, "{}/content/module", &self.url);
+                let _ = write!(&mut s, "{}/domain/module", &self.url);
                 let mut sep = '?';
                 if let Some(uri) = uri {
                     let _ = write!(&mut s, "?uri={}", uri.url_encoded());
@@ -395,7 +517,7 @@ mod server_fn {
             }
             let url = {
                 let mut s = String::with_capacity(64);
-                let _ = write!(&mut s, "{}/content/document", &self.url);
+                let _ = write!(&mut s, "{}/domain/document", &self.url);
                 let mut sep = '?';
                 if let Some(uri) = uri {
                     let _ = write!(&mut s, "?uri={}", uri.url_encoded());

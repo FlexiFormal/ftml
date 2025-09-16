@@ -108,12 +108,15 @@ pub fn fancy_collapsible<V: IntoView>(
     view!(<div class=class style=style>{body()}</div>)
 }
 
-pub fn collapse_marker(signal: RwSignal<bool>) -> impl IntoView {
+pub fn collapse_marker(signal: RwSignal<bool>, moved: bool) -> impl IntoView {
+    let style = if moved {
+        "cursor:pointer;position:relative;bottom:0.65ex;left:-1.3ex;margin-right:-1.3ex;"
+    } else {
+        "cursor:pointer;width:0;"
+    };
     move || {
         leptos::html::span()
             .child(if signal.get() { "▾ " } else { "▸ " })
-            .style(
-                "cursor:pointer;position:relative;bottom:0.65ex;left:-1.3ex;margin-right:-1.3ex;",
-            )
+            .style(style)
     }
 }

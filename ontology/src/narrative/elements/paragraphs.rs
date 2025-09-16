@@ -115,7 +115,7 @@ impl ParagraphKind {
     #[must_use]
     pub fn is_definition_like(&self, styles: &[Id]) -> bool {
         match &self {
-            Self::Definition | Self::Assertion => true,
+            Self::Definition | Self::Assertion | Self::Proof | Self::SubProof => true,
             _ => styles
                 .iter()
                 .any(|s| s.as_ref() == "symdoc" || s.as_ref() == "decl"),

@@ -55,6 +55,16 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     }
 
     #[inline]
+    fn proof_body(then: OriginalNode) -> impl IntoView {
+        paragraphs::proof_body::<B>(then)
+    }
+
+    #[inline]
+    fn paragraph_title(then: OriginalNode) -> impl IntoView {
+        paragraphs::title::<B>(then)
+    }
+
+    #[inline]
     fn problem<V: IntoView>(
         uri: DocumentElementUri,
         styles: Box<[Id]>,
@@ -66,7 +76,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         minutes: Option<f32>,
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
-        problems::problem(
+        problems::problem::<B, _>(
             uri,
             styles,
             style,
@@ -77,6 +87,50 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
             minutes,
             then,
         )
+    }
+
+    #[inline]
+    fn problem_solution() -> impl IntoView {
+        problems::solution()
+    }
+
+    #[inline]
+    fn fillinsol(width: Option<f32>) -> impl IntoView {
+        problems::fillinsol(width)
+    }
+
+    #[inline]
+    fn problem_hint<V: IntoView + 'static>(
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        problems::hint(then)
+    }
+
+    #[inline]
+    fn problem_gnote() -> impl IntoView {
+        problems::gnote()
+    }
+
+    #[inline]
+    fn multiple_choice_block<V: IntoView + 'static>(
+        style: ftml_ontology::narrative::elements::problems::ChoiceBlockStyle,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        problems::choice_block(true, style, then)
+    }
+
+    #[inline]
+    fn single_choice_block<V: IntoView + 'static>(
+        style: ftml_ontology::narrative::elements::problems::ChoiceBlockStyle,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        problems::choice_block(false, style, then)
+    }
+
+    fn problem_choice<V: IntoView + 'static>(
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        problems::choice(then)
     }
 
     #[inline]

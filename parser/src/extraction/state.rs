@@ -28,7 +28,10 @@ use ftml_ontology::{
                 NotationComponent, NotationNode, NotationReference, VariableNotationReference,
             },
             paragraphs::{ParagraphFormatting, ParagraphKind},
-            problems::{ProblemData, SolutionData, Solutions},
+            problems::{
+                AnswerClass, AnswerKind, Choice, ChoiceBlock, ChoiceBlockStyle, FillInSol,
+                FillInSolOption, GradingNote, ProblemData, SolutionData, Solutions,
+            },
             variables::VariableData,
         },
     },
@@ -40,18 +43,33 @@ use ftml_uris::{
 };
 use std::{borrow::Cow, hint::unreachable_unchecked};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct IdCounter {
     inner: rustc_hash::FxHashMap<Cow<'static, str>, u32>,
+    forced: std::sync::Mutex<Option<DocumentElementUri>>,
 }
 impl Default for IdCounter {
     fn default() -> Self {
         let mut inner = rustc_hash::FxHashMap::default();
         inner.insert("EXTSTRUCT".into(), 0);
-        Self { inner }
+        Self {
+            inner,
+            forced: std::sync::Mutex::new(None),
+        }
+    }
+}
+impl Clone for IdCounter {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            forced: std::sync::Mutex::new(self.forced.lock().ok().and_then(|mut e| e.take())),
+        }
     }
 }
 impl IdCounter {
+    pub fn forced(&mut self) -> Option<DocumentElementUri> {
+        self.forced.lock().ok().and_then(|mut e| e.take())
+    }
     pub fn new_id(&mut self, prefix: impl Into<Cow<'static, str>>) -> String {
         use std::collections::hash_map::Entry;
         let prefix = prefix.into();
@@ -127,11 +145,12 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     pub buffer: DataBuffer,
     pub title: Option<Box<str>>,
     pub notations: Vec<(LeafUri, DocumentElementUri, Notation)>,
+    pub solutions: Vec<(DocumentElementUri, Solutions)>,
     pub domain: StackVec<OpenDomainElement<N>>,
     pub narrative: StackVec<OpenNarrativeElement<N>>,
     pub kind: DocumentKind,
     top_section_level: Option<SectionLevel>,
-    ids: IdCounter,
+    pub(crate) ids: IdCounter,
     #[allow(dead_code)]
     do_rdf: bool,
     #[cfg(feature = "rdf")]
@@ -163,6 +182,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             counters: Vec::new(),
             styles: Vec::new(),
             notations: Vec::new(),
+            solutions: Vec::new(),
             buffer: DataBuffer::default(),
             top: Vec::new(),
             modules: Vec::new(),
@@ -171,6 +191,12 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             narrative: StackVec::default(),
             #[cfg(feature = "rdf")]
             rdf: Vec::new(),
+        }
+    }
+
+    pub fn set_next_uri(&mut self, uri: DocumentElementUri) {
+        if let Ok(mut e) = self.ids.forced.lock() {
+            *e = Some(uri);
         }
     }
 
@@ -240,6 +266,147 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         self.narrative.iter()
     }
 
+    #[allow(clippy::too_many_lines)]
+    fn do_meta(&mut self, m: MetaDatum, node: &N) -> Result<(), FtmlExtractionError> {
+        match m {
+            MetaDatum::DocumentKind(k) => self.kind = k,
+            MetaDatum::Style(s) => self.styles.push(s),
+            MetaDatum::Counter(c) => self.counters.push(c),
+            MetaDatum::InputRef { target, uri } => {
+                self.push_elem(DocumentElement::DocumentReference { uri, target });
+            }
+            MetaDatum::SetSectionLevel(lvl) => {
+                self.top_section_level = Some(lvl);
+            }
+            MetaDatum::UseModule(uri) => self.push_elem(DocumentElement::UseModule(uri)),
+            MetaDatum::ImportModule(uri) => {
+                self.push_domain(uri.clone(), Declaration::Import, |uri| {
+                    Ok(StructureDeclaration::Import(uri))
+                })?;
+                self.push_elem(DocumentElement::ImportModule(uri));
+            }
+            MetaDatum::Rename {
+                source,
+                name,
+                macroname,
+            } => {
+                if let Some(OpenDomainElement::Morphism { children, uri, .. }) =
+                    self.domain.last_mut()
+                {
+                    if let Some(e) = children.iter_mut().find(|e| e.original == source) {
+                        e.new_name = name;
+                        e.macroname = macroname;
+                    } else {
+                        children.push(Assignment {
+                            original: source,
+                            morphism: uri.clone(),
+                            definiens: None,
+                            refined_type: None,
+                            new_name: name,
+                            macroname,
+                        });
+                    }
+                } else {
+                    return Err(FtmlExtractionError::InvalidIn(
+                        FtmlKey::Rename,
+                        "outside of morphisms",
+                    ));
+                }
+            }
+            MetaDatum::Precondition(uri, dim) => {
+                if let Some(OpenNarrativeElement::Problem { preconditions, .. }) =
+                    self.narrative.last_mut()
+                {
+                    preconditions.push((dim, uri));
+                } else {
+                    return Err(FtmlExtractionError::InvalidIn(
+                        FtmlKey::PreconditionSymbol,
+                        "outside of (sub)problems",
+                    ));
+                }
+            }
+            MetaDatum::Objective(uri, dim) => {
+                if let Some(OpenNarrativeElement::Problem { objectives, .. }) =
+                    self.narrative.last_mut()
+                {
+                    objectives.push((dim, uri));
+                } else {
+                    return Err(FtmlExtractionError::InvalidIn(
+                        FtmlKey::ObjectiveSymbol,
+                        "outside of (sub)problems",
+                    ));
+                }
+            }
+            MetaDatum::FillinSolCase(opt) => match self.narrative.last_mut() {
+                Some(OpenNarrativeElement::FillinSol { cases, nodes, .. }) => {
+                    nodes.push(node.clone());
+                    cases.push(opt);
+                }
+                _ => {
+                    return Err(FtmlExtractionError::NotIn(
+                        FtmlKey::ProblemFillinsolCase,
+                        "fill-in-solutions",
+                    ));
+                }
+            },
+            MetaDatum::AnswerClassFeedback => {
+                if let Some(nodes) = self.narrative.iter_mut().find_map(|e| {
+                    if let OpenNarrativeElement::AnswerClass { nodes, .. } = e {
+                        Some(nodes)
+                    } else {
+                        None
+                    }
+                }) {
+                    nodes.push(node.clone());
+                } else {
+                    return Err(FtmlExtractionError::NotIn(
+                        FtmlKey::AnswerclassFeedback,
+                        "answer classes",
+                    ));
+                }
+            }
+            MetaDatum::ProblemChoiceVerdict => {
+                if let Some((nodes, verdict)) = self.narrative.iter_mut().find_map(|e| {
+                    if let OpenNarrativeElement::ProblemChoice { nodes, verdict, .. } = e {
+                        Some((nodes, verdict))
+                    } else {
+                        None
+                    }
+                }) {
+                    *verdict = Some(node.inner_string().into_owned().into_boxed_str());
+                    nodes.push(node.clone());
+                } else {
+                    return Err(FtmlExtractionError::NotIn(
+                        FtmlKey::ProblemChoiceVerdict,
+                        "problem choices",
+                    ));
+                }
+            }
+            MetaDatum::ProblemChoiceFeedback => {
+                if let Some((nodes, feedback)) = self.narrative.iter_mut().find_map(|e| {
+                    if let OpenNarrativeElement::ProblemChoice {
+                        nodes, feedback, ..
+                    } = e
+                    {
+                        Some((nodes, feedback))
+                    } else {
+                        None
+                    }
+                }) {
+                    *feedback = node.inner_string().into_owned().into_boxed_str();
+                    nodes.push(node.clone());
+                } else {
+                    return Err(FtmlExtractionError::NotIn(
+                        FtmlKey::ProblemChoiceFeedback,
+                        "problem choices",
+                    ));
+                }
+            }
+            MetaDatum::IfInputref(_) | MetaDatum::ProofBody => (),
+        }
+        Ok(())
+    }
+
     /// ### Errors
     pub fn add(&mut self, e: OpenFtmlElement, node: &N) -> Result<(), FtmlExtractionError> {
         match e.split(node) {
@@ -251,77 +418,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     self.narrative.push(narr);
                 }
             }
-            AnyOpen::Meta(m) => match m {
-                MetaDatum::DocumentKind(k) => self.kind = k,
-                MetaDatum::Style(s) => self.styles.push(s),
-                MetaDatum::Counter(c) => self.counters.push(c),
-                MetaDatum::InputRef { target, uri } => {
-                    self.push_elem(DocumentElement::DocumentReference { uri, target });
-                }
-                MetaDatum::SetSectionLevel(lvl) => {
-                    self.top_section_level = Some(lvl);
-                }
-                MetaDatum::UseModule(uri) => self.push_elem(DocumentElement::UseModule(uri)),
-                MetaDatum::ImportModule(uri) => {
-                    self.push_domain(uri.clone(), Declaration::Import, |uri| {
-                        Ok(StructureDeclaration::Import(uri))
-                    })?;
-                    self.push_elem(DocumentElement::ImportModule(uri));
-                }
-                MetaDatum::Rename {
-                    source,
-                    name,
-                    macroname,
-                } => {
-                    if let Some(OpenDomainElement::Morphism { children, uri, .. }) =
-                        self.domain.last_mut()
-                    {
-                        if let Some(e) = children.iter_mut().find(|e| e.original == source) {
-                            e.new_name = name;
-                            e.macroname = macroname;
-                        } else {
-                            children.push(Assignment {
-                                original: source,
-                                morphism: uri.clone(),
-                                definiens: None,
-                                refined_type: None,
-                                new_name: name,
-                                macroname,
-                            });
-                        }
-                    } else {
-                        return Err(FtmlExtractionError::InvalidIn(
-                            FtmlKey::Rename,
-                            "outside of morphisms",
-                        ));
-                    }
-                }
-                MetaDatum::Precondition(uri, dim) => {
-                    if let Some(OpenNarrativeElement::Problem { preconditions, .. }) =
-                        self.narrative.last_mut()
-                    {
-                        preconditions.push((dim, uri));
-                    } else {
-                        return Err(FtmlExtractionError::InvalidIn(
-                            FtmlKey::PreconditionSymbol,
-                            "outside of (sub)problems",
-                        ));
-                    }
-                }
-                MetaDatum::Objective(uri, dim) => {
-                    if let Some(OpenNarrativeElement::Problem { objectives, .. }) =
-                        self.narrative.last_mut()
-                    {
-                        objectives.push((dim, uri));
-                    } else {
-                        return Err(FtmlExtractionError::InvalidIn(
-                            FtmlKey::ObjectiveSymbol,
-                            "outside of (sub)problems",
-                        ));
-                    }
-                }
-                MetaDatum::IfInputref(_) => (),
-            },
+            AnyOpen::Meta(m) => self.do_meta(m, node)?,
             AnyOpen::None => (),
         }
         Ok(())
@@ -582,6 +679,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type)),
             },
+            CloseFtmlElement::ArgTypes => match self.domain.pop() {
+                Some(OpenDomainElement::ArgTypes(terms)) => {
+                    //debug_assert_eq!(node,n);
+                    self.close_argtypes(terms, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type)),
+            },
             CloseFtmlElement::ReturnType => match self.domain.pop() {
                 Some(OpenDomainElement::ReturnType { terms, node: n }) => {
                     //debug_assert_eq!(node,n);
@@ -617,18 +721,17 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     preconditions,
                     objectives,
                 }) => {
-                    let solutions = self
-                        .buffer
-                        .push(&Solutions::from_solutions(solutions.into_boxed_slice()))
-                        .map_err(|e| {
-                            FtmlExtractionError::EncodingError(FtmlKey::Problem, e.to_string())
-                        })?;
+                    let solutions = Solutions::from_solutions(solutions.into_boxed_slice());
+                    let solref = self.buffer.push(&solutions).map_err(|e| {
+                        FtmlExtractionError::EncodingError(FtmlKey::Problem, e.to_string())
+                    })?;
+                    self.solutions.push((uri.clone(), solutions));
                     let data = Box::new(ProblemData {
                         sub_problem,
                         autogradable,
                         points,
                         minutes,
-                        solutions,
+                        solutions: solref,
                         gnotes: gnotes.into_boxed_slice(),
                         hints: hints.into_boxed_slice(),
                         notes: notes.into_boxed_slice(),
@@ -647,11 +750,79 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Problem)),
             },
+            CloseFtmlElement::FillinSol => match self.narrative.pop() {
+                Some(OpenNarrativeElement::FillinSol {
+                    width,
+                    cases,
+                    nodes,
+                }) => {
+                    for n in nodes {
+                        n.delete();
+                    }
+                    self.close_fillinsol(width, cases, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(
+                    FtmlKey::ProblemFillinsol,
+                )),
+            },
             CloseFtmlElement::Solution => match self.narrative.pop() {
                 Some(OpenNarrativeElement::Solution(id)) => self.close_solution(id, node),
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(
                     FtmlKey::ProblemSolution,
                 )),
+            },
+            CloseFtmlElement::ProblemHint => match self.narrative.pop() {
+                Some(OpenNarrativeElement::ProblemHint) => self.close_hint(node),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProblemHint)),
+            },
+            CloseFtmlElement::ProblemExNote => match self.narrative.pop() {
+                Some(OpenNarrativeElement::ProblemExNote) => self.close_exnote(node),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProblemNote)),
+            },
+            CloseFtmlElement::ProblemGradingNote => match self.narrative.pop() {
+                Some(OpenNarrativeElement::ProblemGradingNote(v)) => self.close_gnote(v, node),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(
+                    FtmlKey::ProblemGradingNote,
+                )),
+            },
+            CloseFtmlElement::AnswerClass => match self.narrative.pop() {
+                Some(OpenNarrativeElement::AnswerClass {
+                    id,
+                    kind,
+                    feedback,
+                    nodes,
+                }) => {
+                    for n in nodes {
+                        n.delete();
+                    }
+                    self.close_answerclass(id, kind, feedback, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::AnswerClass)),
+            },
+            CloseFtmlElement::ChoiceBlock => match self.narrative.pop() {
+                Some(OpenNarrativeElement::ChoiceBlock {
+                    styles,
+                    block_style,
+                    multiple,
+                    choices,
+                }) => self.close_choice_block(styles, block_style, multiple, choices, node),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(
+                    FtmlKey::ProblemMultipleChoiceBlock,
+                )),
+            },
+            CloseFtmlElement::ProblemChoice => match self.narrative.pop() {
+                Some(OpenNarrativeElement::ProblemChoice {
+                    correct,
+                    verdict,
+                    feedback,
+                    nodes,
+                }) => {
+                    for n in nodes {
+                        n.delete();
+                    }
+                    self.close_choice(correct, verdict, feedback)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProblemChoice)),
             },
             CloseFtmlElement::SectionTitle => self.close_section_title(node),
             CloseFtmlElement::ParagraphTitle => self.close_paragraph_title(node),
@@ -666,7 +837,19 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     Some(OpenNarrativeElement::Invisible) => (),
                     e => return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Invisible)),
                 }
-                node.delete();
+                if !self
+                    .narrative
+                    .iter()
+                    .any(|e| matches!(e, OpenNarrativeElement::Notation { .. }))
+                    && !self.domain.iter().any(|e| {
+                        matches!(
+                            e,
+                            OpenDomainElement::OMA { .. } | OpenDomainElement::OMBIND { .. }
+                        )
+                    })
+                {
+                    node.delete();
+                }
                 Ok(())
             }
         }
@@ -709,6 +892,33 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         Ok(uri)
     }
 
+    fn close_fillinsol(
+        &mut self,
+        width: Option<f32>,
+        mut opts: Vec<FillInSolOption>,
+        node: &N,
+    ) -> Result<(), FtmlExtractionError> {
+        let exact = node.inner_string().into_owned().into_boxed_str();
+        opts.insert(
+            0,
+            FillInSolOption::Exact {
+                value: exact,
+                verdict: true,
+                feedback: Box::default(),
+            },
+        );
+        for d in self.narrative.iter_mut() {
+            if let OpenNarrativeElement::Problem { solutions, .. } = d {
+                solutions.push(SolutionData::FillInSol(FillInSol { width, opts }));
+                return Ok(());
+            }
+        }
+        Err(FtmlExtractionError::NotIn(
+            FtmlKey::ProblemFillinsol,
+            "problems",
+        ))
+    }
+
     fn push_elem(&mut self, e: DocumentElement) {
         #[cfg(feature = "rdf")]
         {
@@ -735,6 +945,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Solution(_)
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::NotationArg(_) => (),
             }
         }
@@ -825,31 +1042,32 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         refined_type: Option<Term>,
         definiens: Option<Term>,
     ) -> Result<(), FtmlExtractionError> {
-        if let Some(OpenDomainElement::Morphism { children, uri, .. }) = self.domain.last_mut() {
-            if let Some(e) = children.iter_mut().find(|e| e.original == source) {
-                if let Some(d) = definiens {
-                    e.definiens = Some(d);
+        for e in self.domain.iter_mut() {
+            if let OpenDomainElement::Morphism { children, uri, .. } = e {
+                if let Some(e) = children.iter_mut().find(|e| e.original == source) {
+                    if let Some(d) = definiens {
+                        e.definiens = Some(d);
+                    }
+                    if let Some(t) = refined_type {
+                        e.refined_type = Some(t);
+                    }
+                } else {
+                    children.push(Assignment {
+                        original: source,
+                        morphism: uri.clone(),
+                        definiens,
+                        refined_type,
+                        new_name: None,
+                        macroname: None,
+                    });
                 }
-                if let Some(t) = refined_type {
-                    e.refined_type = Some(t);
-                }
-            } else {
-                children.push(Assignment {
-                    original: source,
-                    morphism: uri.clone(),
-                    definiens,
-                    refined_type,
-                    new_name: None,
-                    macroname: None,
-                });
+                return Ok(());
             }
-            Ok(())
-        } else {
-            Err(FtmlExtractionError::InvalidIn(
-                FtmlKey::Assign,
-                "outside of morphisms",
-            ))
         }
+        Err(FtmlExtractionError::InvalidIn(
+            FtmlKey::Assign,
+            "outside of morphisms",
+        ))
     }
 
     fn close_structure(
@@ -1046,6 +1264,179 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     Ok(())
                 },
             )
+    }
+
+    fn close_hint(&mut self, node: &N) -> super::Result<()> {
+        self.narrative
+            .iter_mut()
+            .find_map(|e| {
+                if let OpenNarrativeElement::Problem { hints, .. } = e {
+                    Some(hints)
+                } else {
+                    None
+                }
+            })
+            .map_or(
+                Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProblemHint)),
+                |s| {
+                    let rf = self
+                        .buffer
+                        .push(&node.string().into_owned().into_boxed_str())
+                        .map_err(|e| {
+                            FtmlExtractionError::EncodingError(FtmlKey::ProblemHint, e.to_string())
+                        })?;
+                    s.push(rf);
+                    Ok(())
+                },
+            )
+    }
+
+    fn close_exnote(&mut self, node: &N) -> super::Result<()> {
+        self.narrative
+            .iter_mut()
+            .find_map(|e| {
+                if let OpenNarrativeElement::Problem { notes, .. } = e {
+                    Some(notes)
+                } else {
+                    None
+                }
+            })
+            .map_or(
+                Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProblemNote)),
+                |s| {
+                    let rf = self
+                        .buffer
+                        .push(&node.string().into_owned().into_boxed_str())
+                        .map_err(|e| {
+                            FtmlExtractionError::EncodingError(FtmlKey::ProblemNote, e.to_string())
+                        })?;
+                    s.push(rf);
+                    node.children().for_each(|e| {
+                        if let Some(either::Either::Left(e)) = e {
+                            e.delete();
+                        }
+                    });
+                    Ok(())
+                },
+            )
+    }
+
+    fn close_gnote(&mut self, answer_classes: Vec<AnswerClass>, node: &N) -> super::Result<()> {
+        self.narrative
+            .iter_mut()
+            .find_map(|e| {
+                if let OpenNarrativeElement::Problem { gnotes, .. } = e {
+                    Some(gnotes)
+                } else {
+                    None
+                }
+            })
+            .map_or(
+                Err(FtmlExtractionError::UnexpectedEndOf(
+                    FtmlKey::ProblemGradingNote,
+                )),
+                |s| {
+                    let gn = GradingNote {
+                        html: node.string().into_owned().into_boxed_str(),
+                        answer_classes: answer_classes.into_boxed_slice(),
+                    };
+                    let rf = self.buffer.push(&gn).map_err(|e| {
+                        FtmlExtractionError::EncodingError(
+                            FtmlKey::ProblemGradingNote,
+                            e.to_string(),
+                        )
+                    })?;
+                    s.push(rf);
+                    node.children().for_each(|e| {
+                        if let Some(either::Either::Left(e)) = e {
+                            e.delete();
+                        }
+                    });
+                    Ok(())
+                },
+            )
+    }
+
+    fn close_answerclass(
+        &mut self,
+        id: Id,
+        kind: AnswerKind,
+        feedback: Box<str>,
+        node: &N,
+    ) -> super::Result<()> {
+        let description = node.inner_string().into_owned().into_boxed_str();
+        if let Some(OpenNarrativeElement::ProblemGradingNote(acs)) = self.narrative.last_mut() {
+            acs.push(AnswerClass {
+                id,
+                feedback,
+                kind,
+                description,
+            });
+            return Ok(());
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::AnswerClass))
+    }
+
+    fn close_choice_block(
+        &mut self,
+        styles: Box<[Id]>,
+        block_style: ChoiceBlockStyle,
+        multiple: bool,
+        choices: Vec<Choice>,
+        node: &N,
+    ) -> super::Result<()> {
+        let key = if multiple {
+            FtmlKey::ProblemMultipleChoiceBlock
+        } else {
+            FtmlKey::ProblemSingleChoiceBlock
+        };
+        self.narrative
+            .iter_mut()
+            .find_map(|e| {
+                if let OpenNarrativeElement::Problem { solutions, .. } = e {
+                    Some(solutions)
+                } else {
+                    None
+                }
+            })
+            .map_or(Err(FtmlExtractionError::UnexpectedEndOf(key)), |s| {
+                let block = SolutionData::ChoiceBlock(ChoiceBlock {
+                    multiple,
+                    block_style,
+                    range: node.range(),
+                    styles,
+                    choices: choices.into_boxed_slice(),
+                });
+                s.push(block);
+                Ok(())
+            })
+    }
+
+    fn close_choice(
+        &mut self,
+        correct: bool,
+        verdict: Option<Box<str>>,
+        feedback: Box<str>,
+    ) -> super::Result<()> {
+        if let Some(choices) = self.narrative.iter_mut().find_map(|e| {
+            if let OpenNarrativeElement::ChoiceBlock { choices, .. } = e {
+                Some(choices)
+            } else {
+                None
+            }
+        }) {
+            choices.push(Choice {
+                correct,
+                verdict: verdict.unwrap_or_else(|| {
+                    (if correct { "correct" } else { "wrong" })
+                        .to_string()
+                        .into_boxed_str()
+                }),
+                feedback,
+            });
+            return Ok(());
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProblemChoice))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1296,6 +1687,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1331,6 +1729,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1366,6 +1771,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1401,6 +1813,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1433,6 +1852,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::HeadTerm { .. }
                 | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::Type { .. }
+                | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::Module { .. }
@@ -1449,6 +1869,27 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         }
     }
 
+    fn close_argtypes(&mut self, terms: Vec<Term>, node: &N) -> super::Result<()> {
+        match self.domain.last_mut() {
+            Some(OpenDomainElement::SymbolDeclaration { uri, data }) if data.tp.is_none() => {
+                data.argument_types = terms.into_boxed_slice();
+                return Ok(());
+            }
+            _ => (),
+        }
+
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::VariableDeclaration { uri, data } if data.tp.is_none() => {
+                    data.argument_types = terms.into_boxed_slice();
+                    return Ok(());
+                }
+                _ => (),
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ArgTypes))
+    }
+
     fn close_type(&mut self, terms: Vec<(Term, crate::NodePath)>, node: &N) -> super::Result<()> {
         let term = node.as_term(terms)?.simplify();
         match self.domain.last_mut() {
@@ -1462,6 +1903,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             }
             Some(OpenDomainElement::Assign { refined_type, .. }) if refined_type.is_none() => {
                 *refined_type = Some(term);
+                return Ok(());
+            }
+            Some(OpenDomainElement::ArgTypes(v)) => {
+                v.push(term);
                 return Ok(());
             }
             None
@@ -1507,6 +1952,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
@@ -1547,13 +1999,14 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::Comp
                 | OpenDomainElement::DefComp
+                | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::VariableReference { .. },
             ) => (),
         }
         for n in self.narrative.iter_mut() {
             match n {
                 OpenNarrativeElement::VariableDeclaration { uri, data } if data.tp.is_none() => {
-                    data.tp = Some(term);
+                    data.return_type = Some(term);
                     return Ok(());
                 }
                 OpenNarrativeElement::Invisible => (),
@@ -1571,6 +2024,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
@@ -1606,6 +2066,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::ReturnType { .. }
+                | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
@@ -1669,6 +2130,13 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Module { .. }
                 | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens));
                 }
@@ -1710,6 +2178,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::OMBIND { .. }
                 | OpenDomainElement::OML { .. }
                 | OpenDomainElement::ReturnType { .. }
+                | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::VariableReference { .. }
                 | OpenDomainElement::Type { .. } => (),
@@ -1806,6 +2275,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
+                | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::VariableReference { .. },
             )
             | None => (),
@@ -1921,12 +2391,27 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         mut arguments: Vec<OpenBoundArgument>,
         node: &N,
     ) -> super::Result<()> {
-        let Some(OpenBoundArgument::Simple {
-            term: body,
-            should_be_var: false,
-        }) = arguments.pop()
-        else {
-            return Err(FtmlExtractionError::MissingArgument(arguments.len()));
+        tracing::info!("Closing OMBIND {head:?} ({head_term:?}) @ {arguments:?}");
+        let body = match arguments.pop() {
+            Some(
+                OpenBoundArgument::Simple {
+                    term: body,
+                    should_be_var: false,
+                }
+                | OpenBoundArgument::Sequence {
+                    terms: either::Either::Left(body),
+                    should_be_var: false,
+                },
+            ) => body,
+            Some(OpenBoundArgument::Sequence {
+                terms: either::Either::Right(terms),
+                should_be_var: false,
+            }) if terms.iter().all(Option::is_some) =>
+            // SAFETY: pattern match
+            {
+                Term::into_seq(unsafe { terms.into_iter().map(|e| e.unwrap_unchecked()) })
+            }
+            _ => return Err(FtmlExtractionError::MissingArgument(arguments.len())),
         };
         let mut args = Vec::with_capacity(arguments.len());
         for (i, a) in arguments.into_iter().enumerate() {

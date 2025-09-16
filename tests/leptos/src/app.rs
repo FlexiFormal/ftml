@@ -1,3 +1,4 @@
+use ftml_components::SidebarPosition;
 use ftml_ontology::utils::Css;
 use ftml_uris::DocumentUri;
 use leptos::prelude::*;
@@ -81,7 +82,7 @@ fn extract_body(s: &str) -> String {
 macro_rules! backend {
     ($num:literal:[$($name:literal),*]) => {
 
-        ftml_backend::new_global!(GlobalBackend = Cached(RemoteFlams [
+        ftml_backend::new_global!(GlobalBackend = Cached(RemoteFlamsLike [
             $(
                 concat!("https://mathhub.info?a=FTML/meta&p=tests&d=",$name,"&l=en")
                 => concat!("http://localhost:3000/api/get?d=",$name,".en")
@@ -114,7 +115,7 @@ macro_rules! backend {
         }
     };
 }
-backend!(8: ["sections","para","symbolsmodules","paragraphs","structures","morphisms","slides","metatheory"]);
+backend!(10: ["sections","para","symbolsmodules","paragraphs","structures","morphisms","slides","metatheory","problems","proof"]);
 
 type Views = ftml_components::Views<GlobalBackend>;
 
@@ -127,5 +128,7 @@ fn Ftml() -> impl IntoView {
     const HTML: &str = include_str!("../public/all.en.html");
     let html = extract_body_as_div(HTML);
     tracing::info!("Here");
-    Views::top(|| Views::document(uri, || Views::render_ftml(html)))
+    Views::setup_document(uri, SidebarPosition::Find, false, || {
+        Views::render_ftml(html, None)
+    })
 }

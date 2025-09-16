@@ -59,7 +59,7 @@ urlencoding = { workspace = true }
 futures-util = { workspace = true }
 either = { workspace = true }
 serde_json = { workspace = true }
-# tracing = { workspace = true }
+tracing = { workspace = true }
 
 ftml-uris = { workspace = true, features = ["serde", "components"] }
 ftml-ontology = { workspace = true, features = ["serde"] }

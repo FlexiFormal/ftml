@@ -204,6 +204,17 @@ impl Term {
             o => o,
         }
     }
+
+    pub fn into_seq(seqs: impl Iterator<Item = Self>) -> Self {
+        Self::Application(ApplicationTerm::new(
+            Self::Symbol {
+                uri: ftml_uris::metatheory::SEQUENCE_EXPRESSION.clone(),
+                presentation: None,
+            },
+            seqs.map(Argument::Simple).collect(),
+            None,
+        ))
+    }
 }
 
 impl crate::utils::RefTree for Term {

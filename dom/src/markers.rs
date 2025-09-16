@@ -16,6 +16,7 @@ use ftml_ontology::{
     narrative::elements::{
         SectionLevel,
         paragraphs::{ParagraphFormatting, ParagraphKind},
+        problems::ChoiceBlockStyle,
     },
     terms::{VarOrSym, Variable},
 };
@@ -79,8 +80,17 @@ pub enum Marker {
         points: Option<ordered_float::OrderedFloat<f32>>,
         minutes: Option<ordered_float::OrderedFloat<f32>>,
     },
+    Solution,
+    Fillinsol(Option<ordered_float::OrderedFloat<f32>>),
     Slide(DocumentElementUri),
     IfInputref(bool),
+    ProblemHint,
+    ProblemExNote,
+    ProblemGNote,
+    SingleChoiceBlock(ChoiceBlockStyle),
+    MultipleChoiceBlock(ChoiceBlockStyle),
+    Choice,
+    ProofBody,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -185,6 +195,7 @@ impl Marker {
                 })
                 .into_any()
             }
+            Self::ProofBody => Views::proof_body(orig).into_any(),
             Self::Problem {
                 is_subproblem,
                 styles,
@@ -208,6 +219,48 @@ impl Marker {
                 )
                 .into_any()
             }
+            Self::Solution => {
+                // parse node content:
+                let _ = Self::apply::<Views>(markers, invisible, is_math, orig.clone());
+                orig.set_inner_html("");
+                Views::problem_solution().into_any()
+            }
+            Self::Fillinsol(wd) => {
+                // parse node content:
+                let _ = Self::apply::<Views>(markers, invisible, is_math, orig.clone());
+                orig.set_inner_html("");
+                Views::fillinsol(wd.map(|f| *f)).into_any()
+            }
+            Self::ProblemHint => {
+                // parse node content:
+                Views::problem_hint(move || Self::apply::<Views>(markers, invisible, is_math, orig))
+                    .into_any()
+            }
+            Self::ProblemExNote => {
+                // parse node content:
+                Views::problem_ex_note(move || {
+                    Self::apply::<Views>(markers, invisible, is_math, orig)
+                })
+                .into_any()
+            }
+            Self::ProblemGNote => {
+                // parse node content:
+                let _ = Self::apply::<Views>(markers, invisible, is_math, orig.clone());
+                orig.set_inner_html("");
+                Views::problem_gnote().into_any()
+            }
+            Self::MultipleChoiceBlock(style) => Views::multiple_choice_block(style, move || {
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            })
+            .into_any(),
+            Self::SingleChoiceBlock(style) => Views::single_choice_block(style, move || {
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            })
+            .into_any(),
+            Self::Choice => Views::problem_choice(move || {
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            })
+            .into_any(),
             Self::Slide(uri) => {
                 provide_context(CurrentUri(uri.clone().into()));
                 DocumentState::new_slide();
@@ -381,6 +434,7 @@ impl Marker {
                 points: points.map(Into::into),
                 minutes: minutes.map(Into::into),
             }),
+            OpenFtmlElement::FillinSol(wd) => Some(Self::Fillinsol(wd.map(Into::into))),
             OpenFtmlElement::IfInputref(b) => Some(Self::IfInputref(*b)),
             OpenFtmlElement::Comp => Some(Self::Comp),
             OpenFtmlElement::DefComp | OpenFtmlElement::Definiendum(_) => Some(Self::DefComp),
@@ -447,8 +501,21 @@ impl Marker {
             OpenFtmlElement::Argument(pos) => Some(Self::Argument(*pos)),
             OpenFtmlElement::CurrentSectionLevel(b) => Some(Self::CurrentSectionLevel(*b)),
             OpenFtmlElement::SlideNumber => Some(Self::SlideNumber),
+            OpenFtmlElement::Solution(_) => Some(Self::Solution),
+            OpenFtmlElement::ProblemHint => Some(Self::ProblemHint),
+            OpenFtmlElement::ProblemExNote => Some(Self::ProblemExNote),
+            OpenFtmlElement::ProblemGradingNote => Some(Self::ProblemGNote),
+            OpenFtmlElement::ChoiceBlock {
+                block_style,
+                multiple: true,
+                ..
+            } => Some(Self::MultipleChoiceBlock(*block_style)),
+            OpenFtmlElement::ChoiceBlock { block_style, .. } => {
+                Some(Self::SingleChoiceBlock(*block_style))
+            }
+            OpenFtmlElement::ProblemChoice(_) => Some(Self::Choice),
+            OpenFtmlElement::ProofBody => Some(Self::ProofBody),
             OpenFtmlElement::Counter(_)
-            | OpenFtmlElement::Solution(_)
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::Module { .. }
             | OpenFtmlElement::MathStructure { .. }
@@ -472,6 +539,12 @@ impl Marker {
             | OpenFtmlElement::DocumentKind(_)
             | OpenFtmlElement::OML { .. }
             | OpenFtmlElement::Rename { .. }
+            | OpenFtmlElement::FillinSolCase(_)
+            | OpenFtmlElement::AnswerClass(..)
+            | OpenFtmlElement::AnswerClassFeedback
+            | OpenFtmlElement::ProblemChoiceVerdict
+            | OpenFtmlElement::ProblemChoiceFeedback
+            | OpenFtmlElement::ArgTypes
             | OpenFtmlElement::HeadTerm => None,
         }
     }

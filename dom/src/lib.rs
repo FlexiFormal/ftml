@@ -157,7 +157,8 @@ fn close_things(
                 | NotationArg | DocTitle | ReturnType | VariableDeclaration | Comp | DefComp
                 | ParagraphTitle | SlideTitle | Slide | Definiendum | MathStructure
                 | ComplexTerm | HeadTerm | OML | Morphism | Assign | ProblemTitle | Problem
-                | Solution => (),
+                | Solution | FillinSol | ProblemHint | ProblemExNote | ProblemGradingNote
+                | AnswerClass | ChoiceBlock | ProblemChoice | ArgTypes => (),
             }
         }
     }

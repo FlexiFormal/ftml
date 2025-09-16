@@ -57,14 +57,12 @@ pub fn iterate_body(cfg: config::FtmlViewerConfig) {
         use ftml_uris::DocumentUri;
 
         let uri = cfg.apply().unwrap_or_else(|| DocumentUri::no_doc().clone());
-        ftml_components::Views::<backend::GlobalBackend>::top_safe(|| {
-            ftml_components::Views::<backend::GlobalBackend>::document(
-                uri,
-                SidebarPosition::Find,
-                false,
-                || ftml_components::Views::<backend::GlobalBackend>::cont(orig, false),
-            )
-        })
+        ftml_components::Views::<backend::GlobalBackend>::setup_document(
+            uri,
+            SidebarPosition::Find,
+            false,
+            || ftml_components::Views::<backend::GlobalBackend>::cont(orig, false),
+        )
     });
 }
 

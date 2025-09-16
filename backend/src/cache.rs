@@ -51,6 +51,12 @@ where
     #[allow(clippy::type_complexity)]
     fragment_cache:
         Cache<(Uri, Option<NarrativeUri>), (Box<str>, Box<[Css]>, bool), BackendError<B::Error>>,
+    #[allow(clippy::type_complexity)]
+    doc_html_cache: Cache<
+        (DocumentUri, Option<NarrativeUri>),
+        (Box<str>, Box<[Css]>, bool),
+        BackendError<B::Error>,
+    >,
     notations_cache: Cache<LeafUri, Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
     paragraphs_cache:
         Cache<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
@@ -67,6 +73,9 @@ where
         Self {
             inner,
             fragment_cache: Cache {
+                map: dashmap::DashMap::default(),
+            },
+            doc_html_cache: Cache {
                 map: dashmap::DashMap::default(),
             },
             notations_cache: Cache {
@@ -109,6 +118,33 @@ where
         self.fragment_cache
             .get((uri, context), |(uri, context)| {
                 self.inner.get_fragment(uri, context)
+            })
+            .map_err(Into::into)
+    }
+
+    fn get_solutions(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<
+        Output = Result<
+            ftml_ontology::narrative::elements::problems::Solutions,
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        // TODO returns wrong error type
+        let fut = self.inner.get_solutions(uri);
+        async move { fut.await.map_err(|e| BackendError::ToDo(e.to_string())) }
+    }
+
+    fn get_document_html(
+        &self,
+        uri: DocumentUri,
+        context: Option<NarrativeUri>,
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
+    {
+        self.doc_html_cache
+            .get((uri, context), |(uri, context)| {
+                self.inner.get_document_html(uri, context)
             })
             .map_err(Into::into)
     }

@@ -131,6 +131,14 @@ impl DocumentState {
     }
 
     /// ### Panics
+    pub fn force_uri(uri: DocumentElementUri) {
+        with_context::<RwSignal<DomExtractor>, _>(|s| {
+            s.update_untracked(|e| e.state.set_next_uri(uri));
+        })
+        .expect("Not in a document context");
+    }
+
+    /// ### Panics
     pub fn finished_parsing() -> ReadSignal<bool> {
         with_context::<RwSignal<DomExtractor>, _>(|s| s.with_untracked(|e| e.is_done_read))
             .expect("Not in a document context")

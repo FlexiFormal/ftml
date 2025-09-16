@@ -163,6 +163,7 @@ pub struct AnswerClass {
     pub id: Id,
     pub feedback: Box<str>,
     pub kind: AnswerKind,
+    pub description: Box<str>,
 }
 impl Eq for AnswerClass {}
 impl PartialEq for AnswerClass {

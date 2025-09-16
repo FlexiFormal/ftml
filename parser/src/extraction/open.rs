@@ -12,7 +12,10 @@ use ftml_ontology::{
             DocumentElement,
             notations::{NotationComponent, NotationNode},
             paragraphs::{ParagraphFormatting, ParagraphKind},
-            problems::{CognitiveDimension, GradingNote, SolutionData},
+            problems::{
+                AnswerClass, AnswerKind, Choice, ChoiceBlockStyle, CognitiveDimension,
+                FillInSolOption, GradingNote, SolutionData,
+            },
             sections::SectionLevel,
             variables::VariableData,
         },
@@ -65,6 +68,14 @@ pub enum CloseFtmlElement {
     Slide,
     Problem,
     Solution,
+    FillinSol,
+    ProblemHint,
+    ProblemExNote,
+    ProblemGradingNote,
+    AnswerClass,
+    ChoiceBlock,
+    ProblemChoice,
+    ArgTypes,
 }
 
 #[derive(Debug, Clone)]
@@ -140,6 +151,7 @@ pub enum OpenDomainElement<N: FtmlNode> {
         terms: Vec<(Term, crate::NodePath)>,
         node: N,
     },
+    ArgTypes(Vec<Term>),
     Definiens {
         terms: Vec<(Term, crate::NodePath)>,
         node: N,
@@ -231,6 +243,32 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
         children: Vec<DocumentElement>,
         title: Option<Box<str>>,
     },
+    FillinSol {
+        width: Option<f32>,
+        cases: Vec<FillInSolOption>,
+        nodes: Vec<N>,
+    },
+    ProblemHint,
+    ProblemExNote,
+    ProblemGradingNote(Vec<AnswerClass>),
+    AnswerClass {
+        id: Id,
+        kind: AnswerKind,
+        feedback: Box<str>,
+        nodes: Vec<N>,
+    },
+    ChoiceBlock {
+        styles: Box<[Id]>,
+        block_style: ChoiceBlockStyle,
+        multiple: bool,
+        choices: Vec<Choice>,
+    },
+    ProblemChoice {
+        correct: bool,
+        verdict: Option<Box<str>>,
+        feedback: Box<str>,
+        nodes: Vec<N>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -253,6 +291,11 @@ pub enum MetaDatum {
     DocumentKind(DocumentKind),
     Precondition(SymbolUri, CognitiveDimension),
     Objective(SymbolUri, CognitiveDimension),
+    FillinSolCase(FillInSolOption),
+    AnswerClassFeedback,
+    ProblemChoiceVerdict,
+    ProblemChoiceFeedback,
+    ProofBody,
 }
 
 #[derive(Debug, Clone)]
@@ -329,9 +372,10 @@ impl OpenArgument {
         let arg = &mut args[idx];
         match (arg, position) {
             (r @ Self::None, ArgumentPosition::Simple(_, m)) => match m {
-                ArgumentMode::Simple => *r = Self::Simple(term),
-                ArgumentMode::Sequence => *r = Self::Sequence(Left(term)),
-                m => return Err(FtmlExtractionError::MismatchedArgument(m)),
+                ArgumentMode::Simple | ArgumentMode::BoundVariable => *r = Self::Simple(term),
+                ArgumentMode::Sequence | ArgumentMode::BoundVariableSequence => {
+                    *r = Self::Sequence(Left(term));
+                }
             },
             (r @ Self::None, ArgumentPosition::Sequence { sequence_index, .. }) => {
                 let mut v = (0..(sequence_index.get() - 1) as usize)
@@ -345,12 +389,23 @@ impl OpenArgument {
                 while v.len() <= idx {
                     v.push(None);
                 }
-                if v[idx].is_some() {
-                    return Err(FtmlExtractionError::MismatchedArgument(position.mode()));
+                if v[idx].as_ref().is_some_and(|t| *t != term) {
+                    return Err(FtmlExtractionError::MismatchedArgument {
+                        pos: position,
+                        //t: term,
+                        //args: args.clone(),
+                    });
                 }
                 v[idx] = Some(term);
             }
-            _ => return Err(FtmlExtractionError::MismatchedArgument(position.mode())),
+            (Self::Simple(t), ArgumentPosition::Simple(_, _)) if *t == term => (),
+            _ => {
+                return Err(FtmlExtractionError::MismatchedArgument {
+                    pos: position,
+                    //t: term,
+                    //args: args.clone(),
+                });
+            }
         }
         Ok(())
     }
@@ -474,12 +529,23 @@ impl OpenBoundArgument {
                 while v.len() <= idx {
                     v.push(None);
                 }
-                if v[idx].is_some() {
-                    return Err(FtmlExtractionError::MismatchedArgument(position.mode()));
+                if v[idx].as_ref().is_some_and(|t| *t != term) {
+                    return Err(FtmlExtractionError::MismatchedBoundArgument {
+                        pos: position,
+                        //t: term,
+                        //args: args.clone(),
+                    });
                 }
                 v[idx] = Some(term);
             }
-            _ => return Err(FtmlExtractionError::MismatchedArgument(position.mode())),
+            (Self::Simple { term: t, .. }, ArgumentPosition::Simple(_, _)) if *t == term => (),
+            _ => {
+                return Err(FtmlExtractionError::MismatchedBoundArgument {
+                    pos: position,
+                    //t: term,
+                    //args: args.clone(),
+                });
+            }
         }
         Ok(())
     }
@@ -723,6 +789,10 @@ impl OpenFtmlElement {
                 }),
                 narrative: None,
             },
+            Self::ArgTypes => AnyOpen::Open {
+                domain: Some(OpenDomainElement::ArgTypes(Vec::new())),
+                narrative: None,
+            },
             Self::Definiens(uri) => AnyOpen::Open {
                 domain: Some(OpenDomainElement::Definiens {
                     terms: Vec::new(),
@@ -793,8 +863,62 @@ impl OpenFtmlElement {
                     objectives: Vec::new(),
                 }),
             },
+            Self::FillinSol(wd) => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::FillinSol {
+                    width: wd,
+                    cases: Vec::new(),
+                    nodes: Vec::new(),
+                }),
+            },
+            Self::FillinSolCase(case) => AnyOpen::Meta(MetaDatum::FillinSolCase(case)),
             Self::Precondition { uri, dim } => AnyOpen::Meta(MetaDatum::Precondition(uri, dim)),
             Self::Objective { uri, dim } => AnyOpen::Meta(MetaDatum::Objective(uri, dim)),
+            Self::ProblemHint => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ProblemHint),
+            },
+            Self::ProblemExNote => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ProblemExNote),
+            },
+            Self::ProblemGradingNote => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ProblemGradingNote(Vec::new())),
+            },
+            Self::AnswerClass(id, kind) => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::AnswerClass {
+                    id,
+                    kind,
+                    feedback: Box::default(),
+                    nodes: Vec::new(),
+                }),
+            },
+            Self::ChoiceBlock {
+                styles,
+                block_style,
+                multiple,
+            } => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ChoiceBlock {
+                    styles,
+                    block_style,
+                    multiple,
+                    choices: Vec::new(),
+                }),
+            },
+            Self::ProblemChoice(correct) => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ProblemChoice {
+                    correct,
+                    verdict: None,
+                    feedback: Box::default(),
+                    nodes: Vec::new(),
+                }),
+            },
+            Self::ProblemChoiceVerdict => AnyOpen::Meta(MetaDatum::ProblemChoiceVerdict),
+            Self::ProblemChoiceFeedback => AnyOpen::Meta(MetaDatum::ProblemChoiceFeedback),
             Self::Definiendum(s) => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Definiendum(s)),
@@ -832,6 +956,8 @@ impl OpenFtmlElement {
                 target: uri,
                 uri: id,
             }),
+            Self::ProofBody => AnyOpen::Meta(MetaDatum::ProofBody),
+            Self::AnswerClassFeedback => AnyOpen::Meta(MetaDatum::AnswerClassFeedback),
             Self::DocumentKind(k) => AnyOpen::Meta(MetaDatum::DocumentKind(k)),
             Self::IfInputref(b) => AnyOpen::Meta(MetaDatum::IfInputref(b)),
             Self::Style(s) => AnyOpen::Meta(MetaDatum::Style(s)),

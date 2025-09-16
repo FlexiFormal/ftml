@@ -136,7 +136,7 @@ fn do_toc<Be: SendBackend>(toc: &[TOCElem], data: AnchorData) -> impl IntoView +
                             {visible.map(|visible|
                                 view!{
                                     <a on:click=move |_| visible.set(!visible.get_untracked())>
-                                        {collapse_marker(visible)}
+                                        {collapse_marker(visible,true)}
                                     </a>
                                     " "
                                 }

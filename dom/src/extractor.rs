@@ -73,6 +73,11 @@ impl DomExtractor {
         for m in modules {
             crate::utils::local_cache::LOCAL_CACHE.modules.insert(m);
         }
+        for (uri, sol) in std::mem::take(&mut self.state.solutions) {
+            crate::utils::local_cache::LOCAL_CACHE
+                .solutions
+                .insert(uri, sol);
+        }
         for (sym, uri, not) in notations {
             match crate::utils::local_cache::LOCAL_CACHE.notations.entry(sym) {
                 Entry::Vacant(v) => {

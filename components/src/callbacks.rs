@@ -5,7 +5,7 @@ use leptos::prelude::*;
 use crate::config::FtmlConfig;
 
 #[cfg(feature = "callbacks")]
-leptos_react::wrapper!(SectionWrap(u:DocumentElementUri));
+leptos_react::wrapper!(SectionWrap(u:DocumentElementUri,lvl:SectionLevel));
 #[cfg(feature = "callbacks")]
 leptos_react::wrapper!(ParagraphWrap(u:DocumentElementUri,kind:ParagraphKind));
 #[cfg(feature = "callbacks")]
@@ -19,6 +19,7 @@ impl FtmlConfig {
     #[allow(unused_variables)]
     pub fn wrap_section<V: IntoView, F: FnOnce() -> V>(
         uri: &DocumentElementUri,
+        lvl: Option<SectionLevel>,
         children: F,
     ) -> impl IntoView + use<V, F> {
         #[cfg(not(feature = "callbacks"))]
@@ -28,8 +29,9 @@ impl FtmlConfig {
         #[cfg(feature = "callbacks")]
         {
             use leptos::either::Either::{Left, Right};
+            let lvl = lvl.unwrap_or(SectionLevel::Subparagraph);
             if let Some(Some(w)) = use_context::<Option<SectionWrap>>() {
-                Left(w.wrap(uri, children))
+                Left(w.wrap(uri, &lvl, children))
             } else {
                 Right(children())
             }

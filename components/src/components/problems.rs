@@ -1,8 +1,8 @@
 use ftml_dom::utils::css::inject_css;
-use ftml_dom::utils::local_cache::LocalCache;
+use ftml_dom::utils::local_cache::{LocalCache, SendBackend};
 use ftml_ontology::narrative::elements::problems::{
-    BlockFeedback, CheckedResult, FillinFeedback, FillinFeedbackKind, ProblemFeedback,
-    ProblemResponse as OrigResponse, ProblemResponseType, Solutions,
+    BlockFeedback, CheckedResult, ChoiceBlockStyle, FillinFeedback, FillinFeedbackKind,
+    ProblemFeedback, ProblemResponse as OrigResponse, ProblemResponseType, Solutions,
 };
 use ftml_uris::{DocumentElementUri, Id, NarrativeUri, UriName};
 use leptos::either::Either::{Left, Right};
@@ -10,6 +10,7 @@ use leptos::prelude::*;
 use smallvec::SmallVec;
 
 use crate::config::FtmlConfig;
+use crate::utils::LocalCacheExt;
 
 #[cfg(feature = "typescript")]
 #[leptos::wasm_bindgen::prelude::wasm_bindgen(typescript_custom_section)]
@@ -39,6 +40,11 @@ impl ProblemContinuation {
     }
 }
 
+pub struct ProblemOptions {
+    pub on_response: Option<ProblemContinuation>,
+    pub states: rustc_hash::FxHashMap<DocumentElementUri, ProblemState>, //HMap<DocumentElementUri, ProblemState>,
+}
+
 //use crate::ProblemOptions;
 
 #[derive(Debug, Clone)]
@@ -54,11 +60,6 @@ pub enum ProblemState {
     Graded {
         feedback: ProblemFeedback,
     },
-}
-
-pub struct ProblemOptions {
-    pub on_response: Option<ProblemContinuation>,
-    pub states: rustc_hash::FxHashMap<DocumentElementUri, ProblemState>, //HMap<DocumentElementUri, ProblemState>,
 }
 
 impl std::fmt::Debug for ProblemOptions {
@@ -111,7 +112,7 @@ enum ProblemResponse {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn problem<V: IntoView>(
+pub fn problem<Be: SendBackend, V: IntoView>(
     uri: DocumentElementUri,
     _styles: Box<[Id]>,
     style: Memo<String>,
@@ -185,7 +186,7 @@ pub fn problem<V: IntoView>(
                     Left(r),
                   Left(false) => Right(view!{
                     {r}
-                    {submit_answer()}
+                    {submit_answer::<Be>()}
                   })
                 }
               }
@@ -195,7 +196,7 @@ pub fn problem<V: IntoView>(
     })
 }
 
-fn submit_answer() -> impl IntoView {
+fn submit_answer<Be: SendBackend>() -> impl IntoView {
     use thaw::{Button, ButtonSize};
     with_context(|current: &CurrentProblem| {
         let uri = current.uri.clone();
@@ -228,6 +229,18 @@ fn submit_answer() -> impl IntoView {
                 {
                     leptos::either::Either::Left(move || do_solution(&uri, &s))
                 } else {
+                    let uricl = uri.clone();
+                    leptos::either::Either::Right(move || {
+                        let res = LocalCache::resource::<Be, _, _>(|c| c.get_solutions(uricl));
+                        Effect::new(move || {
+                            res.with(|r| {
+                                if let Some(Ok(r)) = r {
+                                    do_solution(&uri, r);
+                                }
+                            });
+                        });
+                    })
+                    /*
                     leptos::either::Either::Right(Action::new(move |()| {
                         let uri = uri.clone();
                         let do_solution = do_solution.clone();
@@ -241,11 +254,10 @@ fn submit_answer() -> impl IntoView {
                             todo!()
                         }
                     }))
+                     */
                 };
                 let foract = move || match &foract {
-                    leptos::either::Either::Right(act) => {
-                        act.dispatch(());
-                    }
+                    leptos::either::Either::Right(act) => (act.clone())(),
                     leptos::either::Either::Left(sol) => sol(),
                 };
                 Some(view! {
@@ -260,16 +272,357 @@ fn submit_answer() -> impl IntoView {
     })
 }
 
-pub(super) fn hint<V: IntoView + 'static>(
-    children: impl FnOnce() -> V + Send + 'static,
-) -> impl IntoView {
+pub fn hint<V: IntoView + 'static>(children: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
     use crate::utils::{Header, collapsible::Collapsible};
     view! {
       <Collapsible>
-        <Header slot><span style="font-style:italic;color:gray">"Hint"</span></Header>
-        {children()}
+        <Header slot><span style="font-style:italic;color:gray;cursor:pointer;">"Hint"</span></Header>
+        {children().attr("style","border:1px solid black;")}
       </Collapsible>
     }
+}
+
+#[allow(clippy::missing_panics_doc)]
+pub fn fillinsol(wd: Option<f32>) -> impl IntoView {
+    use leptos::either::EitherOf3 as Either;
+    use thaw::Icon;
+    let Some(ex) = use_context::<CurrentProblem>() else {
+        tracing::error!("choice outside of problem!");
+        return None;
+    };
+    let Some(choice) = ex.responses.try_update_untracked(|resp| {
+        let i = resp.len();
+        resp.push(ProblemResponse::Fillinsol(String::new()));
+        i
+    }) else {
+        tracing::error!("fillinsol outside of an problem!");
+        return None;
+    };
+    let feedback = ex.feedback;
+    Some(move || {
+        let style = wd.map(|wd| format!("width:{wd}px;"));
+        feedback.with(|v|
+    if let Some(feedback) = v.as_ref() {
+      let err = || {
+        tracing::error!("Answer to problem does not match solution!");
+        Either::C(view!(<div style="color:red;">"ERROR"</div>))
+      };
+      let Some(CheckedResult::FillinSol { matching, text, options }) = feedback.data.get(choice) else {return err()};
+      let (correct,feedback) = if let Some(m) = matching {
+        let Some(FillinFeedback{is_correct,feedback,..}) = options.get(*m) else {return err()};
+
+        (*is_correct,Some(feedback.clone()))
+      } else {(false,None)};
+      let solution = if correct { None } else {
+        options.iter().find_map(|f| match f{
+          FillinFeedback{is_correct:true,kind:FillinFeedbackKind::Exact(s),..} => Some(s.clone()),
+          _ => None
+        })
+      };
+      let icon = if correct {
+        view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)
+      } else {
+        view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)
+      };
+      Either::B(view!{
+        {icon}" "
+        <input type="text" style=style disabled value=text.clone()/>
+        {solution.map(|s| view!(" "<pre style="color:green;display:inline;">{s.into_string()}</pre>))}
+        {feedback.map(|s| view!(" "<span style="background-color:lightgray;" inner_html=s.into_string()/>))}
+      })
+    } else {
+      let sig = create_write_slice(ex.responses,
+        move |resps,val| {
+          let resp = resps.get_mut(choice).expect("Signal error in problem");
+          let ProblemResponse::Fillinsol(s) = resp else { panic!("Signal error in problem")};
+          *s = val;
+        }
+      );
+      let txt = if let Some(ProblemResponseType::Fillinsol{value:s}) = ex.initial.as_ref().and_then(|i| i.responses.get(choice)) {
+          sig.set(s.clone());
+          s.clone()
+      } else {String::new()};
+      let disabled = !ex.interactive;
+      Either::A(view!{
+        <input type="text" style=style value=txt disabled=disabled on:input:target=move |ev| {sig.set(ev.target().value());}/>
+      })
+    }
+  )
+    })
+}
+
+#[must_use]
+pub fn solution() -> impl IntoView {}
+
+#[must_use]
+pub fn gnote() -> impl IntoView {}
+
+#[derive(Clone)]
+struct CurrentChoice(usize);
+
+pub(super) fn choice_block<V: IntoView + 'static>(
+    multiple: bool,
+    style: ChoiceBlockStyle,
+    children: impl FnOnce() -> V + Send + 'static,
+) -> impl IntoView {
+    let inline = matches!(style, ChoiceBlockStyle::Dropdown | ChoiceBlockStyle::Inline);
+    let response = if multiple {
+        ProblemResponse::MultipleChoice(inline, SmallVec::new())
+    } else {
+        ProblemResponse::SingleChoice(inline, None, 0)
+    };
+    let Some(i) = with_context::<CurrentProblem, _>(|ex| {
+        ex.responses.try_update_untracked(|ex| {
+            let i = ex.len();
+            ex.push(response);
+            i
+        })
+    })
+    .flatten() else {
+        tracing::error!(
+            "{} choice block outside of a problem!",
+            if multiple { "multiple" } else { "single" }
+        );
+        return None;
+    };
+    provide_context(CurrentChoice(i));
+    Some(children())
+}
+
+pub fn choice<V: IntoView + 'static>(
+    children: impl FnOnce() -> V + Send + 'static,
+) -> impl IntoView {
+    let Some(CurrentChoice(block)) = use_context() else {
+        tracing::error!("choice outside of choice block!");
+        return None;
+    };
+    let Some(ex) = use_context::<CurrentProblem>() else {
+        tracing::error!("choice outside of problem!");
+        return None;
+    };
+    let Some((multiple, inline)) = ex
+        .responses
+        .try_update_untracked(|resp| {
+            resp.get_mut(block).map(|l| match l {
+                ProblemResponse::MultipleChoice(inline, sigs) => {
+                    let idx = sigs.len();
+                    sigs.push(false);
+                    Some((Left(idx), *inline))
+                }
+                ProblemResponse::SingleChoice(inline, _, total) => {
+                    let val = *total;
+                    *total += 1;
+                    Some((Right(val), *inline))
+                }
+                ProblemResponse::Fillinsol(_) => None,
+            })
+        })
+        .flatten()
+        .flatten()
+    else {
+        tracing::error!("choice outside of choice block!");
+        return None;
+    };
+    let selected = ex
+        .initial
+        .as_ref()
+        .and_then(|i| i.responses.get(block))
+        .is_some_and(|init| match (init, multiple) {
+            (ProblemResponseType::MultipleChoice { value }, Left(idx)) => {
+                value.get(idx).copied().unwrap_or_default()
+            }
+            (ProblemResponseType::SingleChoice { value }, Right(val)) => {
+                value.is_some_and(|v| v == val)
+            }
+            _ => false,
+        });
+    let disabled = !ex.interactive;
+    Some(match multiple {
+        Left(idx) => Left(multiple_choice(
+            idx,
+            block,
+            inline,
+            selected,
+            disabled,
+            ex.responses,
+            ex.feedback,
+            children,
+        )),
+        Right(idx) => Right(single_choice(
+            idx,
+            block,
+            inline,
+            selected,
+            disabled,
+            ex.responses,
+            ex.uri,
+            ex.feedback,
+            children,
+        )),
+    })
+}
+
+fn multiple_choice<V: IntoView + 'static>(
+    idx: usize,
+    block: usize,
+    inline: bool,
+    orig_selected: bool,
+    disabled: bool,
+    responses: RwSignal<Vec<ProblemResponse>>,
+    feedback: RwSignal<Option<ProblemFeedback>>,
+    children: impl FnOnce() -> V + Send + 'static,
+) -> impl IntoView {
+    use leptos::either::{
+        Either::Left,
+        Either::Right,
+        EitherOf3::{A, B, C},
+    };
+    use thaw::Icon;
+    let bx = move || {
+        feedback.with(|v| if let Some(feedback) = v.as_ref() {
+            let err = || {
+            tracing::error!("Answer to problem does not match solution:");
+            C(view!(<div style="color:red;">"ERROR"</div>))
+            };
+            let Some(CheckedResult::MultipleChoice{selected,choices}) = feedback.data.get(block) else {return err()};
+            let Some(selected) = selected.get(idx).copied() else { return err() };
+            let Some(BlockFeedback{is_correct,..}) = choices.get(idx) else { return err() };
+            let icon = if selected == *is_correct {
+            view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)
+            } else {
+            view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)
+            };
+            let bx = if selected {
+            Left(view!({icon}<input type="checkbox" checked disabled/>))
+            } else {
+            Right(view!({icon}<input type="checkbox" disabled/>))
+            };
+            A(bx)
+        } else {
+            let sig = create_write_slice(responses,
+            move |resp,val| {
+                let resp = resp.get_mut(block).expect("Signal error in problem");
+                let ProblemResponse::MultipleChoice(_,v) = resp else { panic!("Signal error in problem")};
+                v[idx] = val;
+            }
+            );
+            sig.set(orig_selected);
+            let rf = NodeRef::<leptos::html::Input>::new();
+            let on_change = move |_| {
+            let Some(ip) = rf.get_untracked() else {return};
+            let nv = ip.checked();
+            sig.set(nv);
+            };
+            B(view!{<input node_ref=rf type="checkbox" on:change=on_change checked=orig_selected disabled=disabled/>})
+        })
+    };
+    let post = move || {
+        feedback.with(|v| v.as_ref().map(|feedback| {
+            let err = || {
+            tracing::error!("Answer to problem does not match solution:");
+            Right(view!(<div style="color:red;">"ERROR"</div>))
+            };
+            let Some(CheckedResult::MultipleChoice{choices,..}) = feedback.data.get(block) else {return err()};
+            let Some(BlockFeedback{is_correct,verdict_str,feedback}) = choices.get(idx) else { return err() };
+            let verdict = if *is_correct {
+            Left(view!(<span style="color:green;" inner_html=verdict_str.clone().into_string()/>))
+            } else {
+            Right(view!(<span style="color:red;" inner_html=verdict_str.clone().into_string()/>))
+            };
+            Left(view!{
+            " "{verdict}" "
+            {if inline {None} else {Some(view!(<br/>))}}
+            <span style="background-color:lightgray;" inner_html=feedback.clone().into_string()/>
+            })
+        }))
+    };
+    view! {<div style="display:inline;margin-right:5px;">
+        {bx}
+        {children()}
+        {post}
+    </div>}
+}
+
+fn single_choice<V: IntoView + 'static>(
+    idx: u16,
+    block: usize,
+    inline: bool,
+    orig_selected: bool,
+    disabled: bool,
+    responses: RwSignal<Vec<ProblemResponse>>,
+    uri: DocumentElementUri,
+    feedback: RwSignal<Option<ProblemFeedback>>,
+    children: impl FnOnce() -> V + Send + 'static,
+) -> impl IntoView {
+    use leptos::either::{
+        Either::Left,
+        Either::Right,
+        EitherOf3::{A, B, C},
+    };
+    use thaw::Icon;
+    let bx = move || {
+        feedback.with(|v| if let Some(feedback) = v.as_ref() {
+            let err = || {
+              tracing::error!("Answer to problem does not match solution!");
+              C(view!(<div style="color:red;">"ERROR"</div>))
+            };
+            let Some(CheckedResult::SingleChoice{selected,choices}) = feedback.data.get(block) else {return err()};
+            let Some(BlockFeedback{is_correct,..}) = choices.get(idx as usize) else { return err() };
+            let icon = if selected.is_some_and(|s| s ==  idx) && *is_correct {
+              Some(Left(view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)))
+            } else if selected.is_some_and(|s| s ==  idx) {
+              Some(Right(view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)))
+            } else {None};
+            let bx = if selected.is_some_and(|s| s ==  idx) {
+              Left(view!({icon}<input type="radio" checked disabled/>))
+            } else {
+              Right(view!({icon}<input type="radio" disabled/>))
+            };
+            A(bx)
+        } else {
+          let name = format!("{uri}_{block}");
+          let sig = create_write_slice(responses,
+            move |resp,()| {
+              let resp = resp.get_mut(block).expect("Signal error in problem");
+              let ProblemResponse::SingleChoice(_,i,_) = resp else { panic!("Signal error in problem")};
+              *i = Some(idx);
+            }
+          );
+          if orig_selected {sig.set(());}
+          let rf = NodeRef::<leptos::html::Input>::new();
+          let on_change = move |_| {
+            let Some(ip) = rf.get_untracked() else {return};
+            if ip.checked() { sig.set(()); }
+          };
+          B(view!{
+            <input node_ref=rf type="radio" name=name on:change=on_change checked=orig_selected disabled=disabled/>
+          })
+        })
+    };
+    let post = move || {
+        feedback.with(|v| v.as_ref().map(|feedback| {
+            let err = || {
+              tracing::error!("Answer to problem does not match solution!");
+              Right(view!(<div style="color:red;">"ERROR"</div>))
+            };
+            let Some(CheckedResult::SingleChoice{choices,..}) = feedback.data.get(block) else {return err()};
+            let Some(BlockFeedback{is_correct,verdict_str,feedback}) = choices.get(idx as usize) else { return err() };
+            let verdict = if *is_correct {
+              Left(view!(<span style="color:green;" inner_html=verdict_str.clone().into_string()/>))
+            } else {
+              Right(view!(<span style="color:red;" inner_html=verdict_str.clone().into_string()/>))
+            };
+            Left(view!{" "{verdict}" "
+              {if inline {None} else {Some(view!(<br/>))}}
+              <span style="background-color:lightgray;" inner_html=feedback.clone().into_string()/>
+            })
+        }))
+    };
+    view! {<div style="display:inline;margin-right:5px;">
+        {bx}
+        {children()}
+        {post}
+    </div>}
 }
 
 /*
@@ -338,241 +691,6 @@ pub(super) fn gnote(_skip: usize, _elements: FTMLElements, orig: OriginalNode) -
     }
 }
 
-#[derive(Clone)]
-struct CurrentChoice(usize);
-
-pub(super) fn choice_block<V: IntoView + 'static>(
-    multiple: bool,
-    inline: bool,
-    children: impl FnOnce() -> V + Send + 'static,
-) -> impl IntoView {
-    let response = if multiple {
-        ProblemResponse::MultipleChoice(inline, SmallVec::new())
-    } else {
-        ProblemResponse::SingleChoice(inline, None, 0)
-    };
-    let Some(i) = with_context::<CurrentProblem, _>(|ex| {
-        ex.responses.try_update_untracked(|ex| {
-            let i = ex.len();
-            ex.push(response);
-            i
-        })
-    })
-    .flatten() else {
-        tracing::error!(
-            "{} choice block outside of a problem!",
-            if multiple { "multiple" } else { "single" }
-        );
-        return None;
-    };
-    Some(view! {<Provider value=CurrentChoice(i)>{children()}</Provider>})
-}
-
-pub(super) fn problem_choice<V: IntoView + 'static>(
-    children: impl Fn() -> V + Send + 'static + Clone,
-) -> impl IntoView {
-    let Some(CurrentChoice(block)) = use_context() else {
-        tracing::error!("choice outside of choice block!");
-        return None;
-    };
-    let Some(ex) = use_context::<CurrentProblem>() else {
-        tracing::error!("choice outside of problem!");
-        return None;
-    };
-    let Some((multiple, inline)) = ex
-        .responses
-        .try_update_untracked(|resp| {
-            resp.get_mut(block).map(|l| match l {
-                ProblemResponse::MultipleChoice(inline, sigs) => {
-                    let idx = sigs.len();
-                    sigs.push(false);
-                    Some((Left(idx), *inline))
-                }
-                ProblemResponse::SingleChoice(inline, _, total) => {
-                    let val = *total;
-                    *total += 1;
-                    Some((Right(val), *inline))
-                }
-                ProblemResponse::Fillinsol(_) => None,
-            })
-        })
-        .flatten()
-        .flatten()
-    else {
-        tracing::error!("choice outside of choice block!");
-        return None;
-    };
-    let selected = if let Some(init) = ex.initial.as_ref().and_then(|i| i.responses.get(block)) {
-        match (init, multiple) {
-            (ProblemResponseType::MultipleChoice { value }, Left(idx)) => {
-                value.get(idx).copied().unwrap_or_default()
-            }
-            (ProblemResponseType::SingleChoice { value }, Right(val)) => {
-                value.is_some_and(|v| v == val)
-            }
-            _ => false,
-        }
-    } else {
-        false
-    };
-    let disabled = !ex.interactive;
-    Some(match multiple {
-        Left(idx) => Left(multiple_choice(
-            idx,
-            block,
-            inline,
-            selected,
-            disabled,
-            ex.responses,
-            ex.feedback,
-            children,
-        )),
-        Right(idx) => Right(single_choice(
-            idx,
-            block,
-            inline,
-            selected,
-            disabled,
-            ex.responses,
-            ex.uri,
-            ex.feedback,
-            children,
-        )),
-    })
-}
-
-fn multiple_choice<V: IntoView + 'static>(
-    idx: usize,
-    block: usize,
-    inline: bool,
-    orig_selected: bool,
-    disabled: bool,
-    responses: RwSignal<SmallVec<ProblemResponse, 4>>,
-    feedback: RwSignal<Option<ProblemFeedback>>,
-    children: impl Fn() -> V + Send + 'static + Clone,
-) -> impl IntoView {
-    use leptos::either::{Either::Left, Either::Right, EitherOf3 as Either};
-    use thaw::Icon;
-    move || {
-        feedback.with(|v|
-      if let Some(feedback) = v.as_ref() {
-        let err = || {
-          tracing::error!("Answer to problem does not match solution:");
-          Either::C(view!(<div style="color:red;">"ERROR"</div>))
-        };
-        let Some(CheckedResult::MultipleChoice{selected,choices}) = feedback.data.get(block) else {return err()};
-        let Some(selected) = selected.get(idx).copied() else { return err() };
-        let Some(BlockFeedback{is_correct,verdict_str,feedback}) = choices.get(idx) else { return err() };
-        let icon = if selected == *is_correct {
-          view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)
-        } else {
-          view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)
-        };
-        let bx = if selected {
-          Left(view!(<input type="checkbox" checked disabled/>))
-        } else {
-          Right(view!(<input type="checkbox" disabled/>))
-        };
-        let verdict = if *is_correct {
-          Left(view!(<span style="color:green;" inner_html=verdict_str.clone()/>))
-        } else {
-          Right(view!(<span style="color:red;" inner_html=verdict_str.clone()/>))
-        };
-        Either::B(view!{
-          {icon}{bx}{children()}" "{verdict}" "
-          {if inline {None} else {Some(view!(<br/>))}}
-          <span style="background-color:lightgray;" inner_html=feedback.clone()/>
-        })
-      } else {
-        let sig = create_write_slice(responses,
-          move |resp,val| {
-            let resp = resp.get_mut(block).expect("Signal error in problem");
-            let ProblemResponse::MultipleChoice(_,v) = resp else { panic!("Signal error in problem")};
-            v[idx] = val;
-          }
-        );
-        sig.set(orig_selected);
-        let rf = NodeRef::<leptos::html::Input>::new();
-        let on_change = move |_| {
-          let Some(ip) = rf.get_untracked() else {return};
-          let nv = ip.checked();
-          sig.set(nv);
-        };
-        Either::A(
-          view!{
-            <div style="display:inline;margin-right:5px;"><input node_ref=rf type="checkbox" on:change=on_change checked=orig_selected disabled=disabled/>{children()}</div>
-          }
-        )
-      }
-    )
-    }
-}
-
-fn single_choice<V: IntoView + 'static>(
-    idx: u16,
-    block: usize,
-    inline: bool,
-    orig_selected: bool,
-    disabled: bool,
-    responses: RwSignal<SmallVec<ProblemResponse, 4>>,
-    uri: DocumentElementUri,
-    feedback: RwSignal<Option<ProblemFeedback>>,
-    children: impl Fn() -> V + Send + 'static + Clone,
-) -> impl IntoView {
-    use leptos::either::{Either::Left, Either::Right, EitherOf3 as Either};
-    use thaw::Icon;
-    move || {
-        feedback.with(|v| {
-      if let Some(feedback) = v.as_ref() {
-        let err = || {
-          tracing::error!("Answer to problem does not match solution!");
-          Either::C(view!(<div style="color:red;">"ERROR"</div>))
-        };
-        let Some(CheckedResult::SingleChoice{selected,choices}) = feedback.data.get(block) else {return err()};
-        let Some(BlockFeedback{is_correct,verdict_str,feedback}) = choices.get(idx as usize) else { return err() };
-        let icon = if selected.is_some_and(|s| s ==  idx) && *is_correct {
-          Some(Left(view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)))
-        } else if selected.is_some_and(|s| s ==  idx) {
-          Some(Right(view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)))
-        } else {None};
-        let bx = if selected.is_some_and(|s| s ==  idx) {
-          Left(view!(<input type="radio" checked disabled/>))
-        } else {
-          Right(view!(<input type="radio" disabled/>))
-        };
-        let verdict = if *is_correct {
-          Left(view!(<span style="color:green;" inner_html=verdict_str.clone()/>))
-        } else {
-          Right(view!(<span style="color:red;" inner_html=verdict_str.clone()/>))
-        };
-        Either::B(view!{
-          {icon}{bx}{children()}" "{verdict}" "
-          {if inline {None} else {Some(view!(<br/>))}}
-          <span style="background-color:lightgray;" inner_html=feedback.clone()/>
-        })
-      } else {
-        let name = format!("{uri}_{block}");
-        let sig = create_write_slice(responses,
-          move |resp,()| {
-            let resp = resp.get_mut(block).expect("Signal error in problem");
-            let ProblemResponse::SingleChoice(_,i,_) = resp else { panic!("Signal error in problem")};
-            *i = Some(idx);
-          }
-        );
-        if orig_selected {sig.set(());}
-        let rf = NodeRef::<leptos::html::Input>::new();
-        let on_change = move |_| {
-          let Some(ip) = rf.get_untracked() else {return};
-          if ip.checked() { sig.set(()); }
-        };
-        Either::A(view!{
-          <div style="display:inline;margin-right:5px;"><input node_ref=rf type="radio" name=name on:change=on_change checked=orig_selected disabled=disabled/>{children()}</div>
-        })
-      }
-    })
-    }
-}
-
 /*
   let feedback = ex.feedback;
   move || {
@@ -583,72 +701,5 @@ fn single_choice<V: IntoView + 'static>(
   }
 */
 
-pub(super) fn fillinsol(wd: Option<f32>) -> impl IntoView {
-    use leptos::either::EitherOf3 as Either;
-    use thaw::Icon;
-    let Some(ex) = use_context::<CurrentProblem>() else {
-        tracing::error!("choice outside of problem!");
-        return None;
-    };
-    let Some(choice) = ex.responses.try_update_untracked(|resp| {
-        let i = resp.len();
-        resp.push(ProblemResponse::Fillinsol(String::new()));
-        i
-    }) else {
-        tracing::error!("fillinsol outside of an problem!");
-        return None;
-    };
-    let feedback = ex.feedback;
-    Some(move || {
-        let style = wd.map(|wd| format!("width:{wd}px;"));
-        feedback.with(|v|
-    if let Some(feedback) = v.as_ref() {
-      let err = || {
-        tracing::error!("Answer to problem does not match solution!");
-        Either::C(view!(<div style="color:red;">"ERROR"</div>))
-      };
-      let Some(CheckedResult::FillinSol { matching, text, options }) = feedback.data.get(choice) else {return err()};
-      let (correct,feedback) = if let Some(m) = matching {
-        let Some(FillinFeedback{is_correct,feedback,..}) = options.get(*m) else {return err()};
-
-        (*is_correct,Some(feedback.clone()))
-      } else {(false,None)};
-      let solution = if correct { None } else {
-        options.iter().find_map(|f| match f{
-          FillinFeedback{is_correct:true,kind:FillinFeedbackKind::Exact(s),..} => Some(s.clone()),
-          _ => None
-        })
-      };
-      let icon = if correct {
-        view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)
-      } else {
-        view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)
-      };
-      Either::B(view!{
-        {icon}" "
-        <input type="text" style=style disabled value=text.clone()/>
-        {solution.map(|s| view!(" "<pre style="color:green;display:inline;">{s}</pre>))}
-        {feedback.map(|s| view!(" "<span style="background-color:lightgray;" inner_html=s/>))}
-      })
-    } else {
-      let sig = create_write_slice(ex.responses,
-        move |resps,val| {
-          let resp = resps.get_mut(choice).expect("Signal error in problem");
-          let ProblemResponse::Fillinsol(s) = resp else { panic!("Signal error in problem")};
-          *s = val;
-        }
-      );
-      let txt = if let Some(ProblemResponseType::Fillinsol{value:s}) = ex.initial.as_ref().and_then(|i| i.responses.get(choice)) {
-          sig.set(s.clone());
-          s.clone()
-      } else {String::new()};
-      let disabled = !ex.interactive;
-      Either::A(view!{
-        <input type="text" style=style value=txt disabled=disabled on:input:target=move |ev| {sig.set(ev.target().value());}/>
-      })
-    }
-  )
-    })
-}
 
 */

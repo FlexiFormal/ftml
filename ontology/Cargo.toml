@@ -21,6 +21,7 @@ serde = [
     "smallvec/serde",
     #"dep:postcard",
     "dep:bincode",
+    "ordered-float/serde"
 ]
 ## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
 ## bound to `string`, but naming still allows to make intentions in APIs explicit.
@@ -80,6 +81,7 @@ parking_lot = { workspace = true }
 dashmap = { workspace = true }
 chrono = { workspace = true }
 phf = { workspace = true, features = ["macros"] }
+ordered-float = { workspace = true }
 
 #kanal = { workspace = true }
 pollster = { workspace = true }

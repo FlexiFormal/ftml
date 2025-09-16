@@ -5,6 +5,7 @@ use crate::{
     config::{FtmlConfig, HighlightStyle},
     utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
 };
+use ftml_backend::{BackendError, GlobalBackend};
 use ftml_dom::{
     ClonableView, DocumentState, FtmlViews, TermTrackedViews,
     notations::TermExt,
@@ -12,11 +13,14 @@ use ftml_dom::{
     utils::{
         ContextChain,
         css::{CssExt, inject_css},
-        local_cache::LocalCache,
+        local_cache::{GlobalLocal, LocalCache},
     },
 };
-use ftml_ontology::terms::{ArgumentMode, VarOrSym, Variable};
-use ftml_uris::{DocumentElementUri, Id, LeafUri, SymbolUri};
+use ftml_ontology::{
+    narrative::elements::ParagraphOrProblemKind,
+    terms::{ArgumentMode, VarOrSym, Variable},
+};
+use ftml_uris::{DocumentElementUri, Id, IsNarrativeUri, LeafUri, SymbolUri, Uri, UriWithArchive};
 use leptos::prelude::*;
 use std::hint::unreachable_unchecked;
 
@@ -459,20 +463,20 @@ pub(crate) fn do_onclick<Be: SendBackend>(
     top_term: ReadSignal<Option<DocumentElementUri>>,
     allow_formals: ReadSignal<bool>,
 ) -> impl IntoView + use<Be> {
-    use leptos::either::Either::{Left as A, Right as B};
+    use leptos::either::Either::{Left, Right};
     use leptos::prelude::*;
-    use thaw::{Divider, Skeleton, SkeletonItem, Spinner};
+    use thaw::Divider;
     let s = match vos {
         VarOrSym::Var(Variable::Name {
             notated: Some(n), ..
         }) => {
-            return A(view! {<span>"Variable "{n.to_string()}</span>});
+            return Left(view! {<span>"Variable "{n.to_string()}</span>});
         }
         VarOrSym::Var(Variable::Name { name, .. }) => {
-            return A(view! {<span>"Variable "{name.to_string()}</span>});
+            return Left(view! {<span>"Variable "{name.to_string()}</span>});
         }
         VarOrSym::Var(Variable::Ref { declaration, .. }) => {
-            return A(view! {<span>"Variable "{declaration.name.last().to_string()}</span>});
+            return Left(view! {<span>"Variable "{declaration.name.last().to_string()}</span>});
         }
         VarOrSym::Sym(s) => s.clone(),
     };
@@ -483,22 +487,18 @@ pub(crate) fn do_onclick<Be: SendBackend>(
         LocalCache::resource::<Be, _, _>(
             move |b| async move { Ok(b.get_paragraphs(s, false).await) },
         );
-    B(view! {
+    let selected = RwSignal::new(None);
+    let selector = paras_selector::<Be>(paras, selected);
+    Right(view! {
         // paras
         <div style="display:flex;flex-direction:row;">
             <div style="font-weight:bold;" title=uri_string>{name}</div>
-            <div style="margin-left:auto;">{move || {
-                match paras.get() {
-                    Some(Ok(_)) => A("Here".to_string()),
-                    Some(Err(e)) => A(format!("error: {e}")),
-                    None => B(view!(<Spinner/>))
-                }
-            }}</div>
+            <div style="margin-left:auto;">{selector}</div>
         </div>
         <div style="margin:5px;"><Divider/></div>
 
         // defi
-        <Skeleton><SkeletonItem attr:style="height:150px;"/></Skeleton>
+        {para_window::<Be>(selected)}
         <div style="margin:5px;"><Divider/></div>
 
         // notations
@@ -550,5 +550,106 @@ fn formals<Be: SendBackend>(
             }
             ))}}
         })}
+    }
+}
+
+type Paras<Be> = Result<
+    GlobalLocal<
+        Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
+        BackendError<<Be as GlobalBackend>::Error>,
+    >,
+    BackendError<<Be as GlobalBackend>::Error>,
+>;
+
+fn paras_selector<Be: SendBackend>(
+    paras: ReadSignal<Option<Paras<Be>>>,
+    selected: RwSignal<Option<String>>,
+) -> impl IntoView {
+    use leptos::either::EitherOf3::{A, B, C};
+    use thaw::{Combobox, ComboboxOption, ComboboxOptionGroup, Spinner};
+    move || {
+        paras.with(|p| match p {
+            Some(Ok(v)) => {
+                let mut definitions = Vec::new();
+                let mut examples = Vec::new();
+                for (uri, knd) in v.iter() {
+                    match knd {
+                        ParagraphOrProblemKind::Definition => definitions.push(uri.clone()),
+                        ParagraphOrProblemKind::Example => examples.push(uri.clone()),
+                        _ => (),
+                    }
+                }
+                if let Some(d) = definitions.first() {
+                    selected.set(Some(d.to_string()));
+                }
+                A(view! {
+                    <Combobox selected_options=selected placeholder="Select Definition or Example">
+                      <ComboboxOptionGroup label="Definitions">{
+                          definitions.iter().map(|d| {
+                            let line = para_line(d);
+                            let value = d.to_string();
+                            view!{
+                              <ComboboxOption text="" value>{line}</ComboboxOption>
+                            }
+                        }).collect_view()
+                      }</ComboboxOptionGroup>
+                      <ComboboxOptionGroup label="Examples">{
+                        examples.iter().map(|d| {
+                          let line = para_line(d);
+                          let value = d.to_string();
+                          view!{
+                            <ComboboxOption text="" value>{line}</ComboboxOption>
+                          }
+                        }).collect_view()
+                      }</ComboboxOptionGroup>
+                    </Combobox>
+                })
+            }
+            Some(Err(e)) => B(view!(<span style="color:red;">{format!("error: {e}")}</span>)),
+            None => C(view!(<Spinner/>)),
+        })
+    }
+}
+
+fn para_line(uri: &DocumentElementUri) -> impl IntoView + 'static {
+    let archive = uri.archive_id().to_string();
+    let name = uri.name().to_string();
+    let lang = uri.language().flag_svg();
+    view!(<div>
+        <span>"["{archive}"] "{name}" "</span>
+        <div style="display:contents;" inner_html=lang/>
+    </div>)
+}
+
+fn para_window<Be: SendBackend>(selected: RwSignal<Option<String>>) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
+    use thaw::Spinner;
+    move || {
+        selected
+            .with(|u| {
+                u.as_ref()
+                    .and_then(|u| u.parse::<DocumentElementUri>().ok())
+            })
+            .map_or_else(
+                || Right(view!(<Spinner/>)),
+                |u| {
+                    let uri = u.clone();
+                    Left(LocalCache::with_or_toast::<Be, _, _, _, _>(
+                        |c| c.get_fragment(Uri::DocumentElement(u), None),
+                        |(html, css, stripped)| {
+                            for c in css {
+                                c.inject();
+                            }
+                            crate::Views::<Be>::render_fragment(
+                                Some(uri.into()),
+                                crate::SidebarPosition::None,
+                                stripped,
+                                || crate::Views::<Be>::render_ftml(html.into_string(), None),
+                            )
+                        },
+                        || view!(<span style="color:red;">"error"</span>),
+                    ))
+                },
+            )
     }
 }

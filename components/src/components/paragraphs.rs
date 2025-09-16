@@ -1,18 +1,102 @@
-use ftml_dom::utils::css::inject_css;
+use ftml_dom::{
+    FtmlViews,
+    utils::{css::inject_css, local_cache::SendBackend},
+};
+use ftml_ontology::narrative::elements::paragraphs::{ParagraphFormatting, ParagraphKind};
 use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
+use leptos_posthoc::OriginalNode;
 
-use crate::config::FtmlConfig;
+use crate::{
+    config::FtmlConfig,
+    utils::collapsible::{collapse_marker, fancy_collapsible},
+};
 
 pub fn paragraph<V: IntoView>(
     info: ftml_dom::markers::ParagraphInfo,
     then: impl FnOnce() -> V + Send + 'static,
 ) -> impl IntoView {
+    use leptos::either::EitherOf3::{A, B, C};
     inject_css("ftml-sections", include_str!("sections.css"));
-    view! {
-        <div class=info.class style=info.style>{
-            FtmlConfig::wrap_paragraph(&info.uri,info.kind,then)
-        }</div>
+    if matches!(info.kind, ParagraphKind::Proof) {
+        return A(proof(info, false, then));
+    }
+    if matches!(info.kind, ParagraphKind::SubProof) {
+        return A(proof(info, true, then));
+    }
+    if info.formatting == ParagraphFormatting::Inline {
+        B(view! {
+            <span class=info.class style=info.style>{
+                FtmlConfig::wrap_paragraph(&info.uri,info.kind,then)
+            }</span>
+        })
+    } else {
+        C(view! {
+            <div class=info.class style=info.style>{
+                FtmlConfig::wrap_paragraph(&info.uri,info.kind,then)
+            }</div>
+        })
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ProofData {
+    visible: RwSignal<bool>,
+    subproof: bool,
+}
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn proof<V: IntoView>(
+    info: ftml_dom::markers::ParagraphInfo,
+    subproof: bool,
+    then: impl FnOnce() -> V + Send + 'static,
+) -> impl IntoView {
+    let visible = RwSignal::new(info.formatting != ParagraphFormatting::Collapsed);
+    let data = ProofData { visible, subproof };
+    provide_context(data);
+    FtmlConfig::wrap_paragraph(&info.uri, info.kind, then)
+}
+
+#[must_use]
+pub fn proof_body<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
+    if let Some(data) = use_context::<ProofData>() {
+        Left(fancy_collapsible(
+            move || crate::Views::<Be>::cont(then, true),
+            data.visible,
+            "",
+            "",
+        ))
+    } else {
+        Right(crate::Views::<Be>::cont(then, true))
+    }
+}
+
+#[must_use]
+pub fn title<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
+    use leptos::either::EitherOf3::{A, B, C};
+    if let Some(data) = use_context::<ProofData>() {
+        if data.subproof {
+            A(view! {
+                <div on:click=move |_| data.visible.set(!data.visible.get_untracked())
+                    style="display:flex;flex-direction:row;"
+                >
+                    {collapse_marker(data.visible,false)}
+                    {crate::Views::<Be>::cont(then, true).attr("class", "ftml-subproof-title")}
+                </div>
+            })
+        } else {
+            B(view! {
+                <div on:click=move |_| data.visible.set(!data.visible.get_untracked())
+                    style="display:contents;"
+                >
+                    {collapse_marker(data.visible,true)}
+                    {crate::Views::<Be>::cont(then, true).attr("class", "ftml-proof-title")}
+                </div>
+            })
+        }
+    } else {
+        C(crate::Views::<Be>::cont(then, true).attr("class", "ftml-proof-title"))
     }
 }
 

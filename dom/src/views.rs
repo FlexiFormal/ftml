@@ -4,7 +4,7 @@ use crate::{
     terms::{ReactiveApplication, TopTerm},
 };
 use ftml_ontology::{
-    narrative::elements::SectionLevel,
+    narrative::elements::{SectionLevel, problems::ChoiceBlockStyle},
     terms::{VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, Id, SymbolUri};
@@ -88,6 +88,11 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
+    fn proof_body(then: OriginalNode) -> impl IntoView {
+        Self::cont(then, true)
+    }
+
+    #[inline]
     fn problem<V: IntoView>(
         _uri: DocumentElementUri,
         _styles: Box<[Id]>,
@@ -103,6 +108,50 @@ pub trait FtmlViews: 'static {
           <div class=class style=style>{then()}</div>
         }
     }
+
+    #[inline]
+    fn problem_solution() -> impl IntoView {}
+
+    #[inline]
+    fn problem_hint<V: IntoView + 'static>(
+        _then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+    }
+
+    #[inline]
+    fn problem_ex_note<V: IntoView + 'static>(
+        _then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+    }
+
+    #[inline]
+    fn multiple_choice_block<V: IntoView + 'static>(
+        _style: ChoiceBlockStyle,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
+    fn single_choice_block<V: IntoView + 'static>(
+        _style: ChoiceBlockStyle,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
+    fn problem_choice<V: IntoView + 'static>(
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
+    fn problem_gnote() -> impl IntoView {}
+
+    #[inline]
+    fn fillinsol(_width: Option<f32>) -> impl IntoView {}
 
     #[inline]
     fn problem_title(then: OriginalNode) -> impl IntoView {
@@ -210,6 +259,12 @@ pub trait TermTrackedViews: 'static {
           <div class=info.class style=info.style>{then()}</div>
         }
     }
+
+    #[inline]
+    fn proof_body(then: OriginalNode) -> impl IntoView {
+        Self::cont(then, true)
+    }
+
     #[inline]
     fn problem<V: IntoView>(
         _uri: DocumentElementUri,
@@ -226,6 +281,50 @@ pub trait TermTrackedViews: 'static {
           <div class=class style=style>{then()}</div>
         }
     }
+
+    #[inline]
+    fn problem_solution() -> impl IntoView {}
+
+    #[inline]
+    fn problem_hint<V: IntoView + 'static>(
+        _then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+    }
+
+    #[inline]
+    fn problem_ex_note<V: IntoView + 'static>(
+        _then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+    }
+
+    #[inline]
+    fn problem_gnote() -> impl IntoView {}
+
+    #[inline]
+    fn multiple_choice_block<V: IntoView + 'static>(
+        _style: ChoiceBlockStyle,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
+    fn single_choice_block<V: IntoView + 'static>(
+        _style: ChoiceBlockStyle,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
+    fn problem_choice<V: IntoView + 'static>(
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+
+    #[inline]
+    fn fillinsol(_width: Option<f32>) -> impl IntoView {}
 
     #[inline]
     fn problem_title(then: OriginalNode) -> impl IntoView {
@@ -319,6 +418,11 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     }
 
     #[inline]
+    fn proof_body(then: OriginalNode) -> impl IntoView {
+        <T as TermTrackedViews>::proof_body(then)
+    }
+
+    #[inline]
     fn problem<V: IntoView>(
         uri: DocumentElementUri,
         styles: Box<[Id]>,
@@ -341,6 +445,58 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
             minutes,
             then,
         )
+    }
+
+    #[inline]
+    fn problem_solution() -> impl IntoView {
+        <T as TermTrackedViews>::problem_solution()
+    }
+
+    #[inline]
+    fn problem_hint<V: IntoView + 'static>(
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::problem_hint(then)
+    }
+
+    #[inline]
+    fn problem_ex_note<V: IntoView + 'static>(
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::problem_ex_note(then)
+    }
+
+    #[inline]
+    fn problem_gnote() -> impl IntoView {
+        <T as TermTrackedViews>::problem_gnote()
+    }
+
+    #[inline]
+    fn multiple_choice_block<V: IntoView + 'static>(
+        style: ChoiceBlockStyle,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::multiple_choice_block(style, then)
+    }
+
+    #[inline]
+    fn single_choice_block<V: IntoView + 'static>(
+        style: ChoiceBlockStyle,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::single_choice_block(style, then)
+    }
+
+    #[inline]
+    fn problem_choice<V: IntoView + 'static>(
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::problem_choice(then)
+    }
+
+    #[inline]
+    fn fillinsol(width: Option<f32>) -> impl IntoView {
+        <T as TermTrackedViews>::fillinsol(width)
     }
 
     #[inline]

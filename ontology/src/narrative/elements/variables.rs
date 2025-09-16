@@ -37,6 +37,10 @@ pub struct VariableData {
     pub bind: bool,
     pub assoctype: Option<AssocType>,
     pub reordering: Option<Id>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub argument_types: Box<[Term]>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub return_type: Option<Term>,
     pub is_seq: bool,
 }
 impl crate::Ftml for VariableDeclaration {

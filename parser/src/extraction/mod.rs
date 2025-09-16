@@ -6,7 +6,7 @@ use ftml_ontology::{
     terms::{ArgumentMode, Term, Variable},
 };
 use ftml_uris::{
-    DocumentUri, Id, ModuleUri, NarrativeUriRef, UriName,
+    DocumentElementUri, DocumentUri, Id, ModuleUri, NarrativeUriRef, UriName,
     errors::{SegmentParseError, UriParseError},
 };
 
@@ -41,6 +41,8 @@ pub trait FtmlExtractor: 'static + Sized {
     fn add_element(&mut self, elem: OpenFtmlElement, node: &Self::Node) -> Result<Self::Return>;
     /// ### Errors
     fn close(&mut self, elem: CloseFtmlElement, node: &Self::Node) -> Result<()>;
+
+    fn forced_element_uri(&mut self) -> Option<DocumentElementUri>;
     /// ### Errors
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id>;
     /// ### Errors
@@ -63,6 +65,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenDomainElement::HeadTerm { .. }
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
+                | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::Assign { .. }
                 | OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::Comp
@@ -94,6 +97,13 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::NotationArg(_)
                 | OpenNarrativeElement::Solution(..)
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::Definiendum(_) => None,
                 OpenNarrativeElement::Section { uri, .. }
                 | OpenNarrativeElement::Notation { uri, .. }
@@ -126,6 +136,13 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Slide { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::SkipSection { .. } => return false,
             }
         }
@@ -141,6 +158,7 @@ pub trait FtmlExtractor: 'static + Sized {
                     | OpenDomainElement::MathStructure { .. }
                     | OpenDomainElement::Morphism { .. }
                     | OpenDomainElement::Assign { .. }
+                    | OpenDomainElement::ArgTypes(_)
                     | OpenDomainElement::SymbolDeclaration { .. },
                 ) => false,
                 Some(
@@ -193,6 +211,13 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::NotationArg(_)
                 | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::ArgSep { .. } => continue, // Narrative::Notation(_) => continue,
             };
             for c in ch.iter().rev() {
@@ -248,6 +273,13 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::NotationComp { .. }
                 | OpenNarrativeElement::ArgSep { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::NotationArg(_) => break,
             }
         }
@@ -278,6 +310,13 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Definiendum(_)
                 | OpenNarrativeElement::Solution(_)
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
                 | OpenNarrativeElement::NotationArg(_) => break,
             }
         }
@@ -292,6 +331,7 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::Type { terms, .. }
             | OpenDomainElement::ReturnType { terms, .. }
             | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
+            OpenDomainElement::ArgTypes(terms) => terms.last(),
             OpenDomainElement::Module { .. }
             | OpenDomainElement::MathStructure { .. }
             | OpenDomainElement::Assign { .. }
@@ -348,6 +388,7 @@ pub trait FtmlExtractor: 'static + Sized {
             OpenDomainElement::Argument { .. }
             | OpenDomainElement::HeadTerm { .. }
             | OpenDomainElement::Type { .. }
+            | OpenDomainElement::ArgTypes(_)
             | OpenDomainElement::ReturnType { .. }
             | OpenDomainElement::Definiens { .. }
             | OpenDomainElement::Module { .. }
@@ -402,6 +443,10 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
         &self,
     ) -> impl ExactSizeIterator<Item = &DocumentElement> + DoubleEndedIterator {
         self.state().top.iter()
+    }
+    #[inline]
+    fn forced_element_uri(&mut self) -> Option<DocumentElementUri> {
+        self.state_mut().ids.forced()
     }
     #[inline]
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id> {
@@ -526,8 +571,20 @@ pub enum FtmlExtractionError {
     InvalidIn(FtmlKey, &'static str),
     #[error("missing argument {0} for application term")]
     MissingArgument(usize),
-    #[error("argument mode does not match: {0}")]
-    MismatchedArgument(ArgumentMode),
+    #[error("argument mode does not match (at position {pos:?})")]
+    //: {t:?} at position {pos:?} for {args:?}")]
+    MismatchedArgument {
+        //t: Term,
+        pos: ArgumentPosition,
+        //args: Vec<OpenArgument>,
+    },
+    #[error("bound argument mode does not match (at position {pos:?})")]
+    //: {t:?} at position {pos:?} for {args:?}")]
+    MismatchedBoundArgument {
+        //t: Term,
+        pos: ArgumentPosition,
+        //args: Vec<OpenBoundArgument>,
+    },
     #[error("invalid informal term: {0}")]
     InvalidInformal(String),
     #[error("invalid notation component: {0}")]

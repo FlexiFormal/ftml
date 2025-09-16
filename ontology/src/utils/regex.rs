@@ -17,6 +17,21 @@ impl std::fmt::Display for Regex {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", feature = "wasm")))]
+mod impls {
+    impl PartialEq for super::Regex {
+        fn eq(&self, other: &Self) -> bool {
+            self.0.as_str() == other.0.as_str()
+        }
+    }
+    impl Eq for super::Regex {}
+    impl std::hash::Hash for super::Regex {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            self.0.as_str().hash(state);
+        }
+    }
+}
+
 macro_rules! switch {
     ($rs:block $js:block) => {{
         #[cfg(not(all(target_family = "wasm", feature = "wasm")))]

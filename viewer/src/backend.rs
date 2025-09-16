@@ -11,7 +11,7 @@ pub(crate) static BACKEND_URL: std::sync::LazyLock<std::sync::Arc<parking_lot::R
     });
 pub struct BackendUrlRef;
 impl BackendUrlRef {
-    pub fn set_url(url:&str) {
+    pub fn set_url(url: &str) {
         *BACKEND_URL.write() = url.to_string().into_boxed_str();
     }
 }
@@ -46,7 +46,7 @@ impl ftml_backend::GlobalBackend for GlobalBackend {
     type Error = <BE as ftml_backend::FtmlBackend>::Error;
     fn get() -> &'static BE {
         static BACKEND: std::sync::LazyLock<BE> = std::sync::LazyLock::new(|| {
-            ftml_backend::RemoteFlamsBackend::new_with_redirects(BackendUrlRef, RedirectsRef)
+            ftml_backend::RemoteFlamsBackend::new_with_redirects(BackendUrlRef, RedirectsRef, true)
                 .cached()
         });
         &BACKEND

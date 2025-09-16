@@ -110,7 +110,11 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
 
     #[inline]
     fn parse_error(&self, msg: std::borrow::Cow<'static, str>) {
-        self.extractor.borrow_mut().parse_errors.push_str(&msg);
+        let s = self.document_node.string();
+        if !s.trim().is_empty() || !msg.contains("Unexpected token") {
+            self.extractor.borrow_mut().parse_errors.push_str(&msg);
+            tracing::error!("error: {msg}\nCurrent: {s}");
+        }
     }
     #[inline]
     fn get_document(&self) -> Self::Handle {
@@ -160,6 +164,7 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
         }
         match child {
             NodeOrText::AppendNode(child) => {
+                let mut errors = 0;
                 if child
                     .as_element()
                     .is_some_and(|n| n.name.local.as_ref().eq_ignore_ascii_case("img"))
@@ -189,7 +194,7 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                     let new_start = parent_elem.end_offset.get() - tag_len(&parent_elem.name) - 1;
                     if let Some(child_elem) = child.as_element() {
                         {
-                            let mut attributes = child_elem.attributes.borrow_mut();
+                            let attributes = child_elem.attributes.borrow();
                             let mut extractor = self.extractor.borrow_mut();
                             let rules: KeyList = attributes
                                 .0
@@ -202,19 +207,24 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                                     }
                                 })
                                 .collect();
+                            let mut attrs = attributes.clone();
+                            drop(attributes);
                             if !rules.is_empty() {
                                 let mut closes = SmallVec::<_, 2>::new();
-                                for r in rules.apply(&mut *extractor, &mut *attributes, &child) {
+                                for r in rules.apply(&mut *extractor, &mut attrs, &child) {
                                     match r {
                                         Ok(((), c)) => {
                                             if let Some(c) = c {
                                                 closes.push(c);
                                             }
                                         }
-                                        Err(e) => self.errors.borrow_mut().push(e),
+                                        Err(e) => {
+                                            errors += 1;
+                                            self.errors.borrow_mut().push(e);
+                                        }
                                     }
                                 }
-                                drop(attributes);
+                                *child_elem.attributes.borrow_mut() = attrs;
                                 if !closes.is_empty() {
                                     closes.reverse();
                                     update_attributes(&closes, child_elem);
@@ -229,7 +239,16 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                     }
                     prolong(parent, child.len() as isize);
                 }
+
                 parent.append(child);
+                if errors > 0 {
+                    let s = parent.string();
+                    {
+                        let es = self.errors.borrow();
+                        let es = &es[es.len() - errors..es.len()];
+                        tracing::error!("errors: {es:?}\n in: {s}");
+                    }
+                }
             }
             NodeOrText::AppendText(text) => {
                 if let Some(elem) = parent.as_element() {
@@ -343,6 +362,8 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
             let mut extractor = self.extractor.borrow_mut();
             for c in closes {
                 if let Err(e) = extractor.close(c, node) {
+                    let s = node.string();
+                    tracing::error!("errors: {e}\n in: {s}");
                     self.errors.borrow_mut().push(e);
                 }
             }
@@ -370,8 +391,17 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
         unreachable!()
     }
     #[inline]
-    fn add_attrs_if_missing(&self, _target: &Self::Handle, _attrs: Vec<html5ever::Attribute>) {
-        unreachable!()
+    fn add_attrs_if_missing(&self, target: &Self::Handle, attrs: Vec<html5ever::Attribute>) {
+        if let Some(e) = target.as_element() {
+            let mut ats = e.attributes.borrow_mut();
+            for a in attrs {
+                if let Some(att) = ats.0.iter_mut().find(|att| att.0 == a.name) {
+                    *att = (a.name, a.value);
+                } else {
+                    ats.0.push((a.name, a.value));
+                }
+            }
+        }
     }
 }
 

@@ -35,7 +35,10 @@ use ftml_ontology::{
     narrative::{
         SharedDocumentElement,
         documents::Document,
-        elements::{DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration},
+        elements::{
+            DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration,
+            problems::Solutions,
+        },
     },
     utils::Css,
 };
@@ -65,25 +68,49 @@ macro_rules! new_global {
     (@TYPE RemoteFlams($val:expr;$tp:ty) [$($rkey:literal = $rval:literal),+;$num:literal] ) => {
         $crate::RemoteFlamsBackend<$tp,[(::ftml_uris::DocumentUri,&'static str);$num]>
     };
-    (@NEW RemoteFlams($val:expr;$tp:ty) [$($rkey:literal = $rval:literal),+;$num:literal] ) => {
-        $crate::RemoteFlamsBackend::new_with_redirects($val,[$(
-            (std::str::FromStr::from_str($rkey).expect("invalid DocumentUri"),$rval)
-        ),*])
-    };
-
     (@TYPE RemoteFlams [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
         $crate::RemoteFlamsBackend<&'static str,[(::ftml_uris::DocumentUri,&'static str);$num]>
     };
+    (@TYPE RemoteFlams($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend<$tp,$crate::NoRedirects> };
+    (@TYPE RemoteFlams) => { $crate::RemoteFlamsBackend<&'static str,$crate::NoRedirects> };
+
+    (@NEW RemoteFlams($val:expr;$tp:ty) [$($rkey:literal = $rval:literal),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend::new_with_redirects($val,[$(
+            (std::str::FromStr::from_str($rkey).expect("invalid DocumentUri"),$rval)
+        ),*],true)
+    };
+    (@NEW RemoteFlams($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend::new($val,true) };
+    (@NEW RemoteFlams) => { $crate::RemoteFlamsBackend::new($crate::DEFAULT_SERVER_URL,true) };
     (@NEW RemoteFlams [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
         $crate::RemoteFlamsBackend::new_with_redirects($crate::DEFAULT_SERVER_URL,[$(
             (std::str::FromStr::from_str($rkey).expect("invalid DocumentUri"),$rval)
-        ),*])
+        ),*],true)
     };
 
-    (@TYPE RemoteFlams($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend<$tp,$crate::NoRedirects> };
-    (@NEW RemoteFlams($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend::new($val) };
-    (@TYPE RemoteFlams) => { $crate::RemoteFlamsBackend<&'static str,$crate::NoRedirects> };
-    (@NEW RemoteFlams) => { $crate::RemoteFlamsBackend::new($crate::DEFAULT_SERVER_URL) };
+    (@TYPE RemoteFlamsLike($val:expr;$tp:ty) [$($rkey:literal = $rval:literal),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend<$tp,[(::ftml_uris::DocumentUri,&'static str);$num]>
+    };
+    (@TYPE RemoteFlamsLike [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend<&'static str,[(::ftml_uris::DocumentUri,&'static str);$num]>
+    };
+    (@TYPE RemoteFlamsLike($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend<$tp,$crate::NoRedirects> };
+    (@TYPE RemoteFlamsLike) => { $crate::RemoteFlamsBackend<&'static str,$crate::NoRedirects> };
+
+    (@NEW RemoteFlamsLike($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend::new($val,false) };
+    (@NEW RemoteFlamsLike [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend::new_with_redirects($crate::DEFAULT_SERVER_URL,[$(
+            (std::str::FromStr::from_str($rkey).expect("invalid DocumentUri"),$rval)
+        ),*],false)
+    };
+    (@NEW RemoteFlamsLike($val:expr;$tp:ty) [$($rkey:literal = $rval:literal),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend::new_with_redirects($val,[$(
+            (std::str::FromStr::from_str($rkey).expect("invalid DocumentUri"),$rval)
+        ),*],false)
+    };
+    (@NEW RemoteFlamsLike) => { $crate::RemoteFlamsBackend::new($crate::DEFAULT_SERVER_URL,false) };
+
+
+
 
     (@TYPE Cached($($rest:tt)*) ) => { $crate::CachedBackend< $crate::new_global!(@TYPE $($rest)*) > };
     (@NEW Cached($($rest:tt)*) ) => { $crate::FtmlBackend::cached($crate::new_global!(@NEW $($rest)*)) };
@@ -247,15 +274,16 @@ pub trait FtmlBackend {
         Ok((a, b))
     }
 
-    #[inline]
     fn get_document_html(
         &self,
         uri: DocumentUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
-    {
-        self.get_fragment(uri.into(), context)
-    }
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send;
+
+    fn get_solutions(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<Output = Result<Solutions, BackendError<Self::Error>>> + Send;
 
     fn get_notations(
         &self,
@@ -281,6 +309,7 @@ pub trait FtmlBackend {
 pub trait FlamsBackend {
     fn document_link_url(&self, uri: &DocumentUri) -> String;
     fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String>;
+    fn stripped(&self) -> bool;
 
     /// `/content/fragment`
     #[allow(clippy::too_many_arguments)]
@@ -303,7 +332,24 @@ pub trait FlamsBackend {
         >,
     > + Send;
 
-    /// `/content/module`
+    /// `/content/document`
+    #[allow(clippy::too_many_arguments)]
+    fn get_document_html(
+        &self,
+        uri: Option<DocumentUri>,
+        rp: Option<String>,
+        a: Option<ftml_uris::ArchiveId>,
+        p: Option<String>,
+        d: Option<String>,
+        l: Option<ftml_uris::Language>,
+    ) -> impl Future<
+        Output = Result<
+            (DocumentUri, Box<[Css]>, Box<str>),
+            BackendError<server_fn::error::ServerFnErrorErr>,
+        >,
+    > + Send;
+
+    /// `/domain/module`
     #[allow(clippy::too_many_arguments)]
     fn get_module(
         &self,
@@ -313,7 +359,7 @@ pub trait FlamsBackend {
         m: Option<String>,
     ) -> impl Future<Output = Result<Module, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
 
-    /// `/content/document`
+    /// `/domain/document`
     #[allow(clippy::too_many_arguments)]
     fn get_document(
         &self,
@@ -344,6 +390,12 @@ pub trait FlamsBackend {
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
     > + Send;
+
+    /// `/content/solution`
+    fn get_solutions(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<Output = Result<Solutions, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
 
     /// `/content/los`
     #[allow(clippy::too_many_arguments)]
@@ -385,6 +437,7 @@ where
         context: Option<NarrativeUri>,
     ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
     {
+        let stripped = self.stripped();
         <Self as FlamsBackend>::get_fragment(
             self,
             Some(uri),
@@ -398,7 +451,7 @@ where
             None,
             context,
         )
-        .map(|r| r.map(|(_, css, s)| (s, css, true)))
+        .map(move |r| r.map(|(_, css, s)| (s, css, stripped)))
     }
 
     #[inline]
@@ -415,6 +468,36 @@ where
         uri: DocumentUri,
     ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send {
         <Self as FlamsBackend>::get_document(self, Some(uri), None, None, None, None, None)
+    }
+
+    #[inline]
+    fn get_document_html(
+        &self,
+        uri: DocumentUri,
+        _context: Option<NarrativeUri>,
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
+    {
+        let stripped = self.stripped();
+        let fut = <Self as FlamsBackend>::get_document_html(
+            self,
+            Some(uri),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        async move {
+            let r = fut.await?;
+            Ok((r.2, r.1, stripped))
+        }
+    }
+
+    fn get_solutions(
+        &self,
+        uri: DocumentElementUri,
+    ) -> impl Future<Output = Result<Solutions, BackendError<Self::Error>>> + Send {
+        <Self as FlamsBackend>::get_solutions(self, uri)
     }
 
     #[inline]

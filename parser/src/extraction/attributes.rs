@@ -277,17 +277,32 @@ pub trait Attributes {
     }
 
     /// #### Errors
+    #[inline]
     fn get_elem_uri_from_id(
         &mut self,
         extractor: &mut Self::Ext,
         prefix: impl Into<Cow<'static, str>>,
     ) -> Result<DocumentElementUri> {
-        let id: Id = if let Some(id) = self.get(FtmlKey::Id) {
+        self.get_elem_uri_from(FtmlKey::Id, extractor, prefix)
+    }
+
+    /// #### Errors
+    fn get_elem_uri_from(
+        &mut self,
+        key: FtmlKey,
+        // this doesn't actually need mut, by rust-analyzer doesn't realize that
+        #[allow(unused_mut)] mut extractor: &mut Self::Ext,
+        prefix: impl Into<Cow<'static, str>>,
+    ) -> Result<DocumentElementUri> {
+        if let Some(f) = extractor.forced_element_uri() {
+            return Ok(f);
+        }
+        let id: Id = if let Some(id) = self.get(key) {
             id.as_ref()
                 .parse()
-                .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::Id))?
+                .map_err(|_| FtmlExtractionError::InvalidValue(key))?
         } else {
-            extractor.new_id(FtmlKey::Id, prefix)?
+            extractor.new_id(key, prefix)?
         };
         let curr_uri = extractor.get_narrative_uri();
 

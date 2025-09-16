@@ -1,4 +1,5 @@
 use ftml_uris::Id;
+use ordered_float::OrderedFloat;
 use smallvec::SmallVec;
 
 use crate::narrative::{
@@ -34,6 +35,20 @@ pub enum SolutionData {
     FillInSol(FillInSol),
 }
 
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Default)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum ChoiceBlockStyle {
+    #[default]
+    Block,
+    Inline,
+    Dropdown,
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
@@ -43,10 +58,10 @@ pub enum SolutionData {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ChoiceBlock {
     pub multiple: bool,
-    pub inline: bool,
+    pub block_style: ChoiceBlockStyle,
     pub range: DocumentRange,
     pub styles: Box<[Id]>,
-    pub choices: Vec<Choice>,
+    pub choices: Box<[Choice]>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -74,7 +89,7 @@ pub struct FillInSol {
     pub opts: Vec<FillInSolOption>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
@@ -88,8 +103,10 @@ pub enum FillInSolOption {
         feedback: Box<str>,
     },
     NumericalRange {
-        from: Option<f32>,
-        to: Option<f32>,
+        #[cfg_attr(feature = "serde", bincode(with_serde))]
+        from: Option<OrderedFloat<f32>>,
+        #[cfg_attr(feature = "serde", bincode(with_serde))]
+        to: Option<OrderedFloat<f32>>,
         verdict: bool,
         feedback: Box<str>,
     },
@@ -101,6 +118,13 @@ pub enum FillInSolOption {
 }
 
 impl FillInSolOption {
+    pub fn add_feedback(&mut self, fb: Box<str>) {
+        match self {
+            Self::Exact { feedback, .. }
+            | Self::NumericalRange { feedback, .. }
+            | Self::Regex { feedback, .. } => *feedback = fb,
+        }
+    }
     #[allow(clippy::cast_precision_loss)]
     #[must_use]
     pub fn from_values(kind: &str, value: &str, verdict: bool) -> Option<Self> {
@@ -136,8 +160,8 @@ impl FillInSolOption {
                     Some(i128::from_str(to).ok()? as _)
                 };
                 Some(Self::NumericalRange {
-                    from,
-                    to,
+                    from: from.map(Into::into),
+                    to: to.map(Into::into),
                     verdict,
                     feedback: String::new().into(),
                 })
@@ -193,6 +217,12 @@ impl Solutions {
 }
 
 impl Solutions {
+    #[inline]
+    #[must_use]
+    pub fn inner(&self) -> &[SolutionData] {
+        &self.0
+    }
+
     #[must_use]
     pub fn default(&self) -> ProblemFeedback {
         let mut solutions = SmallVec::new();
@@ -250,8 +280,8 @@ impl Solutions {
                                 is_correct: *verdict,
                                 feedback: feedback.clone(),
                                 kind: FillinFeedbackKind::NumRange {
-                                    from: *from,
-                                    to: *to,
+                                    from: from.map(Into::into),
+                                    to: to.map(Into::into),
                                 },
                             }),
                             FillInSolOption::Regex {
@@ -431,8 +461,8 @@ impl Solutions {
                                         s.parse::<i32>().ok().map(|i| i as f32)
                                     };
                                     if let Some(f) = num
-                                        && !from.is_some_and(|v| f < v)
-                                        && !to.is_some_and(|v| f > v)
+                                        && !from.is_some_and(|v| f < *v)
+                                        && !to.is_some_and(|v| f > *v)
                                     {
                                         if *verdict {
                                             pts += 1.0;
@@ -445,8 +475,8 @@ impl Solutions {
                                     is_correct: *verdict,
                                     feedback: feedback.clone(),
                                     kind: FillinFeedbackKind::NumRange {
-                                        from: *from,
-                                        to: *to,
+                                        from: from.map(Into::into),
+                                        to: to.map(Into::into),
                                     },
                                 });
                             }
