@@ -92,7 +92,7 @@ pub struct BindingTerm(pub(crate) triomphe::Arc<Binding>);
 pub struct Binding {
     pub head: Term,
     pub arguments: Box<[BoundArgument]>,
-    pub body: Term,
+    //pub body: BoundArgument, //Term,
     #[cfg_attr(feature = "serde", serde(default))]
     pub presentation: Option<VarOrSym>,
     #[cfg_attr(feature = "serde", serde(skip))]
@@ -192,7 +192,7 @@ impl Term {
             Self::Bound(b) => Self::Bound(BindingTerm::new(
                 b.head.clone(),
                 b.arguments.clone(),
-                b.body.clone(),
+                //b.body.clone(),
                 Some(pres),
             )),
             Self::Field(f) => Self::Field(RecordFieldTerm::new(
@@ -233,7 +233,7 @@ impl crate::utils::RefTree for Term {
                 df: None, tp: None, ..
             } => ExprChildrenIter::E,
             Self::Application(a) => ExprChildrenIter::App(Some(&a.head), &a.arguments),
-            Self::Bound(b) => ExprChildrenIter::Bound(Some(&b.head), &b.arguments, &b.body),
+            Self::Bound(b) => ExprChildrenIter::Bound(Some(&b.head), &b.arguments),//, &b.body),
             Self::Label {
                 df: Some(df),
                 tp: Some(tp),
@@ -344,7 +344,7 @@ fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt:
             .debug_struct("OMBIND")
             .field("head", &b.head)
             .field("arguments", &b.arguments)
-            .field("body", &b.body)
+            //.field("body", &b.body)
             .finish(),
         Term::Opaque(o) => {
             write!(f, "<{}", o.node.tag)?;
@@ -381,9 +381,9 @@ impl std::fmt::Debug for Short<'_> {
 pub enum ExprChildrenIter<'a> {
     E,
     App(Option<&'a Term>, &'a [Argument]),
-    Bound(Option<&'a Term>, &'a [BoundArgument], &'a Term),
+    Bound(Option<&'a Term>, &'a [BoundArgument]), //, &'a Term),
     Arg(&'a [Term], &'a [Argument]),
-    BArg(&'a [Term], &'a [BoundArgument], &'a Term),
+    BArg(&'a [Term], &'a [BoundArgument]), //, &'a Term),
     One(&'a Term),
     Two(&'a Term, &'a Term),
     Slice(std::slice::Iter<'a, Term>),
@@ -427,15 +427,19 @@ impl<'a> Iterator for ExprChildrenIter<'a> {
                     }
                 }
             }
-            Self::Bound(head, args, b) => {
+            Self::Bound(head, args) => {
+                //, b) => {
                 if let Some(f) = head.take() {
                     return Some(f);
                 }
                 loop {
                     let Some(next) = args.first() else {
+                        /*
                         let b = *b;
                         *self = Self::E;
                         return Some(b);
+                        */
+                        return None;
                     };
                     *args = &args[1..];
                     match next {
@@ -452,7 +456,7 @@ impl<'a> Iterator for ExprChildrenIter<'a> {
                                     ) {
                                         *args = &args[1..];
                                     }
-                                    *self = Self::BArg(&seq[1..], args, b);
+                                    *self = Self::BArg(&seq[1..], args); //, b);
                                 }
                                 return Some(f);
                             }
@@ -471,13 +475,14 @@ impl<'a> Iterator for ExprChildrenIter<'a> {
                 }
                 Some(f)
             }
-            Self::BArg(ls, rest, b) => {
+            Self::BArg(ls, rest) => {
+                //, b) => {
                 // SAFETY: only constructed with non-empty ls (see above)
                 // and replaced by Self::Bound after emptying (below)
                 let f = unsafe { ls.first().unwrap_unchecked() };
                 *ls = &ls[1..];
                 if ls.is_empty() {
-                    *self = Self::Bound(None, rest, b);
+                    *self = Self::Bound(None, rest); //, b);
                 }
                 Some(f)
             }

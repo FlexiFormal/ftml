@@ -25,7 +25,10 @@ pub async fn measure_async<R, F: Future<Output = R>>(f: impl FnOnce() -> F) -> (
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Timestamp(#[cfg_attr(feature = "typescript", tsify(type = "number"))] pub NonZeroU64);

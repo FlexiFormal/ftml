@@ -207,7 +207,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             title: take(&mut self.title), // todo
             elements: take(&mut self.top).into_boxed_slice(),
             top_section_level: self.top_section_level.unwrap_or_default(),
-            kind: self.kind,
+            kind: self.kind.clone(),
             styles: DocumentStyles {
                 // clone instead of take because DomExtractor
                 // still needs them
@@ -2311,11 +2311,15 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 return Ok(());
             }
             Some(OpenDomainElement::Comp | OpenDomainElement::DefComp) => {
+                // this is incompatible with \this in stex:
+                return Ok(());
+                /*
                 tracing::debug!("Error: {:?}", self.domain);
                 return Err(FtmlExtractionError::InvalidIn(
                     FtmlKey::Term,
                     "declarations or terms outside of an argument",
                 ));
+                 */
             }
         }
         otherwise(self, term)
@@ -2388,10 +2392,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         head: VarOrSym,
         head_term: Option<Term>,
         uri: Option<DocumentElementUri>,
-        mut arguments: Vec<OpenBoundArgument>,
+        arguments: Vec<OpenBoundArgument>,
         node: &N,
     ) -> super::Result<()> {
         tracing::info!("Closing OMBIND {head:?} ({head_term:?}) @ {arguments:?}");
+        /*
         let body = match arguments.pop() {
             Some(
                 OpenBoundArgument::Simple {
@@ -2413,6 +2418,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             }
             _ => return Err(FtmlExtractionError::MissingArgument(arguments.len())),
         };
+         */
         let mut args = Vec::with_capacity(arguments.len());
         for (i, a) in arguments.into_iter().enumerate() {
             if let Some(a) = a.close() {
@@ -2442,7 +2448,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         let term = Term::Bound(BindingTerm::new(
             head,
             args.into_boxed_slice(),
-            body,
+            //body,
             presentation,
         ))
         .simplify();

@@ -80,7 +80,7 @@ impl<H: OMSerializable, A: OMSerializable> openmath::ser::OMSerializable for Oma
 struct Args<'a, H: OMSerializable = &'a Term> {
     head: &'a H,
     args: &'a [BoundArgument],
-    bd: &'a Term,
+    //bd: &'a Term,
 }
 impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
     fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
@@ -88,14 +88,14 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
         serializer: S,
     ) -> Result<S::Ok, S::Err> {
         match self.args.first() {
-            None => self.bd.as_openmath(serializer),
+            None => self.head.as_openmath(serializer), //self.bd.as_openmath(serializer),
             Some(BoundArgument::Bound(a)) => serializer.ombind(
                 &self.head,
                 std::iter::once(a),
                 &Self {
                     head: self.head,
                     args: &self.args[1..],
-                    bd: self.bd,
+                    //bd: self.bd,
                 },
             ),
             Some(BoundArgument::BoundSeq(MaybeSequence::One(v))) => serializer.ombind(
@@ -104,7 +104,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                 &Self {
                     head: self.head,
                     args: &self.args[1..],
-                    bd: self.bd,
+                    //bd: self.bd,
                 },
             ),
             Some(BoundArgument::BoundSeq(MaybeSequence::Seq(s))) => serializer.ombind(
@@ -113,7 +113,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                 &Self {
                     head: self.head,
                     args: &self.args[1..],
-                    bd: self.bd,
+                    //bd: self.bd,
                 },
             ),
             Some(BoundArgument::Simple(t)) => Args {
@@ -122,7 +122,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                     args: &[t],
                 },
                 args: &self.args[1..],
-                bd: self.bd,
+                //bd: self.bd,
             }
             .as_openmath(serializer),
             Some(BoundArgument::Sequence(MaybeSequence::One(t))) => Args {
@@ -131,7 +131,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                     args: &[AsSeq(t)],
                 },
                 args: &self.args[1..],
-                bd: self.bd,
+                //bd: self.bd,
             }
             .as_openmath(serializer),
             Some(BoundArgument::Sequence(MaybeSequence::Seq(s))) => Args {
@@ -140,7 +140,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
                     args: s,
                 },
                 args: &self.args[1..],
-                bd: self.bd,
+                //bd: self.bd,
             }
             .as_openmath(serializer),
         }
@@ -179,7 +179,7 @@ impl openmath::ser::OMSerializable for Term {
             Self::Bound(b) => Args {
                 head: &b.head,
                 args: &b.arguments,
-                bd: &b.body,
+                //bd: &b.body,
             }
             .as_openmath(serializer),
             _ => todo!(),

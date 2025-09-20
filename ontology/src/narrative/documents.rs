@@ -11,7 +11,7 @@ use crate::{
             sections::SectionLevel,
         },
     },
-    utils::{RefTree, TreeChild},
+    utils::{RefTree, TreeChild, time::Timestamp},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -127,19 +127,36 @@ pub struct DocumentStyle {
     pub counter: Option<Id>,
 }
 
-#[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
-#[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum DocumentKind {
     #[default]
     Article,
     Fragment,
-    Exam,
-    Homework,
-    Quiz,
+    Exam {
+        date: Timestamp,
+        course: Id,
+        retake: bool,
+        num: u16,
+        term: Id,
+    },
+    Homework {
+        date: Timestamp,
+        course: Id,
+        num: u16,
+        term: Id,
+    },
+    Quiz {
+        date: Timestamp,
+        course: Id,
+        num: u16,
+        term: Id,
+    },
 }
 impl std::str::FromStr for DocumentKind {
     type Err = ();
@@ -147,9 +164,9 @@ impl std::str::FromStr for DocumentKind {
         Ok(match s {
             "article" => Self::Article,
             "fragment" => Self::Fragment,
-            "exam" => Self::Exam,
-            "homework" => Self::Homework,
-            "quiz" => Self::Quiz,
+            //"exam" => Self::Exam,
+            //"homework" => Self::Homework,
+            //"quiz" => Self::Quiz,
             _ => return Err(()),
         })
     }
@@ -159,9 +176,9 @@ impl std::fmt::Display for DocumentKind {
         f.write_str(match self {
             Self::Article => "article",
             Self::Fragment => "fragment",
-            Self::Exam => "exam",
-            Self::Homework => "homework",
-            Self::Quiz => "quiz",
+            Self::Exam { .. } => "exam",
+            Self::Homework { .. } => "homework",
+            Self::Quiz { .. } => "quiz",
         })
     }
 }

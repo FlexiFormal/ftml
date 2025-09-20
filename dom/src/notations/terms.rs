@@ -153,7 +153,7 @@ impl TermExt for Term {
             {
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(b.head.clone()) };
-                bound::<Views, Be>(vos, leaf, b.body.clone(), None, &b.arguments).into_any()
+                bound::<Views, Be>(vos, leaf, /*b.body.clone(),*/ None, &b.arguments).into_any()
             }
             Self::Bound(b) if b.presentation.is_some() => {
                 // SAFETY: presentation.is_some();
@@ -171,7 +171,8 @@ impl TermExt for Term {
                         return "TODO: unresolved variable".into_any();
                     }
                 };
-                bound::<Views, Be>(pres, uri, b.body.clone(), Some(head), &b.arguments).into_any()
+                bound::<Views, Be>(pres, uri, /*b.body.clone(),*/ Some(head), &b.arguments)
+                    .into_any()
             }
             Self::Opaque(o) => {
                 let mut terms = o
@@ -279,16 +280,16 @@ fn application<Views: FtmlViews, Be: SendBackend>(
 fn bound<Views: FtmlViews, Be: SendBackend>(
     head: VarOrSym,
     uri: LeafUri,
-    body: Term,
+    //body: Term,
     real_term: Option<ClonableView>,
     arguments: &[BoundArgument],
 ) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
 
-    let mut arguments = do_bound_args::<Views, Be>(arguments);
-    arguments.push(Either::Left(ClonableView::new(true, move || {
+    let arguments = do_bound_args::<Views, Be>(arguments);
+    /*arguments.push(Either::Left(ClonableView::new(true, move || {
         body.clone().into_view::<Views, Be>(true)
-    })));
+    })));*/
     DocumentState::with_head(head.clone(), move || {
         if with_context::<CurrentUri, _>(|_| ()).is_some() {
             Left(Views::binder_application(

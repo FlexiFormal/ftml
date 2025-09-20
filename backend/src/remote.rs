@@ -402,6 +402,7 @@ mod server_fn {
 
         #[allow(clippy::similar_names)]
         #[allow(clippy::many_single_char_names)]
+        #[allow(clippy::useless_let_if_seq)]
         fn get_document_html(
             &self,
             uri: Option<DocumentUri>,
@@ -451,6 +452,7 @@ mod server_fn {
         }
 
         #[allow(clippy::similar_names)]
+        #[allow(clippy::useless_let_if_seq)]
         fn get_module(
             &self,
             uri: Option<ftml_uris::ModuleUri>,
@@ -495,6 +497,7 @@ mod server_fn {
 
         #[allow(clippy::similar_names)]
         #[allow(clippy::many_single_char_names)]
+        #[allow(clippy::useless_let_if_seq)]
         fn get_document(
             &self,
             uri: Option<ftml_uris::DocumentUri>,

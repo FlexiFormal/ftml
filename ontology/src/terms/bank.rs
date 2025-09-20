@@ -149,7 +149,7 @@ imp!(ApplicationTerm(Application{
 imp!(BindingTerm(Binding{
     head: Term,
     arguments: Box<[BoundArgument]>,
-    body: Term,
+    //body: Term,
     presentation: Option<VarOrSym>,
 }) = bindings);
 
@@ -261,7 +261,7 @@ pub fn get_cache_size() -> TermCacheSize {
         bindings_bytes += std::mem::size_of::<BindingTerm>()
             + std::mem::size_of::<Option<VarOrSym>>() // presentation
             + a.head.deep_size_of()
-            + a.body.deep_size_of()
+            //+ a.body.deep_size_of()
             + a.arguments
                 .iter()
                 .map(BoundArgument::deep_size_of)
