@@ -43,6 +43,10 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--all-features"]
 
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
 [tasks.all-tests]
 dependencies = [
     "test-no-features",
@@ -54,6 +58,7 @@ dependencies = [
     "test-openmath",
     "test-lightningcss",
     "test-all-features",
+    "clean"
 ]
 
 [tasks.doc]

@@ -5,7 +5,17 @@ use std::{
     borrow::Borrow, hash::Hasher, marker::PhantomData, num::NonZeroUsize, ops::Deref, str::FromStr,
 };
 
+pub const BASE_URI_MAX: usize = 16;
+pub const ARCHIVE_ID_MAX: usize = 512;
+pub const ID_MAX: usize = 512;
+pub const NAME_MAX: usize = 2048;
+pub const PATH_MAX: usize = 16_384;
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
 pub struct MemoryState {
     pub num_ids: usize,
     pub ids_bytes: usize,

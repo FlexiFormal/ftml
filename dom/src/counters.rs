@@ -1,5 +1,6 @@
+use crate::extractor::DomExtractor;
 use crate::toc::CurrentTOC;
-use crate::{extractor::DomExtractor, toc::TOCElem};
+use ftml_ontology::narrative::documents::TocElem;
 use ftml_ontology::narrative::elements::{paragraphs::ParagraphKind, sections::SectionLevel};
 use ftml_uris::{DocumentUri, Id};
 use leptos::prelude::*;
@@ -677,7 +678,7 @@ impl SectionCounters {
             ctw.with(|v| {
                 if let Some(v) = v.iter_dfs() {
                     for e in v {
-                        if let TOCElem::Inputref {
+                        if let TocElem::Inputref {
                             uri: u,
                             id: i,
                             children: chs,
@@ -716,7 +717,7 @@ impl SectionCounters {
 }
 
 fn update(
-    ch: &[TOCElem],
+    ch: &[TocElem],
     mut current: LogicalLevel,
     max: SectionLevel,
     old_slides: &RwSignal<u32>,
@@ -739,8 +740,8 @@ fn update(
     loop {
         if let Some(c) = curr.next() {
             match c {
-                TOCElem::Slide => n_slides += 1,
-                TOCElem::SkippedSection { children } => {
+                TocElem::Slide => n_slides += 1,
+                TocElem::SkippedSection { children } => {
                     let lvl = if let LogicalLevel::Section(s) = current {
                         s.inc()
                     } else if current == LogicalLevel::None {
@@ -751,7 +752,7 @@ fn update(
                     let old = std::mem::replace(&mut current, LogicalLevel::Section(lvl));
                     stack.push((std::mem::replace(&mut curr, children.iter()), old));
                 }
-                TOCElem::Section { children, .. } => {
+                TocElem::Section { children, .. } => {
                     let lvl = if let LogicalLevel::Section(s) = current {
                         s.inc()
                     } else if current == LogicalLevel::None {
@@ -763,10 +764,10 @@ fn update(
                     let old = std::mem::replace(&mut current, LogicalLevel::Section(lvl));
                     stack.push((std::mem::replace(&mut curr, children.iter()), old));
                 }
-                TOCElem::Inputref { children, .. } => {
+                TocElem::Inputref { children, .. } => {
                     stack.push((std::mem::replace(&mut curr, children.iter()), current));
                 }
-                TOCElem::Paragraph { styles, kind, .. } => {
+                TocElem::Paragraph { styles, kind, .. } => {
                     if let Some(n) = SectionCounters::get_counter(para_map, *kind, styles) {
                         tracing::trace!("Increasing counter {n}");
                         if let Some((_, c)) = n_counters.iter_mut().find(|(i, _)| *i == n) {

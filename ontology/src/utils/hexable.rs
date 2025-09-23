@@ -34,7 +34,7 @@ impl<T: Sized + serde::Serialize + for<'de> serde::Deserialize<'de>> Hexable for
         Ok(ret)
     }
     fn from_hex(s: &str) -> Result<Self, FromHexError> {
-        let bytes: Result<Vec<_>, _> = if s.len() % 2 == 0 {
+        let bytes: Result<Vec<_>, _> = if s.len().is_multiple_of(2) {
             (0..s.len())
                 .step_by(2)
                 .filter_map(|i| s.get(i..i + 2))

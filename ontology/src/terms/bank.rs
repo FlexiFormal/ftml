@@ -25,7 +25,7 @@ static TERM_BANK: std::sync::LazyLock<TermBank> = std::sync::LazyLock::new(|| Te
 });
 
 macro_rules! imp {
-    ($outer:ident($inner:ident{$($name:ident:$tp:ty),*$(,)?}) = $set:ident ) => {
+    ($outer:ident($inner:ident{$($name:ident:$tp:ty),*$(,)?}) = $set:ident @ $num:literal ) => {
         impl std::ops::Deref for $outer {
             type Target = $inner;
             #[inline]
@@ -56,6 +56,9 @@ macro_rules! imp {
                 }
                 let t = Self(triomphe::Arc::new(inner));
                 TERM_BANK.$set.insert(t.clone());
+                if TERM_BANK.$set.len() > $num {
+                    TERM_BANK.$set.retain(|e| !e.0.is_unique());
+                }
                 t
             }
         }
@@ -144,28 +147,33 @@ imp!(ApplicationTerm(Application{
     head: Term,
     arguments: Box<[Argument]>,
     presentation: Option<VarOrSym>,
-}) = applications);
+}) = applications @ 2048);
 
 imp!(BindingTerm(Binding{
     head: Term,
     arguments: Box<[BoundArgument]>,
     //body: Term,
     presentation: Option<VarOrSym>,
-}) = bindings);
+}) = bindings @ 512);
 
 imp!(RecordFieldTerm(RecordField{
     record: Term,
     key: UriName,
     record_type: Option<Term>,
     presentation: Option<VarOrSym>,
-}) = records);
+}) = records @ 256);
 
 imp!(OpaqueTerm(Opaque {
     node:OpaqueNode,
     terms: Box<[Term]>,
-}) = opaques);
+}) = opaques @ 2048);
 
 #[cfg(feature = "deepsize")]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[derive(Debug, Clone, Copy)]
 pub struct TermCacheSize {
     pub num_applications: usize,
     pub applications_bytes: usize,

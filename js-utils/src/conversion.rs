@@ -26,6 +26,19 @@ pub trait ToJs {
     fn to_js(&self) -> Result<JsValue, Self::Error>;
 }
 
+pub use serde_wasm_bindgen::{Error as SerdeWasmError, from_value};
+
+/*
+pub trait SerdeFromJs: for<'de> serde::Deserialize<'de> {}
+impl<T: SerdeFromJs> TryFromJsValue for T {
+    type Error = serde_wasm_bindgen::Error;
+    #[inline]
+    fn try_from_js_value(value: JsValue) -> Result<Self, Self::Error> {
+        serde_wasm_bindgen::from_value(value)
+    }
+}
+*/
+
 pub trait SerdeToJs: serde::Serialize {}
 impl<T: SerdeToJs> ToJs for T {
     type Error = serde_wasm_bindgen::Error;
@@ -42,10 +55,6 @@ impl<T: FromWasmBindgen> FromJs for T {
         T::try_from_js_value(value.clone()).map_err(|_| JsDisplay(value))
     }
 }
-
-//pub struct Ser<'a, T>(&'a T);
-//pub struct SerDe<T>(PhantomData<T>);
-//pub struct TFJSV<T: TryFromJsValue>(T);
 
 impl<T: FromJs> FromJs for Option<T> {
     type Error = T::Error;
@@ -65,35 +74,6 @@ impl<T: ToJs> ToJs for Option<T> {
         self.as_ref().map_or(Ok(JsValue::NULL), T::to_js)
     }
 }
-/*
-impl<T: TryFromJsValue> FromJs for TFJSV<T>
-where
-    T::Error: std::fmt::Display,
-{
-    type Error = <T as TryFromJsValue>::Error;
-    type Inner = T;
-    #[inline]
-    fn from_js(value: JsValue) -> Result<Self::Inner, Self::Error> {
-        T::try_from_js_value(value)
-    }
-}
-
-impl<T: serde::de::DeserializeOwned> FromJs for SerDe<T> {
-    type Inner = T;
-    type Error = serde_wasm_bindgen::Error;
-    #[inline]
-    fn from_js(value: JsValue) -> Result<Self::Inner, Self::Error> {
-        serde_wasm_bindgen::from_value(value)
-    }
-}
-impl<T: serde::Serialize> ToJs for Ser<'_, T> {
-    type Error = serde_wasm_bindgen::Error;
-    #[inline]
-    fn to_js(&self) -> Result<JsValue, Self::Error> {
-        serde_wasm_bindgen::to_value(&self.0)
-    }
-}
- */
 
 impl FromJs for () {
     type Error = crate::JsDisplay;

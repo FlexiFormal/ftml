@@ -2,7 +2,10 @@ use crate::{BackendError, FtmlBackend, ParagraphOrProblemKind};
 use dashmap::Entry;
 use ftml_ontology::{
     domain::modules::Module,
-    narrative::{documents::Document, elements::Notation},
+    narrative::{
+        documents::{Document, TocElem},
+        elements::Notation,
+    },
     utils::Css,
 };
 use ftml_uris::{
@@ -62,6 +65,7 @@ where
         Cache<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
     modules_cache: Cache<ModuleUri, Module, BackendError<B::Error>>,
     documents_cache: Cache<DocumentUri, Document, BackendError<B::Error>>,
+    toc_cache: Cache<DocumentUri, (Box<[Css]>, Box<[TocElem]>), BackendError<B::Error>>,
 }
 
 impl<B: FtmlBackend> CachedBackend<B>
@@ -88,6 +92,9 @@ where
                 map: dashmap::DashMap::default(),
             },
             documents_cache: Cache {
+                map: dashmap::DashMap::default(),
+            },
+            toc_cache: Cache {
                 map: dashmap::DashMap::default(),
             },
         }
@@ -146,6 +153,16 @@ where
             .get((uri, context), |(uri, context)| {
                 self.inner.get_document_html(uri, context)
             })
+            .map_err(Into::into)
+    }
+
+    fn get_toc(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<Self::Error>>> + Send
+    {
+        self.toc_cache
+            .get(uri, |uri| self.inner.get_toc(uri))
             .map_err(Into::into)
     }
 

@@ -6,9 +6,9 @@
 /// Reexports for convenience
 pub mod rdf_types {
     pub use oxrdf::{
-        BlankNode, GraphName, GraphNameRef, Literal, LiteralRef, NamedNode, NamedNodeRef, Quad,
-        QuadRef, Subject, SubjectRef, Term as RDFTerm, TermRef as RDFTermRef, Triple, TripleRef,
-        Variable,
+        BlankNode, GraphName, GraphNameRef, Literal, LiteralRef, NamedNode, NamedNodeRef,
+        NamedOrBlankNode as Subject, NamedOrBlankNodeRef as SubjectRef, Quad, QuadRef,
+        Term as RDFTerm, TermRef as RDFTermRef, Triple, TripleRef, Variable,
     };
 }
 mod ontologies;

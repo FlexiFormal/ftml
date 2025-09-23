@@ -7,7 +7,7 @@ use crate::{
 use const_format::concatcp;
 use std::{fmt::Write, str::FromStr};
 
-crate::aux::macros::intern!(NAMES = NameStore:NonEmptyStr @ 1024);
+crate::aux::macros::intern!(NAMES = NameStore:NonEmptyStr @ crate::aux::interned::NAME_MAX);
 
 /// A hierarchical name used in FTML URIs for modules, symbols, and other named entities.
 ///

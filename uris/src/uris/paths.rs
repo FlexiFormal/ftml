@@ -7,7 +7,7 @@ use crate::{
 use const_format::concatcp;
 use std::{fmt::Write, str::FromStr};
 
-crate::aux::macros::intern!(PATHS = PathStore:NonEmptyStr @ 1024);
+crate::aux::macros::intern!(PATHS = PathStore:NonEmptyStr @ crate::aux::interned::PATH_MAX);
 
 /// A path within an FTML archive.
 ///

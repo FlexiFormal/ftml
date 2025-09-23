@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use either::Either::{Left, Right};
 use ftml_ontology::{
     narrative::elements::{DocumentElement, DocumentTerm, LogicalParagraph, VariableDeclaration},
-    terms::{ArgumentMode, Term, Variable},
+    terms::{Term, Variable},
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, Id, ModuleUri, NarrativeUriRef, UriName,
@@ -104,6 +104,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::Definiendum(_) => None,
                 OpenNarrativeElement::Section { uri, .. }
                 | OpenNarrativeElement::Notation { uri, .. }
@@ -143,6 +146,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::SkipSection { .. } => return false,
             }
         }
@@ -218,6 +224,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::ArgSep { .. } => continue, // Narrative::Notation(_) => continue,
             };
             for c in ch.iter().rev() {
@@ -280,6 +289,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::NotationArg(_) => break,
             }
         }
@@ -317,6 +329,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::NotationArg(_) => break,
             }
         }

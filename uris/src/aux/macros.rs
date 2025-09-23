@@ -109,7 +109,7 @@ macro_rules! debugdisplay {
 
 #[allow(clippy::redundant_pub_crate)]
 macro_rules! intern {
-    ($static:ident = $store:ident:$str_type:ident @ $num:literal ) => {
+    ($static:ident = $store:ident:$str_type:ident @ $num:expr ) => {
         #[cfg(feature = "interned")]//, not(feature = "api")))]
         #[allow(clippy::redundant_pub_crate)]
         pub(crate) static $static: std::sync::LazyLock<crate::aux::interned::InternMap> =
@@ -135,7 +135,7 @@ macro_rules! intern {
             }
         }
     };
-    ($static:ident $type:ident = $store:ident:$str_type:ident|$noninterned:ident @ $num:literal ) => {
+    ($static:ident $type:ident = $store:ident:$str_type:ident|$noninterned:ident @ $num:expr ) => {
         crate::aux::macros::intern!($static = $store:$str_type @ $num);
         #[cfg(feature = "interned")]
         #[allow(clippy::redundant_pub_crate)]

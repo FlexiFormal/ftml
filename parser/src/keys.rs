@@ -735,6 +735,7 @@ do_keys! {
         { +(AnswerClass) <=(Problem,SubProblem) }
         := (ext,attrs,keys,node) => {
             let id = opt!(attrs.take_typed(FtmlKey::ProblemSolution,|s| Id::from_str(s).map_err(|_| ())));
+            let _ = attrs.take(FtmlKey::AnswerClass.attr_name());
             del!(keys - AnswerClass);
             ret!(ext,node <- Solution(id) + Solution)
         } => Solution(id:Option<Id>),
@@ -837,7 +838,7 @@ do_keys! {
     ProblemChoice = "problem-choice"
         { ="[bool]" <=(ProblemSingleChoiceBlock,ProblemMultipleChoiceBlock) &(ProblemChoiceVerdict,ProblemChoiceFeedback)}
         := (ext,attrs,_keys,node) => {
-            let correct = attrs.get_bool(FtmlKey::Problem);
+            let correct = attrs.get_bool(FtmlKey::ProblemChoice);
             ret!(ext,node <- ProblemChoice(correct) + ProblemChoice)
         } => ProblemChoice(correct:bool),
 
@@ -846,14 +847,14 @@ do_keys! {
     ProblemChoiceVerdict = "problem-choice-verdict"
         { <=(ProblemChoice) }
         := (ext,_attrs,_keys,node) => {
-            ret!(ext,node <- ProblemChoiceVerdict)
+            ret!(ext,node <- ProblemChoiceVerdict + ProblemChoiceVerdict)
         } => ProblemChoiceVerdict,
 
     /// Learner feedback for when this [`ProblemChoice`](FtmlKey::ProblemChoice) was selected
     ProblemChoiceFeedback = "problem-choice-feedback"
         { <=(ProblemChoice) }
         := (ext,_attrs,_keys,node) => {
-            ret!(ext,node <- ProblemChoiceFeedback)
+            ret!(ext,node <- ProblemChoiceFeedback + ProblemChoiceFeedback)
         } => ProblemChoiceFeedback,
 
     /// A fill-in-the-blanks element of an autogradable (sub)problem.
@@ -891,7 +892,7 @@ do_keys! {
                 return Err(FtmlExtractionError::InvalidValue(FtmlKey::ProblemFillinsolCase));
             };
             opt.add_feedback(node.string().into_owned().into_boxed_str());
-            ret!(ext,node <- FillinSolCase(opt))
+            ret!(ext,node <- FillinSolCase(opt) + FillinSolCase)
         } => FillinSolCase(opt:FillInSolOption),
 
     ProblemFillinsolCaseValue = "fillin-case-value"
@@ -943,6 +944,9 @@ do_keys! {
                     | OpenNarrativeElement::ProblemGradingNote(_)
                     | OpenNarrativeElement::AnswerClass{..}
                     | OpenNarrativeElement::ProblemChoice{..}
+                    | OpenNarrativeElement::ProblemChoiceVerdict
+                    | OpenNarrativeElement::ProblemChoiceFeedback
+                    | OpenNarrativeElement::FillinSolCase(_)
                     | OpenNarrativeElement::NotationArg(_) => {
                         break;
                     }

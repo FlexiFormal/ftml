@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 
-use ftml_uris::{DocumentUri, Id, NarrativeUriRef, errors::SegmentParseError};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, NarrativeUriRef, errors::SegmentParseError};
 
 use crate::{
     narrative::{
@@ -181,6 +181,45 @@ impl std::fmt::Display for DocumentKind {
             Self::Quiz { .. } => "quiz",
         })
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
+/// An entry in a table of contents. Either:
+/// 1. a section; the title is assumed to be an HTML string, or
+/// 2. an inputref to some other document; the URI is the one for the
+///    inputref itself; not the referenced Document. For the TOC,
+///    which document is inputrefed is actually irrelevant.
+pub enum TocElem {
+    /// A section; the title is assumed to be an HTML string
+    Section {
+        title: Option<Box<str>>,
+        uri: DocumentElementUri,
+        id: String,
+        children: Vec<TocElem>,
+    },
+    SkippedSection {
+        children: Vec<TocElem>,
+    },
+    /// An inputref to some other document; the URI is the one for the
+    /// referenced Document.
+    Inputref {
+        uri: DocumentUri,
+        title: Option<Box<str>>,
+        id: String,
+        children: Vec<TocElem>,
+    },
+    Paragraph {
+        styles: Vec<Id>,
+        kind: ParagraphKind,
+    },
+    Slide, //{uri:DocumentElementUri}
 }
 
 #[derive(Debug, thiserror::Error)]

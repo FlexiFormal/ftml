@@ -371,9 +371,6 @@ static UNKNOWN_BASE: std::sync::LazyLock<BaseUri> = std::sync::LazyLock::new(||
         BaseUri::from_str("http://unknown.source").unwrap_unchecked()
     });
 
-#[cfg(feature = "interned")]
-const MAX: usize = 8;
-
 /// Cleans up the base URI cache by removing entries that are no longer referenced.
 #[cfg(feature = "interned")]
 #[inline]
@@ -381,7 +378,7 @@ fn clean(v: &mut Vec<InternedBaseURI>) {
     fn actually_clean(v: &mut Vec<InternedBaseURI>) {
         v.retain(|e| !e.url.is_unique());
     }
-    if v.len() > MAX {
+    if v.len() > crate::aux::interned::BASE_URI_MAX {
         actually_clean(v);
     }
 }

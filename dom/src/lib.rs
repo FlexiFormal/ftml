@@ -151,14 +151,53 @@ fn close_things(
                         add_paragraph(sig);
                     }
                 }
-                Module | SymbolDeclaration | Invisible | Section | SectionTitle | SkipSection
-                | SymbolReference | VariableReference | Argument | Type | Definiens | Notation
-                | CompInNotation | NotationOpComp | NotationComp | ArgSep | MainCompInNotation
-                | NotationArg | DocTitle | ReturnType | VariableDeclaration | Comp | DefComp
-                | ParagraphTitle | SlideTitle | Slide | Definiendum | MathStructure
-                | ComplexTerm | HeadTerm | OML | Morphism | Assign | ProblemTitle | Problem
-                | Solution | FillinSol | ProblemHint | ProblemExNote | ProblemGradingNote
-                | AnswerClass | ChoiceBlock | ProblemChoice | ArgTypes => (),
+                Module
+                | SymbolDeclaration
+                | Invisible
+                | Section
+                | SectionTitle
+                | SkipSection
+                | SymbolReference
+                | VariableReference
+                | Argument
+                | Type
+                | Definiens
+                | Notation
+                | CompInNotation
+                | NotationOpComp
+                | NotationComp
+                | ArgSep
+                | MainCompInNotation
+                | NotationArg
+                | DocTitle
+                | ReturnType
+                | VariableDeclaration
+                | Comp
+                | DefComp
+                | ParagraphTitle
+                | SlideTitle
+                | Slide
+                | Definiendum
+                | MathStructure
+                | ComplexTerm
+                | HeadTerm
+                | OML
+                | Morphism
+                | Assign
+                | ProblemTitle
+                | Problem
+                | Solution
+                | FillinSol
+                | ProblemHint
+                | ProblemExNote
+                | ProblemGradingNote
+                | AnswerClass
+                | ChoiceBlock
+                | ProblemChoice
+                | ArgTypes
+                | ProblemChoiceFeedback
+                | FillinSolCase
+                | ProblemChoiceVerdict => (),
             }
         }
     }

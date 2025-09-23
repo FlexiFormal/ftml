@@ -8,7 +8,7 @@ use either::Either::Right;
 use std::{fmt::Write, str::FromStr};
 
 crate::aux::macros::intern!(
-    IDS = IdStore:NonEmptyStr @ 256
+    IDS = IdStore:NonEmptyStr @ crate::aux::interned::ARCHIVE_ID_MAX
 );
 
 static NO_ARCHIVE_URI: std::sync::LazyLock<ArchiveUri> = std::sync::LazyLock::new(||

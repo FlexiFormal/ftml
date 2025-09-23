@@ -73,7 +73,7 @@ impl<B: SendBackend> Views<B> {
             prelude::*,
         };
         Self::maybe_top(move || {
-            ftml_dom::setup_document(uri, is_stripped, move || {
+            ftml_dom::setup_document(uri.clone(), is_stripped, move || {
                 let (v, s) = Slides::new();
                 provide_context(s);
                 let children = move || view! {{children()}{v}};
@@ -88,6 +88,7 @@ impl<B: SendBackend> Views<B> {
                             .is_some_and(|b| b));
                 if do_sidebar {
                     Left(components::sidebar::do_sidebar::<B, _>(
+                        uri,
                         show_content,
                         pdf_link,
                         choose_highlight_style,

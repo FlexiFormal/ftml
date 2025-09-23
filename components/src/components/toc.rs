@@ -1,29 +1,123 @@
 use crate::{
     config::FtmlConfig,
-    utils::collapsible::{collapse_marker, fancy_collapsible},
+    utils::{
+        LocalCacheExt,
+        collapsible::{collapse_marker, fancy_collapsible},
+    },
 };
 use ftml_dom::{
     DocumentState, FtmlViews,
-    toc::{TOCElem, TocSource},
-    utils::{css::inject_css, local_cache::SendBackend, owned},
+    toc::TocSource,
+    utils::{
+        css::{CssExt, inject_css},
+        local_cache::{LocalCache, SendBackend},
+    },
 };
+use ftml_ontology::{narrative::documents::TocElem, utils::time::Timestamp};
+use ftml_uris::{DocumentElementUri, DocumentUri};
 use leptos::prelude::*;
 
-pub fn toc<Be: SendBackend>() -> impl IntoView {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+/// A section that has been "covered" at the specified timestamp; will be marked accordingly
+/// in the TOC.
+pub struct TocProgress {
+    pub uri: DocumentElementUri,
+    #[serde(default)]
+    pub timestamp: Option<Timestamp>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct TocProgresses(pub Box<[TocProgress]>);
+impl wasm_bindgen::convert::TryFromJsValue for TocProgresses {
+    type Error = serde_wasm_bindgen::Error;
+    fn try_from_js_value(value: leptos::wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        Ok(Self(serde_wasm_bindgen::from_value(value)?))
+    }
+}
+impl ftml_js_utils::conversion::FromWasmBindgen for TocProgresses {}
+
+#[derive(Default)]
+struct Gottos {
+    current: Option<TocProgress>,
+    iter: std::vec::IntoIter<TocProgress>,
+}
+impl Gottos {
+    fn next(&mut self, uri: &DocumentElementUri) {
+        if let Some(c) = self.current.as_ref()
+            && c.uri == *uri
+        {
+            loop {
+                self.current = self.iter.next();
+                if let Some(c) = &self.current {
+                    if c.uri != *uri {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    fn new(v: TocProgresses, toc: &[TocElem]) -> Self {
+        let mut v = v.0.into_vec();
+        v.retain(|e| {
+            toc.iter().any(|s| {
+                if let TocElem::Section { uri, .. } = s {
+                    *uri == e.uri
+                } else {
+                    false
+                }
+            })
+        });
+        let mut gotto_iter = v.into_iter();
+        Self {
+            current: gotto_iter.next(),
+            iter: gotto_iter,
+        }
+    }
+}
+
+pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
     use leptos::either::EitherOf4::{A, B, C, D};
     let Some(toc) = FtmlConfig::with_toc_source(Clone::clone) else {
         return A(());
     };
     match toc {
         TocSource::None => A(()),
-        TocSource::Get => B(()), // TODO
+        TocSource::Get => B(LocalCache::with_or_toast::<Be, _, _, _, _>(
+            move |c| c.get_toc(uri),
+            move |(css, toc)| {
+                for c in css {
+                    c.inject();
+                }
+                let gottos: TocProgresses = use_context().unwrap_or_default();
+                let mut gottos = Gottos::new(gottos, &toc);
+                wrap_toc(move |data| do_toc::<Be>(&toc, &mut gottos, data))
+            },
+            || "error",
+        )), // TODO
         TocSource::Extract => {
             let toc = DocumentState::get_toc();
             C(wrap_toc(move |data| {
-                move || toc.with(|toc| toc.toc.as_ref().map(|v| do_toc::<Be>(v, data)))
+                move || {
+                    let gottos: TocProgresses = use_context().unwrap_or_default();
+                    toc.with(|toc| {
+                        toc.toc.as_ref().map(|v| {
+                            let mut gottos = Gottos::new(gottos, v);
+                            do_toc::<Be>(v, &mut gottos, data)
+                        })
+                    })
+                }
             }))
-        } // TODO
-        TocSource::Ready(toc) => D(wrap_toc(move |data| do_toc::<Be>(&toc, data))), // TODO
+        }
+        TocSource::Ready(toc) => D(wrap_toc(move |data| {
+            let gottos: TocProgresses = use_context().unwrap_or_default();
+            let mut gottos = Gottos::new(gottos, &toc);
+            do_toc::<Be>(&toc, &mut gottos, data)
+        })),
     }
 }
 
@@ -69,20 +163,36 @@ fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl I
     }
 }
 
-fn do_toc<Be: SendBackend>(toc: &[TOCElem], data: AnchorData) -> impl IntoView + use<Be> {
+fn do_toc<Be: SendBackend>(
+    toc: &[TocElem],
+    gottos: &mut Gottos,
+    data: AnchorData,
+) -> impl IntoView + use<Be> {
     use leptos::either::{
         Either::{Left, Right},
         EitherOf3::{A, B, C},
     };
     use thaw::Caption1Strong;
+
     toc.iter()
         .map(|toc_elem| match toc_elem {
-            TOCElem::Section {
+            TocElem::Section {
                 title,
                 uri,
                 id,
                 children,
-            } => A(owned(|| {
+            } => {
+                let style = if gottos.current.is_some() {
+                    "background-color:var(--colorPaletteYellowBorder1);"
+                } else {
+                    ""
+                };
+                let after = gottos.current.as_ref().and_then(|e| e.timestamp).map(|ts| {
+                    view! {
+                        <sup><i>" Covered: "{ts.into_date().to_string()}</i></sup>
+                    }
+                });
+                gottos.next(uri);
                 let href = StoredValue::new(format!("#{id}"));
                 let title_ref = NodeRef::<leptos::html::A>::new();
                 let is_active = Memo::new(move |_| {
@@ -123,14 +233,14 @@ fn do_toc<Be: SendBackend>(toc: &[TOCElem], data: AnchorData) -> impl IntoView +
 
                 let (visible, children) = if has_section(children) {
                     let visible = RwSignal::new(true);
-                    let ch =
-                        fancy_collapsible(move || do_toc::<Be>(children, data), visible, "", "");
+                    let i = do_toc::<Be>(children, gottos, data).into_any();
+                    let ch = fancy_collapsible(move || i, visible, "", "");
                     (Some(visible), Some(ch))
                 } else {
                     (None, None)
                 };
 
-                view! {
+                A(view! {
                     <div class=class>
                         <Caption1Strong>
                             {visible.map(|visible|
@@ -146,28 +256,28 @@ fn do_toc<Be: SendBackend>(toc: &[TOCElem], data: AnchorData) -> impl IntoView +
                                 class="thaw-anchor-link__title"
                                 on:click=on_click
                                 node_ref=title_ref
+                                style=style
                             >
-                                {title}
+                                {title}{after}
                             </a>
                         </Caption1Strong>
                         {children}
                     </div>
-                }
-            })
-            .into_any()),
-            TOCElem::Inputref { children, .. } | TOCElem::SkippedSection { children } => {
-                B(do_toc::<Be>(children, data).into_any())
+                })
+            }
+            TocElem::Inputref { children, .. } | TocElem::SkippedSection { children } => {
+                B(do_toc::<Be>(children, gottos, data).into_any())
             }
             _ => C(()),
         })
         .collect_view()
 }
 
-fn has_section(elems: &[TOCElem]) -> bool {
+fn has_section(elems: &[TocElem]) -> bool {
     for e in elems {
         match e {
-            TOCElem::Section { .. } => return true,
-            TOCElem::Inputref { children, .. } | TOCElem::SkippedSection { children }
+            TocElem::Section { .. } => return true,
+            TocElem::Inputref { children, .. } | TocElem::SkippedSection { children }
                 if has_section(children) =>
             {
                 return true;
@@ -185,17 +295,6 @@ fn scroll_listener(
 ) {
     use leptos::ev;
     use thaw_utils::{add_event_listener_with_bool, throttle};
-    /*
-    struct LinkInfo {
-        top: f64,
-        id: StoredValue<String>,
-    }
-    impl std::fmt::Debug for LinkInfo {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            self.id.with_value(|id| write!(f, "{}|{id}", self.top))
-        }
-    }
-     */
 
     let on_scroll = move || {
         element_ids.with(|ids| {
@@ -214,38 +313,6 @@ fn scroll_listener(
                     id.with_value(|id| tracing::warn!("Element with id {id} disappeared!"));
                 }
             }
-            /* This assumes the elements are not already in order:
-
-            let mut links: Vec<LinkInfo> = vec![];
-            for id in ids {
-                if let Some(link_el) = id.with_value(|id| document().get_element_by_id(&id[1..])) {
-                    let link_rect = link_el.get_bounding_client_rect(); //ftml_dom::utils::get_true_rect(&link_el);
-                    links.push(LinkInfo {
-                        top: link_rect.top(),
-                        id: *id,
-                    });
-                } else {
-                    id.with_value(|id| tracing::warn!("Element with id {id} disappeared!"));
-                }
-            }
-            links.sort_by(|a, b| a.top.total_cmp(&b.top));
-
-            let mut temp_link = None::<LinkInfo>;
-            for link in links {
-                if link.top >= 0.0 {
-                    if link.top <= 12.0 {
-                        temp_link = Some(link);
-                        break;
-                    } else if temp_link.is_some() {
-                        break;
-                    }
-                    temp_link = None;
-                } else {
-                    temp_link = Some(link);
-                }
-            }
-            active_id.set(temp_link.map(|link| link.id));
-             */
             active_id.set(temp_link);
         });
     };

@@ -337,18 +337,6 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     ));
                 }
             }
-            MetaDatum::FillinSolCase(opt) => match self.narrative.last_mut() {
-                Some(OpenNarrativeElement::FillinSol { cases, nodes, .. }) => {
-                    nodes.push(node.clone());
-                    cases.push(opt);
-                }
-                _ => {
-                    return Err(FtmlExtractionError::NotIn(
-                        FtmlKey::ProblemFillinsolCase,
-                        "fill-in-solutions",
-                    ));
-                }
-            },
             MetaDatum::AnswerClassFeedback => {
                 if let Some(nodes) = self.narrative.iter_mut().find_map(|e| {
                     if let OpenNarrativeElement::AnswerClass { nodes, .. } = e {
@@ -362,43 +350,6 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     return Err(FtmlExtractionError::NotIn(
                         FtmlKey::AnswerclassFeedback,
                         "answer classes",
-                    ));
-                }
-            }
-            MetaDatum::ProblemChoiceVerdict => {
-                if let Some((nodes, verdict)) = self.narrative.iter_mut().find_map(|e| {
-                    if let OpenNarrativeElement::ProblemChoice { nodes, verdict, .. } = e {
-                        Some((nodes, verdict))
-                    } else {
-                        None
-                    }
-                }) {
-                    *verdict = Some(node.inner_string().into_owned().into_boxed_str());
-                    nodes.push(node.clone());
-                } else {
-                    return Err(FtmlExtractionError::NotIn(
-                        FtmlKey::ProblemChoiceVerdict,
-                        "problem choices",
-                    ));
-                }
-            }
-            MetaDatum::ProblemChoiceFeedback => {
-                if let Some((nodes, feedback)) = self.narrative.iter_mut().find_map(|e| {
-                    if let OpenNarrativeElement::ProblemChoice {
-                        nodes, feedback, ..
-                    } = e
-                    {
-                        Some((nodes, feedback))
-                    } else {
-                        None
-                    }
-                }) {
-                    *feedback = node.inner_string().into_owned().into_boxed_str();
-                    nodes.push(node.clone());
-                } else {
-                    return Err(FtmlExtractionError::NotIn(
-                        FtmlKey::ProblemChoiceFeedback,
-                        "problem choices",
                     ));
                 }
             }
@@ -824,6 +775,88 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProblemChoice)),
             },
+            CloseFtmlElement::FillinSolCase => {
+                let Some(OpenNarrativeElement::FillinSolCase(mut opt)) = self.narrative.pop()
+                else {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(
+                        FtmlKey::ProblemFillinsolCase,
+                    ));
+                };
+                match self.narrative.last_mut() {
+                    Some(OpenNarrativeElement::FillinSol { cases, nodes, .. }) => {
+                        let fb = node.inner_string().into_owned().into_boxed_str();
+                        match &mut opt {
+                            FillInSolOption::Exact { feedback, .. }
+                            | FillInSolOption::Regex { feedback, .. }
+                            | FillInSolOption::NumericalRange { feedback, .. } => *feedback = fb,
+                        }
+                        nodes.push(node.clone());
+                        cases.push(opt);
+                    }
+                    _ => {
+                        return Err(FtmlExtractionError::NotIn(
+                            FtmlKey::ProblemFillinsolCase,
+                            "fill-in-solutions",
+                        ));
+                    }
+                }
+                Ok(())
+            }
+            CloseFtmlElement::ProblemChoiceVerdict => {
+                match self.narrative.pop() {
+                    Some(OpenNarrativeElement::ProblemChoiceVerdict) => (),
+                    _ => {
+                        return Err(FtmlExtractionError::UnexpectedEndOf(
+                            FtmlKey::ProblemChoiceVerdict,
+                        ));
+                    }
+                }
+                if let Some((nodes, verdict)) = self.narrative.iter_mut().find_map(|e| {
+                    if let OpenNarrativeElement::ProblemChoice { nodes, verdict, .. } = e {
+                        Some((nodes, verdict))
+                    } else {
+                        None
+                    }
+                }) {
+                    *verdict = Some(node.inner_string().into_owned().into_boxed_str());
+                    nodes.push(node.clone());
+                    Ok(())
+                } else {
+                    return Err(FtmlExtractionError::NotIn(
+                        FtmlKey::ProblemChoiceVerdict,
+                        "problem choices",
+                    ));
+                }
+            }
+            CloseFtmlElement::ProblemChoiceFeedback => {
+                match self.narrative.pop() {
+                    Some(OpenNarrativeElement::ProblemChoiceFeedback) => (),
+                    _ => {
+                        return Err(FtmlExtractionError::UnexpectedEndOf(
+                            FtmlKey::ProblemChoiceFeedback,
+                        ));
+                    }
+                }
+                if let Some((nodes, feedback)) = self.narrative.iter_mut().find_map(|e| {
+                    if let OpenNarrativeElement::ProblemChoice {
+                        nodes, feedback, ..
+                    } = e
+                    {
+                        Some((nodes, feedback))
+                    } else {
+                        None
+                    }
+                }) {
+                    *feedback = node.inner_string().into_owned().into_boxed_str();
+                    nodes.push(node.clone());
+                    Ok(())
+                } else {
+                    return Err(FtmlExtractionError::NotIn(
+                        FtmlKey::ProblemChoiceFeedback,
+                        "problem choices",
+                    ));
+                }
+            }
             CloseFtmlElement::SectionTitle => self.close_section_title(node),
             CloseFtmlElement::ParagraphTitle => self.close_paragraph_title(node),
             CloseFtmlElement::ProblemTitle => self.close_problem_title(node),
@@ -952,6 +985,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::NotationArg(_) => (),
             }
         }
@@ -1425,13 +1461,18 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 None
             }
         }) {
+            let verdict = match verdict {
+                None => (if correct { "correct" } else { "wrong" })
+                    .to_string()
+                    .into_boxed_str(),
+                Some(s) if s.is_empty() => (if correct { "correct" } else { "wrong" })
+                    .to_string()
+                    .into_boxed_str(),
+                Some(s) => s,
+            };
             choices.push(Choice {
                 correct,
-                verdict: verdict.unwrap_or_else(|| {
-                    (if correct { "correct" } else { "wrong" })
-                        .to_string()
-                        .into_boxed_str()
-                }),
+                verdict,
                 feedback,
             });
             return Ok(());
@@ -1694,6 +1735,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1736,6 +1780,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1778,6 +1825,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1820,6 +1870,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1959,6 +2012,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
@@ -2031,6 +2087,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
@@ -2137,6 +2196,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::AnswerClass { .. }
                 | OpenNarrativeElement::ChoiceBlock { .. }
                 | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens));
                 }
@@ -2258,6 +2320,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::HeadTerm))
     }
 
+    #[allow(clippy::match_same_arms)]
     fn close_term(
         &mut self,
         term: Term,
@@ -2311,8 +2374,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 return Ok(());
             }
             Some(OpenDomainElement::Comp | OpenDomainElement::DefComp) => {
-                // this is incompatible with \this in stex:
                 return Ok(());
+                // this is incompatible with \this in stex:
                 /*
                 tracing::debug!("Error: {:?}", self.domain);
                 return Err(FtmlExtractionError::InvalidIn(

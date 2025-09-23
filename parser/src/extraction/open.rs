@@ -75,7 +75,10 @@ pub enum CloseFtmlElement {
     AnswerClass,
     ChoiceBlock,
     ProblemChoice,
+    ProblemChoiceVerdict,
+    ProblemChoiceFeedback,
     ArgTypes,
+    FillinSolCase,
 }
 
 #[derive(Debug, Clone)]
@@ -269,6 +272,9 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
         feedback: Box<str>,
         nodes: Vec<N>,
     },
+    ProblemChoiceVerdict,
+    ProblemChoiceFeedback,
+    FillinSolCase(FillInSolOption),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -291,10 +297,7 @@ pub enum MetaDatum {
     DocumentKind(DocumentKind),
     Precondition(SymbolUri, CognitiveDimension),
     Objective(SymbolUri, CognitiveDimension),
-    FillinSolCase(FillInSolOption),
     AnswerClassFeedback,
-    ProblemChoiceVerdict,
-    ProblemChoiceFeedback,
     ProofBody,
 }
 
@@ -871,7 +874,10 @@ impl OpenFtmlElement {
                     nodes: Vec::new(),
                 }),
             },
-            Self::FillinSolCase(case) => AnyOpen::Meta(MetaDatum::FillinSolCase(case)),
+            Self::FillinSolCase(case) => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::FillinSolCase(case)),
+            },
             Self::Precondition { uri, dim } => AnyOpen::Meta(MetaDatum::Precondition(uri, dim)),
             Self::Objective { uri, dim } => AnyOpen::Meta(MetaDatum::Objective(uri, dim)),
             Self::ProblemHint => AnyOpen::Open {
@@ -917,8 +923,14 @@ impl OpenFtmlElement {
                     nodes: Vec::new(),
                 }),
             },
-            Self::ProblemChoiceVerdict => AnyOpen::Meta(MetaDatum::ProblemChoiceVerdict),
-            Self::ProblemChoiceFeedback => AnyOpen::Meta(MetaDatum::ProblemChoiceFeedback),
+            Self::ProblemChoiceVerdict => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ProblemChoiceVerdict),
+            },
+            Self::ProblemChoiceFeedback => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ProblemChoiceFeedback),
+            },
             Self::Definiendum(s) => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Definiendum(s)),

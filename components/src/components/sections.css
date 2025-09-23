@@ -91,6 +91,14 @@ body {
     }
 }
 
+.ftml-part,
+.ftml-chapter,
+.ftml-section,
+.ftml-subsection,
+.ftml-subsubsection {
+    width: fit-content;
+}
+
 .ftml-proof-title-collapsed {
     cursor: context-menu;
     &::before {

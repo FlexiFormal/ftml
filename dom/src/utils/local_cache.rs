@@ -12,7 +12,7 @@ use ftml_ontology::{
     },
     narrative::{
         SharedDocumentElement,
-        documents::Document,
+        documents::{Document, TocElem},
         elements::{
             DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration,
             problems::Solutions,
@@ -153,6 +153,14 @@ impl<B: SendBackend> WithLocalCache<B> {
             return either::Either::Left(std::future::ready(Ok(m.clone())));
         }
         either::Either::Right(B::get().get_document(uri))
+    }
+
+    pub fn get_toc(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<B::Error>>> + Send + use<B>
+    {
+        B::get().get_toc(uri)
     }
 
     pub fn get_document_term(

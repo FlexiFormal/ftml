@@ -5,10 +5,16 @@ use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri};
 use leptos::context::Provider;
 use leptos::prelude::*;
 
-use crate::utils::ReactiveStore;
+use crate::{
+    components::{problems::ProblemStates, toc::TocProgresses},
+    utils::ReactiveStore,
+};
 
 #[cfg(feature = "callbacks")]
-use crate::callbacks::{OnSectionTitle, ParagraphWrap, ProblemWrap, SectionWrap, SlideWrap};
+use crate::{
+    callbacks::{OnSectionTitle, ParagraphWrap, ProblemWrap, SectionWrap, SlideWrap},
+    components::problems::ProblemContinuation,
+};
 
 #[cfg(feature = "typescript")]
 #[leptos::wasm_bindgen::prelude::wasm_bindgen(typescript_custom_section)]
@@ -24,12 +30,15 @@ export interface FtmlConfig {
     documentUri?:DocumentUri;
     highlightStyle?:HighlightStyle;
     toc?:TocSource;
+    tocProgress?:TocProgress[];
     autoexpandLimit?:LogicalLevel;
     sectionWrap?:SectionWrap;
     paragraphWrap?:ParagraphWrap;
     slideWrap?:SlideWrap;
     problemWrap?:ProblemWrap;
     onSectionTitle?:OnSectionTitle;
+    problemStates?:ProblemStates;
+    onProblemResponse?:ProblemContinuation;
 }
 "#;
 
@@ -68,6 +77,9 @@ pub struct FtmlConfig {
     #[cfg_attr(feature = "csr", serde(default))]
     pub toc: Option<TocSource>,
 
+    #[cfg_attr(feature = "csr", serde(default))]
+    pub toc_progress: Option<TocProgresses>,
+
     #[cfg_attr(feature = "csr", serde(default, rename = "autoexpandLimit"))]
     pub autoexpand_limit: Option<LogicalLevel>,
 
@@ -90,6 +102,12 @@ pub struct FtmlConfig {
     #[cfg(feature = "callbacks")]
     #[serde(skip)]
     pub on_section_title: Option<OnSectionTitle>,
+
+    #[cfg(feature = "callbacks")]
+    #[serde(skip)]
+    pub on_problem_response: Option<ProblemContinuation>,
+
+    pub problem_states: Option<ProblemStates>,
 }
 
 #[wasm_bindgen::prelude::wasm_bindgen]
@@ -205,6 +223,7 @@ impl ftml_js_utils::conversion::FromJs for FtmlConfig {
         get!("documentUri"+document_uri:DocumentUri);
         get!("highlightStyle"+highlight_style:HighlightStyle);
         get!("toc"+toc:TocSource);
+        get!("tocProgress"+toc_progress:TocProgresses);
         get!("autoexpandLimit"+autoexpand_limit:LogicalLevel);
         #[cfg(feature = "callbacks")]
         get!("sectionWrap"+section_wrap:SectionWrap);
@@ -216,6 +235,9 @@ impl ftml_js_utils::conversion::FromJs for FtmlConfig {
         get!("problemWrap"+problem_wrap:ProblemWrap);
         #[cfg(feature = "callbacks")]
         get!("onSectionTitle"+on_section_title:OnSectionTitle);
+        #[cfg(feature = "callbacks")]
+        get!("onProblemResponse"+on_problem_response:ProblemContinuation);
+        get!("problemStates"+problem_states:ProblemStates);
 
         if errors.is_empty() {
             Ok(config)
@@ -224,131 +246,6 @@ impl ftml_js_utils::conversion::FromJs for FtmlConfig {
         }
     }
 }
-
-/*
-#[cfg(feature = "csr")]
-impl leptos::wasm_bindgen::convert::TryFromJsValue for FtmlConfig {
-    type Error = (Self, Vec<FtmlConfigParseError>);
-    #[allow(clippy::cognitive_complexity)]
-    #[allow(clippy::too_many_lines)]
-    fn try_from_js_value(value: leptos::wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
-        macro_rules! fields {
-            ($($stat:ident = $name:literal),* $(,)?) => {
-                std::thread_local! {$(
-                    static $stat : std::cell::LazyCell<leptos::wasm_bindgen::JsValue> =std::cell::LazyCell::new(|| leptos::wasm_bindgen::JsValue::from($name));
-                )*}
-            }
-        }
-        if !value.is_object() {
-            return Err((
-                Self::default(),
-                vec![FtmlConfigParseError::NotAnObject(JsDisplay(value))],
-            ));
-        }
-        let mut config = Self::default();
-        let mut errors = Vec::new();
-
-        macro_rules! get {
-            ($v:ident @ $name:literal = $id:ident $ast:ident $b:block) => {
-                get!($v @ $name = $id v => v.$ast(); $b)
-            };
-            ($v:ident@ $name:literal = $id:ident $i:ident => $f:expr; $b:block) => {
-                fields! {
-                    $id = $name
-                }
-                if let Ok($i) = $id.with(|s| leptos::web_sys::js_sys::Reflect::get(&value, s)) {
-                    get!(@opt $name $i $f; $v $b)
-                }
-            };
-            ($v:ident@ $name:literal = $id:ident ?F $b:block) => {
-                fields! {
-                    $id = $name
-                }
-                if let Ok(v) = $id.with(|s| leptos::web_sys::js_sys::Reflect::get(&value, s)) {
-                    match  leptos_react::functions::FromJs::from_js(v) {
-                        Ok($v) => $b,
-                        Err(e) => errors.push(FtmlConfigParseError::InvalidFun(
-                            $name,
-                            e,
-                        )),
-                    }
-                }
-            };
-            ($v:ident@ $name:literal = $id:ident ? $i:ident => $r:expr; $e:ident => $err:expr; $b:block) => {
-                fields! {
-                    $id = $name
-                }
-                if let Ok($i) = $id.with(|s| leptos::web_sys::js_sys::Reflect::get(&value, s)) {
-                    match $r {
-                        Ok($v) => $b,
-                        Err($e) => errors.push($err),
-                    }
-                }
-            };
-            (@opt $name:literal $e:ident $f:expr; $v:ident $b:block) => {
-                match $f {
-                    Some($v) => $b,
-                    None => errors.push(FtmlConfigParseError::InvalidValue(
-                        $name,
-                        JsDisplay($e),
-                    )),
-                }
-            };
-        }
-
-        get!(v @ "allowHovers" = ALLOW_HOVERS as_bool { config.allow_hovers = Some(v)});
-        get!(v @ "showContent" = SHOW_CONTENT as_bool { config.show_content = Some(v)});
-        get!(v @ "allowFullscreen" = ALLOW_FULLSCREEN as_bool { config.allow_fullscreen = Some(v)});
-        get!(v @ "allowFormalInfo" = ALLOW_FORMAL_INFO as_bool { config.allow_formals = Some(v)});
-        get!(v @ "pdfLink" = PDF_LINK as_bool { config.pdf_link = Some(v)});
-        get!(v @ "allowNotationChanges" = ALLOW_NOTATION_CHANGES as_bool { config.allow_notation_changes = Some(v)} );
-        get!(v @ "chooseHighlightStyle" = CHOOSE_HIGHLIGHT_STYLE as_bool { config.choose_highlight_style = Some(v)} );
-        get!(v @ "documentUri" = DOCUMENT_URI as_string {
-            match v.parse() {
-                Ok(url) => config.document_uri = Some(url),
-                Err(e) => errors.push(FtmlConfigParseError::InvalidUri("documentUri", e))
-            }
-        });
-        get!(v @ "highlightStyle" = HIGHLIGHT_STYLE ?
-            j => HighlightStyle::try_from_js_value(j);
-            e => FtmlConfigParseError::InvalidValue("highlightStyle", JsDisplay(e));
-            {config.highlight_style = Some(v)}
-        );
-        get!(v @ "toc" = TOC ?
-            j => TocSource::try_from_js_value(j.clone());
-            _e => FtmlConfigParseError::InvalidValue("toc", JsDisplay(j));
-            {config.toc = Some(v)}
-        );
-        get!(v @ "autoexpandLimit" = AUTOEXPAND_LIMIT ?
-            j => LogicalLevel::try_from_js_value(j.clone());
-            _e => FtmlConfigParseError::InvalidValue("autoexpandLimit", JsDisplay(j));
-            {config.autoexpand_limit = Some(v)}
-        );
-        #[cfg(feature = "callbacks")]
-        get!(v @ "sectionWrap" = SECTION_WRAP ?F { config.section_wrap = Some(v) });
-        #[cfg(feature = "callbacks")]
-        get!(v @ "paragraphWrap" = PARAGRAPH_WRAP ?F { config.paragraph_wrap = Some(v) });
-        #[cfg(feature = "callbacks")]
-        get!(v @ "slideWrap" = SLIDE_WRAP ?F { config.slide_wrap = Some(v) });
-        #[cfg(feature = "callbacks")]
-        get!(v @ "problemWrap" = PROBLEM_WRAP ?F { config.problem_wrap = Some(v) });
-        #[cfg(feature = "callbacks")]
-        get!(v @ "onSectionTitle" = ON_SECTION_TITLE ?F { config.on_section_title = Some(v) });
-        /*
-        #[cfg_attr(feature = "csr", serde(rename = "autoexpandLimit"))]
-        pub autoexpand_limit: Option<LogicalLevel>,
-
-        */
-        // more
-
-        if errors.is_empty() {
-            Ok(config)
-        } else {
-            Err((config, errors))
-        }
-    }
-}
-*/
 
 impl FtmlConfig {
     #[must_use]
@@ -380,9 +277,10 @@ impl FtmlConfig {
             provide_context(style.read_only());
         }
         if let Some(toc) = self.toc {
-            //let toc = RwSignal::new(h);
-            //provide_context(toc);
             provide_context(toc);
+        }
+        if let Some(tp) = self.toc_progress {
+            provide_context(tp);
         }
         if let Some(limit) = self.autoexpand_limit {
             let sig = RwSignal::new(AutoexpandLimit(limit));
@@ -408,6 +306,14 @@ impl FtmlConfig {
         #[cfg(feature = "callbacks")]
         if let Some(b) = self.on_section_title {
             provide_context(Some(b));
+        }
+        #[cfg(feature = "callbacks")]
+        if let Some(b) = self.on_problem_response {
+            provide_context(Some(b));
+        }
+
+        if let Some(probs) = self.problem_states {
+            provide_context(Some(probs));
         }
         self.document_uri
     }

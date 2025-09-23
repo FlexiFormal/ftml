@@ -1,46 +1,11 @@
 use std::hint::unreachable_unchecked;
 
-use ftml_ontology::narrative::elements::paragraphs::ParagraphKind;
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri};
+use ftml_ontology::narrative::documents::TocElem;
+use ftml_uris::{DocumentElementUri, DocumentUri, IsNarrativeUri};
 use leptos::prelude::*;
 use smallvec::SmallVec;
 
 use crate::utils::actions::{OneShot, SetOneShotDone};
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[serde(tag = "type")]
-/// An entry in a table of contents. Either:
-/// 1. a section; the title is assumed to be an HTML string, or
-/// 2. an inputref to some other document; the URI is the one for the
-///    inputref itself; not the referenced Document. For the TOC,
-///    which document is inputrefed is actually irrelevant.
-pub enum TOCElem {
-    /// A section; the title is assumed to be an HTML string
-    Section {
-        title: Option<Box<str>>,
-        uri: DocumentElementUri,
-        id: String,
-        children: Vec<TOCElem>,
-    },
-    SkippedSection {
-        children: Vec<TOCElem>,
-    },
-    /// An inputref to some other document; the URI is the one for the
-    /// referenced Document.
-    Inputref {
-        uri: DocumentUri,
-        title: Option<Box<str>>,
-        id: String,
-        children: Vec<TOCElem>,
-    },
-    Paragraph {
-        styles: Vec<Id>,
-        kind: ParagraphKind,
-    },
-    Slide, //{uri:DocumentElementUri}
-}
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
@@ -49,7 +14,7 @@ pub enum TocSource {
     None,
     #[default]
     Extract,
-    Ready(Vec<TOCElem>),
+    Ready(Vec<TocElem>),
     Get,
 }
 impl ftml_js_utils::conversion::FromWasmBindgen for TocSource {}
@@ -63,12 +28,12 @@ impl leptos::wasm_bindgen::convert::TryFromJsValue for TocSource {
 
 #[derive(Default)]
 pub struct CurrentTOC {
-    pub toc: Option<Vec<TOCElem>>,
+    pub toc: Option<Vec<TocElem>>,
 }
 impl CurrentTOC {
     pub(crate) fn set_title(&mut self, uri: &DocumentElementUri, title: Box<str>) {
-        if let Some(e) = self.find_mut(|e| matches!(e,TOCElem::Section { uri:u, .. } if u == uri)) {
-            let TOCElem::Section { title: t, .. } = e else {
+        if let Some(e) = self.find_mut(|e| matches!(e,TocElem::Section { uri:u, .. } if u == uri)) {
+            let TocElem::Section { title: t, .. } = e else {
                 // SAFETY: match above
                 unsafe { unreachable_unchecked() }
             };
@@ -78,7 +43,7 @@ impl CurrentTOC {
         tracing::warn!("Entry with uri {uri} not found!");
     }
 
-    fn get_toc_at<'t>(&'t mut self, id: &str) -> Option<&'t mut Vec<TOCElem>> {
+    fn get_toc_at<'t>(&'t mut self, id: &str) -> Option<&'t mut Vec<TocElem>> {
         let mut path = id.split('/');
         let _ = path.next_back()?;
         let mut toc = match &mut self.toc {
@@ -94,7 +59,7 @@ impl CurrentTOC {
                 return Some(toc);
             };
             if let Some(next) = toc.iter_mut().find_map(|t| match t {
-                TOCElem::Section { id, children, .. } | TOCElem::Inputref { id, children, .. }
+                TocElem::Section { id, children, .. } | TocElem::Inputref { id, children, .. }
                     if id.rsplit_once('/').is_some_and(|(_, last)| last == next) || id == next =>
                 {
                     Some(children)
@@ -112,7 +77,7 @@ impl CurrentTOC {
             tracing::warn!("Entry with id {id} not found!");
             return;
         };
-        ch.push(TOCElem::Section {
+        ch.push(TocElem::Section {
             title: None,
             uri,
             id,
@@ -123,27 +88,27 @@ impl CurrentTOC {
         let Some(ch) = self.get_toc_at(&id) else {
             return;
         };
-        ch.push(TOCElem::Inputref {
+        ch.push(TocElem::Inputref {
             uri,
             title: None,
             id,
             children: Vec::new(),
         });
     }
-    pub fn iter_dfs(&self) -> Option<impl Iterator<Item = &TOCElem>> {
+    pub fn iter_dfs(&self) -> Option<impl Iterator<Item = &TocElem>> {
         struct TOCIterator<'b> {
-            curr: std::slice::Iter<'b, TOCElem>,
-            stack: SmallVec<std::slice::Iter<'b, TOCElem>, 2>,
+            curr: std::slice::Iter<'b, TocElem>,
+            stack: SmallVec<std::slice::Iter<'b, TocElem>, 2>,
         }
         impl<'b> Iterator for TOCIterator<'b> {
-            type Item = &'b TOCElem;
+            type Item = &'b TocElem;
             fn next(&mut self) -> Option<Self::Item> {
                 loop {
                     if let Some(elem) = self.curr.next() {
                         let children: &'b [_] = match elem {
-                            TOCElem::Section { children, .. }
-                            | TOCElem::Inputref { children, .. }
-                            | TOCElem::SkippedSection { children } => children,
+                            TocElem::Section { children, .. }
+                            | TocElem::Inputref { children, .. }
+                            | TocElem::SkippedSection { children } => children,
                             _ => return Some(elem),
                         };
                         self.stack
@@ -163,18 +128,18 @@ impl CurrentTOC {
         })
     }
 
-    pub fn find_mut(&mut self, pred: impl Fn(&TOCElem) -> bool) -> Option<&mut TOCElem> {
-        let mut curr: std::slice::IterMut<TOCElem> = self.toc.as_mut()?.iter_mut();
-        let mut stack: SmallVec<std::slice::IterMut<TOCElem>, 2> = SmallVec::new();
+    pub fn find_mut(&mut self, pred: impl Fn(&TocElem) -> bool) -> Option<&mut TocElem> {
+        let mut curr: std::slice::IterMut<TocElem> = self.toc.as_mut()?.iter_mut();
+        let mut stack: SmallVec<std::slice::IterMut<TocElem>, 2> = SmallVec::new();
         loop {
             if let Some(elem) = curr.next() {
                 if pred(elem) {
                     return Some(elem);
                 }
                 let children: &mut [_] = match elem {
-                    TOCElem::Section { children, .. }
-                    | TOCElem::Inputref { children, .. }
-                    | TOCElem::SkippedSection { children } => children,
+                    TocElem::Section { children, .. }
+                    | TocElem::Inputref { children, .. }
+                    | TocElem::SkippedSection { children } => children,
                     _ => return Some(elem),
                 };
                 stack.push(std::mem::replace(&mut curr, children.iter_mut()));

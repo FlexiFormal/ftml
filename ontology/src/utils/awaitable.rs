@@ -29,6 +29,13 @@ impl<
     E: Clone + From<ChannelError> + Send + Sync,
 > AsyncCache<K, T, E>
 {
+    pub fn all(&self, mut f: impl FnMut(&K, &parking_lot::RwLock<MaybeValue<T, E>>)) {
+        for v in &self.map {
+            let (k, v) = v.pair();
+            f(k, &*v.inner);
+        }
+    }
+
     #[inline]
     pub fn clear(&self) {
         self.map.clear();
@@ -98,7 +105,7 @@ pub struct Awaitable<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
 }
 
 #[derive(Clone, Debug)]
-enum MaybeValue<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
+pub enum MaybeValue<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
     Done(Result<T, E>),
     Pending(flume::Receiver<Result<T, E>>), //(kanal::AsyncReceiver<Result<T, E>>),
 }

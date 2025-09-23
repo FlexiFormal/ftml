@@ -34,7 +34,7 @@ use ftml_ontology::{
     },
     narrative::{
         SharedDocumentElement,
-        documents::Document,
+        documents::{Document, TocElem},
         elements::{
             DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration,
             problems::Solutions,
@@ -164,6 +164,11 @@ pub trait FtmlBackend {
         &self,
         uri: DocumentUri,
     ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send;
+
+    fn get_toc(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<Self::Error>>> + Send;
 
     fn get_symbol(
         &self,
@@ -349,6 +354,21 @@ pub trait FlamsBackend {
         >,
     > + Send;
 
+    fn get_toc(
+        &self,
+        uri: Option<DocumentUri>,
+        rp: Option<String>,
+        a: Option<ftml_uris::ArchiveId>,
+        p: Option<String>,
+        d: Option<String>,
+        l: Option<ftml_uris::Language>,
+    ) -> impl Future<
+        Output = Result<
+            (Box<[Css]>, Box<[TocElem]>),
+            BackendError<server_fn::error::ServerFnErrorErr>,
+        >,
+    > + Send;
+
     /// `/domain/module`
     #[allow(clippy::too_many_arguments)]
     fn get_module(
@@ -468,6 +488,15 @@ where
         uri: DocumentUri,
     ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send {
         <Self as FlamsBackend>::get_document(self, Some(uri), None, None, None, None, None)
+    }
+
+    #[inline]
+    fn get_toc(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<Self::Error>>> + Send
+    {
+        <Self as FlamsBackend>::get_toc(self, Some(uri), None, None, None, None, None)
     }
 
     #[inline]

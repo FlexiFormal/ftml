@@ -200,7 +200,7 @@ impl LocalCacheExt for LocalCache {
             + 'static,
     {
         Self::with_or_err::<B, _, _, _, _>(f, view, |e| {
-            tracing::error!("{}", e);
+            tracing::error!("{e}");
         })
     }
 

@@ -55,6 +55,7 @@ pub struct RemoteBackend<
     pub paragraphs_url: Url,
     pub modules_url: Url,
     pub documents_url: Url,
+    pub toc_url: Url,
     pub resources_url: Option<Url>,
     pub redirects: Re,
     __phantom: PhantomData<E>,
@@ -81,6 +82,7 @@ where
         paragraphs_url: Url,
         modules_url: Url,
         documents_url: Url,
+        toc_url: Url,
         redirects: Re,
     ) -> Self {
         Self {
@@ -91,6 +93,7 @@ where
             modules_url,
             solutions_url,
             documents_url,
+            toc_url,
             resources_url: None,
             redirects,
             __phantom: PhantomData,
@@ -111,6 +114,7 @@ where
         paragraphs_url: Url,
         modules_url: Url,
         documents_url: Url,
+        toc_url: Url,
     ) -> Self {
         Self {
             fragment_url,
@@ -120,6 +124,7 @@ where
             solutions_url,
             modules_url,
             documents_url,
+            toc_url,
             resources_url: None,
             redirects: NoRedirects,
             __phantom: PhantomData,
@@ -200,6 +205,23 @@ where
             || Self::make_url(&self.document_html_url, &uri.into(), context.as_ref()),
             |r| r.to_string(),
         );
+        call(url)
+    }
+
+    #[allow(clippy::similar_names)]
+    fn get_toc(
+        &self,
+        uri: DocumentUri,
+    ) -> impl Future<
+        Output = Result<
+            (
+                Box<[Css]>,
+                Box<[ftml_ontology::narrative::documents::TocElem]>,
+            ),
+            BackendError<Self::Error>,
+        >,
+    > + Send {
+        let url = Self::make_url(&self.toc_url, &uri.into(), None);
         call(url)
     }
 
@@ -390,13 +412,16 @@ mod server_fn {
                 BackendError<ServerFnErrorErr>,
             >,
         > + Send {
-            let url = format!("{}/content/solution?uri={uri}", &self.url);
+            let url = format!("{}/content/solution?uri={}", &self.url, uri.url_encoded());
             async move {
                 let s = super::call::<String, SFnE>(url)
                     .await
                     .map_err(BackendError::from_other)?;
-                Solutions::from_jstring(&s)
-                    .ok_or_else(|| BackendError::ToDo("illegal solution string".to_string()))
+                //tracing::error!("Solution string: {s}");
+                let r = Solutions::from_jstring(&s)
+                    .ok_or_else(|| BackendError::ToDo("illegal solution string".to_string()));
+                //tracing::error!("Result: {r:#?}");
+                r
             }
         }
 
@@ -423,6 +448,63 @@ mod server_fn {
             let url = {
                 let mut s = String::with_capacity(64);
                 let _ = write!(&mut s, "{}/content/document", &self.url);
+                let mut sep = '?';
+                if let Some(uri) = uri {
+                    let _ = write!(&mut s, "?uri={}", uri.url_encoded());
+                    sep = '&';
+                }
+                if let Some(rp) = rp {
+                    let _ = write!(&mut s, "{sep}rp={rp}");
+                    sep = '&';
+                }
+                if let Some(a) = a {
+                    let _ = write!(&mut s, "{sep}a={a}");
+                    sep = '&';
+                }
+                if let Some(p) = p {
+                    let _ = write!(&mut s, "{sep}p={p}");
+                    sep = '&';
+                }
+                if let Some(d) = d {
+                    let _ = write!(&mut s, "{sep}d={d}");
+                }
+                if let Some(l) = l {
+                    let _ = write!(&mut s, "{sep}l={l}");
+                }
+                s
+            };
+            super::call::<_, SFnE>(url).map_err(BackendError::from_other)
+        }
+
+        #[allow(clippy::similar_names)]
+        #[allow(clippy::many_single_char_names)]
+        #[allow(clippy::useless_let_if_seq)]
+        fn get_toc(
+            &self,
+            uri: Option<DocumentUri>,
+            rp: Option<String>,
+            a: Option<ftml_uris::ArchiveId>,
+            p: Option<String>,
+            d: Option<String>,
+            l: Option<ftml_uris::Language>,
+        ) -> impl Future<
+            Output = Result<
+                (
+                    Box<[Css]>,
+                    Box<[ftml_ontology::narrative::documents::TocElem]>,
+                ),
+                BackendError<server_fn::error::ServerFnErrorErr>,
+            >,
+        > + Send {
+            use std::fmt::Write;
+            if let Some(uri) = &uri
+                && let Some(url) = self.redirects.for_document_html(uri)
+            {
+                return super::call::<_, SFnE>(url.to_string()).map_err(BackendError::from_other);
+            }
+            let url = {
+                let mut s = String::with_capacity(64);
+                let _ = write!(&mut s, "{}/content/toc", &self.url);
                 let mut sep = '?';
                 if let Some(uri) = uri {
                     let _ = write!(&mut s, "?uri={}", uri.url_encoded());

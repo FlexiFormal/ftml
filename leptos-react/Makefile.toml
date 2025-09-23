@@ -28,6 +28,10 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=typescript"]
 
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
 [tasks.all-tests]
 dependencies = [
     "test-no-features",
@@ -36,6 +40,7 @@ dependencies = [
     "test-react",
     "test-ssr",
     "test-typescript",
+    "clean"
 ]
 
 [tasks.doc]

@@ -1,5 +1,7 @@
+use ftml_dom::FtmlViews;
 use ftml_dom::utils::css::inject_css;
 use ftml_dom::utils::local_cache::{LocalCache, SendBackend};
+use ftml_js_utils::JsDisplay;
 use ftml_ontology::narrative::elements::problems::{
     BlockFeedback, CheckedResult, ChoiceBlockStyle, FillinFeedback, FillinFeedbackKind,
     ProblemFeedback, ProblemResponse as OrigResponse, ProblemResponseType, Solutions,
@@ -7,6 +9,7 @@ use ftml_ontology::narrative::elements::problems::{
 use ftml_uris::{DocumentElementUri, Id, NarrativeUri, UriName};
 use leptos::either::Either::{Left, Right};
 use leptos::prelude::*;
+use send_wrapper::SendWrapper;
 use smallvec::SmallVec;
 
 use crate::config::FtmlConfig;
@@ -20,9 +23,64 @@ export type ProblemContinuation = (r:ProblemResponse) => void;
 
 #[derive(Clone)]
 pub enum ProblemContinuation {
-    Rs(std::sync::Arc<dyn Fn(&OrigResponse)>),
-    Js(leptos::web_sys::js_sys::Function),
+    Rs(std::sync::Arc<dyn Fn(&OrigResponse) + Send + Sync>),
+    Js(SendWrapper<leptos::web_sys::js_sys::Function>),
 }
+
+pub struct ProblemOptions {
+    pub on_response: Option<ProblemContinuation>,
+    pub states: rustc_hash::FxHashMap<DocumentElementUri, ProblemState>, //HMap<DocumentElementUri, ProblemState>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[allow(clippy::large_enum_variant)]
+#[serde(tag = "type")]
+pub enum ProblemState {
+    Interactive {
+        current_response: Option<OrigResponse>,
+        solution: Option<Solutions>,
+    },
+    Finished {
+        current_response: Option<OrigResponse>,
+    },
+    Graded {
+        feedback: ProblemFeedback,
+    },
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct ProblemStates(
+    #[cfg_attr(
+        feature = "typescript",
+        tsify(type = "Map<DocumentElementUri,ProblemState>")
+    )]
+    pub rustc_hash::FxHashMap<DocumentElementUri, ProblemState>,
+);
+
+impl ftml_js_utils::conversion::FromJs for ProblemStates {
+    type Error = ftml_js_utils::conversion::SerdeWasmError;
+    #[inline]
+    fn from_js(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        ftml_js_utils::conversion::from_value(value)
+    }
+}
+impl ftml_js_utils::conversion::FromWasmBindgen for ProblemContinuation {}
+impl wasm_bindgen::convert::TryFromJsValue for ProblemContinuation {
+    type Error = JsDisplay;
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        use wasm_bindgen::JsCast;
+        let f = match value.dyn_into() {
+            Ok(f) => f,
+            Err(e) => return Err(JsDisplay(e)),
+        };
+        Ok(Self::Js(SendWrapper::new(f)))
+    }
+}
+
 impl ProblemContinuation {
     fn apply(&self, res: &OrigResponse) {
         match self {
@@ -40,34 +98,21 @@ impl ProblemContinuation {
     }
 }
 
-pub struct ProblemOptions {
-    pub on_response: Option<ProblemContinuation>,
-    pub states: rustc_hash::FxHashMap<DocumentElementUri, ProblemState>, //HMap<DocumentElementUri, ProblemState>,
-}
-
-//use crate::ProblemOptions;
-
-#[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
-pub enum ProblemState {
-    Interactive {
-        current_response: Option<OrigResponse>,
-        solution: Option<Solutions>,
-    },
-    Finished {
-        current_response: Option<OrigResponse>,
-    },
-    Graded {
-        feedback: ProblemFeedback,
-    },
-}
-
 impl std::fmt::Debug for ProblemOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ProblemOptions")
             .field("on_response", &self.on_response.is_some())
             .field("states", &self.states)
             .finish()
+    }
+}
+
+impl std::fmt::Debug for ProblemContinuation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Rs(_) => f.debug_struct("ProblemContinuation(Rust)").finish(),
+            Self::Js(_) => f.debug_struct("ProblemContinuation(Js)").finish(),
+        }
     }
 }
 
@@ -135,31 +180,37 @@ pub fn problem<Be: SendBackend, V: IntoView>(
         feedback: RwSignal::new(None),
     };
     let responses = ex.responses;
-    let is_done = with_context(|opt: &ProblemOptions| {
-        match opt.states.get(&ex.uri) {
-            Some(ProblemState::Graded { feedback }) => {
-                ex.feedback
-                    .update_untracked(|v| *v = Some(feedback.clone()));
-                return Left(true);
+    let mut is_done = with_context(|states: &Option<ProblemStates>| {
+        if let Some(states) = states.as_ref() {
+            match states.0.get(&ex.uri) {
+                Some(ProblemState::Graded { feedback }) => {
+                    ex.feedback
+                        .update_untracked(|v| *v = Some(feedback.clone()));
+                    return Left(true);
+                }
+                Some(ProblemState::Interactive {
+                    current_response: Some(resp),
+                    ..
+                }) => ex.initial = Some(resp.clone()),
+                Some(ProblemState::Finished {
+                    current_response: Some(resp),
+                }) => {
+                    ex.initial = Some(resp.clone());
+                    ex.interactive = false;
+                }
+                _ => (),
             }
-            Some(ProblemState::Interactive {
-                current_response: Some(resp),
-                ..
-            }) => ex.initial = Some(resp.clone()),
-            Some(ProblemState::Finished {
-                current_response: Some(resp),
-            }) => {
-                ex.initial = Some(resp.clone());
-                ex.interactive = false;
-            }
-            _ => (),
         }
-        opt.on_response.as_ref().map_or(Left(false), |f| {
-            tracing::debug!("Problem: Using onResponse callback");
-            Right(f.clone())
-        })
+        Left(false)
     })
     .unwrap_or(Left(false));
+    if matches!(is_done, Left(false)) {
+        with_context(|cont: &Option<ProblemContinuation>| {
+            if let Some(cont) = cont {
+                is_done = Right(cont.clone());
+            }
+        });
+    }
 
     let uri = ex.uri.clone();
     let uri2 = uri.clone();
@@ -207,6 +258,7 @@ fn submit_answer<Be: SendBackend>() -> impl IntoView {
                 let do_solution = move |uri: &_, r: &Solutions| {
                     let resp = responses
                         .with_untracked(|responses| CurrentProblem::to_response(uri, responses));
+                    //tracing::warn!("Checking response {resp:#?} against solution {r:#?}");
                     if let Some(r) = r.check(&resp) {
                         feedback.set(Some(r));
                     } else {
@@ -240,21 +292,6 @@ fn submit_answer<Be: SendBackend>() -> impl IntoView {
                             });
                         });
                     })
-                    /*
-                    leptos::either::Either::Right(Action::new(move |()| {
-                        let uri = uri.clone();
-                        let do_solution = do_solution.clone();
-                        async move {
-                            /*
-                            match crate::remote::server_config.solution(uri.clone()).await {
-                                Ok(r) => do_solution(&uri, &r),
-                                Err(s) => tracing::error!("{s}"),
-                            }
-                             */
-                            todo!()
-                        }
-                    }))
-                     */
                 };
                 let foract = move || match &foract {
                     leptos::either::Either::Right(act) => (act.clone())(),
@@ -352,7 +389,30 @@ pub fn fillinsol(wd: Option<f32>) -> impl IntoView {
 }
 
 #[must_use]
-pub fn solution() -> impl IntoView {}
+pub fn solution<Be: SendBackend>() -> impl IntoView {
+    let Some((idx, feedback)) = with_context::<CurrentProblem, _>(|problem| {
+        let idx = problem.solutions.get_untracked();
+        problem.solutions.update_untracked(|i| *i += 1);
+        (idx, problem.feedback)
+    }) else {
+        tracing::error!("solution outside of problem!");
+        return None;
+    };
+    Some(move || {
+        feedback.with(|f| {
+            f.as_ref().and_then(|f| {
+                let Some(f) = f.solutions.get(idx as usize) else {
+                    tracing::error!("No solution!");
+                    return None;
+                };
+                Some(
+                    crate::Views::<Be>::render_ftml(f.to_string(), None)
+                        .attr("style", "background-color:lawngreen;"),
+                )
+            })
+        })
+    })
+}
 
 #[must_use]
 pub fn gnote() -> impl IntoView {}

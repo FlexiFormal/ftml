@@ -12,7 +12,7 @@ pub enum BackendError<E: std::fmt::Debug> {
     NoFragment,
     #[error("no definition for element found")]
     NoDefinition,
-    #[error("not yet implemented")]
+    #[error("not yet implemented: {0}")]
     ToDo(String),
 }
 

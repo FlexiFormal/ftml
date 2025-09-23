@@ -13,8 +13,12 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--all-features"]
 
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
 [tasks.all-tests]
-dependencies = ["test-no-features", "test-rdf", "test-all-features"]
+dependencies = ["test-no-features", "test-rdf", "test-all-features","clean"]
 
 [tasks.doc]
 command = "cargo"

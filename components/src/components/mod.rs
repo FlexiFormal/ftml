@@ -91,7 +91,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
 
     #[inline]
     fn problem_solution() -> impl IntoView {
-        problems::solution()
+        problems::solution::<B>()
     }
 
     #[inline]
