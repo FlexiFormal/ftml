@@ -104,8 +104,10 @@ pub enum FillInSolOption {
     },
     NumericalRange {
         #[cfg_attr(feature = "serde", bincode(with_serde))]
+        #[cfg_attr(feature = "typescript", tsify(type = "number | undefined"))]
         from: Option<OrderedFloat<f32>>,
         #[cfg_attr(feature = "serde", bincode(with_serde))]
+        #[cfg_attr(feature = "typescript", tsify(type = "number | undefined"))]
         to: Option<OrderedFloat<f32>>,
         verdict: bool,
         feedback: Box<str>,

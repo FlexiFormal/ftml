@@ -9,6 +9,11 @@ use crate::{
     errors::{SegmentParseError, UriParseError},
 };
 
+#[cfg(feature = "typescript")]
+#[wasm_bindgen::prelude::wasm_bindgen(typescript_custom_section)]
+const UNKNOWN_DOCUMENT: &str =
+    "export const UnknownDocument = \"http://unknown.source?a=no/archive&d=unknown_document&l=en\"";
+
 static NO_DOCUMENT: std::sync::LazyLock<DocumentUri> = std::sync::LazyLock::new(|| unsafe {
     "http://unknown.source?a=no/archive&d=unknown_document&l=en"
         .parse()
