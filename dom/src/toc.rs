@@ -31,6 +31,10 @@ pub struct CurrentTOC {
     pub toc: Option<Vec<TocElem>>,
 }
 impl CurrentTOC {
+    pub fn set(toc: Vec<TocElem>) {
+        let ctw = expect_context::<RwSignal<Self>>();
+        ctw.update(|ctw| ctw.toc = Some(toc));
+    }
     pub(crate) fn set_title(&mut self, uri: &DocumentElementUri, title: Box<str>) {
         if let Some(e) = self.find_mut(|e| matches!(e,TocElem::Section { uri:u, .. } if u == uri)) {
             let TocElem::Section { title: t, .. } = e else {
@@ -156,6 +160,7 @@ pub struct NavElems {
     //initialized: RwSignal<bool>,
     ids: rustc_hash::FxHashMap<String, SectionOrInputref>,
     titles: rustc_hash::FxHashMap<DocumentUri, RwSignal<String>>,
+    redo: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -172,7 +177,7 @@ impl NavElems {
         Self {
             ids: std::collections::HashMap::default(),
             titles: std::collections::HashMap::default(),
-            //initialized: RwSignal::new(false),
+            redo: None, //initialized: RwSignal::new(false),
         }
     }
 
@@ -180,7 +185,7 @@ impl NavElems {
         expect_context::<RwSignal<Self>>().update_untracked(f)
     }
 
-    pub(crate) fn new_inpuref(id: &str) -> (String, OneShot, SetOneShotDone) {
+    pub(crate) fn new_inputref(id: &str) -> (String, OneShot, SetOneShotDone) {
         let (os, done) = OneShot::new();
         let id = Self::update_untracked(|ne| {
             let id = Self::new_id(id);
@@ -237,9 +242,17 @@ impl NavElems {
         }
     }
 
+    pub fn retry() {
+        if let Some(selfie) = use_context::<RwSignal<Self>>()
+            && let Some(s) = selfie.update_untracked(|s| std::mem::take(&mut s.redo))
+        {
+            Self::navigate_to(selfie, &s);
+        }
+    }
+
     #[allow(clippy::missing_const_for_fn)]
     pub fn navigate_to(selfie: RwSignal<Self>, _id: &str) {
-        selfie.with_untracked(|#[allow(unused_variables)] slf| {
+        selfie.update_untracked(|#[allow(unused_variables)] slf| {
             #[cfg(any(feature = "csr", feature = "hydrate"))]
             {
                 #[allow(clippy::used_underscore_binding)]
@@ -249,10 +262,11 @@ impl NavElems {
                 loop {
                     match slf.ids.get(curr) {
                         None => {
-                            tracing::warn!("navigation id {curr} not known (yet)!");
+                            tracing::debug!("navigation id {curr} not known (yet)\n{:?}!", slf.ids);
+                            slf.redo = Some(id.to_string());
                         }
                         Some(SectionOrInputref::Section) => {
-                            tracing::warn!("Navigating to #{curr}");
+                            tracing::debug!("Navigating to #{curr}");
                             #[allow(unused_variables)]
                             if let Some(e) = document().get_element_by_id(curr) {
                                 tracing::trace!("scrolling to #{curr}");
@@ -293,6 +307,7 @@ impl NavElems {
     pub fn navigate_to_fragment() {
         let fragment = RwSignal::new(String::new());
         let selfie = expect_context::<RwSignal<Self>>();
+        tracing::trace!("Setting up navigation system");
 
         #[cfg(any(feature = "csr", feature = "hydrate"))]
         {
@@ -300,19 +315,24 @@ impl NavElems {
                 && frag.starts_with('#')
             {
                 frag.remove(0);
+                tracing::warn!("Current fragment: {frag}");
                 fragment.set(frag);
             }
-        }
-
-        #[cfg(feature = "csr")]
-        {
             fragment_listener(fragment);
         }
 
+        let done = RwSignal::new(false);
         Effect::new(move || {
-            let fragment = fragment.get();
-            if !fragment.is_empty() && document().get_element_by_id(&fragment).is_none() {
-                Self::navigate_to(selfie, &fragment);
+            done.set(true);
+        });
+        Effect::new(move || {
+            fragment.track();
+            if done.get() {
+                let fragment = fragment.get();
+                if !fragment.is_empty() {
+                    tracing::warn!("Navigating to {fragment}");
+                    Self::navigate_to(selfie, &fragment);
+                }
             }
         });
     }
@@ -326,7 +346,7 @@ impl NavElems {
      */
 }
 
-#[cfg(feature = "csr")]
+#[cfg(any(feature = "csr", feature = "hydrate"))]
 fn fragment_listener(signal: RwSignal<String>) {
     use leptos::wasm_bindgen::JsCast;
     fn get_anchor(e: leptos::web_sys::Element) -> Option<leptos::web_sys::Element> {
@@ -345,6 +365,7 @@ fn fragment_listener(signal: RwSignal<String>) {
             }
         }
     }
+    tracing::warn!("Setting up fragment listener");
     let on_hash_change =
         leptos::wasm_bindgen::prelude::Closure::wrap(Box::new(move |_e: leptos::web_sys::Event| {
             if let Ok(mut frag) = window().location().hash()
@@ -371,6 +392,8 @@ fn fragment_listener(signal: RwSignal<String>) {
             }
         },
     ) as Box<dyn FnMut(_)>);
+
+    tracing::trace!("Setting URL listeners");
 
     let _ = window()
         .add_event_listener_with_callback("hashchange", on_hash_change.as_ref().unchecked_ref());

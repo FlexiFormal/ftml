@@ -409,6 +409,11 @@ impl FtmlConfig {
     }
 
     #[inline]
+    pub fn set_toc_source(src: TocSource) {
+        provide_context(src);
+    }
+
+    #[inline]
     #[must_use]
     pub fn with_toc_source<R>(f: impl FnOnce(&TocSource) -> R) -> Option<R> {
         with_context(f)

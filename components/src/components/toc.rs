@@ -7,7 +7,7 @@ use crate::{
 };
 use ftml_dom::{
     DocumentState, FtmlViews,
-    toc::TocSource,
+    toc::{CurrentTOC, NavElems, TocSource},
     utils::{
         css::{CssExt, inject_css},
         local_cache::{LocalCache, SendBackend},
@@ -87,18 +87,36 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
     };
     match toc {
         TocSource::None => A(()),
-        TocSource::Get => B(LocalCache::with_or_toast::<Be, _, _, _, _>(
-            move |c| c.get_toc(uri),
-            move |(css, toc)| {
-                for c in css {
-                    c.inject();
+        TocSource::Get => B({
+            let csr = RwSignal::new(false);
+            let _ = Effect::new(move || {
+                csr.set(true);
+            });
+            move || {
+                let uri = uri.clone();
+                if csr.get() {
+                    Some(LocalCache::with_or_toast::<Be, _, _, _, _>(
+                        move |c| c.get_toc(uri),
+                        move |(css, toc)| {
+                            for c in css {
+                                c.inject();
+                            }
+                            let gottos: TocProgresses = use_context().unwrap_or_default();
+                            let mut gottos = Gottos::new(gottos, &toc);
+                            wrap_toc(move |data| {
+                                CurrentTOC::set(toc.clone().into_vec());
+                                let r = do_toc::<Be>(&toc, &mut gottos, data);
+                                NavElems::retry();
+                                r
+                            })
+                        },
+                        || "error",
+                    ))
+                } else {
+                    None
                 }
-                let gottos: TocProgresses = use_context().unwrap_or_default();
-                let mut gottos = Gottos::new(gottos, &toc);
-                wrap_toc(move |data| do_toc::<Be>(&toc, &mut gottos, data))
-            },
-            || "error",
-        )), // TODO
+            }
+        }), // TODO
         TocSource::Extract => {
             let toc = DocumentState::get_toc();
             C(wrap_toc(move |data| {
@@ -124,7 +142,7 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
 fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl IntoView {
     use thaw::Scrollbar;
     inject_css("ftml-toc", include_str!("toc.css"));
-    // TODO gottos
+    //owned(move || {
     let anchor_ref = NodeRef::new();
     let bar_ref = NodeRef::new();
     let element_ids = RwSignal::new(Vec::new());
@@ -161,6 +179,7 @@ fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl I
             </div>
         </Scrollbar>
     }
+    //})
 }
 
 fn do_toc<Be: SendBackend>(
@@ -214,11 +233,11 @@ fn do_toc<Be: SendBackend>(
                         data.update_background_position(&title_rect);
                     }
                 });
-                let on_click = move |_| {
+                /*let on_click = move |_| {
                     href.with_value(move |href_id| {
-                        scroll_into_view(href_id);
+                        scroll_into_view(href_id, nav_elems);
                     });
-                };
+                };*/
                 let title = title.as_ref().map_or_else(
                     || Right(uri.name().last().to_string()),
                     |t| Left(crate::Views::<Be>::render_ftml(t.to_string(), None)),
@@ -245,7 +264,7 @@ fn do_toc<Be: SendBackend>(
                         <Caption1Strong>
                             {visible.map(|visible|
                                 view!{
-                                    <a on:click=move |_| visible.set(!visible.get_untracked())>
+                                    <a href on:click=move |_| visible.set(!visible.get_untracked())>
                                         {collapse_marker(visible,true)}
                                     </a>
                                     " "
@@ -254,7 +273,7 @@ fn do_toc<Be: SendBackend>(
                             <a
                                 href=href.get_value()
                                 class="thaw-anchor-link__title"
-                                on:click=on_click
+                                //on:click=on_click
                                 node_ref=title_ref
                                 style=style
                             >
@@ -309,9 +328,12 @@ fn scroll_listener(
                         break;
                     }
                     temp_link = Some(*id);
-                } else {
-                    id.with_value(|id| tracing::warn!("Element with id {id} disappeared!"));
+                } else if temp_link.is_some() {
+                    break;
                 }
+                /*else {
+                id.with_value(|id| tracing::warn!("Element with id {id} disappeared!"));
+                }*/
             }
             active_id.set(temp_link);
         });
@@ -335,8 +357,11 @@ fn scroll_listener(
     });
 }
 
-fn scroll_into_view(id: &str) {
+fn scroll_into_view(id: &str, nav_elems: Option<RwSignal<NavElems>>) {
     let Some(link_el) = document().get_element_by_id(id) else {
+        if let Some(nav) = nav_elems {
+            NavElems::navigate_to(nav, &id[1..]);
+        }
         return;
     };
     link_el.scroll_into_view();

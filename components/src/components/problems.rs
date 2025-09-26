@@ -6,7 +6,7 @@ use ftml_ontology::narrative::elements::problems::{
     BlockFeedback, CheckedResult, ChoiceBlockStyle, FillinFeedback, FillinFeedbackKind,
     ProblemFeedback, ProblemResponse as OrigResponse, ProblemResponseType, Solutions,
 };
-use ftml_uris::{DocumentElementUri, Id, NarrativeUri, UriName};
+use ftml_uris::{DocumentElementUri, Id};
 use leptos::either::Either::{Left, Right};
 use leptos::prelude::*;
 use send_wrapper::SendWrapper;
@@ -522,6 +522,7 @@ pub fn choice<V: IntoView + 'static>(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn multiple_choice<V: IntoView + 'static>(
     idx: usize,
     block: usize,
@@ -603,6 +604,7 @@ fn multiple_choice<V: IntoView + 'static>(
     </div>}
 }
 
+#[allow(clippy::too_many_arguments)]
 fn single_choice<V: IntoView + 'static>(
     idx: u16,
     block: usize,

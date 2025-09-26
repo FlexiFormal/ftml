@@ -13,7 +13,9 @@
     padding: 0;
     color: transparent;
     background-color: transparent;
+    display: block;
 }
 .ftml-collapsible--visible {
     width: fit-content;
+    display: contents;
 }

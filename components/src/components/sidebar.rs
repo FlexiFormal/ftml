@@ -81,7 +81,7 @@ fn flex_sidebar<B: SendBackend, Ch: IntoView + 'static>(
         <Flex>
         {children}
         <div class="ftml-sidebar">
-            <div>
+            <div style="position:fixed;">
                 <Button
                     shape=ButtonShape::Rounded
                     size=ButtonSize::Small

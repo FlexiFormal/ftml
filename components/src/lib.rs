@@ -17,7 +17,7 @@ use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::{
     IntoView,
     html::{ElementChild, div},
-    prelude::{StyleAttribute, use_context},
+    prelude::use_context,
 };
 use std::marker::PhantomData;
 

@@ -154,7 +154,7 @@ impl DocumentState {
         uri: DocumentElementUri,
         f: impl FnOnce(InputrefInfo) -> V,
     ) -> impl IntoView {
-        let (id, replace, replacing_done) = NavElems::new_inpuref(uri.name.last());
+        let (id, replace, replacing_done) = NavElems::new_inputref(uri.name.last());
         let counters = SectionCounters::inputref(target.clone(), id.clone());
         let title = NavElems::get_title(target.clone());
         if with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract)).is_some_and(|b| b) {

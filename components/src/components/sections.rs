@@ -97,6 +97,7 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
     );
     let title = move || {
         title.get().0.map(|(class, title)| {
+            /*
             let pos_ref = NodeRef::new();
             let marker_ref = NodeRef::new();
             let _ = Effect::new(move || {
@@ -106,14 +107,15 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
                     position_marker(&pos, &marker);
                 }
             });
+            */
             view! {
-                <div node_ref=marker_ref on:click=move |_| visible.set(!visible.get_untracked())
-                    style="width:fit-content;"
-                >
-                    {collapse_marker(visible,true)}
-                </div>
-                <div node_ref=pos_ref style="display:contents;">
+                <div /*node_ref=pos_ref*/ style="display:contents;">
                     {title.take().attr("class",class)}
+                </div>
+                <div /*node_ref=marker_ref*/ on:click=move |_| visible.set(!visible.get_untracked())
+                    style="width:0;height:0;left:-15px;top:-15px;position:relative;"
+                >
+                    {collapse_marker(visible,false)}
                 </div>
             }
         })
