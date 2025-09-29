@@ -822,10 +822,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     nodes.push(node.clone());
                     Ok(())
                 } else {
-                    return Err(FtmlExtractionError::NotIn(
+                    Err(FtmlExtractionError::NotIn(
                         FtmlKey::ProblemChoiceVerdict,
                         "problem choices",
-                    ));
+                    ))
                 }
             }
             CloseFtmlElement::ProblemChoiceFeedback => {
@@ -851,10 +851,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     nodes.push(node.clone());
                     Ok(())
                 } else {
-                    return Err(FtmlExtractionError::NotIn(
+                    Err(FtmlExtractionError::NotIn(
                         FtmlKey::ProblemChoiceFeedback,
                         "problem choices",
-                    ));
+                    ))
                 }
             }
             CloseFtmlElement::SectionTitle => self.close_section_title(node),
@@ -894,35 +894,37 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         module: impl FnOnce(D) -> Declaration,
         structure: impl FnOnce(D) -> Result<StructureDeclaration, FtmlExtractionError>,
     ) -> Result<DomainUriRef<'_>, FtmlExtractionError> {
-        let uri = match self.domain.last_mut() {
-            Some(OpenDomainElement::Module { uri, children, .. }) => {
-                let elem = module(data);
-                #[cfg(feature = "rdf")]
-                {
-                    use ftml_ontology::Ftml;
-                    self.rdf.extend(elem.triples());
+        for e in self.domain.iter_mut() {
+            let uri = match e {
+                OpenDomainElement::Module { uri, children, .. } => {
+                    let elem = module(data);
+                    #[cfg(feature = "rdf")]
+                    {
+                        use ftml_ontology::Ftml;
+                        self.rdf.extend(elem.triples());
+                    }
+                    children.push(elem);
+                    DomainUriRef::Module(uri)
                 }
-                children.push(elem);
-                DomainUriRef::Module(uri)
-            }
-            Some(OpenDomainElement::MathStructure { uri, children, .. }) => {
-                let elem = structure(data)?;
-                #[cfg(feature = "rdf")]
-                {
-                    use ftml_ontology::Ftml;
-                    self.rdf.extend(elem.triples());
+                OpenDomainElement::MathStructure { uri, children, .. } => {
+                    let elem = structure(data)?;
+                    #[cfg(feature = "rdf")]
+                    {
+                        use ftml_ontology::Ftml;
+                        self.rdf.extend(elem.triples());
+                    }
+                    children.push(elem);
+                    DomainUriRef::Symbol(uri)
                 }
-                children.push(elem);
-                DomainUriRef::Symbol(uri)
-            }
-            _ => {
-                return Err(FtmlExtractionError::NotIn(
-                    FtmlKey::Module,
-                    "a module or structure (or inside of a declaration)",
-                ));
-            }
-        };
-        Ok(uri)
+                _ => continue,
+            };
+            return Ok(uri);
+        }
+
+        Err(FtmlExtractionError::NotIn(
+            FtmlKey::Symdecl,
+            "a module or structure (or inside of a declaration)",
+        ))
     }
 
     fn close_fillinsol(

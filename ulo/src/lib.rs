@@ -1,5 +1,5 @@
 //#![allow(unexpected_cfgs)]
-//#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
+//#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_cfg))]
 #![recursion_limit = "512"]
 #![doc = include_str!("../README.md")]
 

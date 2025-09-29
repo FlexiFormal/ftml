@@ -47,13 +47,13 @@ pub trait FtmlExtractor: 'static + Sized {
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id>;
     /// ### Errors
     fn get_domain_uri(&self, in_elem: FtmlKey) -> Result<Cow<'_, ModuleUri>> {
-        match self.iterate_domain().next() {
-            Some(OpenDomainElement::Module { uri, .. }) => Ok(Cow::Borrowed(uri)),
-            Some(
+        for e in self.iterate_domain() {
+            match e {
+                OpenDomainElement::Module { uri, .. } => return Ok(Cow::Borrowed(uri)),
                 OpenDomainElement::MathStructure { uri, .. }
-                | OpenDomainElement::Morphism { uri, .. },
-            ) => Ok(Cow::Owned(uri.clone().into_module())),
-            Some(
+                | OpenDomainElement::Morphism { uri, .. } => {
+                    return Ok(Cow::Owned(uri.clone().into_module()));
+                }
                 OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::VariableReference { .. }
@@ -66,16 +66,22 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::ArgTypes(_)
-                | OpenDomainElement::Assign { .. }
-                | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::Assign { .. } => {
+                    return Err(FtmlExtractionError::NotIn(
+                        in_elem,
+                        "a module (or inside a declaration)",
+                    ));
+                }
+
+                OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::Comp
-                | OpenDomainElement::DefComp,
-            )
-            | None => Err(FtmlExtractionError::NotIn(
-                in_elem,
-                "a module (or inside a declaration)",
-            )),
+                | OpenDomainElement::DefComp => (),
+            }
         }
+        Err(FtmlExtractionError::NotIn(
+            in_elem,
+            "a module (or inside a declaration)",
+        ))
     }
 
     fn get_narrative_uri(&self) -> NarrativeUriRef<'_> {

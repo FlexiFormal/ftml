@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs)]
 #![allow(clippy::must_use_candidate)]
-#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_auto_cfg))]
+#![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 /*!
  * ## Feature flags
