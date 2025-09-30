@@ -52,6 +52,11 @@ impl FtmlUri for BaseUri {
     fn base(&self) -> &BaseUri {
         self
     }
+
+    fn ancestors(self) -> impl Iterator<Item = crate::Uri> {
+        std::iter::once(self.into())
+    }
+
     #[inline]
     fn as_uri(&self) -> crate::UriRef<'_> {
         crate::UriRef::Base(self)

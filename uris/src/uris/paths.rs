@@ -73,7 +73,6 @@ impl UriPath {
     /// // Top-level path has no parent
     /// assert!(grandparent.up().is_none());
     /// ```
-    #[inline]
     pub fn up(&self) -> Option<Self> {
         self.0.up::<'/'>().map(Self)
     }
@@ -333,6 +332,29 @@ impl FtmlUri for PathUri {
             }
         }
         Enc(self)
+    }
+
+    fn ancestors(self) -> impl Iterator<Item = crate::Uri> {
+        match &self.path {
+            None => either::Left(self.archive.ancestors()),
+            Some(p) => either::Right({
+                let archive = self.archive.clone();
+                let up = p.up();
+                match up {
+                    None => either::Right(std::iter::once(self.into()).chain(archive.ancestors())),
+                    Some(up) => {
+                        let parent = Box::new(
+                            Self {
+                                archive,
+                                path: Some(up),
+                            }
+                            .ancestors(),
+                        ) as Box<dyn Iterator<Item = _>>;
+                        either::Left(std::iter::once(self.into()).chain(parent))
+                    }
+                }
+            }),
+        }
     }
 
     #[inline]

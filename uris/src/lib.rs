@@ -720,6 +720,20 @@ impl FtmlUri for Uri {
         }
     }
 
+    fn ancestors(self) -> impl Iterator<Item = Self> {
+        #[allow(clippy::enum_glob_use)]
+        use either_of::EitherOf7::*;
+        match self {
+            Self::Base(b) => A(b.ancestors()),
+            Self::Archive(a) => B(a.ancestors()),
+            Self::Path(p) => C(p.ancestors()),
+            Self::Module(m) => D(m.ancestors()),
+            Self::Symbol(s) => E(s.ancestors()),
+            Self::Document(d) => F(d.ancestors()),
+            Self::DocumentElement(e) => G(e.ancestors()),
+        }
+    }
+
     #[inline]
     fn as_uri(&self) -> UriRef<'_> {
         match self {
@@ -855,6 +869,13 @@ impl FtmlUri for DomainUri {
         match self {
             Self::Module(m) => m.base(),
             Self::Symbol(s) => s.base(),
+        }
+    }
+
+    fn ancestors(self) -> impl Iterator<Item = Uri> {
+        match self {
+            Self::Module(m) => either::Left(m.ancestors()),
+            Self::Symbol(s) => either::Right(s.ancestors()),
         }
     }
 
@@ -1187,6 +1208,13 @@ impl FtmlUri for NarrativeUri {
         }
     }
 
+    fn ancestors(self) -> impl Iterator<Item = Uri> {
+        match self {
+            Self::Document(d) => either::Left(d.ancestors()),
+            Self::Element(e) => either::Right(e.ancestors()),
+        }
+    }
+
     fn as_uri(&self) -> UriRef<'_> {
         match self {
             Self::Document(d) => UriRef::Document(d),
@@ -1315,6 +1343,13 @@ impl FtmlUri for LeafUri {
         match self {
             Self::Element(m) => m.base(),
             Self::Symbol(s) => s.base(),
+        }
+    }
+
+    fn ancestors(self) -> impl Iterator<Item = Uri> {
+        match self {
+            Self::Element(m) => either::Left(m.ancestors()),
+            Self::Symbol(s) => either::Right(s.ancestors()),
         }
     }
 

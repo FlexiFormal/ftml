@@ -32,6 +32,9 @@ pub trait FtmlUri:
     + std::hash::Hash
     + crate::sealed::Sealed
 {
+    /// Iterate over all ancestors of this uri (including self)
+    fn ancestors(self) -> impl Iterator<Item = Uri>;
+
     /// Returns a reference to the [`BaseUri`] component.
     fn base(&self) -> &BaseUri;
     /// whether the given string slice *might* represent this kind of Uri

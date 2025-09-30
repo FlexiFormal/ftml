@@ -65,6 +65,31 @@ impl ArchiveId {
         NO_ARCHIVE_URI.archive_id()
     }
 
+    /// Returns `true` if this is a top-level id (contains no forward slashes).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let top = ArchiveId::from_str("math").unwrap();
+    /// assert!(top.is_simple());
+    ///
+    /// let nested = ArchiveId::from_str("math/algebra").unwrap();
+    /// assert!(!nested.is_simple());
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn is_simple(&self) -> bool {
+        !self.as_ref().contains('/')
+    }
+
+    /// Returns the parent of this Id, if this Id is not simple
+    #[inline]
+    pub fn up(&self) -> Option<Self> {
+        self.0.up::<'/'>().map(Self)
+    }
+
     /// Returns the last segment of the hierarchical [`ArchiveId`].
     ///
     /// # Examples
@@ -299,6 +324,19 @@ impl FtmlUri for ArchiveUri {
         }
         Enc(self)
     }
+
+    fn ancestors(self) -> impl Iterator<Item = crate::Uri> {
+        let base = self.base.clone();
+        match self.id.up() {
+            None => either::Right(std::iter::once(self.into()).chain(base.ancestors())),
+            Some(up) => {
+                let parent =
+                    Box::new(Self { base, id: up }.ancestors()) as Box<dyn Iterator<Item = _>>;
+                either::Left(std::iter::once(self.into()).chain(parent))
+            }
+        }
+    }
+
     #[inline]
     fn base(&self) -> &BaseUri {
         &self.base

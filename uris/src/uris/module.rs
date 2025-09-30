@@ -432,6 +432,18 @@ impl FtmlUri for ModuleUri {
         Enc(self)
     }
 
+    fn ancestors(self) -> impl Iterator<Item = crate::Uri> {
+        let path = self.path.clone();
+        match self.name.up() {
+            None => either::Right(std::iter::once(self.into()).chain(path.ancestors())),
+            Some(up) => {
+                let parent =
+                    Box::new(Self { path, name: up }.ancestors()) as Box<dyn Iterator<Item = _>>;
+                either::Left(std::iter::once(self.into()).chain(parent))
+            }
+        }
+    }
+
     #[inline]
     fn base(&self) -> &crate::BaseUri {
         &self.path.archive.base

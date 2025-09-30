@@ -213,6 +213,23 @@ impl FtmlUri for DocumentElementUri {
         crate::UriRef::DocumentElement(self)
     }
 
+    fn ancestors(self) -> impl Iterator<Item = crate::Uri> {
+        let doc = self.document.clone();
+        match self.name.up() {
+            None => either::Right(std::iter::once(self.into()).chain(doc.ancestors())),
+            Some(up) => {
+                let parent = Box::new(
+                    Self {
+                        document: doc,
+                        name: up,
+                    }
+                    .ancestors(),
+                ) as Box<dyn Iterator<Item = _>>;
+                either::Left(std::iter::once(self.into()).chain(parent))
+            }
+        }
+    }
+
     fn could_be(maybe_uri: &str) -> bool {
         let Some((a, p)) = maybe_uri.rsplit_once('&') else {
             return false;

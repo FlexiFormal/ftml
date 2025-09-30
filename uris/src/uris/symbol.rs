@@ -227,6 +227,18 @@ impl FtmlUri for SymbolUri {
         crate::UriRef::Symbol(self)
     }
 
+    fn ancestors(self) -> impl Iterator<Item = crate::Uri> {
+        let module = self.module.clone();
+        match self.name.up() {
+            None => either::Right(std::iter::once(self.into()).chain(module.ancestors())),
+            Some(up) => {
+                let parent =
+                    Box::new(Self { module, name: up }.ancestors()) as Box<dyn Iterator<Item = _>>;
+                either::Left(std::iter::once(self.into()).chain(parent))
+            }
+        }
+    }
+
     fn could_be(maybe_uri: &str) -> bool {
         let Some((a, p)) = maybe_uri.rsplit_once('&') else {
             return false;

@@ -1,6 +1,7 @@
 use crate::{config::FtmlConfig, utils::LocalCacheExt};
 use ftml_dom::{
     DocumentState, FtmlViews,
+    counters::LogicalLevel,
     markers::InputrefInfo,
     utils::{
         actions::{OneShot, SetOneShotDone},
@@ -8,6 +9,7 @@ use ftml_dom::{
         local_cache::{LocalCache, SendBackend},
     },
 };
+use ftml_ontology::narrative::elements::SectionLevel;
 use ftml_uris::{DocumentElementUri, DocumentUri};
 use leptos::prelude::*;
 
@@ -25,7 +27,14 @@ pub fn inputref<B: SendBackend>(info: InputrefInfo) -> impl IntoView {
     let lvl = DocumentState::current_section_level();
     let limit = FtmlConfig::autoexpand_limit();
     tracing::debug!("inputref {uri} at level {lvl:?}");
-    let expand = Memo::new(move |_| lvl <= limit.get().0 || replacing_done.was_clicked());
+    let expand = Memo::new(move |_| {
+        lvl <= limit.get().0
+            || matches!(
+                lvl,
+                LogicalLevel::None | LogicalLevel::Section(SectionLevel::Part)
+            )
+            || replacing_done.was_clicked()
+    });
     move || {
         if expand.get() {
             Left(do_replace::<B>(target.clone(), uri.clone(), replacing_done))

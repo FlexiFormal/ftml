@@ -334,6 +334,11 @@ impl FtmlUri for DocumentUri {
         &self.path.archive.base
     }
 
+    fn ancestors(self) -> impl Iterator<Item = crate::Uri> {
+        let p = self.path.clone();
+        std::iter::once(self.into()).chain(p.ancestors())
+    }
+
     #[inline]
     fn as_uri(&self) -> crate::UriRef<'_> {
         crate::UriRef::Document(self)
