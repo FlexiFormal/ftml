@@ -5,12 +5,52 @@ use crate::{
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
-use ftml_dom::{FtmlViews, notations::TermExt};
+use ftml_dom::{FtmlViews, notations::TermExt, utils::css::inject_css};
 use ftml_ontology::narrative::elements::{
     DocumentElement, FlatIterable, LogicalParagraph, Section,
 };
+use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
 use thaw::Caption1Strong;
+
+pub(super) fn slide<Be: ftml_dom::utils::local_cache::SendBackend>(
+    uri: &DocumentElementUri,
+    title: Option<&str>,
+    children: &[DocumentElement],
+) -> impl IntoView + use<Be> + 'static {
+    use leptos::either::Either::{Left, Right};
+    let title = super::hover_paragraph::<Be>(
+        uri.clone(),
+        view!(<span style="font-style:italic;">{
+            title.as_ref().map_or_else(
+                || Right(uri.name().last().to_string()),
+                |t| Left(crate::Views::<Be>::render_ftml((*t).to_string(), None)),
+            )
+        }</span>),
+    );
+    let uses = children.iter().flat().filter_map(|e| {
+        if let DocumentElement::UseModule(u) = e {
+            Some(u)
+        } else {
+            None
+        }
+    });
+    let uses = super::uses::<Be, _>("Uses", uses);
+    let children = children
+        .iter()
+        .map(FtmlViewable::as_view::<Be>)
+        .collect_view();
+
+    view! {
+      <Block>
+        <Header slot><Caption1Strong>
+            "Slide "{title}
+        </Caption1Strong></Header>
+        <HeaderLeft slot>{uses}</HeaderLeft>
+        {children}
+      </Block>
+    }
+}
 
 impl FtmlViewable for Section {
     fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
@@ -72,7 +112,9 @@ impl FtmlViewable for LogicalParagraph {
             |t| {
                 Left(super::hover_paragraph::<Be>(
                     uri.clone(),
-                    crate::Views::<Be>::render_ftml(t.to_string(), None),
+                    view!(<span style="font-style:italic;">{
+                        crate::Views::<Be>::render_ftml(t.to_string(), None)}
+                    </span>),
                 ))
             },
         );

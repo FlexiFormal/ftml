@@ -1,5 +1,5 @@
 use crate::{
-    components::content::FtmlViewable,
+    components::content::{FtmlViewable, paragraphs},
     config::FtmlConfig,
     utils::{
         Header, LocalCacheExt, ReactiveStore,
@@ -134,9 +134,15 @@ impl super::FtmlViewable for DocumentElement {
             }
             Self::Paragraph(p) => p.as_view::<Be>().into_any(),
             Self::Section(s) => s.as_view::<Be>().into_any(),
+            Self::Slide {
+                uri,
+                title,
+                children,
+                ..
+            } => paragraphs::slide::<Be>(uri, title.as_deref(), children).into_any(),
             Self::Term(DocumentTerm { uri, term }) => view_term::<Be>(uri, term.clone()).into_any(),
-            o => {
-                let txt = format!("{o:?}");
+            Self::Problem(p) => {
+                let txt = format!("{p:?}");
                 view!(<div><Text tag=thaw::TextTag::Code>"TODO: "{txt}</Text></div>).into_any()
             }
         }

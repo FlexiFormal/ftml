@@ -369,7 +369,7 @@ pub fn resolved_var_popover<B: SendBackend>(
     } else {
         "Variable: "
     };
-    view! {<div class="ftml-symbol-popup" style="text-align:left;">
+    view! {<div class="ftml-symbol-popup">
         {title}{uri.name().to_string()}
         {LocalCache::with::<B,_,_,_>(|b| b.get_variable(uri),|v| {
             let v = match &v {

@@ -12,6 +12,8 @@ pub enum BackendError<E: std::fmt::Debug> {
     NoFragment,
     #[error("no definition for element found")]
     NoDefinition,
+    #[error("invalid argument for endpoint: {0}")]
+    InvalidArgument(String),
     #[error("not yet implemented: {0}")]
     ToDo(String),
 }
@@ -23,6 +25,7 @@ impl<F: std::fmt::Display + std::fmt::Debug> BackendError<F> {
             Self::NoDefinition => BackendError::NoDefinition,
             Self::NoFragment => BackendError::NoFragment,
             Self::InvalidUriComponent(u) => BackendError::InvalidUriComponent(u),
+            Self::InvalidArgument(s) => BackendError::InvalidArgument(s),
             Self::NotFound(n) => BackendError::NotFound(n),
             Self::ToDo(t) => BackendError::ToDo(t),
             Self::Connection(c) => BackendError::Connection(c.into()),
@@ -52,6 +55,7 @@ impl<E: std::fmt::Display + std::fmt::Debug> BackendError<E> {
             "HtmlNotFound" => Ok(Self::HtmlNotFound),
             "NoFragment" => Ok(Self::NoFragment),
             "NoDefinition" => Ok(Self::NoDefinition),
+            "InvalidArgument" => Ok(Self::InvalidArgument(js(value, prefix_len)?)),
             "NotYetImplemented" => Ok(Self::ToDo(js(value, prefix_len)?)),
             _ => Err(value),
         }
@@ -154,6 +158,11 @@ pub mod server_fn_impl {
                 BackendError::NotFound(u) => write!(
                     &mut buf,
                     "NotFound|{}",
+                    serde_json::to_string(u).map_err(|e| format!("error serializing: {e}"))?
+                ),
+                BackendError::InvalidArgument(u) => write!(
+                    &mut buf,
+                    "InvalidArgument|{}",
                     serde_json::to_string(u).map_err(|e| format!("error serializing: {e}"))?
                 ),
                 BackendError::ToDo(u) => write!(

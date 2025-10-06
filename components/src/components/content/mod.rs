@@ -88,13 +88,14 @@ pub fn hover_paragraph<Be: SendBackend>(
 ) -> impl IntoView {
     use thaw::{Popover, PopoverTrigger};
     let uristring = uri.to_string();
+    inject_css("ftml-symbol-popup", include_str!("../popup.css"));
 
     view! {
         <Popover>
           <PopoverTrigger slot>{title}</PopoverTrigger>
           <div style="font-size:small;">{uristring}</div>
           <div style="margin-bottom:5px;"><thaw::Divider/></div>
-          <div style="background-color:white;color:black;">
+          <div class="ftml-symbol-popup">
           {
               LocalCache::with_or_err::<Be,_,_,_,_>(
                   |b| b.get_fragment(uri.into(), None),

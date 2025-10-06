@@ -38,6 +38,7 @@ impl<E: std::fmt::Display + std::fmt::Debug> From<CacheError<BackendError<E>>>
                 BackendError::NoFragment => Self::NoFragment,
                 BackendError::InvalidUriComponent(u) => Self::InvalidUriComponent(u),
                 BackendError::NotFound(n) => Self::NotFound(n),
+                BackendError::InvalidArgument(s) => Self::InvalidArgument(s),
                 BackendError::ToDo(s) => Self::ToDo(s),
             },
             CacheError::ReceiveClosed => Self::Connection(CacheError::ReceiveClosed),

@@ -88,7 +88,7 @@ impl FtmlViewerConfig {
             rs.extend_from_slice(&self.redirects);
         }
         if let Some(url) = self.backend_url {
-            let mut be = super::backend::BackendUrlRef::set_url(&*url);
+            super::backend::BackendUrlRef::set_url(&url);
         }
         self.inner.apply()
     }
