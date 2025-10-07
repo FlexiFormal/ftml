@@ -1,6 +1,6 @@
 pub use crate::prelude::*;
-use crate::{
-    aux::NonEmptyStr,
+use crate::utils::{
+    NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
 };
 
@@ -31,7 +31,7 @@ impl bincode::Encode for BaseUri {
     }
 }
 #[cfg(feature = "interned")]
-impl<Store: crate::aux::interned::InternStore, Context> bincode::Decode<Context>
+impl<Store: crate::utils::interned::InternStore, Context> bincode::Decode<Context>
     for NonEmptyStr<Store>
 {
     fn decode<D: bincode::de::Decoder<Context = Context>>(
@@ -42,7 +42,7 @@ impl<Store: crate::aux::interned::InternStore, Context> bincode::Decode<Context>
     }
 }
 #[cfg(feature = "interned")]
-impl<'de, Store: crate::aux::interned::InternStore, Context> bincode::BorrowDecode<'de, Context>
+impl<'de, Store: crate::utils::interned::InternStore, Context> bincode::BorrowDecode<'de, Context>
     for NonEmptyStr<Store>
 {
     fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Context>>(
@@ -73,7 +73,7 @@ impl<'de, Store, Context> bincode::BorrowDecode<'de, Context> for NonEmptyStr<St
 }
 
 #[cfg(feature = "interned")]
-impl<Store: crate::aux::interned::InternStore> bincode::Encode for NonEmptyStr<Store> {
+impl<Store: crate::utils::interned::InternStore> bincode::Encode for NonEmptyStr<Store> {
     fn encode<E: bincode::enc::Encoder>(
         &self,
         encoder: &mut E,

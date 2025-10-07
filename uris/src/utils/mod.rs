@@ -12,7 +12,7 @@ mod uninterned;
 #[cfg(not(feature = "interned"))]
 pub use uninterned::NonEmptyStr;
 
-macros::intern!(IDS IdStr = IdStore:NonEmptyInternedStr|NonEmptyStr @ crate::aux::interned::ID_MAX);
+macros::intern!(IDS IdStr = IdStore:NonEmptyInternedStr|NonEmptyStr @ crate::utils::interned::ID_MAX);
 
 #[cfg(feature = "typescript")]
 #[::wasm_bindgen::prelude::wasm_bindgen(typescript_custom_section)]

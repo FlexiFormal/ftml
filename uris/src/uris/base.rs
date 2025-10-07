@@ -383,7 +383,7 @@ fn clean(v: &mut Vec<InternedBaseURI>) {
     fn actually_clean(v: &mut Vec<InternedBaseURI>) {
         v.retain(|e| !e.url.is_unique());
     }
-    if v.len() > crate::aux::interned::BASE_URI_MAX {
+    if v.len() > crate::utils::interned::BASE_URI_MAX {
         actually_clean(v);
     }
 }

@@ -33,7 +33,7 @@ use std::ops::{BitAnd, BitOr, Div, Not};
 use crate::{
     ArchiveId, BaseUri, DocumentElementUri, DocumentUri, Id, Language, ModuleUri, NarrativeUri,
     NarrativeUriRef, PathUri, SimpleUriName, SymbolUri, UriName, UriPath, archive::ArchiveUri,
-    aux::NonEmptyStr,
+    utils::NonEmptyStr,
 };
 
 /// Combines a [`BaseUri`] with an [`ArchiveId`] to create an [`ArchiveUri`].

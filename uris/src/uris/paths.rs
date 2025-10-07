@@ -1,13 +1,13 @@
 use crate::{
     BaseUri, FtmlUri, UriKind, UriWithArchive, UriWithPath,
     archive::ArchiveUri,
-    aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
+    utils::NonEmptyStr,
 };
 use const_format::concatcp;
 use std::{fmt::Write, str::FromStr};
 
-crate::aux::macros::intern!(PATHS = PathStore:NonEmptyStr @ crate::aux::interned::PATH_MAX);
+crate::utils::macros::intern!(PATHS = PathStore:NonEmptyStr @ crate::utils::interned::PATH_MAX);
 
 /// A path within an FTML archive.
 ///

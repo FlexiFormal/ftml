@@ -5,8 +5,8 @@ use const_format::concatcp;
 use crate::{
     ArchiveUri, BaseUri, FtmlUri, IsNarrativeUri, Language, ModuleUri, NamedUri, PathUri,
     UriComponentKind, UriKind, UriName, UriPath, UriWithArchive, UriWithPath,
-    aux::NonEmptyStr,
     errors::{SegmentParseError, UriParseError},
+    utils::NonEmptyStr,
 };
 
 #[cfg(feature = "typescript")]

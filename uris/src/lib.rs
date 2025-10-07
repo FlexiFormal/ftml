@@ -42,14 +42,14 @@ mod uris {
     pub mod paths;
     pub mod symbol;
 }
-mod aux;
 mod language;
+mod utils;
 #[allow(clippy::wildcard_imports)]
 pub(crate) use uris::*;
 
 /// parsing and related errors
 pub mod errors {
-    pub use crate::aux::errors::*;
+    pub use crate::utils::errors::*;
 }
 #[cfg(feature = "components")]
 pub mod components;
@@ -60,8 +60,8 @@ mod bincode_impl;
 mod traits;
 
 #[cfg(feature = "interned")]
-pub use aux::interned::{MemoryState, clear_memory, get_memory_state};
-pub(crate) use aux::macros::{debugdisplay, tests, ts};
+pub use utils::interned::{MemoryState, clear_memory, get_memory_state};
+pub(crate) use utils::macros::{debugdisplay, tests, ts};
 
 /// exports all Uri types and associated traits
 pub mod prelude {
@@ -71,13 +71,13 @@ pub mod prelude {
     pub use super::paths::{PathUri, UriPath};
     pub use super::symbol::SymbolUri;
     pub use super::{DomainUri, LeafUri, NarrativeUri, Uri};
-    pub use crate::aux::Id;
     pub use crate::doc_element::DocumentElementUri;
     pub use crate::document::{DocumentUri, SimpleUriName};
     pub use crate::module::{ModuleUri, UriName};
     pub use crate::traits::{
         FtmlUri, IsDomainUri, IsNarrativeUri, NamedUri, UriWithArchive, UriWithPath,
     };
+    pub use crate::utils::Id;
 }
 use const_format::concatcp;
 use either::Either::{Left, Right};

@@ -98,7 +98,7 @@ pub fn get_memory_state() -> MemoryState {
                 .sum();
         };
     }
-    data!(num_ids, ids_bytes = super::IDS);
+    data!(num_ids, ids_bytes = crate::utils::IDS);
     data!(num_archives, archives_bytes = crate::uris::archive::IDS);
     data!(num_uri_names, uri_names_bytes = crate::uris::module::NAMES);
     data!(num_uri_paths, uri_paths_bytes = crate::uris::paths::PATHS);
@@ -590,7 +590,7 @@ crate::tests! {
     };
     illegal_characters {
         use crate::UriPath;
-        for ch in &crate::aux::errors::ILLEGAL_CHARS {
+        for ch in &crate::utils::errors::ILLEGAL_CHARS {
             let s = format!("test{ch}string");
             assert!(UriPath::from_str(&s).is_err());
 

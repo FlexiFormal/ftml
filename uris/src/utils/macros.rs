@@ -112,37 +112,37 @@ macro_rules! intern {
     ($static:ident = $store:ident:$str_type:ident @ $num:expr ) => {
         #[cfg(feature = "interned")]//, not(feature = "api")))]
         #[allow(clippy::redundant_pub_crate)]
-        pub(crate) static $static: std::sync::LazyLock<crate::aux::interned::InternMap> =
-            std::sync::LazyLock::new(crate::aux::interned::InternMap::default);
+        pub(crate) static $static: std::sync::LazyLock<crate::utils::interned::InternMap> =
+            std::sync::LazyLock::new(crate::utils::interned::InternMap::default);
         #[cfg(feature = "interned")]//, not(feature = "api")))]
         #[inline]
-        unsafe fn get_ids() -> &'static crate::aux::interned::InternMap {
+        unsafe fn get_ids() -> &'static crate::utils::interned::InternMap {
             &$static
         }
         /*#[cfg(all(feature = "interned", feature = "api"))]
         unsafe extern "C" {
-            fn get_ids() -> &'static crate::aux::interned::InternMap;
+            fn get_ids() -> &'static crate::utils::interned::InternMap;
         }*/
 
         #[allow(clippy::redundant_pub_crate)]
         pub(crate) struct $store;
         #[cfg(feature = "interned")]
-        impl crate::aux::interned::InternStore for $store {
+        impl crate::utils::interned::InternStore for $store {
             const LIMIT: usize = $num;
             #[inline]
-            fn get() -> &'static crate::aux::interned::InternMap {
+            fn get() -> &'static crate::utils::interned::InternMap {
                 unsafe { get_ids() }
             }
         }
     };
     ($static:ident $type:ident = $store:ident:$str_type:ident|$noninterned:ident @ $num:expr ) => {
-        crate::aux::macros::intern!($static = $store:$str_type @ $num);
+        crate::utils::macros::intern!($static = $store:$str_type @ $num);
         #[cfg(feature = "interned")]
         #[allow(clippy::redundant_pub_crate)]
-        pub(crate) type $type = crate::aux::interned::$str_type<$store>;
+        pub(crate) type $type = crate::utils::interned::$str_type<$store>;
         #[cfg(not(feature = "interned"))]
         #[allow(clippy::redundant_pub_crate)]
-        pub(crate) type $type = crate::aux::$noninterned<$store>;
+        pub(crate) type $type = crate::utils::$noninterned<$store>;
     };
 }
 
