@@ -184,14 +184,15 @@ pub const fn comp_class(is_hovered: bool, is_var: bool, style: HighlightStyle) -
     }
 }
 
-pub fn defcomp<B: SendBackend>(children: ClonableView) -> impl IntoView {
+pub fn defcomp<Be: SendBackend>(uri: Option<SymbolUri>, children: ClonableView) -> impl IntoView {
     use HighlightStyle as HL;
-    use leptos::either::Either::{Left, Right};
+    use leptos::either::EitherOf3::{A, B, C};
     tracing::trace!("doing defcomp");
     if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");
-        return Left(children.into_view::<crate::Views<B>>());
+        return A(children.into_view::<crate::Views<Be>>());
     }
+    inject_css("ftml-comp", include_str!("comp.css"));
     let is_hovered = use_context::<InTerm>().map(|h| h.hovered);
     let style = FtmlConfig::highlight_style();
     let class = Memo::new(
@@ -204,11 +205,21 @@ pub fn defcomp<B: SendBackend>(children: ClonableView) -> impl IntoView {
             (true, HL::Off) => "ftml-comp-hover",
         },
     );
-    Right(
-        children
-            .into_view::<crate::Views<B>>()
-            .attr("class", move || class),
-    )
+    if let Some(uri) = uri {
+        let on_click = ReactiveStore::on_click::<Be>(&uri.into());
+        let allow_formals = FtmlConfig::allow_formal_info();
+        let on_click = move |_| {
+            on_click.click(allow_formals, None);
+        };
+        B(children
+            .into_view::<crate::Views<Be>>()
+            .attr("class", move || class)
+            .add_any_attr(leptos::ev::on(leptos::ev::click, Box::new(on_click))))
+    } else {
+        C(children
+            .into_view::<crate::Views<Be>>()
+            .attr("class", move || class))
+    }
 }
 
 pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {

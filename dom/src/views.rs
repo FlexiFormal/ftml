@@ -224,7 +224,12 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
-    fn comp(_is_def: bool, then: ClonableView) -> impl IntoView {
+    fn comp(then: ClonableView) -> impl IntoView {
+        then.into_view::<Self>()
+    }
+
+    #[inline]
+    fn def_comp(_uri: Option<SymbolUri>, then: ClonableView) -> impl IntoView {
         then.into_view::<Self>()
     }
 }
@@ -390,7 +395,12 @@ pub trait TermTrackedViews: 'static {
     ) -> impl IntoView;
 
     #[inline]
-    fn comp(_is_def: bool, then: ClonableView) -> impl IntoView {
+    fn comp(then: ClonableView) -> impl IntoView {
+        then.into_view::<Self>()
+    }
+
+    #[inline]
+    fn def_comp(_uri: Option<SymbolUri>, then: ClonableView) -> impl IntoView {
         then.into_view::<Self>()
     }
 }
@@ -577,7 +587,12 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     }
 
     #[inline]
-    fn comp(is_def: bool, then: ClonableView) -> impl IntoView {
-        <T as TermTrackedViews>::comp(is_def, then)
+    fn comp(then: ClonableView) -> impl IntoView {
+        <T as TermTrackedViews>::comp(then)
+    }
+
+    #[inline]
+    fn def_comp(uri: Option<SymbolUri>, then: ClonableView) -> impl IntoView {
+        <T as TermTrackedViews>::def_comp(uri, then)
     }
 }

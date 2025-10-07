@@ -64,6 +64,65 @@ impl IsDocumentElement for Section {
     }
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct Slide {
+    pub range: DocumentRange,
+    pub uri: DocumentElementUri,
+    //pub level: SectionLevel,
+    pub title: Option<Box<str>>,
+    pub children: Box<[DocumentElement]>,
+}
+impl crate::__private::Sealed for Slide {}
+impl crate::Ftml for Slide {
+    #[cfg(feature = "rdf")]
+    fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use ftml_uris::FtmlUri;
+        use ulo::triple;
+        let iri = self.uri.to_iri();
+        self.contains_triples()
+            .into_iter()
+            .chain(std::iter::once(triple!(<(iri)> : ulo:slide)))
+    }
+}
+impl Narrative for Slide {
+    #[inline]
+    fn narrative_uri(&self) -> Option<ftml_uris::NarrativeUriRef<'_>> {
+        Some(ftml_uris::NarrativeUriRef::Element(&self.uri))
+    }
+    #[inline]
+    fn children(
+        &self,
+    ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
+        self.children.iter().map(DocumentElement::as_ref)
+    }
+}
+impl IsDocumentElement for Slide {
+    #[inline]
+    fn element_uri(&self) -> Option<&DocumentElementUri> {
+        Some(&self.uri)
+    }
+    #[inline]
+    fn as_ref(&self) -> DocumentElementRef<'_> {
+        DocumentElementRef::Slide(self)
+    }
+    #[inline]
+    fn from_element(e: DocumentElementRef<'_>) -> Option<&Self>
+    where
+        Self: Sized,
+    {
+        match e {
+            DocumentElementRef::Slide(p) => Some(p),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(
     feature = "serde",
@@ -181,6 +240,18 @@ impl From<SectionLevel> for u8 {
 
 #[cfg(feature = "deepsize")]
 impl deepsize::DeepSizeOf for Section {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.title.as_ref().map(|t| t.len()).unwrap_or_default()
+            + self
+                .children
+                .iter()
+                .map(|e| std::mem::size_of_val(e) + e.deep_size_of_children(context))
+                .sum::<usize>()
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for Slide {
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
         self.title.as_ref().map(|t| t.len()).unwrap_or_default()
             + self

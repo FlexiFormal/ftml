@@ -52,7 +52,7 @@ pub enum Marker {
     SlideTitle,
     ProblemTitle,
     Comp,
-    DefComp,
+    DefComp(Option<SymbolUri>),
     OMA {
         uri: Option<DocumentElementUri>,
         head: VarOrSym,
@@ -148,7 +148,7 @@ impl Marker {
         }
         match m {
             Self::Comp
-            | Self::DefComp
+            | Self::DefComp(_)
             | Self::Argument(_)
             | Self::OMA { .. }
             | Self::SymbolReference { .. }
@@ -328,10 +328,10 @@ impl Marker {
             }
             Self::SlideNumber => SectionCounters::get_slide().into_any(),
             Self::Comp => {
-                Views::comp(false, MarkedNode::new(markers, orig, is_math, true).into()).into_any()
+                Views::comp(MarkedNode::new(markers, orig, is_math, true).into()).into_any()
             }
-            Self::DefComp => {
-                Views::comp(true, MarkedNode::new(markers, orig, is_math, true).into()).into_any()
+            Self::DefComp(u) => {
+                Views::def_comp(u, MarkedNode::new(markers, orig, is_math, true).into()).into_any()
             }
             Self::SymbolReference {
                 uri,
@@ -437,7 +437,8 @@ impl Marker {
             OpenFtmlElement::FillinSol(wd) => Some(Self::Fillinsol(wd.map(Into::into))),
             OpenFtmlElement::IfInputref(b) => Some(Self::IfInputref(*b)),
             OpenFtmlElement::Comp => Some(Self::Comp),
-            OpenFtmlElement::DefComp | OpenFtmlElement::Definiendum(_) => Some(Self::DefComp),
+            OpenFtmlElement::DefComp => Some(Self::DefComp(None)),
+            OpenFtmlElement::Definiendum(u) => Some(Self::DefComp(Some(u.clone()))),
             OpenFtmlElement::SkipSection => Some(Self::SkipSection),
             OpenFtmlElement::SectionTitle => Some(Self::SectionTitle),
             OpenFtmlElement::ParagraphTitle => Some(Self::ParagraphTitle),

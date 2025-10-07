@@ -175,13 +175,13 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     }
 
     #[inline]
-    fn comp(is_def: bool, then: ClonableView) -> impl IntoView {
-        use leptos::either::Either::{Left, Right};
-        if is_def {
-            Left(terms::defcomp::<B>(then))
-        } else {
-            Right(terms::comp::<B>(then))
-        }
+    fn comp(then: ClonableView) -> impl IntoView {
+        terms::comp::<B>(then)
+    }
+
+    #[inline]
+    fn def_comp(uri: Option<ftml_uris::SymbolUri>, then: ClonableView) -> impl IntoView {
+        terms::defcomp::<B>(uri, then)
     }
 
     #[inline]

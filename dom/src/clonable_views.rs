@@ -154,8 +154,8 @@ impl MarkedNode {
                     |r| r.add_argument::<Views>(pos, child(false)).into_any(),
                 )
             }
-            Marker::Comp => Views::comp(false, child(true)).into_any(),
-            Marker::DefComp => Views::comp(true, child(true)).into_any(),
+            Marker::Comp => Views::comp(child(true)).into_any(),
+            Marker::DefComp(u) => Views::def_comp(u, child(true)).into_any(),
             _ => ftml_parser::TODO!(),
         }
         .into_any()

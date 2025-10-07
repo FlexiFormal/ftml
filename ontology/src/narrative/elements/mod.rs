@@ -16,7 +16,7 @@ use ftml_uris::{DocumentElementUri, DocumentUri, Id, ModuleUri, SymbolUri};
 pub use notations::Notation;
 pub use paragraphs::LogicalParagraph;
 pub use problems::Problem;
-pub use sections::{Section, SectionLevel};
+pub use sections::{Section, SectionLevel, Slide};
 pub use variables::VariableDeclaration;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -105,7 +105,6 @@ pub enum DocumentElement {
     },
     SymbolDeclaration(SymbolUri),
     ImportModule(ModuleUri),
-
     Section(Section),
     SkipSection(
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
@@ -114,14 +113,7 @@ pub enum DocumentElement {
     ),
     Paragraph(LogicalParagraph),
     Problem(Problem),
-    Slide {
-        range: DocumentRange,
-        uri: DocumentElementUri,
-        #[cfg_attr(feature = "serde", serde(default))]
-        title: Option<Box<str>>,
-        #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
-        children: Box<[Self]>,
-    },
+    Slide(Slide),
     DocumentReference {
         uri: DocumentElementUri,
         target: DocumentUri,
@@ -220,7 +212,7 @@ impl super::Narrative for DocumentElement {
         &self,
     ) -> impl ExactSizeIterator<Item = DocumentElementRef<'_>> + DoubleEndedIterator {
         #[allow(clippy::enum_glob_use)]
-        use either_of::EitherOf5::*;
+        use either_of::EitherOf6::*;
         match self {
             //Self::SetSectionLevel(_) |
             Self::UseModule(_)
@@ -238,11 +230,11 @@ impl super::Narrative for DocumentElement {
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
-            | Self::Slide { children, .. }
             | Self::SkipSection(children) => B(children.iter().map(Self::as_ref)),
             Self::Section(s) => C(s.children()),
-            Self::Paragraph(s) => D(s.children()),
-            Self::Problem(s) => E(s.children()),
+            Self::Slide(s) => D(s.children()),
+            Self::Paragraph(s) => E(s.children()),
+            Self::Problem(s) => F(s.children()),
         }
     }
 }
@@ -262,11 +254,11 @@ impl Ftml for DocumentElement {
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
-            | Self::Slide { children, .. }
             | Self::SkipSection(children) => {
                 RdfIterator::Children(Box::new(children.iter().flat_map(Ftml::triples)))
             }
             Self::Section(s) => RdfIterator::Section(s.triples().into_iter()),
+            Self::Slide(s) => RdfIterator::Slide(s.triples().into_iter()),
             Self::Paragraph(s) => RdfIterator::Paragraph(s.triples().into_iter()),
             Self::Problem(s) => RdfIterator::Problem(s.triples().into_iter()),
             Self::VariableDeclaration(v) => RdfIterator::Var(v.triples().into_iter()),
@@ -296,9 +288,9 @@ impl DocumentElement {
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
-            | Self::Slide { children, .. }
             | Self::SkipSection(children) => Some(&**children),
             Self::Section(s) => Some(&*s.children),
+            Self::Slide(s) => Some(&*s.children),
             Self::Paragraph(s) => Some(&*s.children),
             Self::Problem(s) => Some(&*s.children),
         }
@@ -340,12 +332,7 @@ pub enum DocumentElementRef<'d> {
     SkipSection(&'d [DocumentElement]),
     Paragraph(&'d LogicalParagraph),
     Problem(&'d Problem),
-    Slide {
-        range: DocumentRange,
-        uri: &'d DocumentElementUri,
-        title: Option<&'d str>,
-        children: &'d [DocumentElement],
-    },
+    Slide(&'d Slide),
     DocumentReference {
         uri: &'d DocumentElementUri,
         target: &'d DocumentUri,
@@ -376,7 +363,7 @@ impl<'r> DocumentElementRef<'r> {
     ) -> impl ExactSizeIterator<Item = DocumentElementRef<'r>> + DoubleEndedIterator {
         use super::Narrative;
         #[allow(clippy::enum_glob_use)]
-        use either_of::EitherOf5::*;
+        use either_of::EitherOf6::*;
         match self {
             //Self::SetSectionLevel(_) |
             Self::UseModule(_)
@@ -394,11 +381,11 @@ impl<'r> DocumentElementRef<'r> {
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
-            | Self::Slide { children, .. }
             | Self::SkipSection(children) => B(children.iter().map(DocumentElement::as_ref)),
             Self::Section(s) => C(s.children()),
-            Self::Paragraph(s) => D(s.children()),
-            Self::Problem(s) => E(s.children()),
+            Self::Slide(s) => D(s.children()),
+            Self::Paragraph(s) => E(s.children()),
+            Self::Problem(s) => F(s.children()),
         }
     }
 }
@@ -432,11 +419,11 @@ impl crate::Ftml for DocumentElementRef<'_> {
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
-            | Self::Slide { children, .. }
             | Self::SkipSection(children) => {
                 RdfIterator::Children(Box::new(children.iter().flat_map(Ftml::triples)))
             }
             Self::Section(s) => RdfIterator::Section(s.triples().into_iter()),
+            Self::Slide(s) => RdfIterator::Slide(s.triples().into_iter()),
             Self::Paragraph(s) => RdfIterator::Paragraph(s.triples().into_iter()),
             Self::Problem(s) => RdfIterator::Problem(s.triples().into_iter()),
             Self::VariableDeclaration(v) => RdfIterator::Var(v.triples().into_iter()),
@@ -511,8 +498,8 @@ impl DocumentElement {
             Self::Paragraph(s) => &s.uri,
             Self::Problem(s) => &s.uri,
             Self::VariableDeclaration(s) => &s.uri,
-            Self::Slide { uri, .. }
-            | Self::DocumentReference { uri, .. }
+            Self::Slide(s) => &s.uri,
+            Self::DocumentReference { uri, .. }
             | Self::Notation(NotationReference { uri, .. })
             | Self::VariableNotation(VariableNotationReference { uri, .. })
             | Self::Term(DocumentTerm { uri, .. }) => uri,
@@ -568,17 +555,7 @@ impl DocumentElement {
             Self::SkipSection(e) => DocumentElementRef::SkipSection(e),
             Self::Paragraph(p) => DocumentElementRef::Paragraph(p),
             Self::Problem(p) => DocumentElementRef::Problem(p),
-            Self::Slide {
-                range,
-                uri,
-                title,
-                children,
-            } => DocumentElementRef::Slide {
-                range: *range,
-                uri,
-                title: title.as_deref(),
-                children,
-            },
+            Self::Slide(s) => DocumentElementRef::Slide(s),
             Self::DocumentReference { uri, target } => {
                 DocumentElementRef::DocumentReference { uri, target }
             }
@@ -657,11 +634,11 @@ impl<'e> DocumentElementRef<'e> {
             | Self::SymbolReference { .. }
             | Self::VariableReference { .. } => return None,
             Self::Section(s) => &s.uri,
+            Self::Slide(s) => &s.uri,
             Self::Paragraph(s) => &s.uri,
             Self::Problem(s) => &s.uri,
             Self::VariableDeclaration(s) => &s.uri,
-            Self::Slide { uri, .. }
-            | Self::DocumentReference { uri, .. }
+            Self::DocumentReference { uri, .. }
             | Self::Notation(NotationReference { uri, .. })
             | Self::VariableNotation(VariableNotationReference { uri, .. })
             | Self::Term(DocumentTerm { uri, .. }) => uri,
@@ -680,11 +657,13 @@ enum RdfIterator<
     VN: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     N: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     T: Iterator<Item = ulo::rdf_types::Triple> + 'e,
+    Sl: Iterator<Item = ulo::rdf_types::Triple> + 'e,
 > {
     #[allow(dead_code)]
     Empty(DocumentElementRef<'e>),
     Children(Box<dyn Iterator<Item = ulo::rdf_types::Triple> + 'e>),
     Section(S),
+    Slide(Sl),
     Paragraph(Pa),
     Problem(Pr),
     Notation(N),
@@ -702,7 +681,8 @@ impl<
     VN: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     N: Iterator<Item = ulo::rdf_types::Triple> + 'e,
     T: Iterator<Item = ulo::rdf_types::Triple> + 'e,
-> Iterator for RdfIterator<'e, S, Pa, Pr, V, VN, N, T>
+    Sl: Iterator<Item = ulo::rdf_types::Triple> + 'e,
+> Iterator for RdfIterator<'e, S, Pa, Pr, V, VN, N, T, Sl>
 {
     type Item = ulo::rdf_types::Triple;
     fn next(&mut self) -> Option<Self::Item> {
@@ -716,6 +696,7 @@ impl<
             Self::Notation(n) => n.next(),
             Self::VarNotation(n) => n.next(),
             Self::Term(t) => t.next(),
+            Self::Slide(s) => s.next(),
         }
     }
 }
@@ -728,11 +709,11 @@ impl deepsize::DeepSizeOf for DocumentElement {
             | Self::MathStructure { children, .. }
             | Self::Extension { children, .. }
             | Self::Morphism { children, .. }
-            | Self::Slide { children, .. }
             | Self::SkipSection(children) => children
                 .iter()
                 .map(|c| std::mem::size_of_val(c) + c.deep_size_of_children(context))
                 .sum::<usize>(),
+            Self::Slide(s) => s.deep_size_of_children(context),
             Self::Section(s) => s.deep_size_of_children(context),
             Self::Paragraph(s) => s.deep_size_of_children(context),
             Self::Problem(s) => s.deep_size_of_children(context),

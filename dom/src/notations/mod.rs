@@ -126,7 +126,7 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
                             {
 
                                 if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                                    Left(Views::comp(false,ClonableView::new(true,|| leptos::math::mo().child(","))))
+                                    Left(Views::comp(ClonableView::new(true,|| leptos::math::mo().child(","))))
                                 } else {
                                     Right(leptos::math::mo().child(","))
                                 }
@@ -230,12 +230,9 @@ impl NotationExt for Notation {
                         let op = op.clone();
                         if with_context::<CurrentUri, _>(|_| ()).is_some() {
                             Left(
-                                Views::comp(
-                                    false,
-                                    ClonableView::new(true, move || {
-                                        attr(view_node(&op), "data-ftml-comp", "")
-                                    }),
-                                )
+                                Views::comp(ClonableView::new(true, move || {
+                                    attr(view_node(&op), "data-ftml-comp", "")
+                                }))
                                 .into_any(),
                             )
                         } else {
@@ -311,10 +308,9 @@ pub(crate) fn view_component_with_args<Views: FtmlViews>(
             let this = unsafe { this.unwrap_unchecked().clone() };
             let n = n.clone();
             let inner = if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                leptos::either::Either::Left(Views::comp(
-                    false,
-                    ClonableView::new(true, move || view_node(&n).attr("data-ftml-comp", "")),
-                ))
+                leptos::either::Either::Left(Views::comp(ClonableView::new(true, move || {
+                    view_node(&n).attr("data-ftml-comp", "")
+                })))
             } else {
                 leptos::either::Either::Right(view_node(&n).attr("data-ftml-comp", ""))
             };
@@ -324,10 +320,9 @@ pub(crate) fn view_component_with_args<Views: FtmlViews>(
             let n = n.clone();
             if with_context::<CurrentUri, _>(|_| ()).is_some() {
                 Left(
-                    Views::comp(
-                        false,
-                        ClonableView::new(true, move || view_node(&n).attr("data-ftml-comp", "")),
-                    )
+                    Views::comp(ClonableView::new(true, move || {
+                        view_node(&n).attr("data-ftml-comp", "")
+                    }))
                     .into_any(),
                 )
             } else {

@@ -308,6 +308,8 @@ dict! { ulo = "http://mathhub.info/ulo":
         these include symbols, declarations, and quantifications.";
     section <: physical @ "A physical grouping inside a document. These can be nested.";
 
+    slide <: physical @ "A slide in a presentation.";
+
     // ------------------------------------------------------------------------
 
     para <: physical @ "A document paragraph with mathematical meaning.";

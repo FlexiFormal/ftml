@@ -72,7 +72,7 @@ mod document_quiz_impl {
         narrative::{
             DataRef, DocumentRange,
             elements::{
-                DocumentElement, DocumentElementRef,
+                DocumentElement, DocumentElementRef, Slide,
                 problems::{
                     GradingNote, Solutions,
                     quizzes::{Quiz, QuizElement, QuizError, QuizProblem},
@@ -225,13 +225,13 @@ mod document_quiz_impl {
                     | DocumentElementRef::MathStructure { children, .. }
                     | DocumentElementRef::Extension { children, .. }
                     | DocumentElementRef::Morphism { children, .. }
-                    | DocumentElementRef::Slide { children, .. }
                     | DocumentElementRef::SkipSection(children) => {
                         if !children.is_empty() {
                             push!(children.iter().map(DocumentElement::as_ref);None);
                         }
                     }
                     DocumentElementRef::UseModule(_)
+                    | DocumentElementRef::Slide(_)
                     | DocumentElementRef::SymbolDeclaration(_)
                     | DocumentElementRef::ImportModule(_)
                     | DocumentElementRef::VariableDeclaration(_)

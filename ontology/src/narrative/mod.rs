@@ -65,6 +65,7 @@ impl DocumentData {
                 match c {
                     DocumentElement::Section(elements::Section { uri, .. })
                     | DocumentElement::Paragraph(elements::LogicalParagraph { uri, .. })
+                    | DocumentElement::Slide(elements::Slide{uri,..})
                     | DocumentElement::Problem(elements::Problem { uri, .. })
                         if uri.name().last() == step =>
                     {
@@ -74,17 +75,9 @@ impl DocumentData {
                             find_e(c, steps)
                         };
                     }
-                    DocumentElement::Slide { uri, .. } if uri.name().last() == step => {
-                        return if steps.peek().is_none() {
-                            Some(c)
-                        } else {
-                            find_e(c, steps)
-                        };
-                    }
                     DocumentElement::Module { children, .. }
                     | DocumentElement::Morphism { children, .. }
                     | DocumentElement::MathStructure { children, .. }
-                    | DocumentElement::Slide { children, .. }
                     | DocumentElement::Extension { children, .. } => {
                         return find_inner(
                             Box::new(children.iter().chain(iter))
@@ -112,6 +105,7 @@ impl DocumentData {
                     }
                     DocumentElement::Section(_)
                     | DocumentElement::Paragraph(_)
+                    | DocumentElement::Slide(_)
                     | DocumentElement::Problem(_)
                     //| DocumentElementRef::SetSectionLevel(_)
                     | DocumentElement::SymbolDeclaration(_)
@@ -147,6 +141,7 @@ pub trait Narrative: crate::Ftml {
         use crate::narrative::elements::{
             LogicalParagraph, Problem, Section, VariableDeclaration,
             notations::{NotationReference, VariableNotationReference},
+            sections::Slide,
         };
         use ftml_uris::FtmlUri;
         use ulo::triple;
@@ -175,7 +170,7 @@ pub trait Narrative: crate::Ftml {
                     DocumentElementRef::Section(Section { uri, .. })
                     | DocumentElementRef::Paragraph(LogicalParagraph { uri, .. })
                     | DocumentElementRef::Problem(Problem { uri, .. })
-                    | DocumentElementRef::Slide { uri, .. }
+                    | DocumentElementRef::Slide(Slide { uri, .. })
                     | DocumentElementRef::VariableDeclaration(VariableDeclaration {
                         uri, ..
                     })
@@ -227,15 +222,9 @@ pub trait Narrative: crate::Ftml {
                     DocumentElementRef::Section(elements::Section { uri, .. })
                     | DocumentElementRef::Paragraph(elements::LogicalParagraph { uri, .. })
                     | DocumentElementRef::Problem(elements::Problem { uri, .. })
+                    | DocumentElementRef::Slide(elements::Slide { uri, .. })
                         if uri.name().last() == step =>
                     {
-                        return if steps.peek().is_none() {
-                            T::from_element(c)
-                        } else {
-                            find_e(c, steps)
-                        };
-                    }
-                    DocumentElementRef::Slide { uri, .. } if uri.name().last() == step => {
                         return if steps.peek().is_none() {
                             T::from_element(c)
                         } else {
@@ -245,7 +234,6 @@ pub trait Narrative: crate::Ftml {
                     DocumentElementRef::Module { children, .. }
                     | DocumentElementRef::Morphism { children, .. }
                     | DocumentElementRef::MathStructure { children, .. }
-                    | DocumentElementRef::Slide { children, .. }
                     | DocumentElementRef::Extension { children, .. } => {
                         return find_inner(
                             Box::new(children.iter().map(|e| e.as_ref()).chain(iter))
@@ -274,7 +262,7 @@ pub trait Narrative: crate::Ftml {
                     DocumentElementRef::Section(_)
                     | DocumentElementRef::Paragraph(_)
                     | DocumentElementRef::Problem(_)
-                    //| DocumentElementRef::SetSectionLevel(_)
+                    | DocumentElementRef::Slide(_)
                     | DocumentElementRef::SymbolDeclaration(_)
                     | DocumentElementRef::UseModule(_)
                     | DocumentElementRef::ImportModule(_)

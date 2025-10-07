@@ -43,7 +43,7 @@ pub trait TermExt {
 macro_rules! maybe_comp {
     ($e:expr) => {
         if with_context::<CurrentUri, _>(|_| ()).is_some() {
-            leptos::either::Either::Left(Views::comp(false, ClonableView::new(true, move || $e)))
+            leptos::either::Either::Left(Views::comp(ClonableView::new(true, move || $e)))
         } else {
             leptos::either::Either::Right($e)
         }
@@ -333,12 +333,9 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
                             }
                         } else {
                             let name = uri.name;
-                            Right(Views::comp(
-                                false,
-                                ClonableView::new(true, move || {
-                                    mtext().style("color:red").child(name.last().to_string())
-                                }),
-                            ))
+                            Right(Views::comp(ClonableView::new(true, move || {
+                                mtext().style("color:red").child(name.last().to_string())
+                            })))
                         }
                     })
                 }),
@@ -347,10 +344,9 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
             Right(with_notations::<Be, _, _>(uri.clone().into(), move |t| {
                 if let Some(n) = t {
                     if let Some(n) = n.op {
-                        Left(Left(Views::comp(
-                            false,
-                            ClonableView::new(true, move || super::view_node(&n)),
-                        )))
+                        Left(Left(Views::comp(ClonableView::new(true, move || {
+                            super::view_node(&n)
+                        }))))
                     } else {
                         Left(Right(
                             n.as_view::<Views>(&VarOrSym::Sym(uri), this.as_ref()),
@@ -395,10 +391,9 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
                         with_notations::<Be, _, _>(uri.clone().into(), move |t| {
                             if let Some(n) = t {
                                 if let Some(n) = n.op {
-                                    Left(Left(Views::comp(
-                                        false,
-                                        ClonableView::new(true, move || super::view_node(&n)),
-                                    )))
+                                    Left(Left(Views::comp(ClonableView::new(true, move || {
+                                        super::view_node(&n)
+                                    }))))
                                 } else {
                                     Left(Right(n.as_view::<Views>(
                                         &VarOrSym::Var(Variable::Ref {
@@ -467,7 +462,7 @@ fn var_name<Views: FtmlViews>(
                     Variable::Name { name, notated },
                     None,
                     in_term,
-                    ClonableView::new(true, move || Views::comp(false, inner.clone())),
+                    ClonableView::new(true, move || Views::comp(inner.clone())),
                 ))
             } else {
                 Right(mi().child(not))

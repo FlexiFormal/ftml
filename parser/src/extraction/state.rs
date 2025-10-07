@@ -23,7 +23,7 @@ use ftml_ontology::{
         },
         elements::{
             DocumentElement, DocumentTerm, LogicalParagraph, Notation, Problem, Section,
-            SectionLevel, VariableDeclaration,
+            SectionLevel, Slide, VariableDeclaration,
             notations::{
                 NotationComponent, NotationNode, NotationReference, VariableNotationReference,
             },
@@ -1516,12 +1516,12 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         title: Option<Box<str>>,
         range: DocumentRange,
     ) {
-        let p = DocumentElement::Slide {
+        let p = DocumentElement::Slide(Slide {
             uri,
             title,
             range,
             children: children.into_boxed_slice(),
-        };
+        });
         tracing::info!("Adding slide {p:#?}");
         self.push_elem(p);
     }
