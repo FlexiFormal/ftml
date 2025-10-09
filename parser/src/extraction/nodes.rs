@@ -13,6 +13,11 @@ use ftml_ontology::{
 use ftml_uris::Id;
 use std::{borrow::Cow, hint::unreachable_unchecked};
 
+fn is_whitespace(c:char) -> bool {
+    const INVIS : [char;1] = ['​'];
+    char::is_whitespace(c) || INVIS.contains(&c) 
+}
+
 pub trait FtmlNode: Clone + std::fmt::Debug {
     //type Ancestors<'a>: Iterator<Item = Self> where Self: 'a;
     //fn ancestors(&self) -> Self::Ancestors<'_>;
@@ -91,7 +96,7 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
                     continue;
                 }
                 match c {
-                    Some(Right(s)) if !s.as_bytes().iter().all(u8::is_ascii_whitespace) => {
+                    Some(Right(s)) if !s.chars().all(is_whitespace) => {
                         children.push(NotationComponent::Text(s.into_boxed_str()));
                     }
                     Some(Left(n)) => {
@@ -168,8 +173,8 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
                     children.push(AnyOpaque::Term(j as u32));
                     continue;
                 }
-                match c {
-                    Some(Right(s)) if s.as_bytes().iter().all(u8::is_ascii_whitespace) => (),
+                match c { // "​"
+                    Some(Right(s)) if s.chars().all(is_whitespace) => (),
                     Some(Right(s)) => children.push(AnyOpaque::Text(s.into_boxed_str())),
                     Some(Left(n)) => {
                         #[allow(clippy::cast_possible_truncation)]
@@ -213,7 +218,7 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
         for c in self.children() {
             match c {
                 Some(Left(n)) => children.push(NodeOrText::Node(n.as_component()?)),
-                Some(Right(t)) if !t.as_bytes().iter().all(u8::is_ascii_whitespace) => {
+                Some(Right(t)) if !t.chars().all(is_whitespace) => {
                     children.push(NodeOrText::Text(t.into_boxed_str()));
                 }
                 None | Some(Right(_)) => (),

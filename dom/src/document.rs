@@ -186,6 +186,9 @@ impl DocumentState {
             context.clone().into(),
             is_stripped,
         )));
+        if use_context::<SectionCounters>().is_none() {
+            provide_context(SectionCounters::default());
+        }
         provide_context(CurrentUri(target.clone().into()));
         provide_context(InDocument(target));
         provide_context(ContextUri(context.into()));
@@ -198,6 +201,9 @@ impl DocumentState {
             DocumentUri::no_doc().clone().into(),
             true,
         )));
+        if use_context::<SectionCounters>().is_none() {
+            provide_context(SectionCounters::default());
+        }
         provide_context(InDocument(DocumentUri::no_doc().clone()));
         provide_context(ContextUri(DocumentUri::no_doc().clone().into()));
         provide_context(CurrentUri(DocumentUri::no_doc().clone().into()));

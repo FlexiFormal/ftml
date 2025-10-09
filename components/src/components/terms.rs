@@ -1,9 +1,7 @@
 #![allow(clippy::must_use_candidate)]
 
 use crate::{
-    SendBackend,
-    config::{FtmlConfig, HighlightStyle},
-    utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
+    components::content::FtmlViewable, config::{FtmlConfig, HighlightStyle}, utils::{collapsible::lazy_collapsible, LocalCacheExt, ReactiveStore}, SendBackend
 };
 use ftml_backend::{BackendError, GlobalBackend};
 use ftml_dom::{
@@ -18,7 +16,7 @@ use ftml_dom::{
 };
 use ftml_ontology::{
     narrative::elements::ParagraphOrProblemKind,
-    terms::{ArgumentMode, VarOrSym, Variable},
+    terms::{ArgumentMode, Term, VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, Id, IsNarrativeUri, LeafUri, SymbolUri, Uri, UriWithArchive};
 use leptos::prelude::*;
@@ -230,11 +228,9 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> impl IntoView {
         return Left(children.into_view::<crate::Views<B>>());
     }
     let Some(head) = DocumentState::current_term_head() else {
-        tracing::trace!("no current head");
+        tracing::warn!("no current head");
         return Left(children.into_view::<crate::Views<B>>());
     };
-
-    inject_css("ftml-comp", include_str!("comp.css"));
 
     let is_var = matches!(&head, VarOrSym::Var(_));
     let Some(is_hovered) = use_context::<InTerm>().map(|h| h.hovered) else {
@@ -316,7 +312,7 @@ pub fn comp_like<B: SendBackend, V: IntoView + 'static>(
     let style = FtmlConfig::highlight_style();
     let is_var = matches!(head, VarOrSym::Var(_));
     let class = Memo::new(move |_| {
-        super::terms::comp_class(is_hovered.get(), is_var, style.get()).to_string()
+        comp_class(is_hovered.get(), is_var, style.get()).to_string()
     });
     let top_term = if top_term && allow_formals {
         crate::Views::<B>::current_top_term()
@@ -375,13 +371,17 @@ pub fn resolved_var_popover<B: SendBackend>(
     uri: DocumentElementUri,
     is_sequence: bool,
 ) -> impl IntoView {
+    use thaw::Text;
     let title = if is_sequence {
-        "Variable Sequence: "
+        "Variable Sequence "
     } else {
-        "Variable: "
+        "Variable "
     };
+    let declaration = uri.clone();
+    let tm = ftml_dom::utils::math(move || ReactiveStore::render_term::<B>(Term::Var{presentation:None,variable:Variable::Ref { declaration, is_sequence:Some(is_sequence) }}));
+    let header = view!({title}{tm}" ("{uri.name().to_string()}")");
     view! {<div class="ftml-symbol-popup">
-        {title}{uri.name().to_string()}
+        <Text>{header}</Text>
         {LocalCache::with::<B,_,_,_>(|b| b.get_variable(uri),|v| {
             let v = match &v {
                 either::Either::Left(v) => v,
@@ -391,22 +391,21 @@ pub fn resolved_var_popover<B: SendBackend>(
             let df = v.data.df.as_ref();
             view! {
                 {df.map(|df| {
-                    view!{<div><span>
-                        "Defined as "
+                    let v = view!{"defined as "
                         {
                             let t = df.clone().into_view::<crate::Views<B>,B>(false);
                             ftml_dom::utils::math(move || t)
-                        }
-                    </span></div>}
+                        }};
+                    view!{<div><Text>{v}</Text></div>}
                 })}
                 {tp.map(|tp| {
-                    view!{<div><span>
-                        "Of type "
+                    let v = view!{"of type "
                         {
                             let t = tp.clone().into_view::<crate::Views<B>,B>(false);
                             ftml_dom::utils::math(move || t)
                         }
-                    </span></div>}
+                    };
+                    view!{<div><Text>{v}</Text></div>}
                 })}
             }
         })}
@@ -474,20 +473,26 @@ pub(crate) fn do_onclick<Be: SendBackend>(
     top_term: ReadSignal<Option<DocumentElementUri>>,
     allow_formals: ReadSignal<bool>,
 ) -> impl IntoView + use<Be> {
-    use leptos::either::Either::{Left, Right};
+    use leptos::either::{Either::{Left, Right},EitherOf3::{A,B,C}};
     use leptos::prelude::*;
     use thaw::Divider;
     let s = match vos {
         VarOrSym::Var(Variable::Name {
             notated: Some(n), ..
         }) => {
-            return Left(view! {<span>"Variable "{n.to_string()}</span>});
+            return Left(A(view! {<span>"Variable "{n.to_string()}</span>}));
         }
-        VarOrSym::Var(Variable::Name { name, .. }) => {
-            return Left(view! {<span>"Variable "{name.to_string()}</span>});
+        VarOrSym::Var(Variable::Name { name, notated }) => {
+            return Left(B(view! {<span>"Variable "{notated.as_ref().map_or_else(|| name.to_string(),|n| n.to_string())}</span>}));
         }
         VarOrSym::Var(Variable::Ref { declaration, .. }) => {
-            return Left(view! {<span>"Variable "{declaration.name.last().to_string()}</span>});
+            let uri = declaration.clone();
+            return Left(C(
+                LocalCache::with_or_toast::<Be,_,_,_,_>(move |c| c.get_variable(uri), |v| match v {
+                    either::Either::Left(v) => v.as_view::<Be>(),
+                    either::Either::Right(v) => v.as_view::<Be>()
+                }, || "Error")
+            ));
         }
         VarOrSym::Sym(s) => s.clone(),
     };
@@ -537,8 +542,8 @@ fn formals<Be: SendBackend>(
                 LocalCache::with_or_toast::<Be,_,_,_,_>(
                     move |r| r.get_symbol(sym),
                     |s| match s {
-                        ::either::Left(s) => s.as_view::<Be>(),
-                        ::either::Right(s) => s.as_view::<Be>()
+                        ::either::Left(s) => super::content::symbols::symbol_view::<Be>(&s,false),
+                        ::either::Right(s) => super::content::symbols::symbol_view::<Be>(&s,false)
                     },
                     move || view!({format!("error getting uri {bol}")}<br/>)
             )}

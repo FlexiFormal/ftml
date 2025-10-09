@@ -16,17 +16,18 @@ use ftml_dom::{
 use ftml_ontology::{
     domain::declarations::symbols::{ArgumentSpec, Symbol, SymbolData},
     narrative::elements::{
-        Notation, ParagraphOrProblemKind, VariableDeclaration, variables::VariableData,
+        variables::VariableData, Notation, ParagraphOrProblemKind, VariableDeclaration
     },
-    terms::{VarOrSym, Variable},
+    terms::{ArgumentMode, VarOrSym, Variable},
 };
 use ftml_uris::{DocumentElementUri, IsNarrativeUri, LeafUri, SymbolUri};
 use leptos::{html::span, prelude::*};
 use thaw::{Caption1, Caption1Strong, Text, TextTag};
 
-impl super::FtmlViewable for Symbol {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> {
-        let Self { uri, data } = self;
+//impl super::FtmlViewable for Symbol {
+    pub fn symbol_view<Be: SendBackend>(s:&Symbol,show_paras:bool) -> impl IntoView + use<Be> {
+        use std::fmt::Write;
+        let Symbol { uri, data } = s;
         let SymbolData {
             arity,
             macroname,
@@ -47,7 +48,16 @@ impl super::FtmlViewable for Symbol {
             .child(uri.name().last().to_string())
             .title(uri.to_string());
         let macroname = macroname.as_ref().map(|name| {
-            let name = name.to_string();
+            let mut name = name.to_string();
+            for (i,m) in arity.iter().enumerate() {
+                let i = i+1;
+                let _ = match m {
+                    ArgumentMode::Simple => write!(name,"{{i_{i}}}"),
+                    ArgumentMode::Sequence => write!(name,"{{a_{i}^1,...,a_{i}^n}}"),
+                    ArgumentMode::BoundVariable =>write!(name,"{{b_{i}}}"),
+                    ArgumentMode::BoundVariableSequence => write!(name,"{{B_{i}^1,...,B_{i}^n}}"),
+                };
+            }
             view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
         });
         let tp = tp.as_ref().map(|t| {
@@ -67,7 +77,7 @@ impl super::FtmlViewable for Symbol {
             {macroname}
         };
         let notations = do_notations::<Be>(LeafUri::Symbol(uri.clone()), arity.clone());
-        let paragraphs = do_paragraphs::<Be>(uri.clone());
+        let paragraphs = if show_paras {Some(do_paragraphs::<Be>(uri.clone()))} else {None};
         view! {
             <Block show_separator=true>
                 <Header slot>{header}</Header>
@@ -107,10 +117,11 @@ impl super::FtmlViewable for Symbol {
         }
          */
     }
-}
+//}
 
 impl super::FtmlViewable for VariableDeclaration {
     fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
+        use std::fmt::Write;
         use thaw::Caption1;
         let Self { uri, data } = self;
         let VariableData {
@@ -130,7 +141,16 @@ impl super::FtmlViewable for VariableDeclaration {
             .child(uri.name().last().to_string())
             .title(uri.to_string());
         let macroname = macroname.as_ref().map(|name| {
-            let name = name.to_string();
+            let mut name = name.to_string();
+            for (i,m) in arity.iter().enumerate() {
+                let i = i+1;
+                let _ = match m {
+                    ArgumentMode::Simple => write!(name,"{{i_{i}}}"),
+                    ArgumentMode::Sequence => write!(name,"{{a_{i}^1,...,a_{i}^n}}"),
+                    ArgumentMode::BoundVariable =>write!(name,"{{b_{i}}}"),
+                    ArgumentMode::BoundVariableSequence => write!(name,"{{B_{i}^1,...,B_{i}^n}}"),
+                };
+            }
             view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
         });
         let tp = tp.as_ref().map(|t| {

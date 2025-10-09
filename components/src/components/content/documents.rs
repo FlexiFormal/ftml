@@ -66,8 +66,8 @@ impl super::FtmlViewable for DocumentElement {
                 LocalCache::with_or_toast::<Be, _, _, _, _>(
                     |e| e.get_symbol(s),
                     move |s| match s {
-                        either::Either::Left(s) => s.as_view::<Be>(),
-                        either::Either::Right(s) => s.as_view::<Be>(),
+                        either::Either::Left(s) => super::symbols::symbol_view::<Be>(&s,true),
+                        either::Either::Right(s) => super::symbols::symbol_view::<Be>(&s,true),
                     },
                     || "error",
                 )

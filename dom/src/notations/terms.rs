@@ -325,7 +325,7 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
                     with_notations::<Be, _, _>(uri.clone().into(), move |t| {
                         if let Some(n) = t {
                             if let Some(n) = n.op {
-                                Left(Left(super::view_node(&n)))
+                                Left(Left(Views::comp(ClonableView::new(true,move || super::view_node(&n)))))
                             } else {
                                 Left(Right(
                                     n.as_view::<Views>(&VarOrSym::Sym(uri), this.as_ref()),

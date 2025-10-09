@@ -38,7 +38,11 @@ pub use views::*;
 #[inline]
 pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
     #[cfg(feature = "ssr")]
-    provide_context(utils::css::CssIds::default());
+    {
+        if use_context::<utils::css::CssIds>().is_none() {
+            provide_context(utils::css::CssIds::default());
+        }
+    }
     f()
 }
 
