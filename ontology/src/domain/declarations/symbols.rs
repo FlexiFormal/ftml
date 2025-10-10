@@ -189,9 +189,13 @@ impl ArgumentSpec {
     pub const fn num(&self) -> u8 {
         self.0.len() as u8
     }
-    
+
     #[inline]
-    pub fn iter(&self) -> impl std::iter::DoubleEndedIterator<Item = ArgumentMode> + std::iter::ExactSizeIterator {
+    #[must_use]
+    pub fn iter(
+        &self,
+    ) -> impl std::iter::DoubleEndedIterator<Item = ArgumentMode> + std::iter::ExactSizeIterator
+    {
         self.0.iter().copied()
     }
 }

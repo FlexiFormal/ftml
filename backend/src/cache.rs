@@ -280,6 +280,7 @@ where
         then: impl FnOnce(&V) -> R + Send,
     ) -> impl Future<Output = Result<R, CacheError<E>>> {
         use either::Either::{Left, Right};
+
         match self.map.entry(k.clone()) {
             Entry::Occupied(lock) => {
                 let lock = lock.get();
@@ -289,7 +290,14 @@ where
                             .map(then)
                             .map_err(|e| CacheError::Connection(e.clone())),
                     ))),
-                    MaybeValue::Pending(k) => Left(Right(Self::recv_and_then(k.clone(), then))),
+                    MaybeValue::Pending(k) if !k.is_terminated() && !k.is_disconnected() => {
+                        Left(Right(Self::recv_and_then(k.clone(), then)))
+                    }
+                    _ => {
+                        let (sender, receiver) = kanal::bounded_async(1);
+                        *lock.write() = MaybeValue::Pending(receiver);
+                        Right(Self::call_and_then(f(k), sender, lock.clone(), then))
+                    }
                 }
             }
             Entry::Vacant(v) => {
@@ -316,7 +324,7 @@ where
             let mut lock = receiver.write();
             *lock = MaybeValue::Done(r.clone());
         }
-        while sender.receiver_count() > 0 {
+        while sender.receiver_count() > 0 && !sender.is_disconnected() && !sender.is_closed() {
             let _ = sender.send(r.clone()).await;
         }
         drop(sender);
@@ -333,7 +341,7 @@ where
             let mut lock = receiver.write();
             *lock = MaybeValue::Done(r.clone());
         }
-        while sender.receiver_count() > 0 {
+        while sender.receiver_count() > 0 && !sender.is_disconnected() && !sender.is_closed() {
             let _ = sender.send(r.clone()).await;
         }
         drop(sender);
