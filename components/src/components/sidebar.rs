@@ -224,10 +224,10 @@ fn content_drawer<B: SendBackend>() -> impl IntoView {
                     </DrawerHeaderTitleAction>
                     <Popover>
                         <PopoverTrigger slot>
-                            <Text><span inner_html={let uri = uricl2; move || {
+                            <span inner_html={let uri = uricl2; move || {
                                 let ttl = title.get();
                                 if ttl.is_empty() { uri.name.to_string()} else {ttl}
-                            }}/></Text>
+                            }}/>
                         </PopoverTrigger>
                         <Text>{uricl.to_string()}</Text>
                     </Popover>
