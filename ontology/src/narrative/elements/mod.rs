@@ -161,7 +161,7 @@ impl crate::Ftml for DocumentTerm {
         macro_rules! syms {
             ($iri:ident $e:expr) => {{
                 $e.symbols().collect::<rustc_hash::FxHashSet<_>>().into_iter()
-                    .map(move |s| triple!(<($iri.clone())> dc:hasPart <(s.to_iri())>))
+                    .map(move |s| triple!(<($iri.clone())> ulo:crossrefs <(s.to_iri())>))
             }};
         }
         let iri = self.uri.to_iri();

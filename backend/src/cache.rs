@@ -293,7 +293,7 @@ where
                     MaybeValue::Pending(k) if !k.is_terminated() && !k.is_disconnected() => {
                         Left(Right(Self::recv_and_then(k.clone(), then)))
                     }
-                    _ => {
+                    MaybeValue::Pending(_) => {
                         let (sender, receiver) = kanal::bounded_async(1);
                         *lock.write() = MaybeValue::Pending(receiver);
                         Right(Self::call_and_then(f(k), sender, lock.clone(), then))

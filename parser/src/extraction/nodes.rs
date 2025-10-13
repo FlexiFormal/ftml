@@ -13,9 +13,10 @@ use ftml_ontology::{
 use ftml_uris::Id;
 use std::{borrow::Cow, hint::unreachable_unchecked};
 
-fn is_whitespace(c:char) -> bool {
-    const INVIS : [char;1] = ['​'];
-    char::is_whitespace(c) || INVIS.contains(&c) 
+fn is_whitespace(c: char) -> bool {
+    #[allow(clippy::invisible_characters)]
+    const INVIS: [char; 1] = ['​'];
+    char::is_whitespace(c) || INVIS.contains(&c)
 }
 
 pub trait FtmlNode: Clone + std::fmt::Debug {
@@ -173,7 +174,8 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
                     children.push(AnyOpaque::Term(j as u32));
                     continue;
                 }
-                match c { // "​"
+                match c {
+                    // "​"
                     Some(Right(s)) if s.chars().all(is_whitespace) => (),
                     Some(Right(s)) => children.push(AnyOpaque::Text(s.into_boxed_str())),
                     Some(Left(n)) => {

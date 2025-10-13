@@ -16,7 +16,7 @@ use ftml_dom::{
 use ftml_ontology::{
     domain::declarations::symbols::{ArgumentSpec, Symbol, SymbolData},
     narrative::elements::{
-        variables::VariableData, Notation, ParagraphOrProblemKind, VariableDeclaration
+        Notation, ParagraphOrProblemKind, VariableDeclaration, variables::VariableData,
     },
     terms::{ArgumentMode, VarOrSym, Variable},
 };
@@ -25,98 +25,103 @@ use leptos::{html::span, prelude::*};
 use thaw::{Caption1, Caption1Strong, Text, TextTag};
 
 //impl super::FtmlViewable for Symbol {
-    pub fn symbol_view<Be: SendBackend>(s:&Symbol,show_paras:bool) -> impl IntoView + use<Be> {
-        use std::fmt::Write;
-        let Symbol { uri, data } = s;
-        let SymbolData {
-            arity,
-            macroname,
-            role,
-            tp,
-            df,
-            return_type,
-            argument_types,
-            assoctype,
-            reordering,
-        } = &**data;
-        let symbol_str = if role.iter().any(|s| s.as_ref() == "textsymdecl") {
-            "Text Symbol "
-        } else {
-            "Symbol "
-        };
-        let name = span()
-            .child(uri.name().last().to_string())
-            .title(uri.to_string());
-        let macroname = macroname.as_ref().map(|name| {
-            let mut name = name.to_string();
-            for (i,m) in arity.iter().enumerate() {
-                let i = i+1;
-                let _ = match m {
-                    ArgumentMode::Simple => write!(name,"{{i_{i}}}"),
-                    ArgumentMode::Sequence => write!(name,"{{a_{i}^1,...,a_{i}^n}}"),
-                    ArgumentMode::BoundVariable =>write!(name,"{{b_{i}}}"),
-                    ArgumentMode::BoundVariableSequence => write!(name,"{{B_{i}^1,...,B_{i}^n}}"),
-                };
-            }
-            view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
-        });
-        let tp = tp.as_ref().map(|t| {
-            let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
-        });
-        let df = df.as_ref().map(|t| {
-            let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
-            view! {<Caption1>
-                "Definiens: "{ftml_dom::utils::math(|| t)}
-                </Caption1>
-            }
-            .attr("style", "white-space:nowrap;")
-        });
-        let header = view! {
-            <Caption1Strong>{symbol_str}{name}</Caption1Strong>
-            {macroname}
-        };
-        let notations = do_notations::<Be>(LeafUri::Symbol(uri.clone()), arity.clone());
-        let paragraphs = if show_paras {Some(do_paragraphs::<Be>(uri.clone()))} else {None};
-        view! {
-            <Block show_separator=true>
-                <Header slot>{header}</Header>
-                <HeaderLeft slot>{tp}</HeaderLeft>
-                <HeaderRight slot>{df}</HeaderRight>
-                {notations}
-                {paragraphs}
-                //<Footer slot>"moar"</Footer>
-            </Block>
+#[must_use]
+pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> impl IntoView + use<Be> {
+    use std::fmt::Write;
+    let Symbol { uri, data } = s;
+    let SymbolData {
+        arity,
+        macroname,
+        role,
+        tp,
+        df,
+        return_type,
+        argument_types,
+        assoctype,
+        reordering,
+    } = &**data;
+    let symbol_str = if role.iter().any(|s| s.as_ref() == "textsymdecl") {
+        "Text Symbol "
+    } else {
+        "Symbol "
+    };
+    let name = span()
+        .child(uri.name().last().to_string())
+        .title(uri.to_string());
+    let macroname = macroname.as_ref().map(|name| {
+        let mut name = name.to_string();
+        for (i, m) in arity.iter().enumerate() {
+            let i = i + 1;
+            let _ = match m {
+                ArgumentMode::Simple => write!(name, "{{i_{i}}}"),
+                ArgumentMode::Sequence => write!(name, "{{a_{i}^1,...,a_{i}^n}}"),
+                ArgumentMode::BoundVariable => write!(name, "{{b_{i}}}"),
+                ArgumentMode::BoundVariableSequence => write!(name, "{{B_{i}^1,...,B_{i}^n}}"),
+            };
         }
-        /*
-        let uriclone = uri.clone();
-        let uriclone_b = uri.clone();
-        view! {
-            <Block show_separator>
-                <Header slot><span>
-                    <b>{symbol_str}{super::symbol_name(&uri, uri.name().last_name().as_ref())}</b>
-                    {macro_name.map(|name| view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>))}
-                    {tp.map(|t| view! {
-                        " of type "{
-                            crate::remote::get!(present(t.clone()) = html => {
-                                view!(<FTMLStringMath html/>)
-                            })
-                        }
-                    })}
-                </span></Header>
-                <HeaderLeft slot>{do_notations(URI::Content(uriclone_b.into()),arity)}</HeaderLeft>
-                <HeaderRight slot><span style="white-space:nowrap;">{df.map(|t| view! {
-                    "Definiens: "{
+        view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
+    });
+    let tp = tp.as_ref().map(|t| {
+        let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+        view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
+    });
+    let df = df.as_ref().map(|t| {
+        let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+        view! {<Caption1>
+            "Definiens: "{ftml_dom::utils::math(|| t)}
+            </Caption1>
+        }
+        .attr("style", "white-space:nowrap;")
+    });
+    let header = view! {
+        <Caption1Strong>{symbol_str}{name}</Caption1Strong>
+        {macroname}
+    };
+    let notations = do_notations::<Be>(LeafUri::Symbol(uri.clone()), arity.clone());
+    let paragraphs = if show_paras {
+        Some(do_paragraphs::<Be>(uri.clone()))
+    } else {
+        None
+    };
+    view! {
+        <Block show_separator=true>
+            <Header slot>{header}</Header>
+            <HeaderLeft slot>{tp}</HeaderLeft>
+            <HeaderRight slot>{df}</HeaderRight>
+            {notations}
+            {paragraphs}
+            //<Footer slot>"moar"</Footer>
+        </Block>
+    }
+    /*
+    let uriclone = uri.clone();
+    let uriclone_b = uri.clone();
+    view! {
+        <Block show_separator>
+            <Header slot><span>
+                <b>{symbol_str}{super::symbol_name(&uri, uri.name().last_name().as_ref())}</b>
+                {macro_name.map(|name| view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>))}
+                {tp.map(|t| view! {
+                    " of type "{
                         crate::remote::get!(present(t.clone()) = html => {
                             view!(<FTMLStringMath html/>)
                         })
                     }
-                })}</span></HeaderRight>
-                {do_los(uriclone)}
-            </Block>
-        }
-         */
+                })}
+            </span></Header>
+            <HeaderLeft slot>{do_notations(URI::Content(uriclone_b.into()),arity)}</HeaderLeft>
+            <HeaderRight slot><span style="white-space:nowrap;">{df.map(|t| view! {
+                "Definiens: "{
+                    crate::remote::get!(present(t.clone()) = html => {
+                        view!(<FTMLStringMath html/>)
+                    })
+                }
+            })}</span></HeaderRight>
+            {do_los(uriclone)}
+        </Block>
     }
+     */
+}
 //}
 
 impl super::FtmlViewable for VariableDeclaration {
@@ -142,13 +147,13 @@ impl super::FtmlViewable for VariableDeclaration {
             .title(uri.to_string());
         let macroname = macroname.as_ref().map(|name| {
             let mut name = name.to_string();
-            for (i,m) in arity.iter().enumerate() {
-                let i = i+1;
+            for (i, m) in arity.iter().enumerate() {
+                let i = i + 1;
                 let _ = match m {
-                    ArgumentMode::Simple => write!(name,"{{i_{i}}}"),
-                    ArgumentMode::Sequence => write!(name,"{{a_{i}^1,...,a_{i}^n}}"),
-                    ArgumentMode::BoundVariable =>write!(name,"{{b_{i}}}"),
-                    ArgumentMode::BoundVariableSequence => write!(name,"{{B_{i}^1,...,B_{i}^n}}"),
+                    ArgumentMode::Simple => write!(name, "{{i_{i}}}"),
+                    ArgumentMode::Sequence => write!(name, "{{a_{i}^1,...,a_{i}^n}}"),
+                    ArgumentMode::BoundVariable => write!(name, "{{b_{i}}}"),
+                    ArgumentMode::BoundVariableSequence => write!(name, "{{B_{i}^1,...,B_{i}^n}}"),
                 };
             }
             view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)

@@ -185,10 +185,12 @@ pub trait Narrative: crate::Ftml {
                     | DocumentElementRef::SymbolDeclaration(uri) => {
                         Some(triple!(<(iri.clone())> ulo:contains <(uri.to_iri())>))
                     }
+                    DocumentElementRef::SymbolReference { uri, .. } => {
+                        Some(triple!(<(iri.clone())> ulo:crossrefs <(uri.to_iri())>))
+                    }
                     //DocumentElementRef::SetSectionLevel(_)
                     DocumentElementRef::SkipSection(_)
                     | DocumentElementRef::Definiendum { .. }
-                    | DocumentElementRef::SymbolReference { .. }
                     | DocumentElementRef::VariableReference { .. } => None, //e.element_uri().map(|e| triple!(<(iri.clone())> ulo:contains <(e.to_iri())>))
                 }),
         )

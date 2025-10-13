@@ -1,7 +1,10 @@
 #![allow(clippy::must_use_candidate)]
 
 use crate::{
-    components::content::FtmlViewable, config::{FtmlConfig, HighlightStyle}, utils::{collapsible::lazy_collapsible, LocalCacheExt, ReactiveStore}, SendBackend
+    SendBackend,
+    components::content::FtmlViewable,
+    config::{FtmlConfig, HighlightStyle},
+    utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
 };
 use ftml_backend::{BackendError, GlobalBackend};
 use ftml_dom::{
@@ -311,9 +314,7 @@ pub fn comp_like<B: SendBackend, V: IntoView + 'static>(
     });
     let style = FtmlConfig::highlight_style();
     let is_var = matches!(head, VarOrSym::Var(_));
-    let class = Memo::new(move |_| {
-        comp_class(is_hovered.get(), is_var, style.get()).to_string()
-    });
+    let class = Memo::new(move |_| comp_class(is_hovered.get(), is_var, style.get()).to_string());
     let top_term = if top_term && allow_formals {
         crate::Views::<B>::current_top_term()
     } else {
@@ -378,7 +379,15 @@ pub fn resolved_var_popover<B: SendBackend>(
         "Variable "
     };
     let declaration = uri.clone();
-    let tm = ftml_dom::utils::math(move || ReactiveStore::render_term::<B>(Term::Var{presentation:None,variable:Variable::Ref { declaration, is_sequence:Some(is_sequence) }}));
+    let tm = ftml_dom::utils::math(move || {
+        ReactiveStore::render_term::<B>(Term::Var {
+            presentation: None,
+            variable: Variable::Ref {
+                declaration,
+                is_sequence: Some(is_sequence),
+            },
+        })
+    });
     let header = view!({title}{tm}" ("{uri.name().to_string()}")");
     view! {<div class="ftml-symbol-popup">
         <Text>{header}</Text>
@@ -473,7 +482,10 @@ pub(crate) fn do_onclick<Be: SendBackend>(
     top_term: ReadSignal<Option<DocumentElementUri>>,
     allow_formals: ReadSignal<bool>,
 ) -> impl IntoView + use<Be> {
-    use leptos::either::{Either::{Left, Right},EitherOf3::{A,B,C}};
+    use leptos::either::{
+        Either::{Left, Right},
+        EitherOf3::{A, B, C},
+    };
     use leptos::prelude::*;
     use thaw::Divider;
     let s = match vos {
@@ -483,16 +495,20 @@ pub(crate) fn do_onclick<Be: SendBackend>(
             return Left(A(view! {<span>"Variable "{n.to_string()}</span>}));
         }
         VarOrSym::Var(Variable::Name { name, notated }) => {
-            return Left(B(view! {<span>"Variable "{notated.as_ref().map_or_else(|| name.to_string(),|n| n.to_string())}</span>}));
+            return Left(B(
+                view! {<span>"Variable "{notated.as_ref().map_or_else(|| name.to_string(),Id::to_string)}</span>},
+            ));
         }
         VarOrSym::Var(Variable::Ref { declaration, .. }) => {
             let uri = declaration.clone();
-            return Left(C(
-                LocalCache::with_or_toast::<Be,_,_,_,_>(move |c| c.get_variable(uri), |v| match v {
+            return Left(C(LocalCache::with_or_toast::<Be, _, _, _, _>(
+                move |c| c.get_variable(uri),
+                |v| match v {
                     either::Either::Left(v) => v.as_view::<Be>(),
-                    either::Either::Right(v) => v.as_view::<Be>()
-                }, || "Error")
-            ));
+                    either::Either::Right(v) => v.as_view::<Be>(),
+                },
+                || "Error",
+            )));
         }
         VarOrSym::Sym(s) => s.clone(),
     };

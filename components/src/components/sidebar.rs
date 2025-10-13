@@ -8,7 +8,7 @@ use crate::{
 };
 use ftml_backend::FtmlBackend;
 use ftml_dom::{
-    DocumentState,
+    DocumentState, FtmlViews,
     utils::{
         css::inject_css,
         get_true_rect,
@@ -186,13 +186,16 @@ fn position_sidebar(position: &HtmlDivElement, sidebar: &HtmlDivElement) {
 fn content_drawer<B: SendBackend>() -> impl IntoView {
     use thaw::{
         Button, ButtonAppearance, DrawerBody, DrawerHeader, DrawerHeaderTitle,
-        DrawerHeaderTitleAction, DrawerPosition, Icon, OverlayDrawer,
+        DrawerHeaderTitleAction, DrawerPosition, Icon, OverlayDrawer, Popover, PopoverTrigger,
+        Text,
     };
 
     let uri = DocumentState::document_uri();
     if uri == *DocumentUri::no_doc() {
         return None;
     }
+    let uricl = uri.clone();
+    let uricl2 = uri.clone();
     inject_css("ftml-content-drawer", include_str!("content.css"));
     let open = RwSignal::new(false);
     let title = RwSignal::new("...".to_string());
@@ -219,7 +222,15 @@ fn content_drawer<B: SendBackend>() -> impl IntoView {
                         "x"
                         </Button>
                     </DrawerHeaderTitleAction>
-                    <span inner_html=title/>
+                    <Popover>
+                        <PopoverTrigger slot>
+                            <Text>{let uri = uricl2; move || {
+                                let ttl = title.get();
+                                if ttl.is_empty() { uri.name.to_string()} else {ttl}
+                            }}</Text>
+                        </PopoverTrigger>
+                        <Text>{uricl.to_string()}</Text>
+                    </Popover>
                 </DrawerHeaderTitle>
             </DrawerHeader>
             <DrawerBody>

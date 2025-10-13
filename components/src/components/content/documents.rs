@@ -1,5 +1,5 @@
 use crate::{
-    components::content::{FtmlViewable, paragraphs},
+    components::content::{CommaSep, FtmlViewable, paragraphs},
     config::FtmlConfig,
     utils::{
         Header, LocalCacheExt, ReactiveStore,
@@ -11,8 +11,9 @@ use ftml_ontology::{
     narrative::{
         documents::Document,
         elements::{
-            DocumentElement, DocumentTerm, FlatIterable, Slide,
+            DocumentElement, DocumentTerm, FlatIterable, Problem, Slide,
             notations::{NotationReference, VariableNotationReference},
+            problems::ProblemData,
         },
     },
     terms::{Term, VarOrSym, Variable},
@@ -66,8 +67,8 @@ impl super::FtmlViewable for DocumentElement {
                 LocalCache::with_or_toast::<Be, _, _, _, _>(
                     |e| e.get_symbol(s),
                     move |s| match s {
-                        either::Either::Left(s) => super::symbols::symbol_view::<Be>(&s,true),
-                        either::Either::Right(s) => super::symbols::symbol_view::<Be>(&s,true),
+                        either::Either::Left(s) => super::symbols::symbol_view::<Be>(&s, true),
+                        either::Either::Right(s) => super::symbols::symbol_view::<Be>(&s, true),
                     },
                     || "error",
                 )
@@ -145,6 +146,69 @@ impl super::FtmlViewable for DocumentElement {
                 let txt = format!("{p:?}");
                 view!(<div><Text tag=thaw::TextTag::Code>"TODO: "{txt}</Text></div>).into_any()
             }
+        }
+    }
+}
+
+impl super::FtmlViewable for Problem {
+    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
+        &self,
+    ) -> impl IntoView + use<Be> + 'static {
+        use leptos::either::Either::{Left, Right};
+        let Self {
+            uri,
+            children,
+            data,
+            ..
+        } = self;
+        let ProblemData {
+            sub_problem,
+            points,
+            minutes,
+            title,
+            preconditions,
+            objectives,
+            ..
+        } = &**data;
+
+        let title = title.as_ref().map_or_else(
+            || Right(uri.name().last().to_string()),
+            |t| Left(crate::Views::<Be>::render_ftml(t.to_string(), None)),
+        );
+        let uses = children.iter().flat().filter_map(|e| {
+            if let DocumentElement::UseModule(u) = e {
+                Some(u)
+            } else {
+                None
+            }
+        });
+        let uses = super::uses::<Be, _>("Uses", uses);
+        let children = children
+            .iter()
+            .map(FtmlViewable::as_view::<Be>)
+            .collect_view();
+        let prefix = if *sub_problem {
+            "Subproblem "
+        } else {
+            "Problem "
+        };
+        let fors = CommaSep(
+            "Objectives",
+            objectives.iter().map(|(d, u)| {
+                view! {{d.to_string()}" "{u.as_view::<Be>()}}
+            }),
+        )
+        .into_view();
+
+        view! {
+          <Block>
+            <Header slot><Caption1Strong>
+                {prefix}{title}
+            </Caption1Strong></Header>
+            <HeaderLeft slot>{uses}</HeaderLeft>
+            <HeaderRight slot>{fors}</HeaderRight>
+            {children}
+          </Block>
         }
     }
 }
