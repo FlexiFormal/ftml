@@ -357,16 +357,6 @@ fn scroll_listener(
     });
 }
 
-fn scroll_into_view(id: &str, nav_elems: Option<RwSignal<NavElems>>) {
-    let Some(link_el) = document().get_element_by_id(id) else {
-        if let Some(nav) = nav_elems {
-            NavElems::navigate_to(nav, &id[1..]);
-        }
-        return;
-    };
-    link_el.scroll_into_view();
-}
-
 #[derive(Clone, Copy)]
 struct AnchorData {
     anchor_ref: NodeRef<leptos::html::Div>,

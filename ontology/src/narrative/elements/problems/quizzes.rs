@@ -72,7 +72,7 @@ mod document_quiz_impl {
         narrative::{
             DataRef, DocumentRange,
             elements::{
-                DocumentElement, DocumentElementRef, Slide,
+                DocumentElement, DocumentElementRef,
                 problems::{
                     GradingNote, Solutions,
                     quizzes::{Quiz, QuizElement, QuizError, QuizProblem},

@@ -60,7 +60,7 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 serde_json = "1"
 rstest = { version = "0.26" }
-criterion = { version = "0.5", features = ["tokio"] }
+criterion = { version = "0.7", features = ["tokio"] }
 reqwest = { version = "0" }
 
 server_fn = "0.8"
@@ -96,7 +96,7 @@ reqwasm = { version = "0.5" }
 send_wrapper = "0.6.0"
 html5ever = "0.35"
 phf = "0.13"
-lightningcss = { version = "1.0.0-alpha.67", default-features = false }
+lightningcss = { version = "1.0.0-alpha.68", default-features = false }
 console_error_panic_hook = "0.1"
 tracing-wasm = { version = "0.2" }
 chrono = "0.4"
@@ -104,12 +104,12 @@ chrono = "0.4"
 
 paste = "1"
 thread_local = "1.1.8"
-hashbrown = "0.14.5"
-rand = "0.8"
+hashbrown = "0.16"
+rand = "0.9"
 tokio = { version = "1" }
 tokio-uring = { version = "0.5" }
-nix = { version = "0.29" }
-ctor = { version = "0.4" }
+nix = { version = "0.30" }
+ctor = { version = "0.6" }
 async-broadcast = { version = "0.7" }
 bincode = { version = "2", features = ["serde"] }
 #postcard = { version = "1.1", features = ["use-std"] }
@@ -135,13 +135,13 @@ pollster = "0.4"
 bytesize = "2"
 deepsize = "0.2"
 serde-wasm-bindgen = "0.6"
+impl-tools = { version="0.11.4" }
 
 openmath = "0.1"
 #thaw = { version = "0.5.0-beta" }
 #thaw = { path = "../thaw/thaw" }
 thaw = { git = "https://github.com/thaw-ui/thaw" }
 thaw_utils = { git = "https://github.com/thaw-ui/thaw" }
-impl-tools = { git = "https://github.com/kas-gui/impl-tools" }                                  #"0.11.2"
 leptos-posthoc = { version = "0.2", git = "https://github.com/FlexiFormal/leptos-posthoc.git" }
 #leptos-posthoc = { path = "../leptos-posthoc" }
 

@@ -547,7 +547,6 @@ fn formals<Be: SendBackend>(
     symbol: SymbolUri,
     uri: ReadSignal<Option<DocumentElementUri>>,
 ) -> impl IntoView + use<Be> {
-    use super::content::FtmlViewable;
     use thaw::Divider;
     view! {
         <div style="margin:5px;"><Divider/></div>

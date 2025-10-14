@@ -8,7 +8,7 @@ use crate::{
 };
 use ftml_backend::FtmlBackend;
 use ftml_dom::{
-    DocumentState, FtmlViews,
+    DocumentState,
     utils::{
         css::inject_css,
         get_true_rect,

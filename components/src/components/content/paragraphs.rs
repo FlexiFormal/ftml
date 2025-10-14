@@ -5,7 +5,7 @@ use crate::{
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
-use ftml_dom::{FtmlViews, notations::TermExt, utils::css::inject_css};
+use ftml_dom::{FtmlViews, notations::TermExt};
 use ftml_ontology::narrative::elements::{
     DocumentElement, FlatIterable, LogicalParagraph, Section,
 };
