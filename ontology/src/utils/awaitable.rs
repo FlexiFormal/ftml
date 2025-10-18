@@ -57,7 +57,9 @@ impl<
             Entry::Occupied(a) => either::Left(a.get().clone().get()),
             Entry::Vacant(v) => {
                 let (a, ret) = Awaitable::new(f(v.key().clone()));
-                v.insert(a);
+                {
+                    let _ = v.insert(a);
+                }
                 either::Right(ret.get())
             }
         }
@@ -71,17 +73,23 @@ impl<
         self.map.get(k).map(|r| r.inner.read().clone().get_sync())
     }
 
+    pub fn has_async<Q: std::hash::Hash + Eq + ?Sized>(&self, k: &Q) -> Option<impl Future<Output = Result<T, E>> + Send + use<Q,K,T,E>>
+    where
+        K: std::borrow::Borrow<Q>, {
+        self.map.get(k).map(|r| r.inner.read().clone().get())
+    }
+
     /// Assumes f blocks
     /// # Errors
     pub fn get_sync(&self, k: K, f: impl FnOnce(K) -> Result<T, E>) -> Result<T, E> {
         match self.map.entry(k) {
             Entry::Occupied(a) => a.get().clone().get_sync(),
             Entry::Vacant(v) => {
-                let (sender, receiver) = flume::bounded(1);
+                let (sender, receiver) = flume::unbounded();
                 let inner = Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
                 let key = v.key().clone();
                 {
-                    v.insert(Awaitable {
+                    let _ = v.insert(Awaitable {
                         inner: inner.clone(),
                     });
                 }
@@ -90,7 +98,7 @@ impl<
                     let mut lock = inner.write();
                     *lock = MaybeValue::Done(res.clone());
                 }
-                while sender.receiver_count() > 0 {
+                while !sender.is_disconnected() && sender.receiver_count() > 0 {
                     let _ = sender.send(res.clone());
                 }
                 res
@@ -140,7 +148,7 @@ impl<T: Clone + Send, E: Clone + From<ChannelError> + Send> Awaitable<T, E> {
     pub fn new<F: Future<Output = Result<T, E>> + Send>(
         future: F,
     ) -> (Self, AwaitableSource<T, E, F>) {
-        let (sender, receiver) = flume::bounded(1); //kanal::bounded_async(1);
+        let (sender, receiver) = flume::unbounded(); //kanal::bounded_async(1);
         let inner = Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
         (
             Self {
@@ -183,7 +191,7 @@ impl<
             let mut lock = inner.write();
             *lock = MaybeValue::Done(res.clone());
         }
-        while sender.receiver_count() > 0 {
+        while !sender.is_disconnected() && sender.receiver_count() > 0 {
             let _ = sender.send_async(res.clone()).await;
         }
         res
