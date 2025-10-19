@@ -96,7 +96,7 @@ pub fn title<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
             })
         }
     } else {
-        C(crate::Views::<Be>::cont(then, true).attr("class", "ftml-proof-title"))
+        C(crate::Views::<Be>::cont(then, true).attr("class", "ftml-title-paragraph"))
     }
 }
 
