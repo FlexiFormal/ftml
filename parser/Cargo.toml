@@ -53,6 +53,7 @@ smallvec = { workspace = true }
 thiserror = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
+dateparser = {workspace = true}
 
 # syntree = { workspace = true }
 

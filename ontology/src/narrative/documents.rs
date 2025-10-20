@@ -43,15 +43,55 @@ impl crate::__private::Sealed for DocumentData {}
 impl crate::Ftml for DocumentData {
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use either_of::EitherOf3::{A, B, C};
         use ftml_uris::{FtmlUri, IsNarrativeUri, UriWithArchive};
         use ulo::triple;
         let iri = self.uri.to_iri();
         [
             triple!(<(iri.clone())> dc:language = (self.uri.language().to_string()) ),
             triple!(<(iri.clone())> : ulo:document),
-            triple!(<(self.uri.archive_uri().to_iri())> ulo:contains <(iri)>),
+            triple!(<(self.uri.archive_uri().to_iri())> ulo:contains <(iri.clone())>),
         ]
         .into_iter()
+        .chain(match &self.kind {
+            DocumentKind::Article | DocumentKind::Fragment => A(std::iter::empty()),
+            DocumentKind::Exam { date, course,retake,num,term } => B([
+                Some(triple!(<(iri.clone())> : ulo:exam)),
+                if *retake {Some(triple!(<(iri.clone())> : ulo:retake_exam))} else {None},
+                Some(triple!(<(iri.clone())> ulo:has_course = (course.to_string()))),
+                term.as_ref().map(|term| triple!(<(iri.clone())> ulo:has_course_term = (term.to_string()))),
+                Some(triple!(<(iri.clone())> ulo:is_number != (ulo::rdf_types::RDFTerm::Literal(
+                    ulo::rdf_types::Literal::new_typed_literal(num.to_string(), ulo::xsd::POSITIVE_INTEGER.into_owned())
+                )))),
+                Some(triple!(<(iri)> ulo:has_date != (ulo::rdf_types::RDFTerm::Literal(
+                    ulo::rdf_types::Literal::new_typed_literal(date.xsd().to_string(), ulo::xsd::DATE_TIME.into_owned())
+                )))),
+                ].into_iter().flatten()),
+            DocumentKind::Quiz { date, course,num,term } => C([
+                    Some(triple!(<(iri.clone())> : ulo:quiz)),
+                    Some(triple!(<(iri.clone())> ulo:has_course = (course.to_string()))),
+                    term.as_ref().map(|term| triple!(<(iri.clone())> ulo:has_course_term = (term.to_string()))),
+                    Some(triple!(<(iri.clone())> ulo:is_number != (ulo::rdf_types::RDFTerm::Literal(
+                        ulo::rdf_types::Literal::new_typed_literal(num.to_string(), ulo::xsd::POSITIVE_INTEGER.into_owned())
+                    )))),
+                    Some(triple!(<(iri)> ulo:has_date != (ulo::rdf_types::RDFTerm::Literal(
+                        ulo::rdf_types::Literal::new_typed_literal(date.xsd().to_string(), ulo::xsd::DATE_TIME.into_owned())
+                    )))),
+                ].into_iter().flatten()),
+            DocumentKind::Homework { date, course,term,num } => {
+                C([
+                    Some(triple!(<(iri.clone())> : ulo:homework)),
+                    Some(triple!(<(iri.clone())> ulo:has_course = (course.to_string()))),
+                    term.as_ref().map(|term| triple!(<(iri.clone())> ulo:has_course_term = (term.to_string()))),
+                    Some(triple!(<(iri.clone())> ulo:is_number != (ulo::rdf_types::RDFTerm::Literal(
+                        ulo::rdf_types::Literal::new_typed_literal(num.to_string(), ulo::xsd::POSITIVE_INTEGER.into_owned())
+                    )))),
+                    Some(triple!(<(iri)> ulo:has_date != (ulo::rdf_types::RDFTerm::Literal(
+                        ulo::rdf_types::Literal::new_typed_literal(date.xsd().to_string(), ulo::xsd::DATE_TIME.into_owned())
+                    )))),
+                ].into_iter().flatten())
+            }
+        })
         .chain(self.contains_triples())
     }
 }
@@ -143,19 +183,19 @@ pub enum DocumentKind {
         course: Id,
         retake: bool,
         num: u16,
-        term: Id,
+        term: Option<Id>,
     },
     Homework {
         date: Timestamp,
         course: Id,
         num: u16,
-        term: Id,
+        term: Option<Id>,
     },
     Quiz {
         date: Timestamp,
         course: Id,
         num: u16,
-        term: Id,
+        term: Option<Id>,
     },
 }
 impl std::str::FromStr for DocumentKind {
@@ -164,9 +204,28 @@ impl std::str::FromStr for DocumentKind {
         Ok(match s {
             "article" => Self::Article,
             "fragment" => Self::Fragment,
-            //"exam" => Self::Exam,
-            //"homework" => Self::Homework,
-            //"quiz" => Self::Quiz,
+            "exam" => Self::Exam {
+                date: Timestamp::default(),
+                // SAFETY: known to be a valid Id
+                course: unsafe { Id::new("course").unwrap_unchecked() },
+                retake: false,
+                num: 0,
+                term: None,
+            },
+            "homework" => Self::Homework {
+                date: Timestamp::default(),
+                // SAFETY: known to be a valid Id
+                course: unsafe { Id::new("course").unwrap_unchecked() },
+                num: 0,
+                term: None,
+            },
+            "quiz" => Self::Quiz {
+                date: Timestamp::default(),
+                // SAFETY: known to be a valid Id
+                course: unsafe { Id::new("course").unwrap_unchecked() },
+                num: 0,
+                term: None,
+            },
             _ => return Err(()),
         })
     }

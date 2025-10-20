@@ -310,6 +310,17 @@ dict! { ulo = "http://mathhub.info/ulo":
 
     slide <: physical @ "A slide in a presentation.";
 
+    exam <: document @ "A document that represents an exam";
+    retake_exam = "retake-exam", <: exam @ "A document that represents an exam";
+    homework <: document @ "A document that represents a homework sheet";
+    quiz <: document @ "A document that represents a quiz problem set";
+
+    has_date = "has-date", : ::owl::DatatypeProperty;
+    has_course = "has-course", : ::owl::DatatypeProperty;
+    is_number = "is-number", : ::owl::DatatypeProperty;
+    has_course_term = "has-course-term", : ::owl::DatatypeProperty;
+
+
     // ------------------------------------------------------------------------
 
     para <: physical @ "A document paragraph with mathematical meaning.";

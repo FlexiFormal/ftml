@@ -37,6 +37,9 @@ macro_rules! triple {
         $crate::triple!(@OBJ $sub;$crate::rdfs::$pred.into_owned(); $($tt)*)
     };
 
+    (@OBJ $sub:expr;$pred:expr; != ($obj:expr) $($tt:tt)*) => {
+        $crate::triple!(@MAYBEQUAD $sub;$pred;$obj; $($tt)*)
+    };
     (@OBJ $sub:expr;$pred:expr; = ($obj:expr) $($tt:tt)*) => {
         $crate::triple!(@MAYBEQUAD $sub;$pred;$crate::rdf_types::RDFTerm::Literal(
             $crate::rdf_types::Literal::new_simple_literal($obj)

@@ -85,6 +85,11 @@ impl Timestamp {
     pub const fn into_date(self) -> Date {
         Date(self.0)
     }
+
+    #[must_use]
+    pub const fn xsd(&self) -> impl Display {
+        Xsd(self.0)
+    }
 }
 impl Default for Timestamp {
     #[inline]
@@ -101,6 +106,16 @@ impl From<std::time::SystemTime> for Timestamp {
         Self(non_zero(t.as_millis() as u64))
     }
 }
+impl From<chrono::DateTime<chrono::Utc>> for Timestamp {
+    fn from(value: chrono::DateTime<chrono::Utc>) -> Self {
+        let ts = value.timestamp();
+        if ts > 1 {
+            Self(unsafe { NonZeroU64::new_unchecked(ts as _) })
+        } else {
+            Self::default()
+        }
+    }
+}
 impl FromStr for Timestamp {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -115,6 +130,17 @@ impl Display for Timestamp {
             .unwrap_or_else(|| unreachable!())
             .with_timezone(&chrono::Local);
         timestamp.format("%Y-%m-%d %H:%M:%S").fmt(f)
+    }
+}
+
+struct Xsd(NonZeroU64);
+impl Display for Xsd {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ts = self.0.get() as i64;
+        let timestamp = chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ts)
+            .unwrap_or_else(|| unreachable!())
+            .with_timezone(&chrono::Local);
+        timestamp.format("%Y-%m-%dT%H:%M:%S").fmt(f)
     }
 }
 

@@ -136,6 +136,7 @@ bytesize = "2"
 deepsize = "0.2"
 serde-wasm-bindgen = "0.6"
 impl-tools = { version="0.11.4" }
+dateparser = "0.2"
 
 openmath = "0.1"
 #thaw = { version = "0.5.0-beta" }

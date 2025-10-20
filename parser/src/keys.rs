@@ -35,7 +35,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 118;
+pub const NUM_KEYS: u8 = 123;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -389,11 +389,59 @@ do_keys! {
     /// The kind of the document (by default [`Article`](DocumentKind::Article)). Should
     /// occur at most once
     DocKind = "document-kind"
-        {="[DocumentKind]"}
-        := (ext,attrs,_keys,node) => {
-            let kind = attrs.get_typed(FtmlKey::DocKind, DocumentKind::from_str)?;
+        {="[DocumentKind]" +(DocKindDate,DocKindNum,DocKindRetake,DocKindCourse,DocKindTerm)}
+        := (ext,attrs,keys,node) => {
+            let mut kind = attrs.get_typed(FtmlKey::DocKind, DocumentKind::from_str)?;
+            match &mut kind {
+                DocumentKind::Exam { date, course, retake, num, term } => {
+                    *date = attrs.get_typed(FtmlKey::DocKindDate,
+                        |s| dateparser::parse(s).map(Into::into).map_err(|_| ())
+                    )?;
+                    *course = attrs.get_typed(FtmlKey::DocKindCourse, |v| v.parse().map_err(|_| ()))?;
+                    *retake = attrs.take_bool(FtmlKey::DocKindRetake);
+                    if let Some(i) = opt!(attrs.get_typed::<u16,_>(FtmlKey::DocKindNum,|v| v.parse().map_err(|_| ()))) {
+                        *num = i;
+                    }
+                    *term = opt!(attrs.get_typed(FtmlKey::DocKindTerm, |v| v.parse().map_err(|_| ())));
+
+                    del!(keys - DocKindDate,DocKindNum,DocKindRetake,DocKindCourse,DocKindTerm);
+                }
+                DocumentKind::Homework { date, course, num, term } | DocumentKind::Quiz { date, course, num, term } => {
+                    *date = attrs.get_typed(FtmlKey::DocKindDate,
+                        |s| dateparser::parse(s).map(Into::into).map_err(|_| ())
+                    )?;
+                    *course = attrs.get_typed(FtmlKey::DocKindCourse, |v| v.parse().map_err(|_| ()))?;
+                    if let Some(i) = opt!(attrs.get_typed::<u16,_>(FtmlKey::DocKindNum,|v| v.parse().map_err(|_| ()))) {
+                        *num = i;
+                    }
+                    *term = opt!(attrs.get_typed(FtmlKey::DocKindTerm, |v| v.parse().map_err(|_| ())));
+
+                    del!(keys - DocKindDate,DocKindNum,DocKindCourse,DocKindTerm);
+                }
+                _ => ()
+            }
             ret!(ext, node <- DocumentKind(kind) + DocTitle)
         } => DocumentKind(kind:DocumentKind),
+
+    DocKindDate = "document-kind-date"
+        {="[Date](https://docs.rs/dateparser/latest/dateparser/#accepted-date-formats)" -(DocKind)}
+        := noop,
+
+    DocKindNum = "document-kind-num"
+        {="[u8]" -(DocKind)}
+        := noop,
+
+    DocKindRetake = "document-kind-retake"
+        {="[bool]" -(DocKind)}
+        := noop,
+
+    DocKindCourse = "document-kind-course"
+        {="[Id]" -(DocKind)}
+        := noop,
+
+    DocKindTerm = "document-kind-term"
+        {="[Id]" -(DocKind)}
+        := noop,
 
     /// Declares a new CSS style for a section or logical paragraph. May reference a counter
     /// used for numbering the paragraphs/sections of this style.
