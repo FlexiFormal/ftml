@@ -110,7 +110,7 @@ impl From<chrono::DateTime<chrono::Utc>> for Timestamp {
     fn from(value: chrono::DateTime<chrono::Utc>) -> Self {
         let ts = value.timestamp();
         if ts > 1 {
-            Self(unsafe { NonZeroU64::new_unchecked(ts as _) })
+            Self(unsafe { NonZeroU64::new_unchecked((ts as u64) * 1_000) })
         } else {
             Self::default()
         }
