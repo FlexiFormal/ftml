@@ -365,7 +365,7 @@ fn fragment_listener(signal: RwSignal<String>) {
             }
         }
     }
-    tracing::warn!("Setting up fragment listener");
+    tracing::info!("Setting up fragment listener");
     let on_hash_change =
         leptos::wasm_bindgen::prelude::Closure::wrap(Box::new(move |_e: leptos::web_sys::Event| {
             if let Ok(mut frag) = window().location().hash()

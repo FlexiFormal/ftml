@@ -160,18 +160,24 @@ fn position_sidebar(position: &HtmlDivElement, sidebar: &HtmlDivElement) {
         // SAFETY: we added the node above
         unsafe { position.first_element_child().unwrap_unchecked() }
     };
-    while parent.child_element_count() == 1
-        && let Some(fc) = parent.first_element_child()
+    while {
+        parent.get_bounding_client_rect().width() < 10.0
+    } //&& parent.child_element_count() == 1
+        && let Some(fc) = max_child(&parent)
+    //parent.first_element_child()
     {
         parent = fc;
     }
     // first, add it to the end; since width=100%, this will get us a reasonable actual width of
     // the container, which we use as margin-left
     let _ = parent.append_child(sidebar);
-    let rect = get_true_rect(sidebar);
+    //let rect = get_true_rect(sidebar);
     let _ = sidebar.set_attribute(
         "style",
-        &format!("width:fit-content;margin-left:{}px", rect.width() + 50.0),
+        &format!(
+            "width:fit-content;margin-left:{}px",
+            parent.get_bounding_client_rect().width()/*rect.width()*/ + 50.0
+        ),
     );
     // then move to the beginning and make use of display:sticky;
     // SAFETY: HtmlDivElements are Elements
@@ -181,6 +187,26 @@ fn position_sidebar(position: &HtmlDivElement, sidebar: &HtmlDivElement) {
             parent.first_child().as_ref(),
         )
     };
+}
+
+fn max_child(e: &leptos::web_sys::Element) -> Option<leptos::web_sys::Element> {
+    use leptos::wasm_bindgen::JsCast;
+    let mut curr = None::<leptos::web_sys::Element>;
+    let mut i = 0;
+    let nodes = e.child_nodes();
+    while let Some(c) = nodes.get(i) {
+        i += 1;
+        if let Ok(e) = c.dyn_into::<leptos::web_sys::Element>() {
+            if let Some(c) = &mut curr {
+                if c.get_bounding_client_rect().width() < e.get_bounding_client_rect().width() {
+                    *c = e;
+                }
+            } else {
+                curr = Some(e);
+            }
+        }
+    }
+    curr
 }
 
 fn content_drawer<B: SendBackend>() -> impl IntoView {

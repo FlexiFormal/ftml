@@ -19,7 +19,7 @@ pub trait FtmlViews: 'static {
             cont: super::iterate::<Self>,
             on_load,
             class: None::<String>.into(),
-            style: None::<String>.into(),
+            style: Some("display:contents;".to_string()).into(),
         })
     }
     fn render_ftml_and_then(html: String, f: impl FnOnce() + 'static) -> impl IntoView {
@@ -36,7 +36,7 @@ pub trait FtmlViews: 'static {
             cont: super::iterate::<Self>,
             on_load: Some(sig),
             class: None::<String>.into(),
-            style: None::<String>.into(),
+            style: Some("display:contents;".to_string()).into(),
         })
     }
     fn render_math_ftml(html: String) -> impl IntoView {
@@ -57,8 +57,8 @@ pub trait FtmlViews: 'static {
             orig: node,
             skip_head,
             class: None::<String>.into(),
-            style: None::<String>.into(),
             cont: super::iterate::<Self>,
+            style: Some("display:contents;".to_string()).into(),
         })
     }
     #[inline]
