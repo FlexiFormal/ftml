@@ -20,14 +20,29 @@ use ftml_ontology::{
     },
     terms::{ArgumentMode, VarOrSym, Variable},
 };
-use ftml_uris::{DocumentElementUri, IsNarrativeUri, LeafUri, SymbolUri};
+use ftml_uris::{DocumentElementUri, Id, IsNarrativeUri, LeafUri, SymbolUri};
 use leptos::{html::span, prelude::*};
 use thaw::{Caption1, Caption1Strong, Text, TextTag};
+
+#[must_use]
+pub fn do_macroname(name: &Id, arity: &ArgumentSpec) -> impl IntoView + use<> {
+    use std::fmt::Write;
+    let mut name = name.to_string();
+    for (i, m) in arity.iter().enumerate() {
+        let i = i + 1;
+        let _ = match m {
+            ArgumentMode::Simple => write!(name, "{{i_{i}}}"),
+            ArgumentMode::Sequence => write!(name, "{{a_{i}^1,...,a_{i}^n}}"),
+            ArgumentMode::BoundVariable => write!(name, "{{b_{i}}}"),
+            ArgumentMode::BoundVariableSequence => write!(name, "{{B_{i}^1,...,B_{i}^n}}"),
+        };
+    }
+    view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
+}
 
 //impl super::FtmlViewable for Symbol {
 #[must_use]
 pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> impl IntoView + use<Be> {
-    use std::fmt::Write;
     let Symbol { uri, data } = s;
     let SymbolData {
         arity,
@@ -48,19 +63,7 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> impl IntoVi
     let name = span()
         .child(uri.name().last().to_string())
         .title(uri.to_string());
-    let macroname = macroname.as_ref().map(|name| {
-        let mut name = name.to_string();
-        for (i, m) in arity.iter().enumerate() {
-            let i = i + 1;
-            let _ = match m {
-                ArgumentMode::Simple => write!(name, "{{i_{i}}}"),
-                ArgumentMode::Sequence => write!(name, "{{a_{i}^1,...,a_{i}^n}}"),
-                ArgumentMode::BoundVariable => write!(name, "{{b_{i}}}"),
-                ArgumentMode::BoundVariableSequence => write!(name, "{{B_{i}^1,...,B_{i}^n}}"),
-            };
-        }
-        view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
-    });
+    let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
     let tp = tp.as_ref().map(|t| {
         let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
         view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
@@ -126,7 +129,6 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> impl IntoVi
 
 impl super::FtmlViewable for VariableDeclaration {
     fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
-        use std::fmt::Write;
         use thaw::Caption1;
         let Self { uri, data } = self;
         let VariableData {
@@ -145,19 +147,7 @@ impl super::FtmlViewable for VariableDeclaration {
         let name = span()
             .child(uri.name().last().to_string())
             .title(uri.to_string());
-        let macroname = macroname.as_ref().map(|name| {
-            let mut name = name.to_string();
-            for (i, m) in arity.iter().enumerate() {
-                let i = i + 1;
-                let _ = match m {
-                    ArgumentMode::Simple => write!(name, "{{i_{i}}}"),
-                    ArgumentMode::Sequence => write!(name, "{{a_{i}^1,...,a_{i}^n}}"),
-                    ArgumentMode::BoundVariable => write!(name, "{{b_{i}}}"),
-                    ArgumentMode::BoundVariableSequence => write!(name, "{{B_{i}^1,...,B_{i}^n}}"),
-                };
-            }
-            view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
-        });
+        let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
         let tp = tp.as_ref().map(|t| {
             let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
             view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}

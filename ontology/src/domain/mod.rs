@@ -11,7 +11,7 @@ use crate::{
 pub mod declarations;
 pub mod modules;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SharedDeclaration<T: IsDeclaration>(pub SharedArc<Module, T>);
 impl<T: IsDeclaration> std::ops::Deref for SharedDeclaration<T> {
     type Target = T;

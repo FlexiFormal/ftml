@@ -332,11 +332,11 @@ pub fn comp_like<B: SendBackend, V: IntoView + 'static>(
             //on_click_signal=ocp
         >
             <PopoverTrigger slot>{
-            children().attr("class",move || class)
-            .add_any_attr(leptos::ev::on(
-                leptos::ev::click,
-                Box::new(on_click)
-            ))
+                children().attr("class",move || class)
+                .add_any_attr(leptos::ev::on(
+                    leptos::ev::click,
+                    Box::new(on_click)
+                ))
             }</PopoverTrigger>
             {term_popover::<B>(head)}
         </Popover>
@@ -551,6 +551,9 @@ fn formals<Be: SendBackend>(
     view! {
         <div style="margin:5px;"><Divider/></div>
         {lazy_collapsible(Some(|| "Formal Details"), move ||view!{
+            <div style="width:100%"><div style="width:fit-content;margin-left:auto;">
+                "(in module "{symbol.module.as_view::<Be>()}")"
+            </div></div>
             {
                 let sym = symbol.clone();
                 let bol = symbol.clone();

@@ -3,9 +3,83 @@ use std::borrow::Borrow;
 use ftml_uris::{Language, ModuleUri, SymbolUri};
 
 use crate::domain::{
-    HasDeclarations,
-    declarations::{AnyDeclarationRef, Declaration, IsDeclaration},
+    HasDeclarations, SharedDeclaration,
+    declarations::{
+        AnyDeclarationRef, Declaration, IsDeclaration,
+        morphisms::Morphism,
+        structures::{MathStructure, StructureExtension},
+    },
 };
+
+#[derive(Clone, Hash, Debug)]
+pub enum ModuleLike {
+    Module(Module),
+    Structure(SharedDeclaration<MathStructure>),
+    Extension(SharedDeclaration<StructureExtension>),
+    Nested(SharedDeclaration<NestedModule>),
+    Morphism(SharedDeclaration<Morphism>),
+}
+impl From<Module> for ModuleLike {
+    #[inline]
+    fn from(value: Module) -> Self {
+        Self::Module(value)
+    }
+}
+impl From<SharedDeclaration<MathStructure>> for ModuleLike {
+    #[inline]
+    fn from(value: SharedDeclaration<MathStructure>) -> Self {
+        Self::Structure(value)
+    }
+}
+impl From<SharedDeclaration<StructureExtension>> for ModuleLike {
+    #[inline]
+    fn from(value: SharedDeclaration<StructureExtension>) -> Self {
+        Self::Extension(value)
+    }
+}
+impl From<SharedDeclaration<Morphism>> for ModuleLike {
+    #[inline]
+    fn from(value: SharedDeclaration<Morphism>) -> Self {
+        Self::Morphism(value)
+    }
+}
+impl crate::__private::Sealed for ModuleLike {}
+impl HasDeclarations for ModuleLike {
+    fn declarations(
+        &self,
+    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
+        use either_of::EitherOf5::{A, B, C, D, E};
+        match self {
+            Self::Module(m) => A(m.declarations()),
+            Self::Structure(s) => B(s.declarations()),
+            Self::Extension(e) => C(e.declarations()),
+            Self::Morphism(m) => D(m.declarations()),
+            Self::Nested(n) => E(n.declarations()),
+        }
+    }
+    fn domain_uri(&self) -> ftml_uris::DomainUriRef<'_> {
+        match self {
+            Self::Module(m) => ftml_uris::DomainUriRef::Module(&m.uri),
+            Self::Structure(s) => ftml_uris::DomainUriRef::Symbol(&s.uri),
+            Self::Extension(s) => ftml_uris::DomainUriRef::Symbol(&s.uri),
+            Self::Morphism(s) => ftml_uris::DomainUriRef::Symbol(&s.uri),
+            Self::Nested(s) => ftml_uris::DomainUriRef::Symbol(&s.uri),
+        }
+    }
+}
+impl crate::Ftml for ModuleLike {
+    #[cfg(feature = "rdf")]
+    fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use either_of::EitherOf5::{A, B, C, D, E};
+        match self {
+            Self::Module(m) => A(m.triples().into_iter()),
+            Self::Structure(s) => B(s.triples().into_iter()),
+            Self::Extension(e) => C(e.triples().into_iter()),
+            Self::Morphism(m) => D(m.triples().into_iter()),
+            Self::Nested(n) => E(n.triples().into_iter()),
+        }
+    }
+}
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 #[cfg_attr(

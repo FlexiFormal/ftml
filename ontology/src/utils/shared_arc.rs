@@ -8,11 +8,36 @@
 /// behind the [`Arc`](triomphe::Arc), an instance of which is owned by `o`.
 ///
 /// [`SharedArc`] conceptually is such a pair `(o,i)` which dereferences to `Inner`.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub struct SharedArc<Outer, Inner> {
     outer: Outer,
     elem: *const Inner,
 }
+impl<O, I: std::fmt::Debug> std::fmt::Debug for SharedArc<O, I> {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unsafe { (*self.elem).fmt(f) }
+    }
+}
+impl<O, I: PartialEq> PartialEq for SharedArc<O, I> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { (*self.elem).eq(&*other.elem) }
+    }
+}
+impl<O, I: Eq> Eq for SharedArc<O, I> {}
+impl<O, I: PartialEq> PartialEq<I> for SharedArc<O, I> {
+    #[inline]
+    fn eq(&self, other: &I) -> bool {
+        unsafe { (*self.elem).eq(other) }
+    }
+}
+impl<O, I: std::hash::Hash> std::hash::Hash for SharedArc<O, I> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unsafe { (*self.elem).hash(state) };
+    }
+}
+
 impl<Outer, Inner> SharedArc<Outer, Inner> {
     /// Fallibly construct a new [`SharedArc`]. The `outer`,
     /// in the simplest case, is just an <code>[Arc](triomphe::Arc)&lt;Arced&gt;</code>, or a newtype Wrapper around one.

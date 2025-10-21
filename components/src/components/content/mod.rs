@@ -113,45 +113,46 @@ pub fn hover_paragraph<Be: SendBackend>(
     }
 }
 
-impl FtmlViewable for ModuleUri {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> {
-        use thaw::{Popover, PopoverTrigger, Text};
-        let name = self.module_name().to_string();
-        let uri = self.to_string();
-        view! {<Popover>
+#[must_use]
+pub fn module_with_hover(uri: &ModuleUri) -> impl IntoView + use<> {
+    use thaw::{Popover, PopoverTrigger, Text};
+    let name = uri.module_name().to_string();
+    let uri = uri.to_string();
+    view! {
+        <Popover>
             <PopoverTrigger slot>
                 <Text class="ftml-comp">{name}</Text>
             </PopoverTrigger>
             <Text>{uri}</Text>
-        </Popover>}
-        /*
-        use flams_web_utils::components::{OnClickModal, Popover, PopoverTrigger};
-        use thaw::Scrollbar;
-        let name = uri.module_name().last().to_string();
-        let uristring = uri.to_string();
-        let uriclone = uri.clone();
-        let uri = uri.clone();
+        </Popover>
+    }
+}
+
+impl FtmlViewable for ModuleUri {
+    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> {
+        use thaw::{Dialog, DialogSurface, Popover, PopoverTrigger, Scrollbar, Text};
+        let name = self.module_name().to_string();
+        let uri = self.to_string();
+        let on_click = RwSignal::new(false);
+        let origuri = self.clone();
+
         view! {
-          <div style="display:inline-block;"><Popover>
-            <PopoverTrigger slot><b class="ftml-comp">{name}</b></PopoverTrigger>
-            <OnClickModal slot><Scrollbar style="max-height:80vh">{
-              crate::remote::get!(omdoc(uriclone.clone().into()) = (css,s) => {
-                for c in css { do_css(c); }
-                s.into_view()
-              })
-            }</Scrollbar></OnClickModal>
-            <div style="font-size:small;">{uristring}</div>
-            <div style="margin-bottom:5px;"><thaw::Divider/></div>
-            <Scrollbar style="max-height:300px">
-            {
-              crate::remote::get!(omdoc(uri.clone().into()) = (css,s) => {
-                for c in css { do_css(c); }
-                s.into_view()
-              })
-            }
-            </Scrollbar>
-          </Popover></div>
-        } */
+        <Dialog open = on_click>
+            <DialogSurface>{
+                LocalCache::with_or_toast::<Be,_,_,_,_>(move |c| c.get_module(origuri),
+                |m| view!{
+                    <Scrollbar style="max-height:75vh;">{m.as_view::<Be>()}</Scrollbar>
+                },
+                || view!(<Text style="color:red">"Error"</Text>))
+            }</DialogSurface>
+        </Dialog>
+        <Popover>
+            <PopoverTrigger slot>
+                <Text class="ftml-comp" on:click=move|_| on_click.set(true)>{name}</Text>
+            </PopoverTrigger>
+            <Text>{uri}</Text>
+        </Popover>
+        }
     }
 }
 
