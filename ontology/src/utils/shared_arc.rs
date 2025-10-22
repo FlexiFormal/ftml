@@ -105,9 +105,6 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
 
     /// If a reference to an `Inner` allows to get at a `NewInner`, then we can safely turn this
     /// `SharedArc<Outer,Inner>` into a `SharedArc<Outer,NewInner>`.
-    ///
-    /// ## Errors
-    /// iff `get` errors. In that case, we also return the original `self`.
     pub fn inherit_infallibly<NewInner>(
         self,
         get: impl FnOnce(&Inner) -> &NewInner,

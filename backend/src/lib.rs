@@ -30,7 +30,7 @@ use ftml_ontology::{
             structures::{MathStructure, StructureExtension},
             symbols::Symbol,
         },
-        modules::Module,
+        modules::ModuleLike,
     },
     narrative::{
         SharedDocumentElement,
@@ -110,8 +110,6 @@ macro_rules! new_global {
     (@NEW RemoteFlamsLike) => { $crate::RemoteFlamsBackend::new($crate::DEFAULT_SERVER_URL,false) };
 
 
-
-
     (@TYPE Cached($($rest:tt)*) ) => { $crate::CachedBackend< $crate::new_global!(@TYPE $($rest)*) > };
     (@NEW Cached($($rest:tt)*) ) => { $crate::FtmlBackend::cached($crate::new_global!(@NEW $($rest)*)) };
 }
@@ -158,7 +156,7 @@ pub trait FtmlBackend {
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<Module, BackendError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> + Send;
 
     fn get_document(
         &self,
@@ -377,7 +375,7 @@ pub trait FlamsBackend {
         a: Option<ftml_uris::ArchiveId>,
         p: Option<String>,
         m: Option<String>,
-    ) -> impl Future<Output = Result<Module, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
 
     /// `/domain/document`
     #[allow(clippy::too_many_arguments)]
@@ -478,7 +476,7 @@ where
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<Module, BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> + Send {
         <Self as FlamsBackend>::get_module(self, Some(uri), None, None, None)
     }
 

@@ -14,10 +14,23 @@ use ftml_ontology::domain::{
         structures::{MathStructure, StructureExtension},
         symbols::ArgumentSpec,
     },
-    modules::{Module, NestedModule},
+    modules::{Module, ModuleLike, NestedModule},
 };
 use leptos::prelude::*;
 use thaw::{Caption1, Caption1Strong, Divider};
+
+impl FtmlViewable for ModuleLike {
+    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
+        use leptos::either::EitherOf5::{A, B, C, D, E};
+        match self {
+            Self::Module(m) => A(m.as_view::<Be>()),
+            Self::Structure(s) => B(s.as_view::<Be>()),
+            Self::Extension(s) => C(s.as_view::<Be>()),
+            Self::Nested(s) => D(s.as_view::<Be>()),
+            Self::Morphism(s) => E(s.as_view::<Be>()),
+        }
+    }
+}
 
 impl FtmlViewable for AnyDeclarationRef<'_> {
     fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {

@@ -76,6 +76,7 @@ thiserror = { workspace = true }
 either = { workspace = true }
 send_wrapper = { workspace = true }
 ordered-float = { workspace = true }
+futures-util = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 web-sys = { workspace = true, features = [
     "Window",

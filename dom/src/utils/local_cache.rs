@@ -8,7 +8,7 @@ use ftml_ontology::{
             structures::{MathStructure, StructureExtension},
             symbols::Symbol,
         },
-        modules::Module,
+        modules::{Module, ModuleLike},
     },
     narrative::{
         SharedDocumentElement,
@@ -23,7 +23,7 @@ use ftml_ontology::{
 use ftml_uris::{
     DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri, UriKind,
 };
-use std::marker::PhantomData;
+use std::{hint::unreachable_unchecked, marker::PhantomData};
 
 pub trait SendBackend:
     GlobalBackend<Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone> + Send
@@ -138,11 +138,39 @@ impl<B: SendBackend> WithLocalCache<B> {
     pub fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<Module, BackendError<B::Error>>> + Send + use<B> {
-        if let Some(m) = LOCAL_CACHE.modules.get(&uri) {
-            return either::Either::Left(std::future::ready(Ok(m.clone())));
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<B::Error>>> + Send + use<B> {
+        use futures_util::TryFutureExt;
+        if uri.is_top() {
+            if let Some(m) = LOCAL_CACHE.modules.get(&uri) {
+                return either::Left(either::Left(std::future::ready(Ok(ModuleLike::Module(
+                    m.clone(),
+                )))));
+            }
+            either::Left(either::Right(B::get().get_module(uri)))
+        } else {
+            let Some(SymbolUri { name, module }) = uri.into_symbol() else {
+                // SAFETY: uri is not a top-level module uri, so it is compatible with a symbol URI
+                unsafe { unreachable_unchecked() }
+            };
+            let fut = LOCAL_CACHE.modules.get(&module).map_or_else(
+                || {
+                    either::Right(B::get().get_module(module).map_ok(|m| {
+                        let ModuleLike::Module(m) = m else {
+                            // SAFETY: A top-level module uri can only resolve to a top-level module
+                            unsafe { unreachable_unchecked() }
+                        };
+                        m
+                    }))
+                },
+                |m| either::Left(std::future::ready(Ok(m.clone()))),
+            );
+            either::Right(fut.and_then(move |m| {
+                std::future::ready(
+                    m.as_module_like(&name)
+                        .ok_or(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                )
+            }))
         }
-        either::Either::Right(B::get().get_module(uri))
     }
 
     pub fn get_document(

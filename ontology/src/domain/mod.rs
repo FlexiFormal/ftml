@@ -3,7 +3,7 @@ use ftml_uris::{DomainUriRef, UriName};
 use crate::{
     domain::{
         declarations::{AnyDeclarationRef, IsDeclaration},
-        modules::Module,
+        modules::{Module, ModuleLike},
     },
     utils::SharedArc,
 };
@@ -26,6 +26,32 @@ impl Module {
             .ok()
             .map(SharedDeclaration)
     }
+
+    #[must_use]
+    pub fn as_module_like(&self, name: &UriName) -> Option<ModuleLike> {
+        // meh: this needs to find() twice
+        Some(match self.find_declaration(name.steps())? {
+            AnyDeclarationRef::NestedModule(_) => ModuleLike::Nested(SharedDeclaration(unsafe {
+                SharedArc::new(self.clone(), |m| &m.0, |e| e.find(name.steps()).ok_or(()))
+                    .unwrap_unchecked()
+            })),
+            AnyDeclarationRef::MathStructure(_) => {
+                ModuleLike::Structure(SharedDeclaration(unsafe {
+                    SharedArc::new(self.clone(), |m| &m.0, |e| e.find(name.steps()).ok_or(()))
+                        .unwrap_unchecked()
+                }))
+            }
+            AnyDeclarationRef::Extension(_) => ModuleLike::Extension(SharedDeclaration(unsafe {
+                SharedArc::new(self.clone(), |m| &m.0, |e| e.find(name.steps()).ok_or(()))
+                    .unwrap_unchecked()
+            })),
+            AnyDeclarationRef::Morphism(_) => ModuleLike::Morphism(SharedDeclaration(unsafe {
+                SharedArc::new(self.clone(), |m| &m.0, |e| e.find(name.steps()).ok_or(()))
+                    .unwrap_unchecked()
+            })),
+            _ => return None,
+        })
+    }
 }
 
 pub trait HasDeclarations: crate::Ftml {
@@ -34,16 +60,18 @@ pub trait HasDeclarations: crate::Ftml {
     ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator;
     fn domain_uri(&self) -> DomainUriRef<'_>;
 
-    fn find<'s, T: IsDeclaration>(&self, steps: impl IntoIterator<Item = &'s str>) -> Option<&T> {
-        #[allow(clippy::enum_glob_use)]
-        use either_of::EitherOf5::*;
+    fn find_declaration<'s>(
+        &self,
+        steps: impl IntoIterator<Item = &'s str>,
+    ) -> Option<AnyDeclarationRef<'_>> {
+        use either_of::EitherOf5::{A, B, C, D, E};
         let mut steps = steps.into_iter().peekable();
         let mut curr = A(self.declarations());
         'outer: while let Some(step) = steps.next() {
             macro_rules! ret {
                 ($i:ident $e:expr;$m:expr) => {{
                     if steps.peek().is_none() {
-                        return T::from_declaration($e);
+                        return Some($e);
                     }
                     curr = $i($m.declarations());
                     continue 'outer;
@@ -61,7 +89,7 @@ pub trait HasDeclarations: crate::Ftml {
                     AnyDeclarationRef::Extension(m) if m.uri.name().last() == step => ret!(E c;m),
                     AnyDeclarationRef::Symbol(s) if s.uri.name().last() == step => {
                         return if steps.peek().is_none() {
-                            T::from_declaration(c)
+                            Some(c)
                         } else {
                             None
                         };
@@ -72,6 +100,10 @@ pub trait HasDeclarations: crate::Ftml {
             return None;
         }
         None
+    }
+
+    fn find<'s, T: IsDeclaration>(&self, steps: impl IntoIterator<Item = &'s str>) -> Option<&T> {
+        self.find_declaration(steps).and_then(T::from_declaration)
     }
 
     #[cfg(feature = "rdf")]

@@ -243,8 +243,9 @@ where
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<ftml_ontology::domain::modules::Module, BackendError<Self::Error>>>
-    {
+    ) -> impl Future<
+        Output = Result<ftml_ontology::domain::modules::ModuleLike, BackendError<Self::Error>>,
+    > {
         let url = self.redirects.for_modules(&uri).map_or_else(
             || Self::make_url(&self.modules_url, &uri.into(), None),
             |r| r.to_string(),
@@ -543,7 +544,7 @@ mod server_fn {
             m: Option<String>,
         ) -> impl Future<
             Output = Result<
-                ftml_ontology::domain::modules::Module,
+                ftml_ontology::domain::modules::ModuleLike,
                 BackendError<server_fn::error::ServerFnErrorErr>,
             >,
         > {

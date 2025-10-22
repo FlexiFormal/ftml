@@ -1,7 +1,7 @@
 use crate::{BackendError, FtmlBackend, ParagraphOrProblemKind};
 use dashmap::Entry;
 use ftml_ontology::{
-    domain::modules::Module,
+    domain::modules::{Module, ModuleLike},
     narrative::{
         documents::{Document, TocElem},
         elements::Notation,
@@ -14,7 +14,7 @@ use ftml_uris::{
 use futures_util::TryFutureExt;
 use kanal::AsyncSender;
 use parking_lot::RwLock;
-use std::sync::Arc;
+use std::{hint::unreachable_unchecked, sync::Arc};
 
 #[derive(Debug, Clone, thiserror::Error, serde::Deserialize, serde::Serialize)]
 pub enum CacheError<E: std::fmt::Debug> {
@@ -170,10 +170,47 @@ where
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<Module, BackendError<Self::Error>>> {
-        self.modules_cache
-            .get(uri, |uri| self.inner.get_module(uri))
-            .map_err(Into::into)
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> {
+        if uri.is_top() {
+            either::Either::Left(
+                self.modules_cache
+                    .get(uri, |uri| {
+                        self.inner.get_module(uri).map_ok(|m| {
+                            let ModuleLike::Module(m) = m else {
+                                // SAFETY: A top-level module uri can only resolve to a top-level module
+                                unsafe { unreachable_unchecked() }
+                            };
+                            m
+                        })
+                    })
+                    .map_ok(ModuleLike::Module)
+                    .map_err(Into::into),
+            )
+        } else {
+            let Some(SymbolUri { name, module }) = uri.into_symbol() else {
+                // SAFETY: uri is not a top-level module uri, so it is compatible with a symbol URI
+                unsafe { unreachable_unchecked() }
+            };
+            either::Either::Right(
+                self.modules_cache
+                    .get(module, |uri| {
+                        self.inner.get_module(uri).map_ok(|m| {
+                            let ModuleLike::Module(m) = m else {
+                                // SAFETY: A top-level module uri can only resolve to a top-level module
+                                unsafe { unreachable_unchecked() }
+                            };
+                            m
+                        })
+                    })
+                    .map_err(Into::into)
+                    .and_then(move |m| {
+                        std::future::ready(
+                            m.as_module_like(&name)
+                                .ok_or(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                        )
+                    }),
+            )
+        }
     }
 
     fn get_document(

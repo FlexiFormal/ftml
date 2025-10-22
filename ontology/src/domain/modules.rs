@@ -2,13 +2,16 @@ use std::borrow::Borrow;
 
 use ftml_uris::{Language, ModuleUri, SymbolUri};
 
-use crate::domain::{
-    HasDeclarations, SharedDeclaration,
-    declarations::{
-        AnyDeclarationRef, Declaration, IsDeclaration,
-        morphisms::Morphism,
-        structures::{MathStructure, StructureExtension},
+use crate::{
+    domain::{
+        HasDeclarations, SharedDeclaration,
+        declarations::{
+            AnyDeclarationRef, Declaration, IsDeclaration,
+            morphisms::Morphism,
+            structures::{MathStructure, StructureExtension},
+        },
     },
+    utils::SharedArc,
 };
 
 #[derive(Clone, Hash, Debug)]
@@ -18,6 +21,36 @@ pub enum ModuleLike {
     Extension(SharedDeclaration<StructureExtension>),
     Nested(SharedDeclaration<NestedModule>),
     Morphism(SharedDeclaration<Morphism>),
+}
+impl ModuleLike {
+    pub fn get_as<T: IsDeclaration>(
+        &self,
+        name: &ftml_uris::UriName,
+    ) -> Option<SharedDeclaration<T>> {
+        match self {
+            Self::Module(m) => m.get_as(name),
+            Self::Structure(s) => {
+                SharedArc::inherit::<_, _>(s.clone().0, |s| s.find(name.steps()).ok_or(()))
+                    .ok()
+                    .map(SharedDeclaration)
+            }
+            Self::Extension(s) => {
+                SharedArc::inherit::<_, _>(s.clone().0, |s| s.find(name.steps()).ok_or(()))
+                    .ok()
+                    .map(SharedDeclaration)
+            }
+            Self::Nested(s) => {
+                SharedArc::inherit::<_, _>(s.clone().0, |s| s.find(name.steps()).ok_or(()))
+                    .ok()
+                    .map(SharedDeclaration)
+            }
+            Self::Morphism(s) => {
+                SharedArc::inherit::<_, _>(s.clone().0, |s| s.find(name.steps()).ok_or(()))
+                    .ok()
+                    .map(SharedDeclaration)
+            }
+        }
+    }
 }
 impl From<Module> for ModuleLike {
     #[inline]
@@ -213,6 +246,8 @@ impl IsDeclaration for NestedModule {
 
 #[cfg(feature = "serde")]
 mod serde_impl {
+    use ftml_uris::UriName;
+
     use crate::domain::modules::ModuleData;
 
     impl<Context> bincode::Decode<Context> for super::Module {
@@ -245,6 +280,60 @@ mod serde_impl {
             D: serde::Deserializer<'de>,
         {
             ModuleData::deserialize(deserializer).map(|d| Self(triomphe::Arc::new(d)))
+        }
+    }
+
+    impl serde::Serialize for super::ModuleLike {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            match self {
+                Self::Module(m) => (m, None::<&UriName>).serialize(serializer),
+                Self::Structure(s) => {
+                    (s.0.outer(), Some(s.uri.clone().simple_module().name())).serialize(serializer)
+                }
+                Self::Extension(s) => {
+                    (s.0.outer(), Some(s.uri.clone().simple_module().name())).serialize(serializer)
+                }
+                Self::Nested(s) => {
+                    (s.0.outer(), Some(s.uri.clone().simple_module().name())).serialize(serializer)
+                }
+                Self::Morphism(s) => {
+                    (s.0.outer(), Some(s.uri.clone().simple_module().name())).serialize(serializer)
+                }
+            }
+        }
+    }
+    impl<'de> serde::Deserialize<'de> for super::ModuleLike {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            type T = (super::Module, Option<UriName>);
+            let (m, o) = T::deserialize(deserializer)?;
+            if let Some(name) = o {
+                m.as_module_like(&name).ok_or_else(move || {
+                    serde::de::Error::custom(format_args!(
+                        "module does not contain element named {name}"
+                    ))
+                })
+            } else {
+                Ok(Self::Module(m))
+            }
+        }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for ModuleLike {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        match self {
+            Self::Module(m) => m.deep_size_of_children(context),
+            Self::Nested(n) => n.deep_size_of_children(context),
+            Self::Structure(s) => s.deep_size_of_children(context),
+            Self::Extension(e) => e.deep_size_of_children(context),
+            Self::Morphism(m) => m.deep_size_of_children(context),
         }
     }
 }
