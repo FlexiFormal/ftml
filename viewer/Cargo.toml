@@ -61,5 +61,6 @@ wasm-bindgen = { workspace = true }
 serde = { workspace = true }
 console_error_panic_hook = { workspace = true }
 bytesize = { workspace = true }
+dateparser = { workspace=true,features=["wasm"]}
 
 tsify = { workspace = true, optional = true }
