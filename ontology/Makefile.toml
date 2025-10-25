@@ -8,6 +8,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=serde"]
 
+[tasks.test-serde-lite]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=serde-lite"]
+
 [tasks.test-wasm]
 command = "cargo"
 install_crate = false
@@ -51,6 +56,7 @@ args = ["clean"]
 dependencies = [
     "test-no-features",
     "test-serde",
+    "test-serde-lite",
     "test-wasm",
     "test-typescript",
     "test-deepsize",

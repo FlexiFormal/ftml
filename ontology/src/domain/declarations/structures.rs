@@ -9,12 +9,16 @@ use ftml_uris::{DomainUriRef, Id, ModuleUri, SymbolUri};
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct MathStructure {
     pub uri: SymbolUri,
     pub elements: Box<[StructureDeclaration]>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub macroname: Option<Id>,
 }
 impl crate::__private::Sealed for MathStructure {}
@@ -63,9 +67,13 @@ impl HasDeclarations for MathStructure {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 pub enum StructureDeclaration {
     Import(ModuleUri),
     Symbol(Symbol),
@@ -111,6 +119,10 @@ impl IsDeclaration for StructureDeclaration {
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]

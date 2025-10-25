@@ -19,13 +19,17 @@ use crate::{
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentData {
     pub uri: DocumentUri,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub title: Option<Box<str>>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub elements: Box<[DocumentElement]>,
     pub styles: DocumentStyles,
     pub top_section_level: SectionLevel,
@@ -135,6 +139,10 @@ impl Borrow<DocumentUri> for Document {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentStyles {
@@ -146,6 +154,10 @@ pub struct DocumentStyles {
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -159,6 +171,10 @@ pub struct DocumentCounter {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentStyle {
@@ -171,6 +187,10 @@ pub struct DocumentStyle {
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -247,9 +267,13 @@ impl std::fmt::Display for DocumentKind {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 /// An entry in a table of contents. Either:
 /// 1. a section; the title is assumed to be an HTML string, or
 /// 2. an inputref to some other document; the URI is the one for the
@@ -279,6 +303,24 @@ pub enum TocElem {
         kind: ParagraphKind,
     },
     Slide, //{uri:DocumentElementUri}
+}
+
+impl TocElem {
+    pub fn iter(v: &[Self]) -> impl Iterator<Item = &Self> {
+        v.iter().flat_map(|e| std::iter::once(e).chain(e.dfs()))
+    }
+}
+
+impl RefTree for TocElem {
+    type Child<'a> = &'a Self;
+    fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
+        match self {
+            Self::Section { children, .. }
+            | Self::SkippedSection { children }
+            | Self::Inputref { children, .. } => either::Right(children.iter()),
+            _ => either::Left(std::iter::empty()),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -324,6 +366,23 @@ impl<'a> TreeChild<'a> for DocumentElementRef<'a> {
     #[inline]
     fn tree_children(self) -> impl Iterator<Item = Self> {
         self.children_lt()
+    }
+}
+
+#[cfg(feature = "serde-lite")]
+mod serde_lite_impl {
+    use crate::narrative::documents::DocumentData;
+
+    impl serde_lite::Serialize for super::Document {
+        #[inline]
+        fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+            self.0.serialize()
+        }
+    }
+    impl serde_lite::Deserialize for super::Document {
+        fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error> {
+            Ok(Self(triomphe::Arc::new(DocumentData::deserialize(val)?)))
+        }
     }
 }
 

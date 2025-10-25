@@ -27,6 +27,8 @@ cached = ["dep:dashmap", "dep:parking_lot", "dep:kanal", "dep:rustc-hash"]
 typescript = ["wasm", "dep:tsify", "ftml-ontology/typescript"]
 ## Adds memory monitoring for cached backends
 deepsize = ["cached", "ftml-ontology/deepsize", "dep:bytesize", "dep:deepsize"]
+## Use serde_lite instead of serde, where adequate
+serde-lite = ["dep:serde-lite","ftml-ontology/serde-lite","server_fn/serde-lite"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -54,15 +56,16 @@ rustc_version = { workspace = true }
 document-features = { workspace = true }
 
 thiserror = { workspace = true }
-serde = { workspace = true }
 urlencoding = { workspace = true }
 futures-util = { workspace = true }
 either = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
+serde-lite = { workspace = true,optional=true }
 tracing = { workspace = true }
 
-ftml-uris = { workspace = true, features = ["serde", "components"] }
-ftml-ontology = { workspace = true, features = ["serde"] }
+ftml-uris = { workspace = true, features = ["components"] }
+ftml-ontology = { workspace = true,features=["serde"] }
 
 reqwest = { workspace = true, optional = true, features = ["json"] }
 server_fn = { workspace = true, optional = true }

@@ -23,6 +23,11 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=server_fn"]
 
+[tasks.test-serde-lite]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=serde-lite"]
+
 [tasks.test-cached]
 command = "cargo"
 install_crate = false
@@ -50,6 +55,7 @@ dependencies = [
     "test-typescript",
     "test-server_fn",
     "test-cached",
+    "test-serde-lite",
     "test-all-features",
     "clean"
 ]

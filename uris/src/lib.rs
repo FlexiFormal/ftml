@@ -126,6 +126,10 @@ pub(crate) mod sealed {
     ))
 )]
 #[cfg_attr(
+    feature = "serde-lite",
+    strum_discriminants(derive(serde_lite::Serialize, serde_lite::Deserialize,))
+)]
+#[cfg_attr(
     feature = "serde",
     derive(
         serde_with::DeserializeFromStr,
@@ -200,6 +204,14 @@ impl UriRef<'_> {
         bincode::Decode,
         bincode::Encode
     )
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
+#[cfg_attr(
+    feature = "miniserde",
+    derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[allow(non_camel_case_types)]
 pub enum UriComponentKind {
@@ -1452,6 +1464,134 @@ impl NamedUri for LeafUri {
         }
     }
 }
+
+#[cfg(feature = "miniserde")]
+mod miniserde_impl {
+    miniserde::make_place!(UriPlace);
+    macro_rules! imp {
+        ($($tp:ty),*) => {
+            $(
+            impl miniserde::de::Visitor for UriPlace<$tp> {
+                fn string(&mut self, s: &str) -> miniserde::Result<()> {
+                    self.out = s.parse().ok();
+                    Ok(())
+                }
+            }
+            impl miniserde::Serialize for $tp {
+                fn begin(&self) -> miniserde::ser::Fragment<'_> {
+                    miniserde::ser::Fragment::Str(std::borrow::Cow::Owned(self.to_string()))
+                }
+            }
+            impl miniserde::Deserialize for $tp {
+                fn begin(out: &mut Option<Self>) -> &mut dyn miniserde::de::Visitor {
+                    UriPlace::new(out)
+                }
+            }
+            )*
+        }
+    }
+    imp!(
+        super::Uri,
+        super::DomainUri,
+        super::NarrativeUri,
+        super::LeafUri,
+        super::BaseUri,
+        super::ArchiveUri,
+        super::PathUri,
+        super::ModuleUri,
+        super::SymbolUri,
+        super::DocumentUri,
+        super::DocumentElementUri,
+        super::Id,
+        super::ArchiveId,
+        super::UriPath,
+        super::UriName,
+        super::SimpleUriName,
+        super::Language
+    );
+}
+
+#[cfg(feature = "serde-lite")]
+mod serde_lite_impl {
+    macro_rules! imp {
+        ($($tp:ty),*) => {
+            $(
+                impl serde_lite::Serialize for $tp {
+                    fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+                        Ok(serde_lite::Intermediate::String(std::borrow::Cow::Owned(
+                            self.to_string(),
+                        )))
+                    }
+                }
+                impl serde_lite::Deserialize for $tp {
+                    fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+                    where
+                        Self: Sized,
+                    {
+                        match val {
+                            serde_lite::Intermediate::String(s) => s.parse().map_err(serde_lite::Error::custom),
+                            _ => Err(serde_lite::Error::InvalidValue(std::borrow::Cow::Borrowed(
+                                "unexpected intermediate for uri",
+                            ))),
+                        }
+                    }
+                }
+            )*
+        }
+    }
+    imp!(
+        super::Uri,
+        super::DomainUri,
+        super::NarrativeUri,
+        super::LeafUri,
+        super::BaseUri,
+        super::ArchiveUri,
+        super::PathUri,
+        super::ModuleUri,
+        super::SymbolUri,
+        super::DocumentUri,
+        super::DocumentElementUri,
+        super::Id,
+        super::ArchiveId,
+        super::UriPath,
+        super::UriName,
+        super::SimpleUriName,
+        super::Language
+    );
+}
+
+macro_rules! try_from {
+    ($($tp:ty),*) => {
+        $(
+            impl TryFrom<std::borrow::Cow<'_, str>> for $tp {
+                type Error = <Self as FromStr>::Err;
+                #[inline]
+                fn try_from(value: std::borrow::Cow<'_, str>) -> Result<Self, Self::Error> {
+                    value.parse()
+                }
+            }
+        )*
+    }
+}
+try_from!(
+    Uri,
+    DomainUri,
+    NarrativeUri,
+    LeafUri,
+    BaseUri,
+    ArchiveUri,
+    PathUri,
+    ModuleUri,
+    SymbolUri,
+    DocumentUri,
+    DocumentElementUri,
+    Id,
+    ArchiveId,
+    UriPath,
+    UriName,
+    SimpleUriName,
+    Language
+);
 
 // TESTS -------------------------------------------------------------------------------------------
 

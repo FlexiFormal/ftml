@@ -17,6 +17,10 @@ use std::fmt::Write;
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Term {
@@ -45,10 +49,10 @@ pub enum Term {
     Label {
         name: UriName,
         #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         df: Option<Box<Self>>,
         #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         tp: Option<Box<Self>>,
     },
     /// An opaque/informal expression; may contain formal islands, which are collected in
@@ -66,14 +70,18 @@ pub struct ApplicationTerm(pub(crate) triomphe::Arc<Application>);
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Application {
     pub head: Term,
     pub arguments: Box<[Argument]>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub presentation: Option<VarOrSym>,
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(skip))]
     pub(crate) hash: u64,
 }
 
@@ -87,15 +95,19 @@ pub struct BindingTerm(pub(crate) triomphe::Arc<Binding>);
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Binding {
     pub head: Term,
     pub arguments: Box<[BoundArgument]>,
     //pub body: BoundArgument, //Term,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub presentation: Option<VarOrSym>,
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(skip))]
     pub(crate) hash: u64,
 }
 
@@ -109,17 +121,21 @@ pub struct RecordFieldTerm(pub(crate) triomphe::Arc<RecordField>);
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RecordField {
     pub record: Term,
     pub key: UriName,
     /// does not count as a subterm
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub record_type: Option<Term>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub presentation: Option<VarOrSym>,
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(skip))]
     pub(crate) hash: u64,
 }
 
@@ -133,13 +149,17 @@ pub struct OpaqueTerm(pub(crate) triomphe::Arc<Opaque>);
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Opaque {
     pub node: OpaqueNode,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub terms: Box<[Term]>,
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(skip))]
     pub(crate) hash: u64,
 }
 

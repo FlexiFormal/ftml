@@ -6,6 +6,7 @@ use ftml_ontology::narrative::elements::problems::{
     BlockFeedback, CheckedResult, ChoiceBlockStyle, FillinFeedback, FillinFeedbackKind,
     ProblemFeedback, ProblemResponse as OrigResponse, ProblemResponseType, Solutions,
 };
+use ftml_ontology::utils::SVec;
 use ftml_uris::{DocumentElementUri, Id};
 use leptos::either::Either::{Left, Right};
 use leptos::prelude::*;
@@ -32,7 +33,14 @@ pub struct ProblemOptions {
     pub states: rustc_hash::FxHashMap<DocumentElementUri, ProblemState>, //HMap<DocumentElementUri, ProblemState>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    serde_lite::Serialize,
+    serde_lite::Deserialize,
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[allow(clippy::large_enum_variant)]
@@ -50,7 +58,14 @@ pub enum ProblemState {
     },
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    serde_lite::Serialize,
+    serde_lite::Deserialize,
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ProblemStates(
@@ -65,7 +80,7 @@ impl ftml_js_utils::conversion::FromJs for ProblemStates {
     type Error = ftml_js_utils::conversion::SerdeWasmError;
     #[inline]
     fn from_js(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
-        ftml_js_utils::conversion::from_value(value)
+        ftml_js_utils::conversion::from_value(&value)
     }
 }
 impl ftml_js_utils::conversion::FromWasmBindgen for ProblemContinuation {}
@@ -134,7 +149,7 @@ impl CurrentProblem {
                 .map(|r| match r {
                     ProblemResponse::MultipleChoice(_, sigs) => {
                         ProblemResponseType::MultipleChoice {
-                            value: sigs.clone(),
+                            value: SVec(sigs.clone()),
                         }
                     }
                     ProblemResponse::SingleChoice(_, sig, _) => {

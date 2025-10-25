@@ -12,6 +12,10 @@ use ftml_uris::{DocumentElementUri, Id, SymbolUri};
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct LogicalParagraph {
@@ -86,6 +90,10 @@ impl IsDocumentElement for LogicalParagraph {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum ParagraphFormatting {
@@ -99,16 +107,21 @@ pub enum ParagraphFormatting {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[non_exhaustive]
+#[repr(u8)]
 pub enum ParagraphKind {
-    Definition,
-    Assertion,
-    Paragraph,
-    Proof,
-    SubProof,
-    Example,
+    Definition = 0,
+    Assertion = 1,
+    Paragraph = 2,
+    Proof = 3,
+    SubProof = 4,
+    Example = 5,
 }
 
 impl ParagraphKind {
@@ -170,7 +183,33 @@ impl std::fmt::Display for ParagraphKind {
 }
 
 #[cfg(feature = "typescript")]
-impl ftml_js_utils::conversion::SerdeToJs for ParagraphKind {}
+impl ftml_js_utils::conversion::ToJs for ParagraphKind {
+    type Error = std::convert::Infallible;
+    fn to_js(&self) -> Result<wasm_bindgen::JsValue, Self::Error> {
+        Ok(wasm_bindgen::JsValue::from_f64((*self as u8).into()))
+    }
+}
+
+#[cfg(feature = "typescript")]
+impl wasm_bindgen::convert::TryFromJsValue for ParagraphKind {
+    type Error = wasm_bindgen::JsValue;
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+        let Some(jbyte) = value.as_f64() else {
+            return Err(value);
+        };
+        let u = jbyte as u8;
+        Ok(match u {
+            0 => Self::Definition,
+            1 => Self::Assertion,
+            2 => Self::Paragraph,
+            3 => Self::Proof,
+            4 => Self::SubProof,
+            5 => Self::Example,
+            _ => return Err(value),
+        })
+    }
+}
 
 #[derive(thiserror::Error, Debug)]
 #[error("invalid paragraph kind")]

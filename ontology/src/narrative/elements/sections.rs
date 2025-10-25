@@ -10,6 +10,10 @@ use crate::narrative::{
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Section {
@@ -68,6 +72,10 @@ impl IsDocumentElement for Section {
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -128,9 +136,13 @@ impl IsDocumentElement for Slide {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 #[repr(u8)]
 pub enum SectionLevel {
     #[default]
@@ -143,23 +155,30 @@ pub enum SectionLevel {
     Subparagraph = 6,
 }
 #[cfg(feature = "typescript")]
-impl ftml_js_utils::conversion::SerdeToJs for SectionLevel {}
+impl ftml_js_utils::conversion::ToJs for SectionLevel {
+    type Error = std::convert::Infallible;
+    fn to_js(&self) -> Result<wasm_bindgen::JsValue, Self::Error> {
+        Ok(wasm_bindgen::JsValue::from_f64((*self as u8).into()))
+    }
+}
 
 #[cfg(feature = "typescript")]
 impl wasm_bindgen::convert::TryFromJsValue for SectionLevel {
     type Error = wasm_bindgen::JsValue;
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
-        let Some(jstr) = value.as_string() else {
+        let Some(jbyte) = value.as_f64() else {
             return Err(value);
         };
-        Ok(match jstr.as_str() {
-            "Part" => Self::Part,
-            "Chapter" => Self::Chapter,
-            "Section" => Self::Section,
-            "Subsection" => Self::Subsection,
-            "Subsubsection" => Self::Subsubsection,
-            "Paragraph" => Self::Paragraph,
-            "Subparagraph" => Self::Subparagraph,
+        let u = jbyte as u8;
+        Ok(match u {
+            0 => Self::Part,
+            1 => Self::Chapter,
+            2 => Self::Section,
+            3 => Self::Subsection,
+            4 => Self::Subsubsection,
+            5 => Self::Paragraph,
+            6 => Self::Subparagraph,
             _ => return Err(value),
         })
     }

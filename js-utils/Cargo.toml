@@ -10,6 +10,10 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [features]
+## Can use serde-wasm-bindgen to convert between rs/js
+serde = ["dep:serde","dep:serde-wasm-bindgen"]
+## Can use serde-lite to convert between rs/js
+serde-lite = ["dep:serde-lite","dep:serde_json"]
 
 
 [package.metadata.docs.rs]
@@ -38,8 +42,10 @@ rustc_version = { workspace = true }
 document-features = { workspace = true }
 wasm-bindgen = {workspace = true}
 web-sys = {workspace = true,features=["HtmlDivElement"]}
-serde = { workspace = true }
-serde-wasm-bindgen = { workspace = true }
+serde = { workspace = true,optional=true }
+serde_json = {workspace=true,optional=true}
+serde-wasm-bindgen = { workspace = true,optional=true }
+serde-lite = { workspace = true,optional=true }
 # either_of = {workspace=true}
 thiserror = {workspace = true}
 send_wrapper = {workspace=true}

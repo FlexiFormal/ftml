@@ -6,6 +6,10 @@ use std::fmt::Write;
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Argument {
@@ -28,6 +32,10 @@ impl Argument {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum BoundArgument {
@@ -37,6 +45,7 @@ pub enum BoundArgument {
     BoundSeq(MaybeSequence<Variable>),
 }
 
+#[cfg(not(feature = "serde-lite"))]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
@@ -47,6 +56,22 @@ pub enum BoundArgument {
 pub enum MaybeSequence<T>
 where
     T: 'static,
+{
+    One(T),
+    Seq(Box<[T]>),
+}
+
+#[cfg(feature = "serde-lite")]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, serde_lite::Serialize, serde_lite::Deserialize)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum MaybeSequence<T>
+where
+    T: serde_lite::Serialize + serde_lite::Deserialize + 'static,
 {
     One(T),
     Seq(Box<[T]>),
@@ -68,6 +93,10 @@ impl BoundArgument {
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]

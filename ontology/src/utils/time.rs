@@ -329,8 +329,56 @@ impl Display for MaxSeconds {
 
 #[derive(Debug, Copy, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 pub struct Eta {
     pub time_left: Delta,
     pub done: usize,
     pub total: usize,
+}
+
+#[cfg(feature = "serde-lite")]
+mod serde_lt_impl {
+    use std::num::NonZeroU64;
+
+    impl serde_lite::Serialize for super::Timestamp {
+        fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+            self.0.get().serialize()
+        }
+    }
+    impl serde_lite::Deserialize for super::Timestamp {
+        fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+        where
+            Self: Sized,
+        {
+            if let serde_lite::Intermediate::Number(serde_lite::Number::UnsignedInt(v)) = val {
+                Ok(Self(NonZeroU64::new(*v).ok_or_else(|| {
+                    serde_lite::Error::custom("Not a nonzero u64")
+                })?))
+            } else {
+                Err(serde_lite::Error::custom("Not a nonzero u64"))
+            }
+        }
+    }
+    impl serde_lite::Serialize for super::Delta {
+        fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+            self.0.get().serialize()
+        }
+    }
+    impl serde_lite::Deserialize for super::Delta {
+        fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+        where
+            Self: Sized,
+        {
+            if let serde_lite::Intermediate::Number(serde_lite::Number::UnsignedInt(v)) = val {
+                Ok(Self(NonZeroU64::new(*v).ok_or_else(|| {
+                    serde_lite::Error::custom("Not a nonzero u64")
+                })?))
+            } else {
+                Err(serde_lite::Error::custom("Not a nonzero u64"))
+            }
+        }
+    }
 }

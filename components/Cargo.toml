@@ -59,17 +59,18 @@ rustc_version = { workspace = true }
 document-features = { workspace = true }
 
 ftml-dom = { workspace = true }
-ftml-uris = { workspace = true,features=["js"] }
-ftml-ontology = { workspace = true }
+ftml-uris = { workspace = true,features=["js","serde-lite"] }
+ftml-ontology = { workspace = true,features=["serde-lite"] }
 ftml-parser = { workspace = true }
-ftml-backend = { workspace = true }
-ftml-js-utils = { workspace = true }
+ftml-backend = { workspace = true,features=["serde-lite"] }
+ftml-js-utils = { workspace = true,features=["serde-lite"] }
 
 rustc-hash = { workspace = true }
 leptos = { workspace = true }
 leptos-posthoc = { workspace = true }
 thaw = { workspace = true }
 serde_json = { workspace = true }
+serde-lite = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

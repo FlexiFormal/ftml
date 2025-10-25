@@ -44,6 +44,7 @@ ftml-backend = { workspace = true, features = [
     "cached",
     "server_fn",
     "deepsize",
+    "serde-lite"
 ] }
 ftml-js-utils = {workspace = true}
 ftml-uris = { workspace = true, features = ["interned"] }

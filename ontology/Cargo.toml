@@ -23,9 +23,13 @@ serde = [
     "dep:bincode",
     "ordered-float/serde"
 ]
+## Adds [`Serialize`](serde_lite::Serialize) and [`Deserialize`](serde_lite::Deserialize)
+## to all types in this crate.
+serde-lite = ["dep:serde-lite","dep:serde","ftml-uris/serde-lite"]
 ## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
 ## bound to `string`, but naming still allows to make intentions in APIs explicit.
 typescript = [
+    # maybe get rid of this...?
     "serde",
     "wasm",
     "dep:wasm-bindgen",
@@ -90,6 +94,7 @@ flume = { workspace = true }
 
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
+serde-lite = { workspace = true, optional = true }
 #postcard = { workspace = true, optional = true }
 bincode = { workspace = true, optional = true, features = ["derive"] }
 

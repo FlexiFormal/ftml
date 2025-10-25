@@ -74,6 +74,27 @@ impl Regex {
     }
 }
 
+#[cfg(feature = "serde-lite")]
+mod regex_serde_lt {
+    use super::Regex;
+    impl serde_lite::Serialize for Regex {
+        fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+            Ok(serde_lite::Intermediate::String(
+                self.as_str().to_string().into(),
+            ))
+        }
+    }
+    impl serde_lite::Deserialize for Regex {
+        fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+        where
+            Self: Sized,
+        {
+            let s = String::deserialize(val)?;
+            Self::new(&s).map_err(serde_lite::Error::custom)
+        }
+    }
+}
+
 #[cfg(feature = "serde")]
 mod regex_serde {
     use super::Regex;

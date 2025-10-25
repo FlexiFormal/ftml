@@ -104,6 +104,19 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
                             let gottos: TocProgresses = use_context().unwrap_or_default();
                             let mut gottos = Gottos::new(gottos, &toc);
                             wrap_toc(move |data| {
+                                NavElems::update_untracked(|nav| {
+                                    for e in TocElem::iter(&toc) {
+                                        if let TocElem::Inputref {
+                                            uri,
+                                            title: Some(title),
+                                            ..
+                                        } = e
+                                            && !title.is_empty()
+                                        {
+                                            nav.set_title(uri.clone(), title.to_string());
+                                        }
+                                    }
+                                });
                                 CurrentTOC::set(toc.clone().into_vec());
                                 let r = do_toc::<Be>(&toc, &mut gottos, data);
                                 NavElems::retry();
@@ -131,11 +144,26 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
                 }
             }))
         }
-        TocSource::Ready(toc) => D(wrap_toc(move |data| {
-            let gottos: TocProgresses = use_context().unwrap_or_default();
-            let mut gottos = Gottos::new(gottos, &toc);
-            do_toc::<Be>(&toc, &mut gottos, data)
-        })),
+        TocSource::Ready(toc) => {
+            NavElems::update_untracked(|nav| {
+                for e in TocElem::iter(&toc) {
+                    if let TocElem::Inputref {
+                        uri,
+                        title: Some(title),
+                        ..
+                    } = e
+                        && !title.is_empty()
+                    {
+                        nav.set_title(uri.clone(), title.to_string());
+                    }
+                }
+            });
+            D(wrap_toc(move |data| {
+                let gottos: TocProgresses = use_context().unwrap_or_default();
+                let mut gottos = Gottos::new(gottos, &toc);
+                do_toc::<Be>(&toc, &mut gottos, data)
+            }))
+        }
     }
 }
 

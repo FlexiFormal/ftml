@@ -23,6 +23,12 @@ serde = [
     "openmath/serde",
 ]
 
+## Adds [`Serialize`](miniserde::Serialize) and [`Deserialize`](miniserde::Deserialize)
+## to all types in this crate.
+miniserde = ["dep:miniserde"]
+## Adds [`Serialize`](serde_lite::Serialize) and [`Deserialize`](serde_lite::Deserialize)
+## to all types in this crate.
+serde-lite = ["dep:serde-lite"]
 ## Generates converison from/to javascript
 js = ["serde","dep:ftml-js-utils","dep:wasm-bindgen"]
 ## Generates typescript exports for `wasm-pack`; [`Uri`](crate::Uri)s are all
@@ -93,6 +99,8 @@ urlencoding = { workspace = true }
 ftml-js-utils = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+miniserde = { workspace = true, optional = true }
+serde-lite = { workspace = true, optional = true }
 bincode = { workspace = true, optional = true, features = ["derive"] }
 wasm-bindgen = { workspace = true, optional = true }
 leptos_router = { workspace = true, optional = true }

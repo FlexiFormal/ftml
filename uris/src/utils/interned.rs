@@ -16,6 +16,10 @@ pub const PATH_MAX: usize = 16_384;
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 pub struct MemoryState {
     pub num_ids: usize,
     pub ids_bytes: usize,

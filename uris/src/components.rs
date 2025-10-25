@@ -277,17 +277,67 @@ macro_rules! compfun {
 
 #[derive(Debug, Clone, thiserror::Error)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 pub enum ComponentError {
     #[error("no valid combination of components for a uri")]
     NoValidCombination,
     #[error("missing component {1} for {0}")]
     MissingComponents(UriKind, UriComponentKind),
     #[error("invalid components for {0}: {1:?}")]
-    InvalidComponents(UriKind, ArrayVec<UriComponentKind, 8>),
+    InvalidComponents(UriKind, InvalidComponents),
     #[error("{0}")]
     Parse(#[from] UriParseError),
     #[error("No archive {0} known")]
     UnknownArchive(ArchiveId),
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InvalidComponents(pub ArrayVec<UriComponentKind, 8>);
+impl std::fmt::Display for InvalidComponents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ls = f.debug_list();
+        for elem in &self.0 {
+            ls.entry(elem);
+        }
+        ls.finish()
+    }
+}
+
+#[cfg(feature = "serde-lite")]
+impl serde_lite::Serialize for InvalidComponents {
+    fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+        let mut v = Vec::with_capacity(self.0.len());
+        for elem in &self.0 {
+            v.push(elem.serialize()?);
+        }
+        Ok(serde_lite::Intermediate::Array(v))
+    }
+}
+#[cfg(feature = "serde-lite")]
+impl serde_lite::Deserialize for InvalidComponents {
+    fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+    where
+        Self: Sized,
+    {
+        let mut av = ArrayVec::new();
+        match val {
+            serde_lite::Intermediate::Array(v) => {
+                for elem in v {
+                    av.push(UriComponentKind::deserialize(elem)?);
+                }
+            }
+            _ => {
+                return Err(serde_lite::Error::custom_static(
+                    "not an invalid components sequence",
+                ));
+            }
+        }
+        Ok(Self(av))
+    }
 }
 
 impl From<SegmentParseError> for ComponentError {
@@ -590,7 +640,7 @@ macro_rules! forbidden {
         $(
             if $value.$f.is_some() { ret.push(UriComponentKind::$f); }
         )?
-    if !ret.is_empty() { return Err(ComponentError::InvalidComponents($kind,ret)) }
+    if !ret.is_empty() { return Err(ComponentError::InvalidComponents($kind,InvalidComponents(ret))) }
     }}
 }
 macro_rules! missing {
@@ -1209,7 +1259,7 @@ macro_rules! forbidden {
         $(
             if $value.get(stringify!($f)).is_some() { ret.push(UriComponentKind::$f); }
         )?
-    if !ret.is_empty() { return Err(ComponentError::InvalidComponents($kind,ret).into()) }
+    if !ret.is_empty() { return Err(ComponentError::InvalidComponents($kind,InvalidComponents(ret)).into()) }
     }}
 }
 macro_rules! need {

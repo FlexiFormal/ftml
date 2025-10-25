@@ -67,16 +67,18 @@ impl DomExtractor {
             notations,
             ..
         } = self.state.finish();
-        crate::utils::local_cache::LOCAL_CACHE
-            .documents
-            .insert(document);
-        for m in modules {
-            crate::utils::local_cache::LOCAL_CACHE.modules.insert(m);
-        }
-        for (uri, sol) in std::mem::take(&mut self.state.solutions) {
+        if !self.is_stripped {
             crate::utils::local_cache::LOCAL_CACHE
-                .solutions
-                .insert(uri, sol);
+                .documents
+                .insert(document);
+            for m in modules {
+                crate::utils::local_cache::LOCAL_CACHE.modules.insert(m);
+            }
+            for (uri, sol) in std::mem::take(&mut self.state.solutions) {
+                crate::utils::local_cache::LOCAL_CACHE
+                    .solutions
+                    .insert(uri, sol);
+            }
         }
         for (sym, uri, not) in notations {
             match crate::utils::local_cache::LOCAL_CACHE.notations.entry(sym) {

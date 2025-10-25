@@ -7,17 +7,21 @@ use ftml_uris::{DocumentElementUri, Id};
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Variable {
     Name {
         name: Id,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         notated: Option<Id>,
     },
     Ref {
         declaration: DocumentElementUri,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         is_sequence: Option<bool>,
     },
 }

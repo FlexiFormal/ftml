@@ -1,13 +1,15 @@
 use ftml_uris::Id;
-use ordered_float::OrderedFloat;
 use smallvec::SmallVec;
 
-use crate::narrative::{
-    DocumentRange,
-    elements::problems::{
-        BlockFeedback, CheckedResult, FillinFeedback, FillinFeedbackKind, ProblemFeedback,
-        ProblemResponse, ProblemResponseType,
+use crate::{
+    narrative::{
+        DocumentRange,
+        elements::problems::{
+            BlockFeedback, CheckedResult, FillinFeedback, FillinFeedbackKind, ProblemFeedback,
+            ProblemResponse, ProblemResponseType,
+        },
     },
+    utils::{Float, SVec},
 };
 
 #[allow(clippy::unsafe_derive_deserialize)]
@@ -16,6 +18,10 @@ use crate::narrative::{
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Solutions(Box<[SolutionData]>);
 
@@ -23,6 +29,10 @@ pub struct Solutions(Box<[SolutionData]>);
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -40,6 +50,10 @@ pub enum SolutionData {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum ChoiceBlockStyle {
@@ -53,6 +67,10 @@ pub enum ChoiceBlockStyle {
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -69,6 +87,10 @@ pub struct ChoiceBlock {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Choice {
@@ -82,6 +104,10 @@ pub struct Choice {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FillInSol {
@@ -94,6 +120,10 @@ pub struct FillInSol {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum FillInSolOption {
@@ -105,10 +135,10 @@ pub enum FillInSolOption {
     NumericalRange {
         #[cfg_attr(feature = "serde", bincode(with_serde))]
         #[cfg_attr(feature = "typescript", tsify(type = "number | undefined"))]
-        from: Option<OrderedFloat<f32>>,
+        from: Option<Float>,
         #[cfg_attr(feature = "serde", bincode(with_serde))]
         #[cfg_attr(feature = "typescript", tsify(type = "number | undefined"))]
-        to: Option<OrderedFloat<f32>>,
+        to: Option<Float>,
         verdict: bool,
         feedback: Box<str>,
     },
@@ -301,7 +331,7 @@ impl Solutions {
                     }
                     data.push(CheckedResult::FillinSol {
                         matching: None,
-                        options,
+                        options: SVec(options),
                         text: String::new(),
                     });
                 }
@@ -310,8 +340,8 @@ impl Solutions {
 
         ProblemFeedback {
             correct: false,
-            solutions,
-            data,
+            solutions: SVec(solutions),
+            data: SVec(data),
             score_fraction: 0.0,
         }
     }
@@ -340,7 +370,7 @@ impl Solutions {
         let mut data = SmallVec::new();
         let mut datas = self.0.iter();
 
-        for response in &response.responses {
+        for response in &*response.responses {
             total += 1.0;
             let sol = next_sol(&mut solutions, &mut datas)?;
             match (response, sol) {
@@ -507,7 +537,7 @@ impl Solutions {
                     correct = correct && fill_correct.unwrap_or_default();
                     data.push(CheckedResult::FillinSol {
                         matching,
-                        options,
+                        options: SVec(options),
                         text: s.to_string(),
                     });
                 }
@@ -521,8 +551,8 @@ impl Solutions {
 
         Some(ProblemFeedback {
             correct,
-            solutions,
-            data,
+            solutions: SVec(solutions),
+            data: SVec(data),
             score_fraction: pts / total,
         })
     }

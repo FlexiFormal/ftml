@@ -26,28 +26,6 @@ pub trait ToJs {
     fn to_js(&self) -> Result<JsValue, Self::Error>;
 }
 
-pub use serde_wasm_bindgen::{Error as SerdeWasmError, from_value};
-
-/*
-pub trait SerdeFromJs: for<'de> serde::Deserialize<'de> {}
-impl<T: SerdeFromJs> TryFromJsValue for T {
-    type Error = serde_wasm_bindgen::Error;
-    #[inline]
-    fn try_from_js_value(value: JsValue) -> Result<Self, Self::Error> {
-        serde_wasm_bindgen::from_value(value)
-    }
-}
-*/
-
-pub trait SerdeToJs: serde::Serialize {}
-impl<T: SerdeToJs> ToJs for T {
-    type Error = serde_wasm_bindgen::Error;
-    #[inline]
-    fn to_js(&self) -> Result<JsValue, Self::Error> {
-        serde_wasm_bindgen::to_value(self)
-    }
-}
-
 pub trait FromWasmBindgen: TryFromJsValue {}
 impl<T: FromWasmBindgen> FromJs for T {
     type Error = JsDisplay;
@@ -155,6 +133,49 @@ impl ToJs for ::web_sys::HtmlElement {
     fn to_js(&self) -> Result<JsValue, Self::Error> {
         // SAFETY: infallible
         Ok(unsafe { self.clone().dyn_into().unwrap_unchecked() })
+    }
+}
+
+#[cfg(all(feature = "serde", not(feature = "serde-lite")))]
+pub use serde_wasm_bindgen::{Error as SerdeWasmError, from_value};
+#[cfg(all(feature = "serde", not(feature = "serde-lite")))]
+pub trait SerdeToJs: serde::Serialize {}
+#[cfg(all(feature = "serde", not(feature = "serde-lite")))]
+impl<T: SerdeToJs> ToJs for T {
+    type Error = serde_wasm_bindgen::Error;
+    #[inline]
+    fn to_js(&self) -> Result<JsValue, Self::Error> {
+        serde_wasm_bindgen::to_value(self)
+    }
+}
+
+#[cfg(feature = "serde-lite")]
+pub use serde_lite::Error as SerdeWasmError;
+
+#[cfg(feature = "serde-lite")]
+/// ## Errors
+pub fn from_value<T: serde_lite::Deserialize>(value: &JsValue) -> Result<T, serde_lite::Error> {
+    let s = web_sys::js_sys::JSON::stringify(value)
+        .map_err(|e| serde_lite::Error::custom(crate::JsDisplay(e)))?;
+    let Some(s) = s.as_string() else {
+        return Err(serde_lite::Error::custom_static(
+            "JSON serialization is not a string",
+        ));
+    };
+    let im = serde_json::from_str(&s).map_err(serde_lite::Error::custom)?;
+    serde_lite::Deserialize::deserialize(&im)
+}
+
+#[cfg(feature = "serde-lite")]
+pub trait SerdeLiteToJs: serde_lite::Serialize {}
+#[cfg(feature = "serde-lite")]
+impl<T: SerdeLiteToJs> ToJs for T {
+    type Error = String;
+    #[inline]
+    fn to_js(&self) -> Result<JsValue, Self::Error> {
+        let im = T::serialize(self).map_err(|e| e.to_string())?;
+        let js = serde_json::to_string(&im).map_err(|e| e.to_string())?;
+        web_sys::js_sys::JSON::parse(&js).map_err(|e| crate::JsDisplay(e).to_string())
     }
 }
 

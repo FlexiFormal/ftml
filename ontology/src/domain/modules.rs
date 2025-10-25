@@ -14,7 +14,7 @@ use crate::{
     utils::SharedArc,
 };
 
-#[derive(Clone, Hash, Debug)]
+#[derive(Clone, Hash, Debug, PartialEq, Eq)]
 pub enum ModuleLike {
     Module(Module),
     Structure(SharedDeclaration<MathStructure>),
@@ -119,13 +119,17 @@ impl crate::Ftml for ModuleLike {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ModuleData {
     pub uri: ModuleUri,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub meta_module: Option<ModuleUri>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub signature: Option<Language>,
     pub declarations: Box<[Declaration]>,
 }
@@ -197,6 +201,10 @@ impl crate::Ftml for ModuleData {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct NestedModule {
@@ -241,6 +249,64 @@ impl IsDeclaration for NestedModule {
     #[inline]
     fn as_ref(&self) -> AnyDeclarationRef<'_> {
         AnyDeclarationRef::NestedModule(self)
+    }
+}
+
+#[cfg(feature = "serde-lite")]
+mod serde_lt_impl {
+    use crate::domain::modules::ModuleData;
+    use ftml_uris::UriName;
+
+    impl serde_lite::Serialize for super::Module {
+        #[inline]
+        fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+            self.0.serialize()
+        }
+    }
+    impl serde_lite::Deserialize for super::Module {
+        fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+        where
+            Self: Sized,
+        {
+            Ok(Self(triomphe::Arc::new(ModuleData::deserialize(val)?)))
+        }
+    }
+    impl serde_lite::Serialize for super::ModuleLike {
+        fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+            match self {
+                Self::Module(m) => (m, None::<&UriName>).serialize(),
+                Self::Structure(s) => {
+                    (s.0.outer(), Some(s.uri.clone().simple_module().name())).serialize()
+                }
+                Self::Extension(s) => {
+                    (s.0.outer(), Some(s.uri.clone().simple_module().name())).serialize()
+                }
+                Self::Nested(s) => {
+                    (s.0.outer(), Some(s.uri.clone().simple_module().name())).serialize()
+                }
+                Self::Morphism(s) => {
+                    (s.0.outer(), Some(s.uri.clone().simple_module().name())).serialize()
+                }
+            }
+        }
+    }
+    impl serde_lite::Deserialize for super::ModuleLike {
+        fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+        where
+            Self: Sized,
+        {
+            type T = (super::Module, Option<UriName>);
+            let (m, o) = T::deserialize(val)?;
+            if let Some(name) = o {
+                m.as_module_like(&name).ok_or_else(move || {
+                    serde_lite::Error::custom(format_args!(
+                        "module does not contain element named {name}"
+                    ))
+                })
+            } else {
+                Ok(Self::Module(m))
+            }
+        }
     }
 }
 

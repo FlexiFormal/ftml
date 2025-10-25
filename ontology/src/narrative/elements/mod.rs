@@ -21,9 +21,13 @@ pub use variables::VariableDeclaration;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 pub enum ParagraphOrProblemKind {
     Definition,
     Example,
@@ -33,9 +37,13 @@ pub enum ParagraphOrProblemKind {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 pub enum SlideElement {
     Slide {
         html: Box<str>,
@@ -69,6 +77,10 @@ pub trait IsDocumentElement: super::Narrative {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum DocumentElement {
@@ -78,14 +90,14 @@ pub enum DocumentElement {
         range: DocumentRange,
         module: ModuleUri,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         children: Box<[Self]>,
     },
     MathStructure {
         range: DocumentRange,
         structure: SymbolUri,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         children: Box<[Self]>,
     },
     Extension {
@@ -93,14 +105,14 @@ pub enum DocumentElement {
         extension: SymbolUri,
         target: SymbolUri,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         children: Box<[Self]>,
     },
     Morphism {
         range: DocumentRange,
         morphism: SymbolUri,
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         children: Box<[Self]>,
     },
     SymbolDeclaration(SymbolUri),
@@ -108,7 +120,7 @@ pub enum DocumentElement {
     Section(Section),
     SkipSection(
         #[cfg_attr(feature = "typescript", tsify(type = "DocumentElement[]"))]
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         Box<[Self]>,
     ),
     Paragraph(LogicalParagraph),
@@ -128,13 +140,13 @@ pub enum DocumentElement {
     SymbolReference {
         range: DocumentRange,
         uri: SymbolUri,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         notation: Option<Id>,
     },
     VariableReference {
         range: DocumentRange,
         uri: DocumentElementUri,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         notation: Option<Id>,
     },
     Term(DocumentTerm),
@@ -145,6 +157,10 @@ impl crate::__private::Sealed for DocumentElement {}
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -299,7 +315,7 @@ impl DocumentElement {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(feature = "serde-lite", derive(serde_lite::Serialize))]
 pub enum DocumentElementRef<'d> {
     //SetSectionLevel(SectionLevel),
     UseModule(&'d ModuleUri),

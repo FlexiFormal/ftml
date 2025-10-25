@@ -33,6 +33,34 @@ impl<F: std::fmt::Display + std::fmt::Debug> BackendError<F> {
     }
 }
 impl<E: std::fmt::Display + std::fmt::Debug> BackendError<E> {
+    #[cfg(feature = "serde-lite")]
+    /// ### Errors
+    pub fn from_prefix_value_pair(value: String, prefix_len: usize) -> Result<Self, String> {
+        fn js<V: serde_lite::Deserialize>(mut s: String, prefix_len: usize) -> Result<V, String> {
+            let s = if s.get(prefix_len..).is_none_or(|v| !v.starts_with('|')) {
+                return Err(s);
+            } else {
+                s.split_off(prefix_len + 1)
+            };
+            let im = serde_json::from_str(&s).map_err(|_| s.clone())?;
+            serde_lite::Deserialize::deserialize(&im).map_err(|_| s)
+        }
+        let Some(prefix) = value.get(0..prefix_len) else {
+            return Err(value);
+        };
+        match prefix {
+            "InvalidUri" => Ok(Self::InvalidUriComponent(js(value, prefix_len)?)),
+            "NotFound" => Ok(Self::NotFound(js(value, prefix_len)?)),
+            "HtmlNotFound" => Ok(Self::HtmlNotFound),
+            "NoFragment" => Ok(Self::NoFragment),
+            "NoDefinition" => Ok(Self::NoDefinition),
+            "InvalidArgument" => Ok(Self::InvalidArgument(js(value, prefix_len)?)),
+            "NotYetImplemented" => Ok(Self::ToDo(js(value, prefix_len)?)),
+            _ => Err(value),
+        }
+    }
+
+    #[cfg(not(feature = "serde-lite"))]
     /// ### Errors
     pub fn from_prefix_value_pair(value: String, prefix_len: usize) -> Result<Self, String> {
         fn js<V: serde::de::DeserializeOwned>(
@@ -144,6 +172,58 @@ pub mod server_fn_impl {
     impl Encodes<BackendError<ServerFnErrorErr>> for Encoder {
         type Error = String;
 
+        #[cfg(feature = "serde-lite")]
+        fn encode(output: &BackendError<ServerFnErrorErr>) -> Result<Bytes, Self::Error> {
+            fn ser<T: serde_lite::Serialize>(
+                u: &T,
+                or: impl Fn(&dyn std::fmt::Display) -> String,
+            ) -> Result<impl std::fmt::Display, String> {
+                let im = serde_lite::Serialize::serialize(u).map_err(|e| or(&e))?;
+                serde_json::to_string(&im).map_err(|e| or(&e))
+            }
+            let mut buf = String::new();
+            match output {
+                BackendError::Connection(e) => {
+                    return encode_server_fn(e).map_err(|_| "error serializing".to_string());
+                }
+                BackendError::InvalidUriComponent(u) => write!(
+                    &mut buf,
+                    "InvalidUri|{}",
+                    ser(u, |e| format!("error serializing: {e}"))?
+                ),
+                BackendError::NotFound(u) => write!(
+                    &mut buf,
+                    "NotFound|{}",
+                    ser(u, |e| format!("error serializing: {e}"))?
+                ),
+                BackendError::InvalidArgument(u) => write!(
+                    &mut buf,
+                    "InvalidArgument|{}",
+                    ser(u, |e| format!("error serializing: {e}"))?
+                ),
+                BackendError::ToDo(u) => write!(
+                    &mut buf,
+                    "NotYetImplemented|{}",
+                    ser(u, |e| format!("error serializing: {e}"))?
+                ),
+                BackendError::HtmlNotFound => {
+                    buf.push_str("HtmlNotFound|");
+                    Ok(())
+                }
+                BackendError::NoFragment => {
+                    buf.push_str("NoFragment|");
+                    Ok(())
+                }
+                BackendError::NoDefinition => {
+                    buf.push_str("NoDefinition|");
+                    Ok(())
+                }
+            }
+            .map_err(|_| "Error deserializing".to_string())?;
+            Ok(Bytes::from(buf))
+        }
+
+        #[cfg(not(feature = "serde-lite"))]
         fn encode(output: &BackendError<ServerFnErrorErr>) -> Result<Bytes, Self::Error> {
             let mut buf = String::new();
             match output {

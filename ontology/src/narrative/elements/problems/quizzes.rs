@@ -6,16 +6,20 @@ use ftml_uris::{DocumentElementUri, DocumentUri, SymbolUri};
 
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Quiz {
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub css: Box<[Css]>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub title: Option<String>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub elements: Box<[QuizElement]>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     #[cfg_attr(feature = "typescript", tsify(type = "[DocumentElementUri,string][]"))]
     pub solutions:
         std::collections::HashMap<DocumentElementUri, Box<str>, rustc_hash::FxBuildHasher>,
@@ -23,20 +27,24 @@ pub struct Quiz {
         feature = "typescript",
         tsify(type = "[DocumentElementUri,AnswerClass[]][]")
     )]
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub answer_classes:
         std::collections::HashMap<DocumentElementUri, Vec<AnswerClass>, rustc_hash::FxBuildHasher>,
 }
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 pub enum QuizElement {
     Section {
         title: Box<str>,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         elements: Box<[QuizElement]>,
     },
     Problem(QuizProblem),
@@ -47,20 +55,24 @@ pub enum QuizElement {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct QuizProblem {
     pub html: Box<str>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub title_html: Option<Box<str>>,
     pub uri: DocumentElementUri,
     //pub solution:String,//Solutions,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub total_points: Option<f32>,
     //pub is_sub_problem:bool,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub preconditions: Box<[(CognitiveDimension, SymbolUri)]>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub objectives: Box<[(CognitiveDimension, SymbolUri)]>,
 }
 

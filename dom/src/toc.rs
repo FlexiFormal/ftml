@@ -181,7 +181,7 @@ impl NavElems {
         }
     }
 
-    pub(crate) fn update_untracked<R>(f: impl FnOnce(&mut Self) -> R) -> R {
+    pub fn update_untracked<R>(f: impl FnOnce(&mut Self) -> R) -> R {
         expect_context::<RwSignal<Self>>().update_untracked(f)
     }
 

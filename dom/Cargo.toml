@@ -57,14 +57,14 @@ rustc_version = { workspace = true }
 document-features = { workspace = true }
 
 ftml-parser = { workspace = true }
-ftml-uris = { workspace = true, features = ["serde"] }
-ftml-ontology = { workspace = true, features = ["serde"] }
-ftml-backend = { workspace = true }
+ftml-uris = { workspace = true, features = ["serde-lite"] }
+ftml-ontology = { workspace = true, features = ["serde-lite"] }
+ftml-backend = { workspace = true,features=["serde-lite"] }
 ftml-js-utils = {workspace=true}
 
 leptos-posthoc = { workspace = true }
 serde = { workspace = true }
-leptos = { workspace = true }
+leptos = { workspace = true,features=["serde-lite"] }
 leptos_meta = { workspace = true }
 tracing = { workspace = true }
 smallvec = { workspace = true }

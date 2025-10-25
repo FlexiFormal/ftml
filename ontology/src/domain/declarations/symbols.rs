@@ -12,6 +12,10 @@ use crate::{
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Symbol {
@@ -24,24 +28,28 @@ pub struct Symbol {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SymbolData {
     pub arity: ArgumentSpec,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub macroname: Option<Id>,
     pub role: Box<[Id]>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub tp: Option<Term>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub df: Option<Term>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub return_type: Option<Term>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub argument_types: Box<[Term]>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub assoctype: Option<AssocType>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub reordering: Option<Id>,
 }
 
@@ -107,6 +115,10 @@ impl IsDeclaration for Symbol {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[non_exhaustive]
@@ -143,6 +155,39 @@ impl FromStr for AssocType {
 pub struct ArgumentSpec(
     #[cfg_attr(feature = "typescript", tsify(type = "ArgumentMode[]"))] SmallVec<ArgumentMode, 8>,
 );
+
+#[cfg(feature = "serde-lite")]
+mod serdelt_impl {
+    use smallvec::SmallVec;
+
+    use crate::terms::ArgumentMode;
+
+    impl serde_lite::Serialize for super::ArgumentSpec {
+        #[inline]
+        fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+            self.0.as_slice().serialize()
+        }
+    }
+    impl serde_lite::Deserialize for super::ArgumentSpec {
+        fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+        where
+            Self: Sized,
+        {
+            match val {
+                serde_lite::Intermediate::Array(v) => {
+                    let mut r = SmallVec::new();
+                    for v in v {
+                        r.push(ArgumentMode::deserialize(v)?);
+                    }
+                    Ok(Self(r))
+                }
+                _ => Err(serde_lite::Error::InvalidValue(std::borrow::Cow::Borrowed(
+                    "expected array for smallvec",
+                ))),
+            }
+        }
+    }
+}
 
 #[cfg(feature = "serde")]
 mod bincode_impl {

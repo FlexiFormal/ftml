@@ -14,6 +14,10 @@ use ftml_uris::{DocumentElementUri, Id, NarrativeUriRef, SymbolUri};
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct NotationReference {
@@ -27,6 +31,10 @@ pub struct NotationReference {
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -42,16 +50,20 @@ pub struct VariableNotationReference {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Notation {
     pub precedence: i64,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub id: Option<Id>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub argprecs: Vec<i64>,
     pub component: NotationComponent,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub op: Option<NotationNode>,
 }
 impl Notation {
@@ -74,15 +86,19 @@ impl Notation {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 pub enum NotationComponent {
     Node {
         tag: ftml_uris::Id,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         attributes: Box<[(ftml_uris::Id, Box<str>)]>,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         children: Box<[NotationComponent]>,
     },
     Argument {
@@ -92,17 +108,17 @@ pub enum NotationComponent {
     ArgSep {
         index: u8,
         mode: ArgumentMode,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         sep: Box<[NotationComponent]>,
     },
     ArgMap {
         index: u8,
-        #[cfg_attr(feature = "serde", serde(default))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         segments: Box<[NotationComponent]>,
     },
     MainComp(NotationNode),
     Comp(NotationNode),
-    #[cfg_attr(feature = "serde", serde(untagged))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(untagged))]
     Text(Box<str>),
 }
 impl crate::__private::Sealed for NotationReference {}
@@ -274,13 +290,17 @@ impl std::fmt::Debug for NotationComponent {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct NotationNode {
     pub tag: ftml_uris::Id,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub attributes: Box<[(ftml_uris::Id, Box<str>)]>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub children: Box<[NodeOrText]>,
 }
 
@@ -303,9 +323,13 @@ impl std::fmt::Debug for NotationNode {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(untagged))]
 pub enum NodeOrText {
     Node(NotationNode),
     Text(Box<str>),

@@ -69,6 +69,13 @@ pub enum RequestError {
     Deserialization(String),
 }
 
+#[cfg(feature = "serde-lite")]
+impl From<serde_lite::Error> for RequestError {
+    fn from(value: serde_lite::Error) -> Self {
+        Self::Deserialization(value.to_string())
+    }
+}
+
 impl<Url, E, Re: Redirects> RemoteBackend<E, Url, Re>
 where
     Url: std::fmt::Display,
@@ -745,7 +752,113 @@ mod server_fn {
     }
 }
 
+trait JsWrap {
+    #[cfg(not(feature = "serde-lite"))]
+    async fn get<
+        T: serde::de::DeserializeOwned,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>>;
+    #[cfg(feature = "serde-lite")]
+    async fn get<
+        T: serde_lite::Deserialize,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>>;
+}
+
 #[cfg(feature = "wasm")]
+impl JsWrap for reqwasm::http::Response {
+    #[cfg(not(feature = "serde-lite"))]
+    #[allow(clippy::future_not_send)]
+    async fn get<
+        T: serde::de::DeserializeOwned,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>> {
+        self.json()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))
+    }
+    #[cfg(feature = "serde-lite")]
+    #[allow(clippy::future_not_send)]
+    async fn get<
+        T: serde_lite::Deserialize,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>> {
+        let im = self
+            .json()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+        serde_lite::Deserialize::deserialize(&im)
+            .map_err(|e| BackendError::Connection(E::from(e.into())))
+    }
+}
+
+#[cfg(feature = "reqwest")]
+impl JsWrap for ::reqwest::Response {
+    #[cfg(not(feature = "serde-lite"))]
+    async fn get<
+        T: serde::de::DeserializeOwned,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>> {
+        self.json()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))
+    }
+    #[cfg(feature = "serde-lite")]
+    async fn get<
+        T: serde_lite::Deserialize,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>> {
+        todo!()
+    }
+}
+
+#[cfg(all(feature = "wasm", feature = "serde-lite"))]
+fn call<R, E>(url: String) -> impl Future<Output = Result<R, BackendError<E>>>
+where
+    R: serde_lite::Deserialize,
+    E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    #[allow(clippy::future_not_send)]
+    async fn call_i<R, E>(url: String) -> Result<R, BackendError<E>>
+    where
+        R: serde_lite::Deserialize,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+        E::Err: Into<BackendError<E>>,
+    {
+        let res = reqwasm::http::Request::get(&url)
+            .send()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+
+        let status = res.status();
+        if (400..=599).contains(&status) {
+            let str = res
+                .text()
+                .await
+                .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+            return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
+        }
+
+        res.get().await
+    }
+
+    crate::utils::FutWrap::new(call_i(url))
+}
+
+#[cfg(all(feature = "wasm", not(feature = "serde-lite")))]
 fn call<R, E>(url: String) -> impl Future<Output = Result<R, BackendError<E>>>
 where
     R: serde::de::DeserializeOwned,
@@ -773,9 +886,7 @@ where
             return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
         }
 
-        res.json::<R>()
-            .await
-            .map_err(|e| BackendError::Connection(E::from(e.into())))
+        res.get().await
     }
 
     crate::utils::FutWrap::new(call_i(url))
@@ -801,9 +912,7 @@ where
         return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
     }
 
-    res.json::<R>()
-        .await
-        .map_err(|e| BackendError::Connection(E::from(e.into())))
+    res.get().await
 }
 
 #[cfg(feature = "wasm")]

@@ -292,6 +292,10 @@ pub trait Narrative: crate::Ftml {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocumentRange {
@@ -301,13 +305,17 @@ pub struct DocumentRange {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct DocDataRef<T> {
     pub start: usize,
     pub end: usize,
     pub in_doc: DocumentUri,
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(skip))]
     phantom_data: PhantomData<T>,
 }
 
@@ -457,6 +465,40 @@ mod serde_impl {
                 end: usize,
             }
             DataRef::deserialize(deserializer).map(|DataRef { start, end }| Self {
+                start,
+                end,
+                phantom_data: PhantomData,
+            })
+        }
+    }
+}
+
+#[cfg(feature = "serde-lite")]
+mod serde_lite_impl {
+    use std::marker::PhantomData;
+
+    #[derive(serde_lite::Serialize, serde_lite::Deserialize)]
+    struct DataRef {
+        start: usize,
+        end: usize,
+    }
+    impl<T> serde_lite::Serialize for super::DataRef<T> {
+        #[inline]
+        fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+            DataRef {
+                start: self.start,
+                end: self.end,
+            }
+            .serialize()
+        }
+    }
+    impl<T> serde_lite::Deserialize for super::DataRef<T> {
+        #[inline]
+        fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+        where
+            Self: Sized,
+        {
+            DataRef::deserialize(val).map(|DataRef { start, end }| Self {
                 start,
                 end,
                 phantom_data: PhantomData,

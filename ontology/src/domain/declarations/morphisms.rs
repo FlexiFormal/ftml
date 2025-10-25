@@ -3,7 +3,8 @@ use ftml_uris::{DomainUriRef, Id, ModuleUri, SimpleUriName, SymbolUri};
 use crate::{
     domain::{
         HasDeclarations,
-        declarations::{AnyDeclarationRef, IsDeclaration},
+        declarations::{AnyDeclarationRef, IsDeclaration, symbols::Symbol},
+        modules::ModuleLike,
     },
     terms::Term,
 };
@@ -12,6 +13,10 @@ use crate::{
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -74,18 +79,22 @@ impl HasDeclarations for Morphism {
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
 )]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Assignment {
     pub original: SymbolUri,
     pub morphism: SymbolUri,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub definiens: Option<Term>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub refined_type: Option<Term>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub new_name: Option<SimpleUriName>,
-    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub macroname: Option<Id>,
 }
 impl Assignment {
@@ -127,3 +136,146 @@ impl deepsize::DeepSizeOf for Morphism {
             .sum::<usize>()
     }
 }
+
+// -------------------------------------------------------------------------
+
+/*
+pub struct ElaborationI {
+    modules: Option<std::collections::HashSet<ModuleLike, rustc_hash::FxBuildHasher>>,
+    decls: Vec<std::pin::Pin<Box<Symbol>>>,
+}
+impl ElaborationI {
+    fn compute(&mut self, uri: SymbolUri) -> Option<&Symbol> {
+        let mut cp = orig.clone();
+        cp.uri = uri;
+        todo!()
+    }
+
+    fn initialize(
+        &mut self,
+        domain: &ModuleUri,
+        get: impl Fn(&ModuleUri) -> Option<ModuleLike>,
+    ) -> Vec<ModuleUri> {
+        if self.modules.is_some() {
+            return Vec::new();
+        }
+        let mut ret = std::collections::HashSet::default();
+        let Some(dom) = get(domain) else {
+            self.modules = Some(ret);
+            return vec![domain.clone()];
+        };
+        let mut stack = Vec::new();
+        ret.insert(dom.clone());
+        let mut curr = dom
+            .declarations()
+            .filter_map(|e| {
+                if let AnyDeclarationRef::Import(e) = e {
+                    Some(e.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_iter();
+        let mut missing = Vec::new();
+        loop {
+            if let Some(m) = curr.next() {
+                if ret
+                    .iter()
+                    .any(|e| matches!(e.domain_uri(),DomainUriRef::Module(e) if *e == m))
+                {
+                    continue;
+                }
+                if let Some(n) = get(&m) {
+                    ret.insert(n.clone());
+                    let old = std::mem::replace(
+                        &mut curr,
+                        n.declarations()
+                            .filter_map(|e| {
+                                if let AnyDeclarationRef::Import(e) = e {
+                                    Some(e.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .into_iter(),
+                    );
+                    stack.push(old);
+                } else {
+                    missing.push(m.clone());
+                }
+            } else if let Some(n) = stack.pop() {
+                curr = n;
+            } else {
+                break;
+            }
+        }
+        self.modules = Some(ret);
+        missing
+    }
+    async fn initialize_async<F: Future<Output = Option<ModuleLike>> + Send>(
+        &mut self,
+        domain: ModuleUri,
+        get: impl Fn(ModuleUri) -> F,
+    ) -> Vec<ModuleUri> {
+        if self.modules.is_some() {
+            return Vec::new();
+        }
+        let mut ret = std::collections::HashSet::default();
+        let Some(dom) = get(domain.clone()).await else {
+            self.modules = Some(ret);
+            return vec![domain];
+        };
+        let mut stack = Vec::new();
+        ret.insert(dom.clone());
+        let mut curr = dom
+            .declarations()
+            .filter_map(|e| {
+                if let AnyDeclarationRef::Import(e) = e {
+                    Some(e.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_iter();
+        let mut missing = Vec::new();
+        loop {
+            if let Some(m) = curr.next() {
+                if ret
+                    .iter()
+                    .any(|e| matches!(e.domain_uri(),DomainUriRef::Module(e) if *e == m))
+                {
+                    continue;
+                }
+                if let Some(n) = get(m.clone()).await {
+                    ret.insert(n.clone());
+                    let old = std::mem::replace(
+                        &mut curr,
+                        n.declarations()
+                            .filter_map(|e| {
+                                if let AnyDeclarationRef::Import(e) = e {
+                                    Some(e.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .into_iter(),
+                    );
+                    stack.push(old);
+                } else {
+                    missing.push(m.clone());
+                }
+            } else if let Some(n) = stack.pop() {
+                curr = n;
+            } else {
+                break;
+            }
+        }
+        self.modules = Some(ret);
+        missing
+    }
+}
+ */

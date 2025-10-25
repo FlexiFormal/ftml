@@ -93,6 +93,23 @@ macro_rules! imp {
         }
         impl Eq for $outer {}
 
+        #[cfg(feature = "serde-lite")]
+        impl serde_lite::Serialize for $outer {
+            #[inline]
+            fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+                self.0.serialize()
+            }
+        }
+
+        #[cfg(feature = "serde-lite")]
+        impl serde_lite::Deserialize for $outer {
+            #[inline]
+            fn deserialize(val:&serde_lite::Intermediate) -> Result<Self,serde_lite::Error> {
+                $inner::deserialize(val).map(Self::from_inner)
+            }
+
+        }
+
         #[cfg(feature = "serde")]
         impl serde::Serialize for $outer {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -172,6 +189,10 @@ imp!(OpaqueTerm(Opaque {
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
 )]
 #[derive(Debug, Clone, Copy)]
 pub struct TermCacheSize {
