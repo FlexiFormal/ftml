@@ -104,7 +104,9 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
                             let gottos: TocProgresses = use_context().unwrap_or_default();
                             let mut gottos = Gottos::new(gottos, &toc);
                             wrap_toc(move |data| {
+                                CurrentTOC::set(toc.clone().into_vec());
                                 NavElems::update_untracked(|nav| {
+                                    tracing::debug!("Initializing titles");
                                     for e in TocElem::iter(&toc) {
                                         if let TocElem::Inputref {
                                             uri,
@@ -117,7 +119,6 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
                                         }
                                     }
                                 });
-                                CurrentTOC::set(toc.clone().into_vec());
                                 let r = do_toc::<Be>(&toc, &mut gottos, data);
                                 NavElems::retry();
                                 r
@@ -146,6 +147,7 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
         }
         TocSource::Ready(toc) => {
             NavElems::update_untracked(|nav| {
+                tracing::debug!("Initializing titles");
                 for e in TocElem::iter(&toc) {
                     if let TocElem::Inputref {
                         uri,

@@ -4,7 +4,8 @@ use ftml_dom::utils::local_cache::{LocalCache, SendBackend};
 use ftml_js_utils::JsDisplay;
 use ftml_ontology::narrative::elements::problems::{
     BlockFeedback, CheckedResult, ChoiceBlockStyle, FillinFeedback, FillinFeedbackKind,
-    ProblemFeedback, ProblemResponse as OrigResponse, ProblemResponseType, Solutions,
+    ProblemFeedback, ProblemFeedbackJson, ProblemResponse as OrigResponse, ProblemResponseType,
+    SolutionData, Solutions,
 };
 use ftml_ontology::utils::SVec;
 use ftml_uris::{DocumentElementUri, Id};
@@ -48,13 +49,13 @@ pub struct ProblemOptions {
 pub enum ProblemState {
     Interactive {
         current_response: Option<OrigResponse>,
-        solution: Option<Solutions>,
+        solution: Option<Box<[SolutionData]>>,
     },
     Finished {
         current_response: Option<OrigResponse>,
     },
     Graded {
-        feedback: ProblemFeedback,
+        feedback: ProblemFeedbackJson,
     },
 }
 
@@ -199,8 +200,9 @@ pub fn problem<Be: SendBackend, V: IntoView>(
         if let Some(states) = states.as_ref() {
             match states.0.get(&ex.uri) {
                 Some(ProblemState::Graded { feedback }) => {
-                    ex.feedback
-                        .update_untracked(|v| *v = Some(feedback.clone()));
+                    ex.feedback.update_untracked(|v| {
+                        *v = Some(ProblemFeedback::from_json(feedback.clone()));
+                    });
                     return Left(true);
                 }
                 Some(ProblemState::Interactive {
@@ -294,7 +296,9 @@ fn submit_answer<Be: SendBackend>() -> impl IntoView {
                 })
                 .flatten()
                 {
-                    leptos::either::Either::Left(move || do_solution(&uri, &s))
+                    leptos::either::Either::Left(move || {
+                        do_solution(&uri, &Solutions::from_solutions(s.clone()));
+                    })
                 } else {
                     let uricl = uri.clone();
                     leptos::either::Either::Right(move || {

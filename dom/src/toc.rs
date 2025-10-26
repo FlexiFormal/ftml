@@ -234,6 +234,7 @@ impl NavElems {
         })
     }
     pub fn set_title(&mut self, uri: DocumentUri, title: String) {
+        tracing::debug!("Setting title of {uri} to \n{title}");
         match self.titles.entry(uri) {
             std::collections::hash_map::Entry::Occupied(e) => e.get().set(title),
             std::collections::hash_map::Entry::Vacant(e) => {
