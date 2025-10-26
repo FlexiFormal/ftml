@@ -48,4 +48,5 @@ serde-wasm-bindgen = { workspace = true,optional=true }
 serde-lite = { workspace = true,optional=true }
 # either_of = {workspace=true}
 thiserror = {workspace = true}
+tracing = {workspace = true}
 send_wrapper = {workspace=true}

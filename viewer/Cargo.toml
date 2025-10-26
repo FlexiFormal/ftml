@@ -57,7 +57,7 @@ leptos = { workspace = true }
 leptos-posthoc = { workspace = true }
 tracing-wasm = { workspace = true }
 tracing-subscriber = { workspace = true }
-tracing = { workspace = true, features = ["release_max_level_info"] }
+tracing = { workspace = true}#, features = ["release_max_level_info"] }
 wasm-bindgen = { workspace = true }
 serde = { workspace = true }
 console_error_panic_hook = { workspace = true }

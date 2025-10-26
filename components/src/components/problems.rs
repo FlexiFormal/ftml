@@ -4,8 +4,8 @@ use ftml_dom::utils::local_cache::{LocalCache, SendBackend};
 use ftml_js_utils::JsDisplay;
 use ftml_ontology::narrative::elements::problems::{
     BlockFeedback, CheckedResult, ChoiceBlockStyle, FillinFeedback, FillinFeedbackKind,
-    ProblemFeedback, ProblemFeedbackJson, ProblemResponse as OrigResponse, ProblemResponseType,
-    SolutionData, Solutions,
+    ProblemFeedback, ProblemFeedbackJson, ProblemResponse, ProblemResponseType, SolutionData,
+    Solutions,
 };
 use ftml_ontology::utils::SVec;
 use ftml_uris::{DocumentElementUri, Id};
@@ -25,14 +25,24 @@ export type ProblemContinuation = (r:ProblemResponse) => void;
 
 #[derive(Clone)]
 pub enum ProblemContinuation {
-    Rs(std::sync::Arc<dyn Fn(&OrigResponse) + Send + Sync>),
+    Rs(std::sync::Arc<dyn Fn(&ProblemResponse) + Send + Sync>),
     Js(SendWrapper<leptos::web_sys::js_sys::Function>),
 }
 
+/*
 pub struct ProblemOptions {
     pub on_response: Option<ProblemContinuation>,
     pub states: rustc_hash::FxHashMap<DocumentElementUri, ProblemState>, //HMap<DocumentElementUri, ProblemState>,
 }
+impl std::fmt::Debug for ProblemOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProblemOptions")
+            .field("on_response", &self.on_response.is_some())
+            .field("states", &self.states)
+            .finish()
+    }
+}
+ */
 
 #[derive(
     Debug,
@@ -48,11 +58,11 @@ pub struct ProblemOptions {
 #[serde(tag = "type")]
 pub enum ProblemState {
     Interactive {
-        current_response: Option<OrigResponse>,
+        current_response: Option<ProblemResponse>,
         solution: Option<Box<[SolutionData]>>,
     },
     Finished {
-        current_response: Option<OrigResponse>,
+        current_response: Option<ProblemResponse>,
     },
     Graded {
         feedback: ProblemFeedbackJson,
@@ -81,7 +91,9 @@ impl ftml_js_utils::conversion::FromJs for ProblemStates {
     type Error = ftml_js_utils::conversion::SerdeWasmError;
     #[inline]
     fn from_js(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
-        ftml_js_utils::conversion::from_value(&value)
+        let obj = leptos::web_sys::js_sys::Object::from_entries(&value)
+            .map_err(|e| Self::Error::custom(JsDisplay(e)))?;
+        ftml_js_utils::conversion::from_value(&obj)
     }
 }
 impl ftml_js_utils::conversion::FromWasmBindgen for ProblemContinuation {}
@@ -98,7 +110,7 @@ impl wasm_bindgen::convert::TryFromJsValue for ProblemContinuation {
 }
 
 impl ProblemContinuation {
-    fn apply(&self, res: &OrigResponse) {
+    fn apply(&self, res: &ProblemResponse) {
         match self {
             Self::Rs(f) => f(res),
             Self::Js(f) => {
@@ -111,15 +123,6 @@ impl ProblemContinuation {
                 }
             }
         }
-    }
-}
-
-impl std::fmt::Debug for ProblemOptions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ProblemOptions")
-            .field("on_response", &self.on_response.is_some())
-            .field("states", &self.states)
-            .finish()
     }
 }
 
@@ -136,27 +139,30 @@ impl std::fmt::Debug for ProblemContinuation {
 pub struct CurrentProblem {
     uri: DocumentElementUri,
     solutions: RwSignal<u8>,
-    initial: Option<OrigResponse>,
-    responses: RwSignal<Vec<ProblemResponse>>,
+    initial: Option<ProblemResponse>,
+    responses: RwSignal<Vec<ActiveProblemResponse>>,
     interactive: bool,
     feedback: RwSignal<Option<ProblemFeedback>>,
 }
 impl CurrentProblem {
-    fn to_response(uri: &DocumentElementUri, responses: &[ProblemResponse]) -> OrigResponse {
-        OrigResponse {
+    fn to_response(
+        uri: &DocumentElementUri,
+        responses: &[ActiveProblemResponse],
+    ) -> ProblemResponse {
+        ProblemResponse {
             uri: uri.clone(),
             responses: responses
                 .iter()
                 .map(|r| match r {
-                    ProblemResponse::MultipleChoice(_, sigs) => {
+                    ActiveProblemResponse::MultipleChoice(_, sigs) => {
                         ProblemResponseType::MultipleChoice {
                             value: SVec(sigs.clone()),
                         }
                     }
-                    ProblemResponse::SingleChoice(_, sig, _) => {
+                    ActiveProblemResponse::SingleChoice(_, sig, _) => {
                         ProblemResponseType::SingleChoice { value: *sig }
                     }
-                    ProblemResponse::Fillinsol(s) => {
+                    ActiveProblemResponse::Fillinsol(s) => {
                         ProblemResponseType::Fillinsol { value: s.clone() }
                     }
                 })
@@ -166,7 +172,7 @@ impl CurrentProblem {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-enum ProblemResponse {
+enum ActiveProblemResponse {
     MultipleChoice(bool, SmallVec<bool, 8>),
     SingleChoice(bool, Option<u16>, u16),
     Fillinsol(String),
@@ -196,27 +202,39 @@ pub fn problem<Be: SendBackend, V: IntoView>(
         feedback: RwSignal::new(None),
     };
     let responses = ex.responses;
-    let mut is_done = with_context(|states: &Option<ProblemStates>| {
+    tracing::debug!("Problem {}", ex.uri);
+    let mut is_done = with_context::<Option<ProblemStates>, _>(|states| {
         if let Some(states) = states.as_ref() {
             match states.0.get(&ex.uri) {
                 Some(ProblemState::Graded { feedback }) => {
+                    tracing::debug!("Problem is graded already");
                     ex.feedback.update_untracked(|v| {
                         *v = Some(ProblemFeedback::from_json(feedback.clone()));
                     });
+                    ex.interactive = false;
                     return Left(true);
                 }
                 Some(ProblemState::Interactive {
                     current_response: Some(resp),
                     ..
-                }) => ex.initial = Some(resp.clone()),
+                }) => {
+                    tracing::debug!("Problem is interactive");
+                    ex.initial = Some(resp.clone());
+                }
                 Some(ProblemState::Finished {
                     current_response: Some(resp),
                 }) => {
+                    tracing::debug!("Problem is finished");
                     ex.initial = Some(resp.clone());
                     ex.interactive = false;
+                    return Left(true);
                 }
-                _ => (),
+                _ => {
+                    tracing::debug!("Problem has no state yet");
+                }
             }
+        } else {
+            tracing::debug!("No problem states");
         }
         Left(false)
     })
@@ -283,11 +301,12 @@ fn submit_answer<Be: SendBackend>() -> impl IntoView {
                     }
                 };
                 let uri = uri.clone();
-                let foract = if let Some(s) = with_context(|opt: &ProblemOptions| {
-                    if let Some(ProblemState::Interactive {
-                        solution: Some(sol),
-                        ..
-                    }) = opt.states.get(&uri)
+                let foract = if let Some(s) = with_context(|states: &Option<ProblemStates>| {
+                    if let Some(states) = states
+                        && let Some(ProblemState::Interactive {
+                            solution: Some(sol),
+                            ..
+                        }) = states.0.get(&uri)
                     {
                         Some(sol.clone())
                     } else {
@@ -348,7 +367,7 @@ pub fn fillinsol(wd: Option<f32>) -> impl IntoView {
     };
     let Some(choice) = ex.responses.try_update_untracked(|resp| {
         let i = resp.len();
-        resp.push(ProblemResponse::Fillinsol(String::new()));
+        resp.push(ActiveProblemResponse::Fillinsol(String::new()));
         i
     }) else {
         tracing::error!("fillinsol outside of an problem!");
@@ -390,7 +409,7 @@ pub fn fillinsol(wd: Option<f32>) -> impl IntoView {
       let sig = create_write_slice(ex.responses,
         move |resps,val| {
           let resp = resps.get_mut(choice).expect("Signal error in problem");
-          let ProblemResponse::Fillinsol(s) = resp else { panic!("Signal error in problem")};
+          let ActiveProblemResponse::Fillinsol(s) = resp else { panic!("Signal error in problem")};
           *s = val;
         }
       );
@@ -446,9 +465,9 @@ pub(super) fn choice_block<V: IntoView + 'static>(
 ) -> impl IntoView {
     let inline = matches!(style, ChoiceBlockStyle::Dropdown | ChoiceBlockStyle::Inline);
     let response = if multiple {
-        ProblemResponse::MultipleChoice(inline, SmallVec::new())
+        ActiveProblemResponse::MultipleChoice(inline, SmallVec::new())
     } else {
-        ProblemResponse::SingleChoice(inline, None, 0)
+        ActiveProblemResponse::SingleChoice(inline, None, 0)
     };
     let Some(i) = with_context::<CurrentProblem, _>(|ex| {
         ex.responses.try_update_untracked(|ex| {
@@ -483,17 +502,17 @@ pub fn choice<V: IntoView + 'static>(
         .responses
         .try_update_untracked(|resp| {
             resp.get_mut(block).map(|l| match l {
-                ProblemResponse::MultipleChoice(inline, sigs) => {
+                ActiveProblemResponse::MultipleChoice(inline, sigs) => {
                     let idx = sigs.len();
                     sigs.push(false);
                     Some((Left(idx), *inline))
                 }
-                ProblemResponse::SingleChoice(inline, _, total) => {
+                ActiveProblemResponse::SingleChoice(inline, _, total) => {
                     let val = *total;
                     *total += 1;
                     Some((Right(val), *inline))
                 }
-                ProblemResponse::Fillinsol(_) => None,
+                ActiveProblemResponse::Fillinsol(_) => None,
             })
         })
         .flatten()
@@ -548,7 +567,7 @@ fn multiple_choice<V: IntoView + 'static>(
     inline: bool,
     orig_selected: bool,
     disabled: bool,
-    responses: RwSignal<Vec<ProblemResponse>>,
+    responses: RwSignal<Vec<ActiveProblemResponse>>,
     feedback: RwSignal<Option<ProblemFeedback>>,
     children: impl FnOnce() -> V + Send + 'static,
 ) -> impl IntoView {
@@ -560,6 +579,7 @@ fn multiple_choice<V: IntoView + 'static>(
     use thaw::Icon;
     let bx = move || {
         feedback.with(|v| if let Some(feedback) = v.as_ref() {
+            tracing::debug!("multiple choice has feedback");
             let err = || {
             tracing::error!("Answer to problem does not match solution:");
             C(view!(<div style="color:red;">"ERROR"</div>))
@@ -579,10 +599,11 @@ fn multiple_choice<V: IntoView + 'static>(
             };
             A(bx)
         } else {
+            tracing::debug!("multiple choice has no feedback");
             let sig = create_write_slice(responses,
             move |resp,val| {
                 let resp = resp.get_mut(block).expect("Signal error in problem");
-                let ProblemResponse::MultipleChoice(_,v) = resp else { panic!("Signal error in problem")};
+                let ActiveProblemResponse::MultipleChoice(_,v) = resp else { panic!("Signal error in problem")};
                 v[idx] = val;
             }
             );
@@ -630,7 +651,7 @@ fn single_choice<V: IntoView + 'static>(
     inline: bool,
     orig_selected: bool,
     disabled: bool,
-    responses: RwSignal<Vec<ProblemResponse>>,
+    responses: RwSignal<Vec<ActiveProblemResponse>>,
     uri: DocumentElementUri,
     feedback: RwSignal<Option<ProblemFeedback>>,
     children: impl FnOnce() -> V + Send + 'static,
@@ -643,6 +664,7 @@ fn single_choice<V: IntoView + 'static>(
     use thaw::Icon;
     let bx = move || {
         feedback.with(|v| if let Some(feedback) = v.as_ref() {
+            tracing::debug!("single choice has feedback");
             let err = || {
               tracing::error!("Answer to problem does not match solution!");
               C(view!(<div style="color:red;">"ERROR"</div>))
@@ -661,11 +683,12 @@ fn single_choice<V: IntoView + 'static>(
             };
             A(bx)
         } else {
+            tracing::debug!("single choice has no feedback yet");
           let name = format!("{uri}_{block}");
           let sig = create_write_slice(responses,
             move |resp,()| {
               let resp = resp.get_mut(block).expect("Signal error in problem");
-              let ProblemResponse::SingleChoice(_,i,_) = resp else { panic!("Signal error in problem")};
+              let ActiveProblemResponse::SingleChoice(_,i,_) = resp else { panic!("Signal error in problem")};
               *i = Some(idx);
             }
           );

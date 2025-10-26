@@ -154,7 +154,7 @@ pub use serde_lite::Error as SerdeWasmError;
 
 #[cfg(feature = "serde-lite")]
 /// ## Errors
-pub fn from_value<T: serde_lite::Deserialize>(value: &JsValue) -> Result<T, serde_lite::Error> {
+pub fn from_value<T: serde_lite::Deserialize + std::fmt::Debug>(value: &JsValue) -> Result<T, serde_lite::Error> {
     let s = web_sys::js_sys::JSON::stringify(value)
         .map_err(|e| serde_lite::Error::custom(crate::JsDisplay(e)))?;
     let Some(s) = s.as_string() else {
@@ -162,8 +162,12 @@ pub fn from_value<T: serde_lite::Deserialize>(value: &JsValue) -> Result<T, serd
             "JSON serialization is not a string",
         ));
     };
+    tracing::debug!("Converting {s} from js");
     let im = serde_json::from_str(&s).map_err(serde_lite::Error::custom)?;
-    serde_lite::Deserialize::deserialize(&im)
+    serde_lite::Deserialize::deserialize(&im).map(|e| {
+        tracing::debug!("Converted: {e:?}");
+        e
+    })
 }
 
 #[cfg(feature = "serde-lite")]

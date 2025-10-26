@@ -106,7 +106,7 @@ pub fn iterate<Views: FtmlViews + ?Sized>(
         tracing::trace!("No markers");
         None
     } else {
-        tracing::debug!("got elements: {markers:?}");
+        tracing::trace!("got elements: {markers:?}");
         let e: OriginalNode = e.clone().into();
         Some(move || {
             markers.reverse();

@@ -379,7 +379,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cognitive_complexity)]
     pub fn close(&mut self, elem: CloseFtmlElement, node: &N) -> super::Result<()> {
-        tracing::debug!("Closing: {elem:?} in {:?}", self.domain);
+        tracing::trace!("Closing: {elem:?} in {:?}", self.domain);
         match elem {
             CloseFtmlElement::Module => match self.domain.pop() {
                 Some(OpenDomainElement::Module {
