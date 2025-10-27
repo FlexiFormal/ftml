@@ -820,7 +820,12 @@ impl JsWrap for ::reqwest::Response {
     >(
         self,
     ) -> Result<T, BackendError<E>> {
-        todo!()
+        let im = self
+            .json()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+        serde_lite::Deserialize::deserialize(&im)
+            .map_err(|e| BackendError::Connection(E::from(e.into())))
     }
 }
 
@@ -892,10 +897,33 @@ where
     crate::utils::FutWrap::new(call_i(url))
 }
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(all(not(feature = "serde-lite"), not(feature = "wasm")))]
 async fn call<R, E>(url: String) -> Result<R, BackendError<E>>
 where
     R: serde::de::DeserializeOwned,
+    E: From<RequestError> + std::fmt::Debug + std::fmt::Display + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    let res = ::reqwest::get(&url)
+        .await
+        .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+
+    let status = res.status().as_u16();
+    if (400..=599).contains(&status) {
+        let str = res
+            .text()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+        return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
+    }
+
+    res.get().await
+}
+
+#[cfg(all(feature = "serde-lite", not(feature = "wasm")))]
+async fn call<R, E>(url: String) -> Result<R, BackendError<E>>
+where
+    R: serde_lite::Deserialize,
     E: From<RequestError> + std::fmt::Debug + std::fmt::Display + std::str::FromStr,
     E::Err: Into<BackendError<E>>,
 {
