@@ -520,7 +520,7 @@ pub(crate) fn do_onclick<Be: SendBackend>(
             move |b| async move { Ok(b.get_paragraphs(s, false).await) },
         );
     let selected = RwSignal::new(None);
-    let selector = paras_selector::<Be>(paras, selected);
+    let selector = paras_selector::<Be>(paras.read_only(), selected);
     Right(view! {
         // paras
         <div style="display:flex;flex-direction:row;">
@@ -674,7 +674,7 @@ fn para_window<Be: SendBackend>(selected: RwSignal<Option<String>>) -> impl Into
                             for c in css {
                                 c.inject();
                             }
-                            crate::Views::<Be>::render_fragment(
+                            crate::Views::<Be>::render_fragment::<Be, _>(
                                 Some(uri.into()),
                                 crate::SidebarPosition::None,
                                 stripped,

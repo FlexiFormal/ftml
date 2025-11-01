@@ -1,16 +1,12 @@
 use crate::{
     FtmlViews,
     clonable_views::MarkedNode,
-    counters::{LogicalLevel, SectionCounters},
+    counters::LogicalLevel,
     document::{CurrentUri, DocumentState, WithHead},
     extractor::{DomExtractor, FtmlDomElement},
+    structure::{DocumentStructure, TocSource},
     terms::ReactiveTerm,
-    toc::{CurrentTOC, TocSource},
-    utils::{
-        ContextChain,
-        actions::{OneShot, SetOneShotDone},
-        local_cache::LOCAL_CACHE,
-    },
+    utils::{ContextChain, local_cache::LOCAL_CACHE},
 };
 use ftml_ontology::{
     narrative::elements::{
@@ -23,8 +19,8 @@ use ftml_ontology::{
 use ftml_parser::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, nodes::FtmlNode};
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, NarrativeUri, SymbolUri};
 use leptos::prelude::{
-    AnyView, CustomAttribute, IntoAny, Memo, RwSignal, Update, expect_context, provide_context,
-    use_context, with_context,
+    AnyView, CustomAttribute, Get, IntoAny, Memo, RwSignal, Update, expect_context,
+    provide_context, use_context, with_context,
 };
 use leptos_posthoc::OriginalNode;
 
@@ -94,15 +90,6 @@ pub enum Marker {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct SectionInfo {
-    pub uri: DocumentElementUri,
-    pub style: Option<Memo<String>>,
-    pub class: Option<&'static str>,
-    pub lvl: LogicalLevel,
-    pub id: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ParagraphInfo {
     pub uri: DocumentElementUri,
     pub style: Memo<String>,
@@ -111,16 +98,6 @@ pub struct ParagraphInfo {
     pub formatting: ParagraphFormatting,
     pub styles: Box<[Id]>,
     pub fors: Vec<SymbolUri>,
-}
-
-#[derive(Clone, Debug)]
-pub struct InputrefInfo {
-    pub uri: DocumentElementUri,
-    pub target: DocumentUri,
-    pub replace: OneShot,
-    pub replacing_done: SetOneShotDone,
-    pub id: String,
-    pub title: RwSignal<String>,
 }
 
 pub type MarkerList = smallvec::SmallVec<Marker, 4>;
@@ -163,18 +140,16 @@ impl Marker {
             }
             Self::IfInputref(_) => orig.attr("style", "display:none;").into_any(),
             Self::Section(uri) => {
-                provide_context(CurrentUri(uri.clone().into()));
-                DocumentState::new_section(uri, move |info| {
-                    Views::section(info, move || {
-                        Self::apply::<Views>(markers, invisible, is_math, orig)
-                    })
+                let info = DocumentState::new_section(uri);
+                Views::section(info, move || {
+                    Self::apply::<Views>(markers, invisible, is_math, orig)
                 })
                 .into_any()
             }
-            Self::SkipSection => DocumentState::skip_section(move || {
-                Self::apply::<Views>(markers, invisible, is_math, orig)
-            })
-            .into_any(),
+            Self::SkipSection => {
+                DocumentState::skip_section();
+                Self::apply::<Views>(markers, invisible, is_math, orig).into_any()
+            }
             Self::Paragraph {
                 uri,
                 kind,
@@ -182,7 +157,6 @@ impl Marker {
                 styles,
                 fors,
             } => {
-                provide_context(CurrentUri(uri.clone().into()));
                 if *uri.document_uri() != *DocumentUri::no_doc() {
                     LOCAL_CACHE
                         .paragraphs
@@ -204,8 +178,7 @@ impl Marker {
                 points,
                 minutes,
             } => {
-                provide_context(CurrentUri(uri.clone().into()));
-                let (style, class) = DocumentState::new_problem(&styles);
+                let (style, class) = DocumentState::new_problem(uri.clone(), &styles);
                 Views::problem(
                     uri,
                     styles,
@@ -262,14 +235,14 @@ impl Marker {
             })
             .into_any(),
             Self::Slide(uri) => {
-                provide_context(CurrentUri(uri.clone().into()));
-                DocumentState::new_slide();
+                DocumentState::new_slide(uri.clone());
                 Views::slide(uri, move || {
                     Self::apply::<Views>(markers, invisible, is_math, orig)
                 })
                 .into_any()
             }
             Self::SectionTitle => {
+                /*
                 let (LogicalLevel::Section(lvl), cls) = DocumentState::title_class() else {
                     tracing::error!("Unexpected section title");
                     return Self::apply::<Views>(markers, invisible, is_math, orig);
@@ -286,13 +259,20 @@ impl Marker {
                         current_toc.update(|toc| toc.set_title(&uri, title.into_boxed_str()));
                     }
                 }
-                Views::section_title(lvl, cls, orig).into_any()
+                 */
+                let cls = DocumentStructure::insert_section_title(|| {
+                    FtmlDomElement::new((*orig).clone())
+                        .inner_string()
+                        .into_owned()
+                });
+                Views::section_title(cls, orig).into_any()
             }
             Self::ParagraphTitle => Views::paragraph_title(orig).into_any(),
             Self::SlideTitle => Views::slide_title(orig).into_any(),
             Self::ProblemTitle => Views::problem_title(orig).into_any(),
             Self::InputRef { target, uri } => {
-                DocumentState::do_inputref(target, uri, Views::inputref).into_any()
+                let ipr = DocumentState::do_inputref(target, uri);
+                Views::inputref(ipr).into_any()
             }
             Self::Argument(pos) => {
                 ContextChain::provide(Some(pos));
@@ -306,27 +286,9 @@ impl Marker {
             }
             Self::CurrentSectionLevel(cap) => {
                 let lvl = DocumentState::current_section_level();
-                match (lvl, cap) {
-                    (LogicalLevel::None, true) => "Document",
-                    (LogicalLevel::None, _) => "document",
-                    (LogicalLevel::Section(SectionLevel::Part), true) => "Part",
-                    (LogicalLevel::Section(SectionLevel::Part), _) => "part",
-                    (LogicalLevel::Section(SectionLevel::Chapter), true) => "Chapter",
-                    (LogicalLevel::Section(SectionLevel::Chapter), _) => "chapter",
-                    (LogicalLevel::Section(SectionLevel::Section), true) => "Section",
-                    (LogicalLevel::Section(SectionLevel::Section), _) => "section",
-                    (LogicalLevel::Section(SectionLevel::Subsection), true) => "Subsection",
-                    (LogicalLevel::Section(SectionLevel::Subsection), _) => "subsection",
-                    (LogicalLevel::Section(SectionLevel::Subsubsection), true) => "Subsubsection",
-                    (LogicalLevel::Section(SectionLevel::Subsubsection), _) => "subsubsection",
-                    (LogicalLevel::BeamerSlide, true) => "Slide",
-                    (LogicalLevel::BeamerSlide, _) => "slide",
-                    (_, true) => "Paragraph",
-                    (_, _) => "paragraph",
-                }
-                .into_any()
+                lvl.into_view(cap).into_any()
             }
-            Self::SlideNumber => SectionCounters::get_slide().into_any(),
+            Self::SlideNumber => DocumentStructure::get_slide().into_any(),
             Self::Comp => {
                 Views::comp(MarkedNode::new(markers, orig, is_math, true).into()).into_any()
             }
@@ -402,17 +364,7 @@ impl Marker {
     pub fn from(ext: &DomExtractor, elem: &OpenFtmlElement) -> Option<Self> {
         match elem {
             OpenFtmlElement::SetSectionLevel(lvl) => {
-                let in_inputref = DocumentState::in_inputref();
-                if !in_inputref {
-                    DocumentState::update_counters(|c| {
-                        if c.current_level() == LogicalLevel::None {
-                            tracing::trace!("SetSectionLevel {lvl}");
-                            c.max = *lvl;
-                        } else {
-                            tracing::error!("ftml:set-section-level: Section already started");
-                        }
-                    });
-                }
+                DocumentStructure::set_max_level(*lvl);
                 None
             }
             OpenFtmlElement::InputRef { target, uri } => Some(Self::InputRef {

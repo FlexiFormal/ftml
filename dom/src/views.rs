@@ -1,6 +1,7 @@
 use crate::{
     ClonableView,
-    markers::{InputrefInfo, ParagraphInfo, SectionInfo},
+    markers::ParagraphInfo,
+    structure::{Inputref, SectionInfo},
     terms::{ReactiveApplication, TopTerm},
 };
 use ftml_ontology::{
@@ -71,7 +72,7 @@ pub trait FtmlViews: 'static {
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         view! {
-            <div id=info.id style=info.style class=info.class>
+            <div id=info.id.to_string() style=info.style() class=info.class()>
               {then()}
             </div>
         }
@@ -167,7 +168,7 @@ pub trait FtmlViews: 'static {
     }
 
     #[inline]
-    fn section_title(_lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
+    fn section_title(class: &'static str, then: OriginalNode) -> impl IntoView {
         then.attr("class", class)
     }
 
@@ -181,7 +182,7 @@ pub trait FtmlViews: 'static {
         then.attr("class", "ftml-title-slide")
     }
 
-    fn inputref(_info: InputrefInfo) -> impl IntoView {}
+    fn inputref(_info: Inputref) -> impl IntoView {}
 
     #[inline]
     fn symbol_reference(
@@ -249,7 +250,7 @@ pub trait TermTrackedViews: 'static {
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         view! {
-            <div id=info.id style=info.style class=info.class>
+            <div id=info.id.to_string() style=info.style() class=info.class()>
               {then()}
             </div>
         }
@@ -345,7 +346,7 @@ pub trait TermTrackedViews: 'static {
     }
 
     #[inline]
-    fn section_title(_lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
+    fn section_title(class: &'static str, then: OriginalNode) -> impl IntoView {
         then.attr("class", class)
     }
 
@@ -358,7 +359,7 @@ pub trait TermTrackedViews: 'static {
         then.attr("class", "ftml-title-slide")
     }
 
-    fn inputref(_info: InputrefInfo) -> impl IntoView {}
+    fn inputref(_info: Inputref) -> impl IntoView {}
 
     #[inline]
     fn symbol_reference(
@@ -523,8 +524,8 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     }
 
     #[inline]
-    fn section_title(lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
-        <T as TermTrackedViews>::section_title(lvl, class, then)
+    fn section_title(class: &'static str, then: OriginalNode) -> impl IntoView {
+        <T as TermTrackedViews>::section_title(class, then)
     }
 
     #[inline]
@@ -538,7 +539,7 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     }
 
     #[inline]
-    fn inputref(info: InputrefInfo) -> impl IntoView {
+    fn inputref(info: Inputref) -> impl IntoView {
         <T as TermTrackedViews>::inputref(info)
     }
 

@@ -3,8 +3,9 @@ use crate::{
     utils::collapsible::{collapse_marker, fancy_collapsible},
 };
 use ftml_dom::{
+    DocumentState,
     counters::LogicalLevel,
-    markers::SectionInfo,
+    structure::SectionInfo,
     utils::{css::inject_css, get_true_rect},
 };
 use ftml_ontology::narrative::elements::SectionLevel;
@@ -53,32 +54,28 @@ pub fn section_title(
 #[derive(Default, Clone)]
 struct SectionTitle(Option<(&'static str, SendWrapper<OriginalNode>)>);
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     inject_css("ftml-sections", include_str!("sections.css"));
-    let SectionInfo {
-        id,
-        style,
-        class,
-        lvl,
-        uri,
-    } = info;
-    tracing::debug!("section {id} at level {lvl:?}");
+    let lvl = info.level();
+    tracing::debug!("section {} at level {lvl:?}", info.id);
     let title = RwSignal::new(SectionTitle::default());
     provide_context(title);
     if let LogicalLevel::Section(lvl) = lvl {
         tracing::trace!("Section at level {lvl}");
         if lvl <= SectionLevel::Paragraph {
             return Left(view! {
-                <div id=id style=style class=class>
+                <div id=info.id.to_string() style=info.style() class=info.class()>
                   {
-                    FtmlConfig::wrap_section(&uri,Some(lvl),children)
+                    FtmlConfig::wrap_section(&info.uri,Some(lvl),children)
                   }
                 </div>
             });
         }
     }
     let visible = RwSignal::new(true);
+    let uri = info.uri.clone();
     let inner = fancy_collapsible(
         move || {
             FtmlConfig::wrap_section(
@@ -122,19 +119,21 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
     };
 
     Right(view! {
-        <div id=id style=style class=class>
+        <div id=info.id.to_string() style=info.style() class=info.class()>
             {title}
             {inner}
         </div>
     })
 }
 
-pub fn section_title(
-    lvl: SectionLevel,
-    class: &'static str,
-    children: OriginalNode,
-) -> impl IntoView {
+pub fn section_title(class: &'static str, children: OriginalNode) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
+    let lvl = DocumentState::current_section_level();
+    let lvl = if let LogicalLevel::Section(lvl) = lvl {
+        lvl
+    } else {
+        SectionLevel::Subparagraph
+    };
     tracing::debug!("section title at level {lvl:?}");
     if lvl <= SectionLevel::Paragraph {
         return Left(view! {

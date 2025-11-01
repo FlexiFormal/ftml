@@ -191,10 +191,9 @@ impl ftml_js_utils::conversion::ToJs for ParagraphKind {
 }
 
 #[cfg(feature = "typescript")]
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 impl wasm_bindgen::convert::TryFromJsValue for ParagraphKind {
-    type Error = wasm_bindgen::JsValue;
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, wasm_bindgen::JsValue> {
         let Some(jbyte) = value.as_f64() else {
             return Err(value);
         };
@@ -207,6 +206,19 @@ impl wasm_bindgen::convert::TryFromJsValue for ParagraphKind {
             4 => Self::SubProof,
             5 => Self::Example,
             _ => return Err(value),
+        })
+    }
+
+    fn try_from_js_value_ref(value: &wasm_bindgen::JsValue) -> Option<Self> {
+        let u = value.as_f64()? as u8;
+        Some(match u {
+            0 => Self::Definition,
+            1 => Self::Assertion,
+            2 => Self::Paragraph,
+            3 => Self::Proof,
+            4 => Self::SubProof,
+            5 => Self::Example,
+            _ => return None,
         })
     }
 }

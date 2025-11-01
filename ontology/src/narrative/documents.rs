@@ -304,12 +304,13 @@ pub enum TocElem {
     },
     Slide, //{uri:DocumentElementUri}
 }
-
+/*
 impl TocElem {
     pub fn iter(v: &[Self]) -> impl Iterator<Item = &Self> {
         v.iter().flat_map(|e| std::iter::once(e).chain(e.dfs()))
     }
 }
+ */
 
 impl RefTree for TocElem {
     type Child<'a> = &'a Self;

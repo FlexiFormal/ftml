@@ -148,13 +148,22 @@ impl FromStr for AssocType {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ArgumentSpec(
     #[cfg_attr(feature = "typescript", tsify(type = "ArgumentMode[]"))] SmallVec<ArgumentMode, 8>,
 );
+impl std::fmt::Debug for ArgumentSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ls = f.debug_list();
+        for a in &self.0 {
+            ls.entry(a);
+        }
+        ls.finish()
+    }
+}
 
 #[cfg(feature = "serde-lite")]
 mod serdelt_impl {

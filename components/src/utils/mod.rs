@@ -117,18 +117,6 @@ impl ReactiveStore {
 }
 
 pub trait LocalCacheExt {
-    #[allow(clippy::type_complexity)]
-    fn resource<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-    ) -> leptos::prelude::ReadSignal<
-        Option<Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>>,
-    >
-    where
-        R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + Send
-            + 'static;
     fn with<B: SendBackend, R, Fut, V: IntoView + 'static>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> V + Clone + Send + 'static,
@@ -169,25 +157,6 @@ pub trait LocalCacheExt {
 }
 
 impl LocalCacheExt for LocalCache {
-    fn resource<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-    ) -> leptos::prelude::ReadSignal<
-        Option<Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>>,
-    >
-    where
-        R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + 'static,
-    {
-        use leptos::prelude::*;
-        let result = RwSignal::new(None);
-        leptos::task::spawn_local(async move {
-            let r = f(WithLocalCache::default()).await;
-            result.set(Some(r));
-        });
-        result.read_only()
-    }
     fn with<B: SendBackend, R, Fut, V: IntoView + 'static>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> V + Clone + Send + 'static,

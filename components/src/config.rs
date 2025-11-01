@@ -1,4 +1,4 @@
-use ftml_dom::{counters::LogicalLevel, toc::TocSource};
+use ftml_dom::{counters::LogicalLevel, structure::TocSource};
 use ftml_js_utils::JsDisplay;
 use ftml_ontology::narrative::elements::SectionLevel;
 use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri};

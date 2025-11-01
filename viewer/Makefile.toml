@@ -49,34 +49,15 @@ args = [
 
 [tasks.patch-js]
 script = '''
-sed -i 's/wasm_bindgen/ftmlViewer/g' ../bin/viewer/ftml.js
+sed -i 's/wasm_bindgen = Object/ftmlViewer = Object/g' ../bin/viewer/ftml.js
 echo "ftmlViewer();" >> ../bin/viewer/ftml.js
 '''
 
-[tasks.ts]
-#env = { "RUSTFLAGS" = "--cfg getrandom_backend=\"wasm_js\" -Ctarget-cpu=mvp -Ctarget-feature=+multivalue,+mutable-globals,+reference-types,+sign-ext" }
-install_crate = "wasm-pack"
-command = "wasm-pack"
-toolchain = "nightly"
-args = [
-    "build",
-    "--out-dir",
-    "../bin/ts",
-    "--out-name",
-    "ftml-viewer-base",
-    "--target",
-    "web",
-    "--",
-    "--features",
-    "typescript",
-    "--target",
-    "wasm32-unknown-unknown",
-    "-Z",
-    "build-std=std,panic_abort,core,alloc",
-    "-Z",
-    "build-std-features=optimize_for_size", #,panic_immediate_abort",
-    "--timings",
-]
+[tasks.patch-dev]
+script = '''
+#sed -i 's/wasm_bindgen/ftmlViewer/g' ../bin/viewer-dev/ftml.js
+echo "wasm_bindgen();" >> ../bin/viewer-dev/ftml.js
+'''
 
 [tasks.copy]
 script_runner = "@shell"
@@ -85,7 +66,40 @@ script = '''
     cp ../bin/viewer/ftml_bg.wasm ../tests/leptos/public/ftml_bg.wasm
 '''
 
+[tasks.copy-dev]
+script_runner = "@shell"
+script = '''
+    cp ../bin/viewer-dev/ftml.js ../tests/leptos/public/ftml.js
+    cp ../bin/viewer-dev/ftml_bg.wasm ../tests/leptos/public/ftml_bg.wasm
+'''
 
 [tasks.default]
 clear = true
 dependencies = ["wasm-pack", "patch-js", "copy"]
+
+[tasks.dev]
+clear = true
+dependencies = ["wasm-pack-dev", "patch-dev","copy-dev"]
+
+[tasks.wasm-pack-dev]
+#env = { "RUSTFLAGS" = "--cfg getrandom_backend=\"wasm_js\" -Ctarget-cpu=mvp -Ctarget-feature=+multivalue,+mutable-globals,+reference-types,+sign-ext" }
+install_crate = "wasm-pack"
+command = "wasm-pack"
+args = [
+    "build",
+    "--target",
+    "no-modules",
+    "--dev",
+    "--out-name",
+    "ftml",
+    "--out-dir",
+    "../bin/viewer-dev",
+    "--",
+    "--target",
+    "wasm32-unknown-unknown",
+    #"-Z",
+    #"build-std=std,panic_abort,core,alloc",
+    #"-Z",
+    #"build-std-features=optimize_for_size", #,panic_immediate_abort",
+    "--timings",
+]

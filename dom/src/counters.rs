@@ -1,5 +1,5 @@
 use crate::extractor::DomExtractor;
-use crate::toc::CurrentTOC;
+//use crate::structure::CurrentTOC;
 use ftml_ontology::narrative::documents::TocElem;
 use ftml_ontology::narrative::elements::{paragraphs::ParagraphKind, sections::SectionLevel};
 use ftml_uris::{DocumentUri, Id};
@@ -20,9 +20,49 @@ pub enum LogicalLevel {
 impl ftml_js_utils::conversion::FromWasmBindgen for LogicalLevel {}
 //#[cfg(feature = "typescript")]
 impl wasm_bindgen::convert::TryFromJsValue for LogicalLevel {
-    type Error = serde_wasm_bindgen::Error;
-    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
-        serde_wasm_bindgen::from_value(value)
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, wasm_bindgen::JsValue> {
+        serde_wasm_bindgen::from_value(value.clone()).map_err(|_| value)
+    }
+    fn try_from_js_value_ref(value: &wasm_bindgen::JsValue) -> Option<Self> {
+        serde_wasm_bindgen::from_value(value.clone()).ok()
+    }
+}
+impl LogicalLevel {
+    pub fn into_view(self, capitalize: bool) -> impl IntoView {
+        match (self, capitalize) {
+            (Self::None, true) => "Document",
+            (Self::None, _) => "document",
+            (Self::Section(SectionLevel::Part), true) => "Part",
+            (Self::Section(SectionLevel::Part), _) => "part",
+            (Self::Section(SectionLevel::Chapter), true) => "Chapter",
+            (Self::Section(SectionLevel::Chapter), _) => "chapter",
+            (Self::Section(SectionLevel::Section), true) => "Section",
+            (Self::Section(SectionLevel::Section), _) => "section",
+            (Self::Section(SectionLevel::Subsection), true) => "Subsection",
+            (Self::Section(SectionLevel::Subsection), _) => "subsection",
+            (Self::Section(SectionLevel::Subsubsection), true) => "Subsubsection",
+            (Self::Section(SectionLevel::Subsubsection), _) => "subsubsection",
+            (Self::BeamerSlide, true) => "Slide",
+            (Self::BeamerSlide, _) => "slide",
+            (_, true) => "Paragraph",
+            (_, _) => "paragraph",
+        }
+    }
+    pub const fn title_class(self) -> &'static str {
+        match self {
+            Self::Section(l) => match l {
+                SectionLevel::Part => "ftml-title-part",
+                SectionLevel::Chapter => "ftml-title-chapter",
+                SectionLevel::Section => "ftml-title-section",
+                SectionLevel::Subsection => "ftml-title-subsection",
+                SectionLevel::Subsubsection => "ftml-title-subsubsection",
+                SectionLevel::Paragraph => "ftml-title-paragraph",
+                SectionLevel::Subparagraph => "ftml-title-subparagraph",
+            },
+            Self::BeamerSlide => "ftml-title-slide",
+            Self::Paragraph => "ftml-title-paragraph",
+            Self::None => "ftml-title",
+        }
     }
 }
 
@@ -52,6 +92,7 @@ impl PartialOrd for LogicalLevel {
     }
 }
 
+/*
 #[derive(Debug, Clone)]
 pub struct SectionCounters {
     pub current: LogicalLevel,
@@ -80,20 +121,9 @@ impl Default for SectionCounters {
         }
     }
 }
+ */
 
-/// part, chapter, section, subsection, subsubsection, paragraph
-#[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
-struct AllSections(pub [u16; 7]);
-impl std::fmt::Display for AllSections {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "[{} {} {} {} {} {} {}]",
-            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], self.0[6]
-        )
-    }
-}
-
+/*
 #[derive(Clone)]
 struct Cutoff<N: CounterTrait> {
     previous: Option<std::sync::Arc<Cutoff<N>>>,
@@ -350,21 +380,6 @@ impl<N: CounterTrait> SmartCounter<N> {
     fn reset(&self) {
         self.0.update_untracked(|x| *x = SmartCounterI::default());
     }
-    /*
-    fn get_untracked(&self) -> N {
-        self.0.with_untracked(|SmartCounterI { cutoff, since }| {
-            cutoff.as_ref().map_or(*since, |c| c.get() + *since)
-        })
-    }
-
-    fn set_cutoff(&self, v: N) {
-        self.0.update_untracked(|SmartCounterI { cutoff, .. }| {
-            if let Some(c) = cutoff.as_ref() {
-                c.set.set(v);
-            }
-        });
-    }
-     */
 
     fn split(&self) -> Self {
         let SmartCounterI { cutoff, since } = self.0.get_untracked();
@@ -391,7 +406,9 @@ impl<N: CounterTrait> SmartCounter<N> {
         ret
     }
 }
+ */
 
+/*
 impl SectionCounters {
     fn init_paras(&self) {
         if self.initialized.get_untracked() {
@@ -796,3 +813,5 @@ fn update(
         }
     }
 }
+
+*/

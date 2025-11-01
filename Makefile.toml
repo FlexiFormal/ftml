@@ -23,3 +23,11 @@ script = '''
 cd viewer
 cargo make
 '''
+
+[tasks.dev]
+clear = true
+workspace = false
+script = '''
+cd viewer
+cargo make dev
+'''

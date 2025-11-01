@@ -1,13 +1,12 @@
 use crate::{
     DocumentState, FtmlViews,
-    counters::LogicalLevel,
     document::{CurrentUri, WithHead},
     extractor::{DomExtractor, FtmlDomElement},
     markers::{Marker, MarkerList},
     terms::ReactiveTerm,
     utils::ContextChain,
 };
-use ftml_ontology::{narrative::elements::SectionLevel, terms::VarOrSym};
+use ftml_ontology::terms::VarOrSym;
 use ftml_parser::extraction::{
     ArgumentPosition, FtmlExtractor, OpenDomainElement, OpenNarrativeElement,
 };
@@ -89,25 +88,7 @@ impl MarkedNode {
         match marker {
             Marker::CurrentSectionLevel(cap) => {
                 let lvl = DocumentState::current_section_level();
-                (match (lvl, cap) {
-                    (LogicalLevel::None, true) => "Document",
-                    (LogicalLevel::None, _) => "document",
-                    (LogicalLevel::Section(SectionLevel::Part), true) => "Part",
-                    (LogicalLevel::Section(SectionLevel::Part), _) => "part",
-                    (LogicalLevel::Section(SectionLevel::Chapter), true) => "Chapter",
-                    (LogicalLevel::Section(SectionLevel::Chapter), _) => "chapter",
-                    (LogicalLevel::Section(SectionLevel::Section), true) => "Section",
-                    (LogicalLevel::Section(SectionLevel::Section), _) => "section",
-                    (LogicalLevel::Section(SectionLevel::Subsection), true) => "Subsection",
-                    (LogicalLevel::Section(SectionLevel::Subsection), _) => "subsection",
-                    (LogicalLevel::Section(SectionLevel::Subsubsection), true) => "Subsubsection",
-                    (LogicalLevel::Section(SectionLevel::Subsubsection), _) => "subsubsection",
-                    (LogicalLevel::BeamerSlide, true) => "Slide",
-                    (LogicalLevel::BeamerSlide, _) => "slide",
-                    (_, true) => "Paragraph",
-                    (_, _) => "paragraph",
-                })
-                .into_any()
+                lvl.into_view(cap).into_any()
             }
             Marker::SymbolReference {
                 in_term,

@@ -1,21 +1,16 @@
-use crate::{
-    config::FtmlConfig,
-    utils::{
-        LocalCacheExt,
-        collapsible::{collapse_marker, fancy_collapsible},
-    },
-};
 use ftml_dom::{
-    DocumentState, FtmlViews,
-    toc::{CurrentTOC, NavElems, TocSource},
-    utils::{
-        css::{CssExt, inject_css},
-        local_cache::{LocalCache, SendBackend},
-    },
+    FtmlViews,
+    structure::DocumentStructure,
+    utils::{css::inject_css, local_cache::SendBackend},
 };
-use ftml_ontology::{narrative::documents::TocElem, utils::time::Timestamp};
-use ftml_uris::{DocumentElementUri, DocumentUri};
+use ftml_ontology::{
+    narrative::{documents::TocElem, elements::SectionLevel},
+    utils::time::Timestamp,
+};
+use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
+
+use crate::utils::collapsible::{collapse_marker, fancy_collapsible};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
@@ -31,9 +26,15 @@ pub struct TocProgress {
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TocProgresses(pub Box<[TocProgress]>);
 impl wasm_bindgen::convert::TryFromJsValue for TocProgresses {
-    type Error = serde_wasm_bindgen::Error;
-    fn try_from_js_value(value: leptos::wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
-        Ok(Self(serde_wasm_bindgen::from_value(value)?))
+    fn try_from_js_value(
+        value: leptos::wasm_bindgen::JsValue,
+    ) -> Result<Self, leptos::wasm_bindgen::JsValue> {
+        Ok(Self(
+            serde_wasm_bindgen::from_value(value.clone()).map_err(|_| value)?,
+        ))
+    }
+    fn try_from_js_value_ref(value: &wasm_bindgen::JsValue) -> Option<Self> {
+        serde_wasm_bindgen::from_value(value.clone()).ok()
     }
 }
 impl ftml_js_utils::conversion::FromWasmBindgen for TocProgresses {}
@@ -80,8 +81,19 @@ impl Gottos {
     }
 }
 
-pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
-    use leptos::either::EitherOf4::{A, B, C, D};
+#[must_use]
+pub fn toc<Be: SendBackend>() -> impl IntoView {
+    wrap_toc(move |data| {
+        move || {
+            DocumentStructure::with_toc(|toc| {
+                let gottos: TocProgresses = use_context().unwrap_or_default();
+                let mut gottos = Gottos::new(gottos, toc);
+                do_toc::<Be>(toc, &mut gottos, data, SectionLevel::Part)
+            })
+        }
+    })
+    //use leptos::either::EitherOf4::{A, B, C, D};
+    /*
     let Some(toc) = FtmlConfig::with_toc_source(Clone::clone) else {
         return A(());
     };
@@ -120,7 +132,6 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
                                     }
                                 });
                                 let r = do_toc::<Be>(&toc, &mut gottos, data);
-                                NavElems::retry();
                                 r
                             })
                         },
@@ -167,6 +178,7 @@ pub fn toc<Be: SendBackend>(uri: DocumentUri) -> impl IntoView {
             }))
         }
     }
+     */
 }
 
 fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl IntoView {
@@ -216,6 +228,7 @@ fn do_toc<Be: SendBackend>(
     toc: &[TocElem],
     gottos: &mut Gottos,
     data: AnchorData,
+    lvl: SectionLevel,
 ) -> impl IntoView + use<Be> {
     use leptos::either::{
         Either::{Left, Right},
@@ -263,11 +276,6 @@ fn do_toc<Be: SendBackend>(
                         data.update_background_position(&title_rect);
                     }
                 });
-                /*let on_click = move |_| {
-                    href.with_value(move |href_id| {
-                        scroll_into_view(href_id, nav_elems);
-                    });
-                };*/
                 let title = title.as_ref().map_or_else(
                     || Right(uri.name().last().to_string()),
                     |t| Left(crate::Views::<Be>::render_ftml(t.to_string(), None)),
@@ -282,12 +290,13 @@ fn do_toc<Be: SendBackend>(
 
                 let (visible, children) = if has_section(children) {
                     let visible = RwSignal::new(true);
-                    let i = do_toc::<Be>(children, gottos, data).into_any();
+                    let i = do_toc::<Be>(children, gottos, data, lvl.inc()).into_any();
                     let ch = fancy_collapsible(move || i, visible, "", "");
                     (Some(visible), Some(ch))
                 } else {
                     (None, None)
                 };
+                let counter = DocumentStructure::display_counter(id);
 
                 A(view! {
                     <div class=class>
@@ -303,19 +312,21 @@ fn do_toc<Be: SendBackend>(
                             <a
                                 href=href.get_value()
                                 class="thaw-anchor-link__title"
-                                //on:click=on_click
                                 node_ref=title_ref
                                 style=style
                             >
-                                {title}{after}
+                                {counter}" "{title}{after}
                             </a>
                         </Caption1Strong>
                         {children}
                     </div>
                 })
             }
-            TocElem::Inputref { children, .. } | TocElem::SkippedSection { children } => {
-                B(do_toc::<Be>(children, gottos, data).into_any())
+            TocElem::Inputref { children, .. } => {
+                B(do_toc::<Be>(children, gottos, data, lvl).into_any())
+            }
+            TocElem::SkippedSection { children } => {
+                B(do_toc::<Be>(children, gottos, data, lvl.inc()).into_any())
             }
             _ => C(()),
         })

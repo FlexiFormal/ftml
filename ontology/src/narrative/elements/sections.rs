@@ -163,10 +163,9 @@ impl ftml_js_utils::conversion::ToJs for SectionLevel {
 }
 
 #[cfg(feature = "typescript")]
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 impl wasm_bindgen::convert::TryFromJsValue for SectionLevel {
-    type Error = wasm_bindgen::JsValue;
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, wasm_bindgen::JsValue> {
         let Some(jbyte) = value.as_f64() else {
             return Err(value);
         };
@@ -182,7 +181,21 @@ impl wasm_bindgen::convert::TryFromJsValue for SectionLevel {
             _ => return Err(value),
         })
     }
+    fn try_from_js_value_ref(value: &wasm_bindgen::JsValue) -> Option<Self> {
+        let u = value.as_f64()? as u8;
+        Some(match u {
+            0 => Self::Part,
+            1 => Self::Chapter,
+            2 => Self::Section,
+            3 => Self::Subsection,
+            4 => Self::Subsubsection,
+            5 => Self::Paragraph,
+            6 => Self::Subparagraph,
+            _ => return None,
+        })
+    }
 }
+
 impl Ord for SectionLevel {
     #[inline]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {

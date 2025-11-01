@@ -9,7 +9,7 @@ use crate::{
 use ftml_dom::{FtmlViews, notations::NotationExt, utils::local_cache::LocalCache};
 use ftml_ontology::{
     narrative::{
-        documents::Document,
+        documents::{Document, DocumentKind},
         elements::{
             DocumentElement, DocumentTerm, FlatIterable, Problem, Slide,
             notations::{NotationReference, VariableNotationReference},
@@ -26,6 +26,7 @@ impl super::FtmlViewable for Document {
     fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
         &self,
     ) -> impl leptos::IntoView + use<Be> {
+        use leptos::either::EitherOf3::{A, B, C};
         let uses = self.elements.iter().flat().filter_map(|e| {
             if let DocumentElement::UseModule(u) = e {
                 Some(u)
@@ -33,6 +34,50 @@ impl super::FtmlViewable for Document {
                 None
             }
         });
+        let knd = match &self.kind {
+            DocumentKind::Article | DocumentKind::Fragment => A(()),
+            DocumentKind::Exam {
+                date,
+                course,
+                retake,
+                num,
+                term,
+            } => B(view! {<span>
+                {if *retake {"retake "} else {""}}
+                "exam for "
+                {course.to_string()}
+                " "
+                {term.as_ref().map(ToString::to_string)}
+                ", "
+                {date.into_date().to_string()}
+            </span>}),
+            DocumentKind::Quiz {
+                date,
+                course,
+                num,
+                term,
+            } => C(view! {<span>
+                "quiz for "
+                {course.to_string()}
+                " "
+                {term.as_ref().map(ToString::to_string)}
+                ", "
+                {date.into_date().to_string()}
+            </span>}),
+            DocumentKind::Homework {
+                date,
+                course,
+                num,
+                term,
+            } => C(view! {<span>
+                "homework for "
+                {course.to_string()}
+                " "
+                {term.as_ref().map(ToString::to_string)}
+                ", "
+                {date.into_date().to_string()}
+            </span>}),
+        };
         let uses = super::uses::<Be, _>("Uses", uses);
         let children = self
             .elements
@@ -41,6 +86,7 @@ impl super::FtmlViewable for Document {
             .collect_view();
         view! {<Block show_separator=false>
           <HeaderLeft slot>{uses}</HeaderLeft>
+          {knd}<br/>
           {children}
         </Block>}
     }

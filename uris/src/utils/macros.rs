@@ -35,17 +35,21 @@ macro_rules! ts {
                 <String as ::wasm_bindgen::describe::WasmDescribe>::describe();
             }
         }
+
         #[cfg(feature = "js")]
         impl$(<$($a$(:$guard)?),+>)? ::wasm_bindgen::convert::TryFromJsValue for $name$(<$($a),+>)? {
-            type Error = Option<$crate::errors::UriParseError>;
-            fn try_from_js_value(value: ::wasm_bindgen::JsValue) -> Result<Self,Self::Error> {
+            fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, wasm_bindgen::JsValue> {
                 if let Some(s) = value.as_string() {
-                    s.parse().map_err(|e| Some($crate::errors::UriParseError::from(e)))
+                    s.parse().map_err(|_| value)
                 } else {
-                    Err(None)
+                    Err(value)
                 }
             }
+            fn try_from_js_value_ref(value: &wasm_bindgen::JsValue) -> Option<Self> {
+                value.as_string()?.parse().ok()
+            }
         }
+
         #[cfg(feature = "js")]
         impl$(<$($a$(:$guard)?),+>)? ::ftml_js_utils::conversion::FromJs for $name$(<$($a),+>)? {
             type Error = $crate::errors::UriParseError;

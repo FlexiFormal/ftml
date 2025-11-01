@@ -1,14 +1,18 @@
 use crate::{
-    counters::{LogicalLevel, SectionCounters},
+    //counters::{LogicalLevel, SectionCounters},
+    counters::LogicalLevel,
     extractor::DomExtractor,
-    markers::{InputrefInfo, ParagraphInfo, SectionInfo},
-    toc::{CurrentId, CurrentTOC, NavElems, TocSource},
-    utils::{ContextChain, owned},
+    markers::ParagraphInfo,
+    structure::{DocumentStructure, Inputref, SectionInfo},
+    utils::{ContextChain, local_cache::SendBackend, owned},
 };
 use ftml_ontology::{
-    narrative::elements::{
-        SectionLevel,
-        paragraphs::{ParagraphFormatting, ParagraphKind},
+    narrative::{
+        documents::TocElem,
+        elements::{
+            SectionLevel,
+            paragraphs::{ParagraphFormatting, ParagraphKind},
+        },
     },
     terms::VarOrSym,
 };
@@ -43,7 +47,7 @@ impl DocumentMeta {
     }
 }
 
-pub fn setup_document<Ch: IntoView + 'static>(
+pub fn setup_document<Be: SendBackend, Ch: IntoView + 'static>(
     uri: DocumentUri,
     is_stripped: bool,
     children: impl FnOnce() -> Ch,
@@ -56,8 +60,11 @@ pub fn setup_document<Ch: IntoView + 'static>(
     provide_context(InDocument(uri.clone()));
     provide_context(CurrentUri(uri.clone().into()));
     provide_context(ContextUri(uri.into()));
-    provide_context(SectionCounters::default());
+    DocumentStructure::set::<Be>();
+    DocumentStructure::navigate_to_fragment();
 
+    /*
+    provide_context(SectionCounters::default());
     let current_toc = match with_context::<TocSource, _>(|c| {
         if let TocSource::Ready(r) = c {
             Some(r.clone())
@@ -74,12 +81,9 @@ pub fn setup_document<Ch: IntoView + 'static>(
     };
     provide_context(RwSignal::new(current_toc));
     provide_context(RwSignal::new(NavElems::new()));
-    NavElems::navigate_to_fragment();
+     */
     children()
 }
-
-#[derive(Copy, Clone, PartialEq, Eq)]
-struct InInputref(bool);
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct WithHead(pub Option<VarOrSym>);
@@ -146,14 +150,17 @@ impl DocumentState {
 
     #[inline]
     pub fn in_inputref() -> bool {
-        use_context::<InInputref>().is_some_and(|b| b.0)
+        DocumentStructure::in_inputref()
     }
 
-    pub(crate) fn do_inputref<V: IntoView>(
-        target: DocumentUri,
-        uri: DocumentElementUri,
-        f: impl FnOnce(InputrefInfo) -> V,
-    ) -> impl IntoView {
+    pub fn arguments() -> impl Iterator<Item = ArgumentPosition> {
+        ContextChain::<Option<ArgumentPosition>>::iter().flatten()
+    }
+
+    #[inline]
+    pub(crate) fn do_inputref(target: DocumentUri, uri: DocumentElementUri) -> Inputref {
+        DocumentStructure::new_inputref(uri, target)
+        /*
         let (id, replace, replacing_done) = NavElems::new_inputref(uri.name.last());
         let counters = SectionCounters::inputref(target.clone(), id.clone());
         let title = NavElems::get_title(target.clone());
@@ -162,7 +169,6 @@ impl DocumentState {
             current_toc.update(|t| t.insert_inputref(id.clone(), target.clone()));
         }
         provide_context(counters);
-        provide_context(InInputref(true));
         provide_context(CurrentId(id.clone()));
         f(InputrefInfo {
             uri,
@@ -172,6 +178,7 @@ impl DocumentState {
             id,
             title,
         })
+        */
     }
 
     pub fn inner_document<V: IntoView, F: FnOnce() -> V>(
@@ -186,9 +193,6 @@ impl DocumentState {
             context.clone().into(),
             is_stripped,
         )));
-        if use_context::<SectionCounters>().is_none() {
-            provide_context(SectionCounters::default());
-        }
         provide_context(CurrentUri(target.clone().into()));
         provide_context(InDocument(target));
         provide_context(ContextUri(context.into()));
@@ -201,23 +205,17 @@ impl DocumentState {
             DocumentUri::no_doc().clone().into(),
             true,
         )));
-        if use_context::<SectionCounters>().is_none() {
-            provide_context(SectionCounters::default());
-        }
         provide_context(InDocument(DocumentUri::no_doc().clone()));
         provide_context(ContextUri(DocumentUri::no_doc().clone().into()));
         provide_context(CurrentUri(DocumentUri::no_doc().clone().into()));
+        DocumentStructure::set_empty();
         f()
     }
 
-    pub fn arguments() -> impl Iterator<Item = ArgumentPosition> {
-        ContextChain::<Option<ArgumentPosition>>::iter().flatten()
-    }
-
-    pub(crate) fn new_section<V: IntoView>(
-        uri: DocumentElementUri,
-        f: impl FnOnce(SectionInfo) -> V,
-    ) -> impl IntoView {
+    #[inline]
+    pub(crate) fn new_section(uri: DocumentElementUri) -> SectionInfo {
+        DocumentStructure::new_section(uri)
+        /*
         let id = NavElems::new_section(uri.name.last());
         let mut counters: SectionCounters = expect_context();
         let (style, class) = counters.next_section();
@@ -235,10 +233,11 @@ impl DocumentState {
             lvl,
             id,
         })
+         */
     }
 
-    pub fn get_toc() -> ReadSignal<CurrentTOC> {
-        expect_context::<RwSignal<CurrentTOC>>().read_only()
+    pub fn get_toc() -> ReadSignal<Vec<TocElem>> {
+        expect_context::<DocumentStructure>().toc.read_only()
     }
 
     pub(crate) fn new_paragraph<V: IntoView>(
@@ -249,8 +248,8 @@ impl DocumentState {
         fors: Vec<SymbolUri>,
         f: impl FnOnce(ParagraphInfo) -> V,
     ) -> impl IntoView {
-        let mut counters: SectionCounters = expect_context();
-        let (style, class) = counters.get_para(kind, &styles);
+        provide_context(CurrentUri(uri.clone().into()));
+        let (style, class) = expect_context::<DocumentStructure>().get_para(kind, &styles);
         f(ParagraphInfo {
             uri,
             style,
@@ -262,60 +261,29 @@ impl DocumentState {
         })
     }
 
-    pub(crate) fn new_problem(styles: &[Id]) -> (Memo<String>, String) {
-        let mut counters: SectionCounters = expect_context();
-        counters.get_problem(styles)
+    pub(crate) fn new_problem(uri: DocumentElementUri, styles: &[Id]) -> (Memo<String>, String) {
+        provide_context(CurrentUri(uri.into()));
+        expect_context::<DocumentStructure>().get_problem(styles)
     }
 
-    pub(crate) fn new_slide() {
-        let counters = SectionCounters::slide_inc();
-        provide_context(counters);
+    pub(crate) fn new_slide(uri: DocumentElementUri) {
+        provide_context(CurrentUri(uri.into()));
+        DocumentStructure::slide_inc();
     }
 
     pub fn current_section_level() -> LogicalLevel {
-        with_context(|cntrs: &SectionCounters| cntrs.current_level()).unwrap_or(LogicalLevel::None)
+        use_context().unwrap_or(LogicalLevel::None)
     }
 
-    pub(crate) fn title_class() -> (LogicalLevel, &'static str) {
-        with_context(|cntrs: &SectionCounters| {
-            let lvl = cntrs.current_level();
-            (
-                lvl,
-                match lvl {
-                    LogicalLevel::Section(l) => match l {
-                        SectionLevel::Part => "ftml-title-part",
-                        SectionLevel::Chapter => "ftml-title-chapter",
-                        SectionLevel::Section => "ftml-title-section",
-                        SectionLevel::Subsection => "ftml-title-subsection",
-                        SectionLevel::Subsubsection => "ftml-title-subsubsection",
-                        SectionLevel::Paragraph => "ftml-title-paragraph",
-                        SectionLevel::Subparagraph => "ftml-title-subparagraph",
-                    },
-                    LogicalLevel::BeamerSlide => "ftml-title-slide",
-                    LogicalLevel::Paragraph => "ftml-title-paragraph",
-                    LogicalLevel::None => "ftml-title",
-                },
-            )
-        })
-        .unwrap_or((LogicalLevel::None, "ftml-title"))
-    }
-
-    pub(crate) fn skip_section<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
-        let mut counters: SectionCounters = expect_context();
-        match counters.current_level() {
-            LogicalLevel::Section(l) => {
-                counters.current = LogicalLevel::Section(l.inc());
-            }
-            LogicalLevel::None => {
-                counters.current = LogicalLevel::Section(counters.max);
-            }
-            _ => (),
-        }
-        provide_context(counters);
-        f()
-    }
+    /*
 
     pub(crate) fn update_counters<R>(f: impl FnOnce(&mut SectionCounters) -> R) -> R {
         update_context::<SectionCounters, _>(f).expect("Not in a document context")
+    }
+     */
+
+    #[inline]
+    pub(crate) fn skip_section() {
+        DocumentStructure::skip_section();
     }
 }

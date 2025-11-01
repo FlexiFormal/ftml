@@ -2,7 +2,7 @@ use crate::{config::FtmlConfig, utils::LocalCacheExt};
 use ftml_dom::{
     DocumentState, FtmlViews,
     counters::LogicalLevel,
-    markers::InputrefInfo,
+    structure::Inputref,
     utils::{
         actions::{OneShot, SetOneShotDone},
         css::{CssExt, inject_css},
@@ -14,19 +14,21 @@ use ftml_uris::{DocumentElementUri, DocumentUri};
 use leptos::prelude::*;
 
 #[must_use]
-pub fn inputref<B: SendBackend>(info: InputrefInfo) -> impl IntoView {
+pub fn inputref<B: SendBackend>(info: Inputref) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
-    let InputrefInfo {
+    /*let Inputref {
         uri,
         target,
         replace,
         replacing_done,
         id,
         title,
-    } = info;
+        ..
+    } = info;*/
     let lvl = DocumentState::current_section_level();
     let limit = FtmlConfig::autoexpand_limit();
-    tracing::debug!("inputref {uri} at level {lvl:?}");
+    let replacing_done = info.done;
+    tracing::debug!("inputref {} at level {lvl:?}", info.uri);
     let expand = Memo::new(move |_| {
         lvl <= limit.get().0
             || matches!(
@@ -37,22 +39,26 @@ pub fn inputref<B: SendBackend>(info: InputrefInfo) -> impl IntoView {
     });
     move || {
         if expand.get() {
-            Left(do_replace::<B>(target.clone(), uri.clone(), replacing_done))
+            Left(do_replace::<B>(
+                info.target.clone(),
+                info.uri.clone(),
+                replacing_done,
+            ))
         } else {
-            Right(do_unreplaced::<B>(id.clone(), title, replace))
+            Right(do_unreplaced::<B>(info.id.to_string(), &info, info.replace))
         }
     }
 }
 
 fn do_unreplaced<B: SendBackend>(
     id: String,
-    title: RwSignal<String>,
+    title: &Inputref,
     load: OneShot,
-) -> impl IntoView {
+) -> impl IntoView + use<B> {
     inject_css("ftml-inputref", include_str!("inputref.css"));
     view! {
         <div class="ftml-inputref" id=id on:click=move |_| load.activate()>
-        {move || crate::Views::<B>::render_ftml(title.get(),None)}
+        {title.title::<crate::Views<B>>()}
         </div>
     }
 }

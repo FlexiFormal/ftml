@@ -46,6 +46,27 @@ pub struct LocalCache {
     pub(crate) dochtmls: Map<DocumentUri, Box<str>>,
     pub(crate) solutions: Map<DocumentElementUri, Solutions>,
 }
+impl LocalCache {
+    pub fn resource<B: SendBackend, R, Fut>(
+        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
+    ) -> leptos::prelude::RwSignal<
+        Option<Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>>,
+    >
+    where
+        R: Send + Sync + 'static + Clone,
+        Fut: Future<
+                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
+            > + 'static,
+    {
+        use leptos::prelude::*;
+        let result = RwSignal::new(None);
+        leptos::task::spawn_local(async move {
+            let r = f(WithLocalCache::default()).await;
+            result.set(Some(r));
+        });
+        result
+    }
+}
 
 pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
     std::sync::LazyLock::new(|| LocalCache {

@@ -12,7 +12,7 @@ pub mod config;
 pub mod utils;
 
 use crate::{components::paragraphs::Slides, config::FtmlConfig};
-use ftml_dom::{DocumentState, toc::TocSource, utils::local_cache::SendBackend};
+use ftml_dom::{DocumentState, structure::TocSource, utils::local_cache::SendBackend};
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::{
     IntoView,
@@ -62,7 +62,7 @@ impl<B: SendBackend> Views<B> {
         }
     }
 
-    pub fn setup_document<Ch: IntoView + 'static>(
+    pub fn setup_document<Be: SendBackend, Ch: IntoView + 'static>(
         uri: DocumentUri,
         sidebar: SidebarPosition,
         is_stripped: bool,
@@ -73,7 +73,7 @@ impl<B: SendBackend> Views<B> {
             prelude::*,
         };
         Self::maybe_top(move || {
-            ftml_dom::setup_document(uri.clone(), is_stripped, move || {
+            ftml_dom::setup_document::<Be, _>(uri, is_stripped, move || {
                 let (v, s) = Slides::new();
                 provide_context(s);
                 let children = move || view! {{children()}{v}};
@@ -88,7 +88,6 @@ impl<B: SendBackend> Views<B> {
                             .is_some_and(|b| b));
                 if do_sidebar {
                     Left(components::sidebar::do_sidebar::<B, _>(
-                        uri,
                         show_content,
                         pdf_link,
                         choose_highlight_style,
@@ -102,7 +101,7 @@ impl<B: SendBackend> Views<B> {
         })
     }
 
-    pub fn render_fragment<Ch: IntoView + 'static>(
+    pub fn render_fragment<Be: SendBackend, Ch: IntoView + 'static>(
         uri: Option<NarrativeUri>,
         sidebar: SidebarPosition,
         is_stripped: bool,
@@ -114,7 +113,7 @@ impl<B: SendBackend> Views<B> {
             (DocumentUri::no_doc().clone(), true)
         };
         let inner = Self::maybe_top(move || {
-            Self::setup_document(doc, sidebar, is_stripped, move || {
+            Self::setup_document::<Be, _>(doc, sidebar, is_stripped, move || {
                 if let Some(NarrativeUri::Element(uri)) = uri {
                     DocumentState::force_uri(uri);
                 }

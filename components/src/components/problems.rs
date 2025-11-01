@@ -98,14 +98,17 @@ impl ftml_js_utils::conversion::FromJs for ProblemStates {
 }
 impl ftml_js_utils::conversion::FromWasmBindgen for ProblemContinuation {}
 impl wasm_bindgen::convert::TryFromJsValue for ProblemContinuation {
-    type Error = JsDisplay;
-    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, Self::Error> {
+    fn try_from_js_value(value: wasm_bindgen::JsValue) -> Result<Self, wasm_bindgen::JsValue> {
         use wasm_bindgen::JsCast;
-        let f = match value.dyn_into() {
-            Ok(f) => f,
-            Err(e) => return Err(JsDisplay(e)),
-        };
+        let f = value.dyn_into()?;
         Ok(Self::Js(SendWrapper::new(f)))
+    }
+    fn try_from_js_value_ref(value: &wasm_bindgen::JsValue) -> Option<Self> {
+        use wasm_bindgen::JsCast;
+        let f = value
+            .dyn_ref::<leptos::web_sys::js_sys::Function>()?
+            .clone();
+        Some(Self::Js(SendWrapper::new(f)))
     }
 }
 

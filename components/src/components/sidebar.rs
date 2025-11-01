@@ -11,7 +11,6 @@ use ftml_dom::{
     DocumentState,
     utils::{
         css::inject_css,
-        get_true_rect,
         local_cache::{LocalCache, SendBackend},
     },
 };
@@ -20,7 +19,6 @@ use leptos::{prelude::*, web_sys::HtmlDivElement};
 
 #[allow(clippy::fn_params_excessive_bools)]
 pub fn do_sidebar<B: SendBackend, Ch: IntoView + 'static>(
-    uri: DocumentUri,
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -32,7 +30,6 @@ pub fn do_sidebar<B: SendBackend, Ch: IntoView + 'static>(
 
     if floating {
         Left(floating_sidebar::<B, _>(
-            uri,
             show_content,
             pdf_link,
             choose_highlight_style,
@@ -40,7 +37,6 @@ pub fn do_sidebar<B: SendBackend, Ch: IntoView + 'static>(
         ))
     } else {
         Right(flex_sidebar::<B, _>(
-            uri,
             show_content,
             pdf_link,
             choose_highlight_style,
@@ -50,7 +46,6 @@ pub fn do_sidebar<B: SendBackend, Ch: IntoView + 'static>(
 }
 
 fn flex_sidebar<B: SendBackend, Ch: IntoView + 'static>(
-    uri: DocumentUri,
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -67,7 +62,7 @@ fn flex_sidebar<B: SendBackend, Ch: IntoView + 'static>(
                     {if show_content {Some(content_drawer::<B>())} else {None}}
                     {if pdf_link {Some(pdf::<B>())} else {None}}
                 </Flex>
-                {super::toc::toc::<B>(uri)}
+                {super::toc::toc::<B>()}
             }
         },
         visible,
@@ -97,7 +92,6 @@ fn flex_sidebar<B: SendBackend, Ch: IntoView + 'static>(
 }
 
 fn floating_sidebar<B: SendBackend, Ch: IntoView + 'static>(
-    uri: DocumentUri,
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -123,7 +117,7 @@ fn floating_sidebar<B: SendBackend, Ch: IntoView + 'static>(
                     {if show_content {Some(content_drawer::<B>())} else {None}}
                     {if pdf_link {Some(pdf::<B>())} else {None}}
                 </Flex>
-                {super::toc::toc::<B>(uri)}
+                {super::toc::toc::<B>()}
             }
         },
         visible,

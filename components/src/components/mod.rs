@@ -10,7 +10,9 @@ pub mod toc;
 
 use crate::config::FtmlConfig;
 use ftml_dom::{
-    ClonableView, TermTrackedViews, markers::SectionInfo, terms::ReactiveApplication,
+    ClonableView, TermTrackedViews,
+    structure::{Inputref, SectionInfo},
+    terms::ReactiveApplication,
     utils::local_cache::SendBackend,
 };
 use ftml_ontology::narrative::elements::SectionLevel;
@@ -42,8 +44,8 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     }
 
     #[inline]
-    fn section_title(lvl: SectionLevel, class: &'static str, then: OriginalNode) -> impl IntoView {
-        sections::section_title(lvl, class, then)
+    fn section_title(class: &'static str, then: OriginalNode) -> impl IntoView {
+        sections::section_title(class, then)
     }
 
     #[inline]
@@ -142,7 +144,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     }
 
     #[inline]
-    fn inputref(info: ftml_dom::markers::InputrefInfo) -> impl IntoView {
+    fn inputref(info: Inputref) -> impl IntoView {
         inputref::inputref::<B>(info)
     }
 
