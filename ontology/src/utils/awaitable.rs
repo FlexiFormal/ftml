@@ -11,6 +11,7 @@ pub struct AsyncCache<
     T: Clone + Send,
     E: Clone + From<ChannelError> + Send,
 > {
+    max: Option<usize>,
     map: dashmap::DashMap<K, Awaitable<T, E>, rustc_hash::FxBuildHasher>,
 }
 impl<K: std::hash::Hash + Clone + Eq, T: Clone + Send, E: Clone + From<ChannelError> + Send> Default
@@ -19,6 +20,7 @@ impl<K: std::hash::Hash + Clone + Eq, T: Clone + Send, E: Clone + From<ChannelEr
     fn default() -> Self {
         Self {
             map: dashmap::DashMap::default(),
+            max: None,
         }
     }
 }
@@ -29,6 +31,13 @@ impl<
     E: Clone + From<ChannelError> + Send + Sync,
 > AsyncCache<K, T, E>
 {
+    #[must_use]
+    pub fn new(max: usize) -> Self {
+        Self {
+            map: dashmap::DashMap::default(),
+            max: Some(max),
+        }
+    }
     pub fn all(&self, mut f: impl FnMut(&K, &parking_lot::RwLock<MaybeValue<T, E>>)) {
         for v in &self.map {
             let (k, v) = v.pair();
@@ -53,12 +62,16 @@ impl<
         k: K,
         f: F,
     ) -> impl Future<Output = Result<T, E>> + Send + use<Fut, T, E, K, F> {
+        let clear = self.max.is_some_and(|max| max >= self.map.len());
         match self.map.entry(k) {
             Entry::Occupied(a) => either::Left(a.get().clone().get()),
             Entry::Vacant(v) => {
                 let (a, ret) = Awaitable::new(f(v.key().clone()));
                 {
                     let _ = v.insert(a);
+                }
+                if clear {
+                    self.retain(|_, _| false);
                 }
                 either::Right(ret.get())
             }
@@ -73,9 +86,13 @@ impl<
         self.map.get(k).map(|r| r.inner.read().clone().get_sync())
     }
 
-    pub fn has_async<Q: std::hash::Hash + Eq + ?Sized>(&self, k: &Q) -> Option<impl Future<Output = Result<T, E>> + Send + use<Q,K,T,E>>
+    pub fn has_async<Q: std::hash::Hash + Eq + ?Sized>(
+        &self,
+        k: &Q,
+    ) -> Option<impl Future<Output = Result<T, E>> + Send + use<Q, K, T, E>>
     where
-        K: std::borrow::Borrow<Q>, {
+        K: std::borrow::Borrow<Q>,
+    {
         self.map.get(k).map(|r| r.inner.read().clone().get())
     }
 
