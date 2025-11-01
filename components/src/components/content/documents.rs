@@ -26,7 +26,7 @@ impl super::FtmlViewable for Document {
     fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
         &self,
     ) -> impl leptos::IntoView + use<Be> {
-        use leptos::either::EitherOf3::{A, B, C};
+        use leptos::either::EitherOf4::{A, B, C, D};
         let uses = self.elements.iter().flat().filter_map(|e| {
             if let DocumentElement::UseModule(u) = e {
                 Some(u)
@@ -69,7 +69,7 @@ impl super::FtmlViewable for Document {
                 course,
                 num,
                 term,
-            } => C(view! {<span>
+            } => D(view! {<span>
                 "homework for "
                 {course.to_string()}
                 " "
