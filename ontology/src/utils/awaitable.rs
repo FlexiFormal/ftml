@@ -62,7 +62,7 @@ impl<
         k: K,
         f: F,
     ) -> impl Future<Output = Result<T, E>> + Send + use<Fut, T, E, K, F> {
-        let clear = self.max.is_some_and(|max| max >= self.map.len());
+        let clear = self.max.is_some_and(|max| self.map.len() >= max);
         match self.map.entry(k) {
             Entry::Occupied(a) => either::Left(a.get().clone().get()),
             Entry::Vacant(v) => {
