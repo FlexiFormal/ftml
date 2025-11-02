@@ -1,21 +1,26 @@
 .ftml-comp {
     color: dodgerblue;
+    display: inherit;
 }
 .ftml-def-comp {
     color: mediumvioletred;
+    display: inherit;
 }
 
 .ftml-comp-subtle {
     text-shadow: 0.1ex 0.1ex 0.3ex #1e90ff80;
     transition-delay: 0.15s;
+    display: inherit;
 }
 .ftml-def-comp-subtle {
     text-shadow: 0.1ex 0.1ex 0.5ex #c7158580;
     font-weight: bold;
+    display: inherit;
 }
 
 .ftml-var-comp {
     color: gray;
+    display: inherit;
 }
 .ftml-comp-hover {
     background-color: rgba(238, 255, 47, 0.702);
