@@ -5,7 +5,7 @@ use ftml_dom::{
 };
 use ftml_ontology::{
     narrative::{documents::TocElem, elements::SectionLevel},
-    utils::time::Timestamp,
+    utils::{TreeIter, time::Timestamp},
 };
 use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
@@ -39,7 +39,7 @@ impl wasm_bindgen::convert::TryFromJsValue for TocProgresses {
 }
 impl ftml_js_utils::conversion::FromWasmBindgen for TocProgresses {}
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Gottos {
     current: Option<TocProgress>,
     iter: std::vec::IntoIter<TocProgress>,
@@ -65,7 +65,7 @@ impl Gottos {
     fn new(v: TocProgresses, toc: &[TocElem]) -> Self {
         let mut v = v.0.into_vec();
         v.retain(|e| {
-            toc.iter().any(|s| {
+            toc.dfs().any(|s| {
                 if let TocElem::Section { uri, .. } = s {
                     *uri == e.uri
                 } else {
