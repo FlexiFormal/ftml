@@ -17,7 +17,7 @@ use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::{
     IntoView,
     html::{ElementChild, div},
-    prelude::use_context,
+    prelude::{AnyView, IntoAny, use_context},
 };
 use std::marker::PhantomData;
 
@@ -52,7 +52,7 @@ impl<B: SendBackend> Views<B> {
         })
     }
 
-    pub fn maybe_top<V: IntoView + 'static>(
+    pub fn maybe_top<V: IntoView + Send + 'static>(
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         if use_context::<InFtmlTop>().is_some() {
@@ -62,21 +62,18 @@ impl<B: SendBackend> Views<B> {
         }
     }
 
-    pub fn setup_document<Be: SendBackend, Ch: IntoView + 'static>(
+    pub fn setup_document<Be: SendBackend>(
         uri: DocumentUri,
         sidebar: SidebarPosition,
         is_stripped: bool,
-        children: impl FnOnce() -> Ch + Send + 'static,
-    ) -> impl IntoView {
-        use leptos::{
-            either::Either::{Left, Right},
-            prelude::*,
-        };
+        children: impl FnOnce() -> AnyView + Send + 'static,
+    ) -> AnyView {
+        use leptos::prelude::*;
         Self::maybe_top(move || {
             ftml_dom::setup_document::<Be, _>(uri, is_stripped, move || {
                 let (v, s) = Slides::new();
                 provide_context(s);
-                let children = move || view! {{children()}{v}};
+                let children = move || view! {{children()}{v}}.into_any();
                 let show_content = FtmlConfig::show_content();
                 let pdf_link = FtmlConfig::pdf_link();
                 let choose_highlight_style = FtmlConfig::choose_highlight_style();
@@ -87,45 +84,45 @@ impl<B: SendBackend> Views<B> {
                         || FtmlConfig::with_toc_source(|toc| !matches!(toc, TocSource::None))
                             .is_some_and(|b| b));
                 if do_sidebar {
-                    Left(components::sidebar::do_sidebar::<B, _>(
+                    components::sidebar::do_sidebar::<B>(
                         show_content,
                         pdf_link,
                         choose_highlight_style,
                         sidebar == SidebarPosition::Find,
                         children,
-                    ))
+                    )
                 } else {
-                    Right(children())
+                    children()
                 }
             })
         })
+        .into_any()
     }
 
-    pub fn render_fragment<Be: SendBackend, Ch: IntoView + 'static>(
+    pub fn render_fragment<Be: SendBackend>(
         uri: Option<NarrativeUri>,
         sidebar: SidebarPosition,
         is_stripped: bool,
-        children: impl FnOnce() -> Ch + Send + 'static,
-    ) -> impl IntoView {
+        children: impl FnOnce() -> AnyView + Send + 'static,
+    ) -> AnyView {
         let (doc, wrap) = if let Some(NarrativeUri::Document(d)) = &uri {
             (d.clone(), false)
         } else {
             (DocumentUri::no_doc().clone(), true)
         };
         let inner = Self::maybe_top(move || {
-            Self::setup_document::<Be, _>(doc, sidebar, is_stripped, move || {
+            Self::setup_document::<Be>(doc, sidebar, is_stripped, move || {
                 if let Some(NarrativeUri::Element(uri)) = uri {
                     DocumentState::force_uri(uri);
                 }
                 children()
             })
-        });
+        })
+        .into_any();
         if wrap {
-            leptos::either::Either::Left(
-                div().child(inner), //.style("padding: 0 60px;--rustex-this-width:590px;"),
-            )
+            div().child(inner).into_any() //.style("padding: 0 60px;--rustex-this-width:590px;"),
         } else {
-            leptos::either::Either::Right(inner)
+            inner
         }
     }
 }

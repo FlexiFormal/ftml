@@ -13,7 +13,7 @@ use ftml_ontology::terms::{Term, VarOrSym};
 use ftml_uris::{DocumentElementUri, LeafUri};
 use leptos::{
     IntoView,
-    prelude::{Owner, RwSignal, StoredValue, WithValue, expect_context},
+    prelude::{AnyView, IntoAny, Owner, RwSignal, StoredValue, WithValue, expect_context},
     tachys::reactive_graph::OwnedView,
 };
 
@@ -117,10 +117,10 @@ impl ReactiveStore {
 }
 
 pub trait LocalCacheExt {
-    fn with<B: SendBackend, R, Fut, V: IntoView + 'static>(
+    fn with<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-        view: impl FnOnce(R) -> V + Clone + Send + 'static,
-    ) -> impl IntoView
+        view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
+    ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
         Fut: Future<
@@ -128,14 +128,14 @@ pub trait LocalCacheExt {
             > + Send
             + 'static;
 
-    fn with_or_err<B: SendBackend, R, Fut, V: IntoView + 'static, V2: IntoView + 'static>(
+    fn with_or_err<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-        view: impl FnOnce(R) -> V + Clone + Send + 'static,
-        error: impl FnOnce(ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>) -> V2
+        view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
+        error: impl FnOnce(ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>) -> AnyView
         + Clone
         + Send
         + 'static,
-    ) -> impl IntoView
+    ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
         Fut: Future<
@@ -143,11 +143,11 @@ pub trait LocalCacheExt {
             > + Send
             + 'static;
 
-    fn with_or_toast<B: SendBackend, R, Fut, V: IntoView + 'static, V2: IntoView + 'static>(
+    fn with_or_toast<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-        view: impl FnOnce(R) -> V + Clone + Send + 'static,
-        error: impl FnOnce() -> V2 + Send + Clone + 'static,
-    ) -> impl IntoView
+        view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
+        error: impl FnOnce() -> AnyView + Send + Clone + 'static,
+    ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
         Fut: Future<
@@ -157,10 +157,10 @@ pub trait LocalCacheExt {
 }
 
 impl LocalCacheExt for LocalCache {
-    fn with<B: SendBackend, R, Fut, V: IntoView + 'static>(
+    fn with<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-        view: impl FnOnce(R) -> V + Clone + Send + 'static,
-    ) -> impl IntoView
+        view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
+    ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
         Fut: Future<
@@ -168,16 +168,17 @@ impl LocalCacheExt for LocalCache {
             > + Send
             + 'static,
     {
-        Self::with_or_err::<B, _, _, _, _>(f, view, |e| {
+        Self::with_or_err::<B, _, _>(f, view, |e| {
             tracing::error!("{e}");
+            ().into_any()
         })
     }
 
-    fn with_or_toast<B: SendBackend, R, Fut, V: IntoView + 'static, V2: IntoView + 'static>(
+    fn with_or_toast<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-        view: impl FnOnce(R) -> V + Clone + Send + 'static,
-        error: impl FnOnce() -> V2 + Send + Clone + 'static,
-    ) -> impl IntoView
+        view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
+        error: impl FnOnce() -> AnyView + Send + Clone + 'static,
+    ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
         Fut: Future<
@@ -191,7 +192,7 @@ impl LocalCacheExt for LocalCache {
             ToasterInjection,
         };
         let toaster = ToasterInjection::expect_context();
-        Self::with_or_err::<B, _, _, _, _>(f, view, move |e| {
+        Self::with_or_err::<B, _, _>(f, view, move |e| {
             tracing::error!("{e}");
             toaster.dispatch_toast(
                 move || {
@@ -207,14 +208,14 @@ impl LocalCacheExt for LocalCache {
         })
     }
 
-    fn with_or_err<B: SendBackend, R, Fut, V: IntoView + 'static, V2: IntoView + 'static>(
+    fn with_or_err<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-        view: impl FnOnce(R) -> V + Clone + Send + 'static,
-        error: impl FnOnce(ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>) -> V2
+        view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
+        error: impl FnOnce(ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>) -> AnyView
         + Clone
         + Send
         + 'static,
-    ) -> impl IntoView
+    ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
         Fut: Future<
@@ -227,17 +228,11 @@ impl LocalCacheExt for LocalCache {
     }
 }
 
-pub fn wait_and_then<
-    R,
-    E: Send + Sync + 'static,
-    Fut,
-    V: IntoView + 'static,
-    V2: IntoView + 'static,
->(
+pub fn wait_and_then<R, E: Send + Sync + 'static, Fut>(
     f: impl FnOnce() -> Fut + Send + Sync + 'static + Clone,
-    view: impl FnOnce(R) -> V + Clone + Send + 'static,
-    error: impl FnOnce(E) -> V2 + Clone + Send + 'static,
-) -> impl IntoView
+    view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
+    error: impl FnOnce(E) -> AnyView + Clone + Send + 'static,
+) -> AnyView
 where
     R: Send + Sync + 'static + Clone,
     Fut: Future<Output = Result<R, E>> + Send + 'static,
@@ -260,4 +255,5 @@ where
             })
         }}</Suspense>
     }
+    .into_any()
 }

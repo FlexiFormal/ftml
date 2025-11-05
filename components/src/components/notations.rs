@@ -14,13 +14,13 @@ pub fn has_notation<B: SendBackend>(
     uri: LeafUri,
     children: ClonableView,
     arguments: Option<ReadSignal<ReactiveApplication>>,
-) -> impl IntoView + use<B> + 'static {
+) -> AnyView {
     use leptos::either::Either::{Left, Right};
     let notation = FtmlConfig::notation_preference(&uri);
     let finished = RwSignal::new(false);
     let _ = Effect::new(move || finished.set(true));
 
-    move || {
+    (move || {
         notation.get().map_or_else(
             || Left(children.clone().into_view::<crate::Views<B>>()),
             |notation| {
@@ -42,7 +42,8 @@ pub fn has_notation<B: SendBackend>(
                 }
             },
         )
-    }
+    })
+    .into_any()
 }
 
 #[must_use]
@@ -51,14 +52,14 @@ pub fn with_notation<B: SendBackend>(
     notation: DocumentElementUri,
     arguments: Option<ReadSignal<ReactiveApplication>>,
     children: ClonableView,
-) -> impl IntoView {
+) -> AnyView {
     use leptos::either::Either::{Left, Right};
     let h = head.clone();
-    LocalCache::with_or_toast::<B, _, _, _, _>(
+    LocalCache::with_or_toast::<B, _, _>(
         |c| c.get_notation(Some(h), notation),
         move |n| {
             match arguments {
-                None => Left(n.as_op::<crate::Views<B>>(&head.into(), None)),
+                None => n.as_op::<crate::Views<B>>(&head.into(), None),
                 Some(s) => {
                     let args = s.with(|s| {
                         if let ReactiveApplication::Closed(c) = s {
@@ -67,10 +68,11 @@ pub fn with_notation<B: SendBackend>(
                             Vec::new()
                         }
                     });
-                    Right(n.with_arguments::<crate::Views<B>, _>(&head.into(), None, &args))
+                    n.with_arguments::<crate::Views<B>, _>(&head.into(), None, &args)
                 }
             }
             .attr("style", "border: 1px dotted red;")
+            .into_any()
         },
         move || children.into_view::<crate::Views<B>>(),
     )

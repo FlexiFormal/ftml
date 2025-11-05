@@ -18,39 +18,28 @@ use ftml_uris::DocumentUri;
 use leptos::{prelude::*, web_sys::HtmlDivElement};
 
 #[allow(clippy::fn_params_excessive_bools)]
-pub fn do_sidebar<B: SendBackend, Ch: IntoView + 'static>(
+pub fn do_sidebar<B: SendBackend>(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
     floating: bool,
-    children: impl FnOnce() -> Ch,
-) -> impl IntoView {
-    use leptos::either::Either::{Left, Right};
+    children: impl FnOnce() -> AnyView,
+) -> AnyView {
     inject_css("ftml-sidebar", include_str!("./sidebar.css"));
 
     if floating {
-        Left(floating_sidebar::<B, _>(
-            show_content,
-            pdf_link,
-            choose_highlight_style,
-            children,
-        ))
+        floating_sidebar::<B>(show_content, pdf_link, choose_highlight_style, children)
     } else {
-        Right(flex_sidebar::<B, _>(
-            show_content,
-            pdf_link,
-            choose_highlight_style,
-            children,
-        ))
+        flex_sidebar::<B>(show_content, pdf_link, choose_highlight_style, children)
     }
 }
 
-fn flex_sidebar<B: SendBackend, Ch: IntoView + 'static>(
+fn flex_sidebar<B: SendBackend>(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
-    children: impl FnOnce() -> Ch,
-) -> impl IntoView {
+    children: impl FnOnce() -> AnyView,
+) -> AnyView {
     use thaw::{Button, ButtonShape, ButtonSize, Caption1, Flex};
 
     let visible = RwSignal::new(true);
@@ -89,14 +78,15 @@ fn flex_sidebar<B: SendBackend, Ch: IntoView + 'static>(
         </div>
         </Flex>
     }
+    .into_any()
 }
 
-fn floating_sidebar<B: SendBackend, Ch: IntoView + 'static>(
+fn floating_sidebar<B: SendBackend>(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
-    children: impl FnOnce() -> Ch,
-) -> impl IntoView {
+    children: impl FnOnce() -> AnyView,
+) -> AnyView {
     use thaw::{Button, ButtonShape, ButtonSize, Caption1, Flex};
 
     let pos_ref = NodeRef::new();
@@ -142,6 +132,7 @@ fn floating_sidebar<B: SendBackend, Ch: IntoView + 'static>(
             </div>
         </div>
     }
+    .into_any()
 }
 
 fn position_sidebar(position: &HtmlDivElement, sidebar: &HtmlDivElement) {
@@ -203,7 +194,7 @@ fn max_child(e: &leptos::web_sys::Element) -> Option<leptos::web_sys::Element> {
     curr
 }
 
-fn content_drawer<B: SendBackend>() -> impl IntoView {
+fn content_drawer<B: SendBackend>() -> AnyView {
     use thaw::{
         Button, ButtonAppearance, DrawerBody, DrawerHeader, DrawerHeaderTitle,
         DrawerHeaderTitleAction, DrawerPosition, Icon, OverlayDrawer, Popover, PopoverTrigger,
@@ -212,7 +203,7 @@ fn content_drawer<B: SendBackend>() -> impl IntoView {
 
     let uri = DocumentState::document_uri();
     if uri == *DocumentUri::no_doc() {
-        return None;
+        ().into_any();
     }
     let uricl = uri.clone();
     let uricl2 = uri.clone();
@@ -220,7 +211,7 @@ fn content_drawer<B: SendBackend>() -> impl IntoView {
     let open = RwSignal::new(false);
     let title = RwSignal::new("...".to_string());
 
-    Some(view! {
+    view! {
         <Button
             attr:title="Show Content"
            appearance=ButtonAppearance::Subtle
@@ -254,18 +245,18 @@ fn content_drawer<B: SendBackend>() -> impl IntoView {
                 </DrawerHeaderTitle>
             </DrawerHeader>
             <DrawerBody>
-                {move || if open.get() { let uri= uri.clone(); Some(LocalCache::with_or_toast::<B,_,_,_,_>(
+                {move || if open.get() { let uri= uri.clone(); Some(LocalCache::with_or_toast::<B,_,_>(
                     move |b| b.get_document(uri), move |d| {
                         if let Some(t) = &d.title {
                             title.set(t.to_string());
                         }
                         d.as_view::<B>()
                     },
-                    || "error"
+                    || "error".into_any()
                 ))} else { None }
             }</DrawerBody>
         </OverlayDrawer>
-    })
+    }.into_any()
 }
 
 fn pdf<B: SendBackend>() -> impl IntoView {

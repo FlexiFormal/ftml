@@ -20,34 +20,32 @@ use leptos::prelude::*;
 use thaw::{Caption1, Caption1Strong, Divider};
 
 impl FtmlViewable for ModuleLike {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
-        use leptos::either::EitherOf5::{A, B, C, D, E};
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
         match self {
-            Self::Module(m) => A(m.as_view::<Be>()),
-            Self::Structure(s) => B(s.as_view::<Be>()),
-            Self::Extension(s) => C(s.as_view::<Be>()),
-            Self::Nested(s) => D(s.as_view::<Be>()),
-            Self::Morphism(s) => E(s.as_view::<Be>()),
+            Self::Module(m) => m.as_view::<Be>(),
+            Self::Structure(s) => s.as_view::<Be>(),
+            Self::Extension(s) => s.as_view::<Be>(),
+            Self::Nested(s) => s.as_view::<Be>(),
+            Self::Morphism(s) => s.as_view::<Be>(),
         }
     }
 }
 
 impl FtmlViewable for AnyDeclarationRef<'_> {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
-        use leptos::either::EitherOf6::{A, B, C, D, E, F};
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
         match self {
-            Self::Import(_) => A(()),
-            Self::Morphism(m) => B(m.as_view::<Be>()),
-            Self::Symbol(s) => C(super::symbols::symbol_view::<Be>(s, true)),
-            Self::MathStructure(m) => D(m.as_view::<Be>()),
-            Self::Extension(e) => E(e.as_view::<Be>()),
-            Self::NestedModule(m) => F(m.as_view::<Be>()),
+            Self::Import(_) => ().into_any(),
+            Self::Morphism(m) => m.as_view::<Be>(),
+            Self::Symbol(s) => super::symbols::symbol_view::<Be>(s, true),
+            Self::MathStructure(m) => m.as_view::<Be>(),
+            Self::Extension(e) => e.as_view::<Be>(),
+            Self::NestedModule(m) => m.as_view::<Be>(),
         }
     }
 }
 
 impl FtmlViewable for MathStructure {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
         let name = self.uri.as_view::<Be>();
         let imports = self.declarations().filter_map(|e| {
             if let AnyDeclarationRef::Import(u) = e {
@@ -75,11 +73,12 @@ impl FtmlViewable for MathStructure {
             {paragraphs}
             {children}
         </Block>}
+        .into_any()
     }
 }
 
 impl FtmlViewable for StructureExtension {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
         let name = self.uri.as_view::<Be>();
         let target = self.target.as_view::<Be>();
         let imports = self.declarations().filter_map(|e| {
@@ -101,18 +100,19 @@ impl FtmlViewable for StructureExtension {
             <HeaderRight slot>{imports}</HeaderRight>
             {children}
         </Block>}
+        .into_any()
     }
 }
 
 impl FtmlViewable for Morphism {
     #[inline]
-    fn as_view<Be: SendBackend>(&self) -> impl leptos::IntoView + use<Be> + 'static {
-        morphism::<Be, ()>(self, None)
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
+        morphism::<Be>(self, None)
     }
 }
 
 impl FtmlViewable for NestedModule {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
         let name = super::module_with_hover(&self.uri.clone().into_module());
         let imports = self.declarations().filter_map(|e| {
             if let AnyDeclarationRef::Import(u) = e {
@@ -133,11 +133,12 @@ impl FtmlViewable for NestedModule {
             <HeaderRight slot>{imports}</HeaderRight>
             {children}
         </Block>}
+        .into_any()
     }
 }
 
 impl FtmlViewable for Module {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
         let name = super::module_with_hover(&self.uri);
         let imports = self.declarations().filter_map(|e| {
             if let AnyDeclarationRef::Import(u) = e {
@@ -158,13 +159,11 @@ impl FtmlViewable for Module {
             <HeaderRight slot>{imports}</HeaderRight>
             {children}
         </Block>}
+        .into_any()
     }
 }
 
-pub fn morphism<Be: SendBackend, V: IntoView + 'static>(
-    m: &Morphism,
-    doc_elems: Option<V>,
-) -> impl IntoView + use<Be, V> + 'static {
+pub fn morphism<Be: SendBackend>(m: &Morphism, doc_elems: Option<AnyView>) -> AnyView {
     let domain = m.domain.as_view::<Be>();
     let name = m.uri.as_view::<Be>();
     let assignments = m.elements.iter().map(do_assignment::<Be>).collect_view();
@@ -183,9 +182,10 @@ pub fn morphism<Be: SendBackend, V: IntoView + 'static>(
             {elems}
         </Block>
     }
+    .into_any()
 }
 
-fn do_assignment<Be: SendBackend>(a: &Assignment) -> impl IntoView + use<Be> + 'static {
+fn do_assignment<Be: SendBackend>(a: &Assignment) -> AnyView {
     let elaborated_uri = a.elaborated_uri();
     let name = super::symbol_uri::<Be>(elaborated_uri.name().to_string(), &elaborated_uri);
     let header = view!(<Caption1Strong>"Symbol "{name}</Caption1Strong>);
@@ -212,4 +212,5 @@ fn do_assignment<Be: SendBackend>(a: &Assignment) -> impl IntoView + use<Be> + '
             {paragraphs}
         </Block>
     }
+    .into_any()
 }

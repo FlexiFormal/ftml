@@ -89,7 +89,7 @@ ordered-float = { workspace = true }
 
 #kanal = { workspace = true }
 pollster = { workspace = true }
-flume = { workspace = true }
+async-broadcast = { workspace = true }
 # syntree = { workspace = true }
 
 serde = { workspace = true, optional = true }

@@ -538,7 +538,7 @@ impl Solutions {
                     data.push(CheckedResult::FillinSol {
                         matching,
                         options: SVec(options),
-                        text: s.to_string(),
+                        text: s.clone(),
                     });
                 }
                 _ => return None,

@@ -9,7 +9,7 @@ leptos_react::wrapper!(SectionWrap(u:DocumentElementUri,lvl:SectionLevel));
 #[cfg(feature = "callbacks")]
 leptos_react::wrapper!(ParagraphWrap(u:DocumentElementUri,kind:ParagraphKind));
 #[cfg(feature = "callbacks")]
-leptos_react::wrapper!(ProblemWrap(u:DocumentElementUri,sub_problem:bool));
+leptos_react::wrapper!(ProblemWrap(u:DocumentElementUri,sub_problem:bool,autogradable:bool));
 #[cfg(feature = "callbacks")]
 leptos_react::wrapper!(SlideWrap(u:DocumentElementUri));
 #[cfg(feature = "callbacks")]
@@ -85,6 +85,7 @@ impl FtmlConfig {
     pub fn wrap_problem<V: IntoView, F: FnOnce() -> V>(
         uri: &DocumentElementUri,
         sub_problem: bool,
+        autogradable: bool,
         children: F,
     ) -> impl IntoView + use<V, F> {
         #[cfg(not(feature = "callbacks"))]
@@ -96,7 +97,7 @@ impl FtmlConfig {
             use leptos::either::Either::{Left, Right};
 
             if let Some(Some(w)) = use_context::<Option<ProblemWrap>>() {
-                Left(w.wrap(uri, &sub_problem, children))
+                Left(w.wrap(uri, &sub_problem, &autogradable, children))
             } else {
                 Right(children())
             }

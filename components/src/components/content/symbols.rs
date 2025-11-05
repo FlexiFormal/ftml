@@ -25,7 +25,7 @@ use leptos::{html::span, prelude::*};
 use thaw::{Caption1, Caption1Strong, Text, TextTag};
 
 #[must_use]
-pub fn do_macroname(name: &Id, arity: &ArgumentSpec) -> impl IntoView + use<> {
+pub fn do_macroname(name: &Id, arity: &ArgumentSpec) -> AnyView {
     use std::fmt::Write;
     let mut name = name.to_string();
     for (i, m) in arity.iter().enumerate() {
@@ -37,12 +37,12 @@ pub fn do_macroname(name: &Id, arity: &ArgumentSpec) -> impl IntoView + use<> {
             ArgumentMode::BoundVariableSequence => write!(name, "{{B_{i}^1,...,B_{i}^n}}"),
         };
     }
-    view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>)
+    view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>).into_any()
 }
 
 //impl super::FtmlViewable for Symbol {
 #[must_use]
-pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> impl IntoView + use<Be> {
+pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
     let Symbol { uri, data } = s;
     let SymbolData {
         arity,
@@ -96,6 +96,7 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> impl IntoVi
             //<Footer slot>"moar"</Footer>
         </Block>
     }
+    .into_any()
     /*
     let uriclone = uri.clone();
     let uriclone_b = uri.clone();
@@ -128,7 +129,7 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> impl IntoVi
 //}
 
 impl super::FtmlViewable for VariableDeclaration {
-    fn as_view<Be: SendBackend>(&self) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
         use thaw::Caption1;
         let Self { uri, data } = self;
         let VariableData {
@@ -171,6 +172,7 @@ impl super::FtmlViewable for VariableDeclaration {
                 //<Footer slot>"moar"</Footer>
             </Block>
         }
+        .into_any()
         /*
         let uriclone = uri.clone();
         let uriclone_b = uri.clone();
@@ -202,12 +204,12 @@ impl super::FtmlViewable for VariableDeclaration {
     }
 }
 
-pub(super) fn do_paragraphs<Be: SendBackend>(uri: SymbolUri) -> impl IntoView {
+pub(super) fn do_paragraphs<Be: SendBackend>(uri: SymbolUri) -> AnyView {
     use crate::utils::collapsible::LazyCollapsible;
 
     let cached = move || {
         let uri = uri.clone();
-        LocalCache::with_or_toast::<Be, _, _, _, _>(
+        LocalCache::with_or_toast::<Be, _, _>(
             move |be| async move { Ok(be.get_paragraphs(uri, false).await) },
             |ps| {
                 let mut definitions = Vec::new();
@@ -223,9 +225,9 @@ pub(super) fn do_paragraphs<Be: SendBackend>(uri: SymbolUri) -> impl IntoView {
                     {super::CommaSep("Definitions",definitions.into_iter().map(|e| e.as_view::<Be>())).into_view()}
                     <br/>
                     {super::CommaSep("Examples",examples.into_iter().map(|e| e.as_view::<Be>())).into_view()}
-                }
+                }.into_any()
             },
-            || "(errored)",
+            || "(errored)".into_any(),
         )
     };
     view! {
@@ -266,12 +268,10 @@ pub(super) fn do_paragraphs<Be: SendBackend>(uri: SymbolUri) -> impl IntoView {
                 </div>
             </LazyCollapsible>
         }
+    .into_any()
 }
 
-pub(super) fn do_notations<Be: SendBackend>(
-    uri: LeafUri,
-    arity: ArgumentSpec,
-) -> impl IntoView + use<Be> {
+pub(super) fn do_notations<Be: SendBackend>(uri: LeafUri, arity: ArgumentSpec) -> AnyView {
     //let functional = arity.num() > 0;
     //let as_variable = matches!(uri, LeafUri::Element(_));
     let var_or_sym = match &uri {
@@ -282,10 +282,10 @@ pub(super) fn do_notations<Be: SendBackend>(
         LeafUri::Symbol(s) => VarOrSym::Sym(s.clone()),
     };
     inject_css("ftml-notation-table", include_str!("notations.css"));
-    LocalCache::with_or_toast::<Be, _, _, _, _>(
+    LocalCache::with_or_toast::<Be, _, _>(
         move |b| async move { Ok(b.get_notations(uri).await) },
         move |nots| do_table::<Be, _>(var_or_sym, arity, nots),
-        || "(errored)",
+        || "(errored)".into_any(),
     )
 }
 
@@ -293,14 +293,14 @@ fn do_table<Be: SendBackend, E>(
     head: VarOrSym,
     arity: ArgumentSpec,
     nots: GlobalLocal<Vec<(DocumentElementUri, Notation)>, E>,
-) -> impl IntoView + use<Be, E> {
+) -> AnyView {
     use thaw::{Popover, PopoverTrigger, Table, TableCell, TableHeader, TableHeaderCell, TableRow};
     fn render_not<Be: SendBackend>(
         head: &VarOrSym,
         arity: &ArgumentSpec,
         not_uri: DocumentElementUri,
         not: &Notation,
-    ) -> impl IntoView + use<Be> {
+    ) -> AnyView {
         let functional = arity.num() > 0;
         let notation = not.as_view_safe::<crate::Views<Be>>(head, None);
         let op = if functional {
@@ -330,7 +330,7 @@ fn do_table<Be: SendBackend, E>(
                     </TableRow>
                 </Table>
             </Popover>
-        </TableCell>}
+        </TableCell>}.into_any()
     }
     FtmlConfig::disable_hovers(move || {
         let notations = nots
@@ -338,15 +338,16 @@ fn do_table<Be: SendBackend, E>(
             .map(|(k, v)| render_not::<Be>(&head, &arity, k, &v))
             .collect::<Vec<_>>();
         if notations.is_empty() {
-            return None;
+            return ().into_any();
         }
-        Some(view! {
+        view! {
             <div>
                 <Table class="ftml-notation-table"><TableRow>
                     <TableCell class="ftml-notation-header"><span>"Notations: "</span></TableCell>
                 {notations.collect_view()}
                 </TableRow></Table>
             </div>
-        })
+        }
+        .into_any()
     })
 }

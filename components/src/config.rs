@@ -420,7 +420,7 @@ impl FtmlConfig {
     }
 
     /// ### Panics
-    pub fn disable_hovers<V: IntoView, F: FnOnce() -> V>(f: F) -> impl IntoView + use<F, V> {
+    pub fn disable_hovers<F: FnOnce() -> AnyView>(f: F) -> AnyView {
         let owner = leptos::prelude::Owner::current()
             .expect("no current reactive Owner found")
             .child();
@@ -428,7 +428,7 @@ impl FtmlConfig {
             provide_context(AllowHovers(false));
             f()
         });
-        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner)
+        leptos::tachys::reactive_graph::OwnedView::new_with_owner(children, owner).into_any()
     }
 
     /// ### Panics

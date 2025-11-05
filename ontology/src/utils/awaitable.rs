@@ -102,8 +102,10 @@ impl<
         match self.map.entry(k) {
             Entry::Occupied(a) => a.get().clone().get_sync(),
             Entry::Vacant(v) => {
-                let (sender, receiver) = flume::unbounded();
-                let inner = Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
+                let (sender, receiver) = async_broadcast::broadcast(1);
+                let inner = Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(
+                    receiver.deactivate(),
+                )));
                 let key = v.key().clone();
                 {
                     let _ = v.insert(Awaitable {
@@ -115,8 +117,16 @@ impl<
                     let mut lock = inner.write();
                     *lock = MaybeValue::Done(res.clone());
                 }
-                while !sender.is_disconnected() && sender.receiver_count() > 0 {
-                    let _ = sender.send(res.clone());
+                if !sender.is_closed() && sender.receiver_count() > 0 {
+                    #[cfg(not(target_family = "wasm"))]
+                    {
+                        sender.broadcast_blocking(res.clone());
+                    }
+                    #[cfg(target_family = "wasm")]
+                    {
+                        let res = res.clone();
+                        pollster::FutureExt::block_on(sender.broadcast(res));
+                    }
                 }
                 res
             }
@@ -132,14 +142,15 @@ pub struct Awaitable<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
 #[derive(Clone, Debug)]
 pub enum MaybeValue<T: Clone + Send, E: Clone + From<ChannelError> + Send> {
     Done(Result<T, E>),
-    Pending(flume::Receiver<Result<T, E>>), //(kanal::AsyncReceiver<Result<T, E>>),
+    Pending(async_broadcast::InactiveReceiver<Result<T, E>>), //(kanal::AsyncReceiver<Result<T, E>>),
 }
 impl<T: Clone + Send, E: Clone + From<ChannelError> + Send> MaybeValue<T, E> {
     async fn get(self) -> Result<T, E> {
         match self {
             Self::Done(r) => r,
-            Self::Pending(kanal) => kanal
-                .recv_async()
+            Self::Pending(rec) => rec
+                .activate()
+                .recv_direct()
                 .await
                 .unwrap_or_else(|_| Err(ChannelError.into())),
         }
@@ -147,7 +158,19 @@ impl<T: Clone + Send, E: Clone + From<ChannelError> + Send> MaybeValue<T, E> {
     fn get_sync(self) -> Result<T, E> {
         match self {
             Self::Done(r) => r,
-            Self::Pending(kanal) => kanal.recv().unwrap_or_else(|_| Err(ChannelError.into())),
+            Self::Pending(rec) => {
+                #[cfg(not(target_family = "wasm"))]
+                {
+                    rec.activate()
+                        .recv_blocking()
+                        .unwrap_or_else(|_| Err(ChannelError.into()))
+                }
+                #[cfg(target_family = "wasm")]
+                {
+                    pollster::FutureExt::block_on(rec.activate().recv())
+                        .unwrap_or_else(|_| Err(ChannelError.into()))
+                }
+            }
         }
     }
 }
@@ -165,8 +188,10 @@ impl<T: Clone + Send, E: Clone + From<ChannelError> + Send> Awaitable<T, E> {
     pub fn new<F: Future<Output = Result<T, E>> + Send>(
         future: F,
     ) -> (Self, AwaitableSource<T, E, F>) {
-        let (sender, receiver) = flume::unbounded(); //kanal::bounded_async(1);
-        let inner = Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(receiver)));
+        let (sender, receiver) = async_broadcast::broadcast(1); //kanal::bounded_async(1);
+        let inner = Arc::new(parking_lot::RwLock::new(MaybeValue::Pending(
+            receiver.deactivate(),
+        )));
         (
             Self {
                 inner: inner.clone(),
@@ -186,7 +211,7 @@ pub struct AwaitableSource<
     F: Future<Output = Result<T, E>> + Send,
 > {
     inner: Arc<parking_lot::RwLock<MaybeValue<T, E>>>,
-    sender: flume::Sender<Result<T, E>>, //kanal::AsyncSender<Result<T, E>>,
+    sender: async_broadcast::Sender<Result<T, E>>, //kanal::AsyncSender<Result<T, E>>,
     future: F,
 }
 
@@ -208,8 +233,8 @@ impl<
             let mut lock = inner.write();
             *lock = MaybeValue::Done(res.clone());
         }
-        while !sender.is_disconnected() && sender.receiver_count() > 0 {
-            let _ = sender.send_async(res.clone()).await;
+        if !sender.is_closed() && sender.receiver_count() > 0 {
+            let _ = sender.broadcast_direct(res.clone()).await;
         }
         res
     }

@@ -137,7 +137,7 @@ gloo-storage = "0.3"
 urlencoding = "2.1"
 futures-util = { version = "0.3", default-features = false }
 kanal = "0.1"
-flume = { version = "0.11", features = ["async"] }
+#flume = { version = "0.11", features = ["async"] }
 pollster = "0.4"
 bytesize = "2"
 deepsize = "0.2"

@@ -2,7 +2,7 @@ use crate::extractor::DomExtractor;
 //use crate::structure::CurrentTOC;
 use ftml_ontology::narrative::documents::TocElem;
 use ftml_ontology::narrative::elements::{paragraphs::ParagraphKind, sections::SectionLevel};
-use ftml_uris::{DocumentUri, Id};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id};
 use leptos::prelude::*;
 use leptos::wasm_bindgen;
 use smallvec::SmallVec;
@@ -91,6 +91,143 @@ impl PartialOrd for LogicalLevel {
         Some(self.cmp(other))
     }
 }
+
+/*
+struct CounterStore {
+    max: std::cell::Cell<SectionLevel>,
+    //current_level: std::cell::Cell<LogicalLevel>,
+    initialized: std::cell::Cell<bool>,
+    resets: std::cell::RefCell<[Vec<Id>; 7]>,
+    document_titles: std::cell::RefCell<rustc_hash::FxHashMap<DocumentUri, RwSignal<Box<str>>>>,
+    sections: std::cell::RefCell<
+        rustc_hash::FxHashMap<DocumentElementUri, (RwSignal<Box<str>>, CurrentCounters)>,
+    >,
+    inputrefs: std::cell::RefCell<rustc_hash::FxHashMap<Id, CurrentCountersI>>,
+}
+impl CounterStore {
+    fn set_new() {
+        provide_context(send_wrapper::SendWrapper::new(Self {
+            max: std::cell::Cell::new(SectionLevel::Part),
+            //current_level: std::cell::Cell::new(LogicalLevel::None),
+            initialized: std::cell::Cell::new(false),
+            resets: std::cell::RefCell::new(Default::default()),
+            document_titles: std::cell::RefCell::default(),
+            sections: std::cell::RefCell::default(),
+            inputrefs: std::cell::RefCell::default(),
+        }));
+        provide_context(send_wrapper::SendWrapper::new(std::cell::RefCell::new(
+            CurrentCounters {
+                level: LogicalLevel::None,
+                current: CurrentCountersI::default(),
+                follows: Vec::new(),
+            },
+        )));
+    }
+    fn with<R>(f: impl FnOnce(&Self) -> R) -> R {
+        with_context::<send_wrapper::SendWrapper<Self>, _>(|slf| f(slf))
+            .expect("not in a document context")
+    }
+
+    fn with_counters<R>(f: impl FnOnce(&mut CurrentCounters) -> R) -> R {
+        with_context::<send_wrapper::SendWrapper<std::cell::RefCell<CurrentCounters>>, _>(|ctrs| {
+            let mut ctrs = ctrs.borrow_mut();
+            f(&mut ctrs)
+        })
+        .expect("not in a document context")
+    }
+
+    fn get_current_level() -> LogicalLevel {
+        with_context::<CurrentCounters, _>(|ctrs| ctrs.level).unwrap_or(LogicalLevel::None)
+    }
+
+    fn set_max(lvl: SectionLevel) {
+        Self::with(|slf| slf.max.set(lvl));
+    }
+    fn initialized() -> bool {
+        Self::with(|slf| slf.initialized.get())
+    }
+    fn initialize() {
+        if Self::initialized() {
+            return;
+        }
+        let extractor = expect_context::<RwSignal<DomExtractor>>();
+        let mut resets = <[Vec<_>; 7]>::default();
+        Self::with_counters(|ctrs| {
+            let mut ctrs = ctrs.current.counters.borrow_mut();
+            extractor.with_untracked(|e| {
+                for c in &e.state.counters {
+                    ctrs.insert(c.name.clone(), RwSignal::new(0));
+                    if let Some(p) = c.parent {
+                        resets[(p as u8) as usize].push(c.name.clone());
+                    }
+                }
+            });
+        });
+        Self::with(|slf| {
+            slf.initialized.set(true);
+            slf.resets.replace(resets);
+        });
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
+struct SectionCounter {
+    values: [u16; 7],
+    level: SectionLevel,
+}
+
+#[derive(Clone)]
+struct CurrentCountersI {
+    sections: RwSignal<SectionCounter>,
+    slides: RwSignal<u32>,
+    counters:
+        send_wrapper::SendWrapper<std::cell::RefCell<rustc_hash::FxHashMap<Id, RwSignal<u16>>>>,
+}
+impl Default for CurrentCountersI {
+    fn default() -> Self {
+        Self {
+            sections: RwSignal::new(SectionCounter::default()),
+            slides: RwSignal::new(0),
+            counters: send_wrapper::SendWrapper::new(std::cell::RefCell::default()),
+        }
+    }
+}
+
+struct CurrentCounters {
+    level: LogicalLevel,
+    current: CurrentCountersI,
+    follows: Vec<CurrentCountersI>,
+}
+impl Default for CurrentCounters {
+    fn default() -> Self {
+        Self {
+            level: LogicalLevel::None,
+            current: CurrentCountersI::default(),
+            follows: Vec::new(),
+        }
+    }
+}
+
+impl CurrentCounters {
+    fn inputref(id: &Id) {
+        let cc = CounterStore::with_counters(|ctrs| {
+            let old = std::mem::take(ctrs);
+            ctrs.level = old.level;
+            let counters = ctrs.current.counters.get_mut();
+            for (k, _) in old.current.counters.borrow().iter() {
+                counters.insert(k.clone(), RwSignal::new(0));
+            }
+            ctrs.follows.push(old.current.clone());
+            old
+        });
+        let actual = CounterStore::with(|ctrs| {
+            let map = ctrs.inputrefs.borrow_mut();
+            if let Some(act) = map.get(id)
+        });
+        provide_context(send_wrapper::SendWrapper::new(std::cell::RefCell::new(cc)));
+    }
+}
+*/
 
 /*
 #[derive(Debug, Clone)]

@@ -23,10 +23,7 @@ use leptos::prelude::*;
 use thaw::{Caption1Strong, Flex, Text};
 
 impl super::FtmlViewable for Document {
-    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
-        &self,
-    ) -> impl leptos::IntoView + use<Be> {
-        use leptos::either::EitherOf4::{A, B, C, D};
+    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
         let uses = self.elements.iter().flat().filter_map(|e| {
             if let DocumentElement::UseModule(u) = e {
                 Some(u)
@@ -35,14 +32,14 @@ impl super::FtmlViewable for Document {
             }
         });
         let knd = match &self.kind {
-            DocumentKind::Article | DocumentKind::Fragment => A(()),
+            DocumentKind::Article | DocumentKind::Fragment => ().into_any(),
             DocumentKind::Exam {
                 date,
                 course,
                 retake,
                 num,
                 term,
-            } => B(view! {<span>
+            } => view! {<span>
                 {if *retake {"retake "} else {""}}
                 "exam for "
                 {course.to_string()}
@@ -50,33 +47,36 @@ impl super::FtmlViewable for Document {
                 {term.as_ref().map(ToString::to_string)}
                 ", "
                 {date.into_date().to_string()}
-            </span>}),
+            </span>}
+            .into_any(),
             DocumentKind::Quiz {
                 date,
                 course,
                 num,
                 term,
-            } => C(view! {<span>
+            } => view! {<span>
                 "quiz for "
                 {course.to_string()}
                 " "
                 {term.as_ref().map(ToString::to_string)}
                 ", "
                 {date.into_date().to_string()}
-            </span>}),
+            </span>}
+            .into_any(),
             DocumentKind::Homework {
                 date,
                 course,
                 num,
                 term,
-            } => D(view! {<span>
+            } => view! {<span>
                 "homework for "
                 {course.to_string()}
                 " "
                 {term.as_ref().map(ToString::to_string)}
                 ", "
                 {date.into_date().to_string()}
-            </span>}),
+            </span>}
+            .into_any(),
         };
         let uses = super::uses::<Be, _>("Uses", uses);
         let children = self
@@ -89,13 +89,12 @@ impl super::FtmlViewable for Document {
           {knd}<br/>
           {children}
         </Block>}
+        .into_any()
     }
 }
 
 impl super::FtmlViewable for DocumentElement {
-    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
-        &self,
-    ) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
         //use leptos::either::EitherOf10::{A, B, C, D, E, F, G, H, I, J};
         match self {
             Self::UseModule(_)
@@ -110,15 +109,14 @@ impl super::FtmlViewable for DocumentElement {
                 .into_any(),
             Self::SymbolDeclaration(s) => {
                 let s = s.clone();
-                LocalCache::with_or_toast::<Be, _, _, _, _>(
+                LocalCache::with_or_toast::<Be, _, _>(
                     |e| e.get_symbol(s),
                     move |s| match s {
                         either::Either::Left(s) => super::symbols::symbol_view::<Be>(&s, true),
                         either::Either::Right(s) => super::symbols::symbol_view::<Be>(&s, true),
                     },
-                    || "error",
+                    || "error".into_any(),
                 )
-                .into_any()
             }
             Self::DocumentReference { target, .. } => view_inputref::<Be>(target).into_any(),
             Self::Module {
@@ -134,14 +132,14 @@ impl super::FtmlViewable for DocumentElement {
             } => {
                 let children = children.clone();
                 let uri = morphism.clone();
-                LocalCache::with_or_toast::<Be, _, _, _, _>(
+                LocalCache::with_or_toast::<Be, _, _>(
                     |e| e.get_morphism(uri),
                     move |s| {
                         let s = match &s {
                             either::Either::Left(s) => s,
                             either::Either::Right(s) => s,
                         };
-                        super::domain::morphism::<Be, _>(
+                        super::domain::morphism::<Be>(
                             s,
                             if children.is_empty() {
                                 None
@@ -150,12 +148,13 @@ impl super::FtmlViewable for DocumentElement {
                                     children
                                         .iter()
                                         .map(FtmlViewable::as_view::<Be>)
-                                        .collect_view(),
+                                        .collect_view()
+                                        .into_any(),
                                 )
                             },
                         )
                     },
-                    || "error",
+                    || "error".into_any(),
                 )
                 .into_any()
             }
@@ -197,9 +196,7 @@ impl super::FtmlViewable for DocumentElement {
 }
 
 impl super::FtmlViewable for Problem {
-    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
-        &self,
-    ) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
         use leptos::either::Either::{Left, Right};
         let Self {
             uri,
@@ -256,13 +253,14 @@ impl super::FtmlViewable for Problem {
             {children}
           </Block>
         }
+        .into_any()
     }
 }
 
 fn view_term<Be: ftml_dom::utils::local_cache::SendBackend>(
     uri: &DocumentElementUri,
     term: Term,
-) -> impl IntoView + 'static {
+) -> AnyView {
     let name = view!(<span title=uri.to_string()>{uri.name().last().to_string()}</span>);
     let tm = ReactiveStore::render_term::<Be>(term);
 
@@ -275,6 +273,7 @@ fn view_term<Be: ftml_dom::utils::local_cache::SendBackend>(
         </Flex>
         //</Block>
     }
+    .into_any()
 }
 
 fn view_notation<Be: ftml_dom::utils::local_cache::SendBackend>(
@@ -295,10 +294,10 @@ fn view_notation<Be: ftml_dom::utils::local_cache::SendBackend>(
         VarOrSym::Var(Variable::Name { .. }) => (C("TODO"), None),
     };
     let not = FtmlConfig::disable_hovers(move || {
-        LocalCache::with_or_toast::<Be, _, _, _, _>(
+        LocalCache::with_or_toast::<Be, _, _>(
             |e| e.get_notation(leaf, uri),
             move |n| n.as_view_safe::<crate::Views<Be>>(&head, None),
-            || "error",
+            || "error".into_any(),
         )
     });
     view! {//<Block>
@@ -315,9 +314,7 @@ fn view_notation<Be: ftml_dom::utils::local_cache::SendBackend>(
     }
 }
 
-fn view_inputref<Be: ftml_dom::utils::local_cache::SendBackend>(
-    uri: &DocumentUri,
-) -> impl IntoView + 'static {
+fn view_inputref<Be: ftml_dom::utils::local_cache::SendBackend>(uri: &DocumentUri) -> AnyView {
     use crate::utils::collapsible::LazyCollapsible;
     let name = uri.as_view::<Be>();
     let uri = uri.clone();
@@ -328,21 +325,21 @@ fn view_inputref<Be: ftml_dom::utils::local_cache::SendBackend>(
         </Header>
         <div style="padding-left:15px;">{
             let uri = uri.clone();
-            LocalCache::with_or_toast::<Be,_,_,_,_>(
+            LocalCache::with_or_toast::<Be,_,_>(
                 move |b| b.get_document(uri), move |d| {
                     let title = d.title.as_ref().map(ToString::to_string);
                     view!{
-                    {title.map(|s|
-                        view!(<Caption1Strong>{crate::Views::<Be>::render_ftml(s,None)}</Caption1Strong>)
-                    )}
-                   { d.as_view::<Be>() }
-                }
+                        {title.map(|s|
+                            view!(<Caption1Strong>{crate::Views::<Be>::render_ftml(s,None)}</Caption1Strong>)
+                        )}
+                        { d.as_view::<Be>() }
+                    }.into_any()
                 },
-                || "error"
+                || "error".into_any()
             )
         }</div>
     </LazyCollapsible>
-    }
+    }.into_any()
 }
 
 fn view_module<Be: ftml_dom::utils::local_cache::SendBackend>(

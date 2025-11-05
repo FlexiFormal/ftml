@@ -6,7 +6,7 @@ use ftml_ontology::utils::Css;
 use leptos::{
     IntoView,
     html::ElementChild,
-    prelude::{StyleAttribute, Suspend},
+    prelude::{AnyView, IntoAny, StyleAttribute, Suspend},
 };
 
 use crate::utils::css::CssExt;
@@ -91,19 +91,13 @@ impl<T: Send + Sync + Clone + 'static + std::fmt::Debug> ContextChain<T> {
 
 pub trait FutureExt {
     type T;
-    fn into_view<V: IntoView + 'static>(
-        self,
-        f: impl FnOnce(Self::T) -> V + Clone + Send + 'static,
-    ) -> impl IntoView;
+    fn into_view(self, f: impl FnOnce(Self::T) -> AnyView + Clone + Send + 'static) -> AnyView;
 }
 impl<T, Fut: std::future::Future<Output = T>, F: Fn() -> Fut + Clone + Send + 'static> FutureExt
     for F
 {
     type T = T;
-    fn into_view<V: IntoView + 'static>(
-        self,
-        f: impl FnOnce(T) -> V + Clone + Send + 'static,
-    ) -> impl IntoView {
+    fn into_view(self, f: impl FnOnce(T) -> AnyView + Clone + Send + 'static) -> AnyView {
         use leptos::prelude::{Suspense, view};
         view!(<Suspense fallback = || "…">{move || {
             let s = self.clone();
@@ -111,5 +105,6 @@ impl<T, Fut: std::future::Future<Output = T>, F: Fn() -> Fut + Clone + Send + 's
             let fut = send_wrapper::SendWrapper::new(async move {let ret = s().await;f(ret)});
             Suspend::new(fut)
         }}</Suspense>)
+        .into_any()
     }
 }

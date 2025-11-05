@@ -124,14 +124,12 @@ impl DocumentState {
         use_context::<WithHead>().and_then(|w| w.0)
     }
 
-    pub fn with_head<V: IntoView, F: FnOnce() -> V>(
-        head: VarOrSym,
-        then: F,
-    ) -> leptos::tachys::reactive_graph::OwnedView<V> {
+    pub fn with_head<F: FnOnce() -> AnyView>(head: VarOrSym, then: F) -> AnyView {
         owned(|| {
             provide_context(WithHead(Some(head)));
             then()
         })
+        .into_any()
     }
 
     /// ### Panics
@@ -181,12 +179,12 @@ impl DocumentState {
         */
     }
 
-    pub fn inner_document<V: IntoView, F: FnOnce() -> V>(
+    pub fn inner_document<F: FnOnce() -> AnyView>(
         target: DocumentUri,
         uri: &DocumentElementUri,
         is_stripped: bool,
         f: F,
-    ) -> impl IntoView + use<V, F> {
+    ) -> AnyView {
         let context = Self::context_uri() & uri.name();
         provide_context(RwSignal::new(DomExtractor::new(
             target.clone(),

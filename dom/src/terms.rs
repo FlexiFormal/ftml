@@ -107,11 +107,11 @@ impl ReactiveApplication {
             tracing::warn!("Tracked term does not exist");
         }*/
     }
-    pub(crate) fn track<V: IntoView>(
+    pub(crate) fn track(
         head: VarOrSym,
         uri: Option<DocumentElementUri>,
-        children: impl FnOnce(ReadSignal<Self>) -> V,
-    ) -> impl IntoView {
+        children: impl FnOnce(ReadSignal<Self>) -> AnyView,
+    ) -> AnyView {
         tracing::debug!("Tracking {head:?}");
         let sig = RwSignal::new(Self::Open(OpenApp {
             //owner: Owner::current().expect("not in a reactive context"),

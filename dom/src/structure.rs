@@ -1,16 +1,3 @@
-use std::{collections::hash_map::Entry, hint::unreachable_unchecked, ops::ControlFlow};
-
-use ftml_ontology::{
-    narrative::{
-        documents::TocElem,
-        elements::{SectionLevel, paragraphs::ParagraphKind},
-    },
-    utils::{IterCont, TreeIter},
-};
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, NamedUri, NarrativeUri};
-use leptos::prelude::*;
-use smallvec::SmallVec;
-
 use crate::{
     DocumentState,
     counters::LogicalLevel,
@@ -22,6 +9,17 @@ use crate::{
         local_cache::{LocalCache, SendBackend},
     },
 };
+use ftml_ontology::{
+    narrative::{
+        documents::TocElem,
+        elements::{SectionLevel, paragraphs::ParagraphKind},
+    },
+    utils::{IterCont, TreeIter},
+};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, NamedUri, NarrativeUri};
+use leptos::prelude::*;
+use smallvec::SmallVec;
+use std::{collections::hash_map::Entry, hint::unreachable_unchecked, ops::ControlFlow};
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]

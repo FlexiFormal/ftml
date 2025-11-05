@@ -154,12 +154,11 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         _notation: Option<Id>,
         in_term: bool,
         then: ClonableView,
-    ) -> impl IntoView {
-        use leptos::either::Either::{Left, Right};
+    ) -> AnyView {
         if then.is_math() {
-            Left(terms::oms::<B>(uri, in_term, then))
+            terms::oms::<B>(uri, in_term, then)
         } else {
-            Right(terms::symbol_reference::<B>(uri, then))
+            terms::symbol_reference::<B>(uri, then)
         }
     }
     fn variable_reference(
@@ -167,17 +166,16 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         _notation: Option<Id>,
         in_term: bool,
         then: ClonableView,
-    ) -> impl IntoView {
-        use leptos::either::Either::{Left, Right};
+    ) -> AnyView {
         if then.is_math() {
-            Left(terms::omv::<B>(var, in_term, then))
+            terms::omv::<B>(var, in_term, then)
         } else {
-            Right(terms::variable_reference::<B>(var, then))
+            terms::variable_reference::<B>(var, then)
         }
     }
 
     #[inline]
-    fn comp(then: ClonableView) -> impl IntoView {
+    fn comp(then: ClonableView) -> AnyView {
         terms::comp::<B>(then)
     }
 
@@ -192,7 +190,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         _notation: Option<Id>,
         _uri: Option<DocumentElementUri>,
         then: ClonableView,
-    ) -> impl IntoView {
+    ) -> AnyView {
         terms::oma::<B>(false, head, then)
     }
 
@@ -202,7 +200,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         _notation: Option<Id>,
         _uri: Option<DocumentElementUri>,
         then: ClonableView,
-    ) -> impl IntoView {
+    ) -> AnyView {
         terms::oma::<B>(true, head, then)
     }
 }

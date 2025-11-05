@@ -34,11 +34,11 @@ pub trait NotationExt {
         head: &VarOrSym,
         this: Option<&ClonableView>,
         args: &R,
-    ) -> impl IntoView + use<Self, Views, R> {
+    ) -> AnyView {
         DocumentState::with_head(head.clone(), move || {
             provide_context(None::<TopTerm>);
             provide_context(None::<ReactiveTerm>);
-            self.with_arguments::<Views, R>(head, this, args)
+            self.with_arguments::<Views, R>(head, this, args).into_any()
         })
     }
     fn as_view<Views: FtmlViews>(
@@ -50,8 +50,10 @@ pub trait NotationExt {
         &self,
         head: &VarOrSym,
         this: Option<&ClonableView>,
-    ) -> impl IntoView + use<Self, Views> {
-        DocumentState::with_head(head.clone(), move || self.as_view::<Views>(head, this))
+    ) -> AnyView {
+        DocumentState::with_head(head.clone(), move || {
+            self.as_view::<Views>(head, this).into_any()
+        })
     }
     fn as_op<Views: FtmlViews>(
         &self,
@@ -62,8 +64,10 @@ pub trait NotationExt {
         &self,
         head: &VarOrSym,
         this: Option<&ClonableView>,
-    ) -> impl IntoView + use<Self, Views> {
-        DocumentState::with_head(head.clone(), move || self.as_op::<Views>(head, this))
+    ) -> AnyView {
+        DocumentState::with_head(head.clone(), move || {
+            self.as_op::<Views>(head, this).into_any()
+        })
     }
 }
 
@@ -200,27 +204,23 @@ impl NotationExt for Notation {
         head: &VarOrSym,
         this: Option<&ClonableView>,
         args: &R,
-    ) -> impl IntoView + use<Views, R> {
-        use leptos::either::Either::{Left, Right};
+    ) -> AnyView {
         if args.is_empty() {
-            return Left(self.as_op::<Views>(head, this));
+            return self.as_op::<Views>(head, this);
         }
-        Right(/*owned(move ||*/ {
+        /*owned(move ||*/
+        {
             let h = head.to_string();
             //provide_context(WithHead(Some(head.clone())));
             let r = view_component_with_args::<Views>(&self.component, args, this)
                 .attr(FtmlKey::Term.attr_name(), "OMBIND")
                 .attr(FtmlKey::Head.attr_name(), h);
             ReactiveApplication::close();
-            r
-        }) //)
+            r.into_any()
+        } //)
     }
 
-    fn as_op<Views: FtmlViews>(
-        &self,
-        head: &VarOrSym,
-        this: Option<&ClonableView>,
-    ) -> impl IntoView + use<Views> {
+    fn as_op<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView {
         use leptos::either::Either::Left;
         attr(
             attr(
@@ -246,13 +246,10 @@ impl NotationExt for Notation {
             FtmlKey::Head.attr_name(),
             head.to_string(),
         )
+        .into_any()
     }
 
-    fn as_view<Views: FtmlViews>(
-        &self,
-        head: &VarOrSym,
-        this: Option<&ClonableView>,
-    ) -> impl IntoView + use<Views> {
+    fn as_view<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView {
         //owned(move || {
         let h = head.to_string();
         //provide_context(WithHead(Some(head.clone())));
@@ -265,6 +262,7 @@ impl NotationExt for Notation {
             FtmlKey::Head.attr_name(),
             h,
         )
+        .into_any()
         //})
     }
 }

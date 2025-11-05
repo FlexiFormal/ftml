@@ -17,7 +17,7 @@ pub(super) fn slide<Be: ftml_dom::utils::local_cache::SendBackend>(
     uri: &DocumentElementUri,
     title: Option<&str>,
     children: &[DocumentElement],
-) -> impl IntoView + use<Be> + 'static {
+) -> AnyView {
     use leptos::either::Either::{Left, Right};
     let title = super::hover_paragraph::<Be>(
         uri.clone(),
@@ -26,7 +26,8 @@ pub(super) fn slide<Be: ftml_dom::utils::local_cache::SendBackend>(
                 || Right(uri.name().last().to_string()),
                 |t| Left(crate::Views::<Be>::render_ftml((*t).to_string(), None)),
             )
-        }</span>),
+        }</span>)
+        .into_any(),
     );
     let uses = children.iter().flat().filter_map(|e| {
         if let DocumentElement::UseModule(u) = e {
@@ -50,14 +51,12 @@ pub(super) fn slide<Be: ftml_dom::utils::local_cache::SendBackend>(
         {children}
       </Block>
     }
+    .into_any()
 }
 
 impl FtmlViewable for Section {
-    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
-        &self,
-    ) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
         use leptos::either::Either::{Left, Right};
-
         let Self {
             uri,
             title,
@@ -90,13 +89,12 @@ impl FtmlViewable for Section {
             {children}
           </Block>
         }
+        .into_any()
     }
 }
 
 impl FtmlViewable for LogicalParagraph {
-    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(
-        &self,
-    ) -> impl IntoView + use<Be> + 'static {
+    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
         use leptos::either::Either::{Left, Right};
         let Self {
             kind,
@@ -114,7 +112,8 @@ impl FtmlViewable for LogicalParagraph {
                     uri.clone(),
                     view!(<span style="font-style:italic;">{
                         crate::Views::<Be>::render_ftml(t.to_string(), None)}
-                    </span>),
+                    </span>)
+                    .into_any(),
                 ))
             },
         );
@@ -158,5 +157,6 @@ impl FtmlViewable for LogicalParagraph {
             {children}
           </Block>
         }
+        .into_any()
     }
 }

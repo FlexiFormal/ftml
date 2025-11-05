@@ -14,7 +14,7 @@ use ftml_uris::{DocumentElementUri, DocumentUri};
 use leptos::prelude::*;
 
 #[must_use]
-pub fn inputref<B: SendBackend>(info: Inputref) -> impl IntoView {
+pub fn inputref<B: SendBackend>(info: Inputref) -> AnyView {
     use leptos::either::Either::{Left, Right};
     /*let Inputref {
         uri,
@@ -37,41 +37,35 @@ pub fn inputref<B: SendBackend>(info: Inputref) -> impl IntoView {
             )
             || replacing_done.was_clicked()
     });
-    move || {
+    (move || {
         if expand.get() {
-            Left(do_replace::<B>(
-                info.target.clone(),
-                info.uri.clone(),
-                replacing_done,
-            ))
+            do_replace::<B>(info.target.clone(), info.uri.clone(), replacing_done)
         } else {
-            Right(do_unreplaced::<B>(info.id.to_string(), &info, info.replace))
+            do_unreplaced::<B>(info.id.to_string(), &info, info.replace)
         }
-    }
+    })
+    .into_any()
 }
 
-fn do_unreplaced<B: SendBackend>(
-    id: String,
-    title: &Inputref,
-    load: OneShot,
-) -> impl IntoView + use<B> {
+fn do_unreplaced<B: SendBackend>(id: String, title: &Inputref, load: OneShot) -> AnyView {
     inject_css("ftml-inputref", include_str!("inputref.css"));
     view! {
         <div class="ftml-inputref" id=id on:click=move |_| load.activate()>
         {title.title::<crate::Views<B>>()}
         </div>
     }
+    .into_any()
 }
 
 fn do_replace<B: SendBackend>(
     uri: DocumentUri,
     inputref: DocumentElementUri,
     on_load: SetOneShotDone,
-) -> impl IntoView {
+) -> AnyView {
     let context = DocumentState::context_uri();
     let uri2 = uri.clone();
     tracing::debug!("expanding inputref {inputref}");
-    LocalCache::with::<B, _, _, _>(
+    LocalCache::with::<B, _, _>(
         |b| b.get_fragment(uri2.into(), Some(context)),
         move |(html, css, b)| {
             for c in css {
@@ -82,6 +76,7 @@ fn do_replace<B: SendBackend>(
                     tracing::debug!("inputref expansion for {uri} finished!");
                     let _ = on_load.set();
                 })
+                .into_any()
             })
         },
     )

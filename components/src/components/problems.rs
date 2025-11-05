@@ -138,14 +138,26 @@ impl std::fmt::Debug for ProblemContinuation {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct CurrentProblem {
     uri: DocumentElementUri,
     solutions: RwSignal<u8>,
     initial: Option<ProblemResponse>,
+    autogradable: RwSignal<bool>,
     responses: RwSignal<Vec<ActiveProblemResponse>>,
     interactive: bool,
+    has_subproblems: RwSignal<bool>,
     feedback: RwSignal<Option<ProblemFeedback>>,
+}
+impl std::fmt::Debug for CurrentProblem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CurrrentProblem")
+            .field("uri", &self.uri)
+            .field("solutions", &self.solutions.get_untracked())
+            .field("autogradable", &self.autogradable.get_untracked())
+            .field("responses", &self.responses.get_untracked())
+            .finish_non_exhaustive()
+    }
 }
 impl CurrentProblem {
     fn to_response(
@@ -194,6 +206,9 @@ pub fn problem<Be: SendBackend, V: IntoView>(
     children: impl FnOnce() -> V + Send + 'static,
 ) -> impl IntoView {
     inject_css("ftml-sections", include_str!("sections.css"));
+    if is_subproblem {
+        with_context::<CurrentProblem, _>(|cp| cp.has_subproblems.set(true));
+    }
 
     //let uri = with_context::<ForcedName, _>(|n| n.update(uri)).unwrap_or_else(|| uri.clone());
     let mut ex = CurrentProblem {
@@ -201,6 +216,8 @@ pub fn problem<Be: SendBackend, V: IntoView>(
         uri,
         initial: None,
         interactive: true,
+        autogradable: RwSignal::new(false),
+        has_subproblems: RwSignal::new(false),
         responses: RwSignal::new(Vec::new()),
         feedback: RwSignal::new(None),
     };
@@ -252,37 +269,45 @@ pub fn problem<Be: SendBackend, V: IntoView>(
 
     let uri = ex.uri.clone();
     let uri2 = uri.clone();
+    let has_subproblems = ex.has_subproblems;
+    let autogradable = ex.autogradable;
     provide_context(ex);
-    FtmlConfig::wrap_problem(&uri2, is_subproblem, move || {
-        view! {
-          //<Provider value=ForcedName::default()>
-            <div class=class style=style>
-              {
-                let r = children();
-                match is_done {
-                  Left(true) => Left(r),
-                  Right(f) => {
-                    let _ = Effect::new(move |_| {
-                      if let Some(resp) = responses.try_with(|resp|
-                        CurrentProblem::to_response(&uri, resp)
-                      ) {
-                        f.apply(&resp);
-                      }
-                    });
-                    Left(r)
+    let inner = view! {
+      //<Provider value=ForcedName::default()>
+        <div class=class style=style>
+          {
+            let r = children();
+            match is_done {
+              Left(true) => Left(r),
+              Right(f) => {
+                let _ = Effect::new(move |_| {
+                  if let Some(resp) = responses.try_with(|resp|
+                    CurrentProblem::to_response(&uri, resp)
+                  ) {
+                    f.apply(&resp);
                   }
-                  Left(false) if responses.get_untracked().is_empty() =>
-                    Left(r),
-                  Left(false) => Right(view!{
-                    {r}
-                    {submit_answer::<Be>()}
-                  })
-                }
+                });
+                Left(r)
               }
-          </div>
-          //</Provider>
-        }
-    })
+              Left(false) if responses.get_untracked().is_empty() =>
+                Left(r),
+              Left(false) => Right(view!{
+                {r}
+                {submit_answer::<Be>()}
+              })
+            }
+          }
+      </div>
+      //</Provider>
+    };
+
+    //tracing::error!("Here: {ex:?}");
+    FtmlConfig::wrap_problem(
+        &uri2,
+        is_subproblem,
+        has_subproblems.get_untracked() || autogradable.get_untracked(),
+        move || inner,
+    )
 }
 
 fn submit_answer<Be: SendBackend>() -> impl IntoView {
@@ -368,6 +393,7 @@ pub fn fillinsol(wd: Option<f32>) -> impl IntoView {
         tracing::error!("choice outside of problem!");
         return None;
     };
+    ex.autogradable.set(true);
     let Some(choice) = ex.responses.try_update_untracked(|resp| {
         let i = resp.len();
         resp.push(ActiveProblemResponse::Fillinsol(String::new()));
@@ -473,6 +499,7 @@ pub(super) fn choice_block<V: IntoView + 'static>(
         ActiveProblemResponse::SingleChoice(inline, None, 0)
     };
     let Some(i) = with_context::<CurrentProblem, _>(|ex| {
+        ex.autogradable.set(true);
         ex.responses.try_update_untracked(|ex| {
             let i = ex.len();
             ex.push(response);
