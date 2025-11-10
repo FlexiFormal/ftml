@@ -143,6 +143,7 @@ pub enum FillinFeedbackKind {
 #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 pub enum CheckedResult {
     SingleChoice {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         selected: Option<u16>,
         #[cfg_attr(feature = "typescript", tsify(type = "BlockFeedback[]"))]
         #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
