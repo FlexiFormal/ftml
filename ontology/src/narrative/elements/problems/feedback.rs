@@ -29,8 +29,10 @@ pub struct ProblemFeedback {
 pub struct ProblemFeedbackJson {
     pub correct: bool,
     #[cfg_attr(feature = "typescript", tsify(type = "string[]"))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub solutions: SVec<Box<str>, 1>,
     #[cfg_attr(feature = "typescript", tsify(type = "CheckedResult[]"))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub data: SVec<CheckedResult, 4>,
     pub score_fraction: f32,
 }
@@ -143,18 +145,23 @@ pub enum CheckedResult {
     SingleChoice {
         selected: Option<u16>,
         #[cfg_attr(feature = "typescript", tsify(type = "BlockFeedback[]"))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         choices: SVec<BlockFeedback, 4>,
     },
     MultipleChoice {
         #[cfg_attr(feature = "typescript", tsify(type = "boolean[]"))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         selected: SVec<bool, 8>,
         #[cfg_attr(feature = "typescript", tsify(type = "BlockFeedback[]"))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         choices: SVec<BlockFeedback, 4>,
     },
     FillinSol {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         matching: Option<usize>,
         text: String,
         #[cfg_attr(feature = "typescript", tsify(type = "FillinFeedback[]"))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         options: SVec<FillinFeedback, 4>,
     },
 }
@@ -170,6 +177,7 @@ pub enum CheckedResult {
 pub struct ProblemResponse {
     pub uri: DocumentElementUri,
     #[cfg_attr(feature = "typescript", tsify(type = "ProblemResponseType[]"))]
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub responses: SVec<ProblemResponseType, 4>,
 }
 
@@ -187,9 +195,11 @@ pub struct ProblemResponse {
 pub enum ProblemResponseType {
     MultipleChoice {
         #[cfg_attr(feature = "typescript", tsify(type = "boolean[]"))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         value: SVec<bool, 8>,
     },
     SingleChoice {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         value: Option<u16>,
     },
     Fillinsol {

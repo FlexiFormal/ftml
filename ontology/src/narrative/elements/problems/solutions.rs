@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[allow(clippy::unsafe_derive_deserialize)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
@@ -39,6 +39,7 @@ pub struct Solutions(Box<[SolutionData]>);
 pub enum SolutionData {
     Solution {
         html: Box<str>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         answer_class: Option<Id>,
     },
     ChoiceBlock(ChoiceBlock),
@@ -78,7 +79,9 @@ pub struct ChoiceBlock {
     pub multiple: bool,
     pub block_style: ChoiceBlockStyle,
     pub range: DocumentRange,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub styles: Box<[Id]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub choices: Box<[Choice]>,
 }
 
@@ -111,7 +114,9 @@ pub struct Choice {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FillInSol {
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub width: Option<f32>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub opts: Vec<FillInSolOption>,
 }
 
@@ -135,9 +140,11 @@ pub enum FillInSolOption {
     NumericalRange {
         #[cfg_attr(feature = "serde", bincode(with_serde))]
         #[cfg_attr(feature = "typescript", tsify(type = "number | undefined"))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         from: Option<Float>,
         #[cfg_attr(feature = "serde", bincode(with_serde))]
         #[cfg_attr(feature = "typescript", tsify(type = "number | undefined"))]
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         to: Option<Float>,
         verdict: bool,
         feedback: Box<str>,

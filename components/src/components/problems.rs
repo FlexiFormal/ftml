@@ -58,10 +58,13 @@ impl std::fmt::Debug for ProblemOptions {
 #[serde(tag = "type")]
 pub enum ProblemState {
     Interactive {
+        #[serde(default)]
         current_response: Option<ProblemResponse>,
+        #[serde(default)]
         solution: Option<Box<[SolutionData]>>,
     },
     Finished {
+        #[serde(default)]
         current_response: Option<ProblemResponse>,
     },
     Graded {

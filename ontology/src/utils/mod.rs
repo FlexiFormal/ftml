@@ -96,6 +96,12 @@ impl<T, const N: usize> FromIterator<T> for SVec<T, N> {
         Self(SmallVec::from_iter(iter))
     }
 }
+impl<T, const N: usize> Default for SVec<T, N> {
+    #[inline]
+    fn default() -> Self {
+        Self(SmallVec::default())
+    }
+}
 
 #[cfg(feature = "serde-lite")]
 impl<T: serde_lite::Serialize, const N: usize> serde_lite::Serialize for SVec<T, N> {
