@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>	<meta charset="UTF-8">
-	<link rel="stylesheet" type="text/css" href="https://raw.githack.com/Jazzpirate/RusTeX/main/rustex/src/resources/rustex.css">
+	<link rel="stylesheet" type="text/css" href="https://raw.githack.com/FlexiFormal/RusTeX/main/rustex/src/resources/rustex.css">
 	<style>
 .ftml-assertion-theorem{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Theorem" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
 	<style>
@@ -23,36 +23,48 @@
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/dreampulse/computer-modern-web-font@master/font/Serif/cmun-serif.css">
 	<script type="text/javascript" id="ftml">
 	window.FTML_CONFIG = {
-	  documentUri:"https://mathhub.info?a=FTML/meta&p=tests&d=all&l=en",
+	  documentUri:"http://mathhub.info?a=FTML/meta&p=tests&d=all&l=en",
 	  backendUrl:"https://mathhub.info",
 	  logLevel:"INFO",
+	  autoexpandLimit: {type:"BeamerSlide"},
 	  redirects:[
-			["https://mathhub.info?a=FTML/meta&p=tests&d=para&l=en","http://localhost:3000/api/get?d=para.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=sections&l=en","http://localhost:3000/api/get?d=sections.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=symbolsmodules&l=en","http://localhost:3000/api/get?d=symbolsmodules.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=paragraphs&l=en","http://localhost:3000/api/get?d=paragraphs.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=structures&l=en","http://localhost:3000/api/get?d=structures.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=slides&l=en","http://localhost:3000/api/get?d=slides.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=morphisms&l=en","http://localhost:3000/api/get?d=morphisms.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=problems&l=en","http://localhost:3000/api/get?d=problems.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=proof&l=en","http://localhost:3000/api/get?d=proof.en"],
-			["https://mathhub.info?a=FTML/meta&p=tests&d=metatheory&l=en","http://localhost:3000/api/get?d=metatheory.en"]
+			["http://mathhub.info?a=FTML/meta&p=tests&d=para&l=en","http://localhost:3000/api/get?d=para.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=sections&l=en","http://localhost:3000/api/get?d=sections.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=symbolsmodules&l=en","http://localhost:3000/api/get?d=symbolsmodules.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=paragraphs&l=en","http://localhost:3000/api/get?d=paragraphs.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=structures&l=en","http://localhost:3000/api/get?d=structures.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=slides&l=en","http://localhost:3000/api/get?d=slides.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=morphisms&l=en","http://localhost:3000/api/get?d=morphisms.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=problems&l=en","http://localhost:3000/api/get?d=problems.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=proof&l=en","http://localhost:3000/api/get?d=proof.en"],
+			["http://mathhub.info?a=FTML/meta&p=tests&d=metatheory&l=en","http://localhost:3000/api/get?d=metatheory.en"]
 		]
 	};
 	</script>
 	<script src="http://localhost:3000/ftml.js"></script>
-</head><body class="rustex-body" style="--rustex-text-width:517.5;--rustex-page-width:921.44238;font-family:Computer Modern Serif;font-size:15px;"><div class="rustex-contents" data-ftml-invisible="true" data-ftml-sectionlevel="0" style="display:none;"><!--empty--></div>
-	<a id="Doc-Start"></a><span data-ftml-counter="para" style="display:none;" data-ftml-counter-parent="2"></span><span data-ftml-style="assertion-theorem" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-observation" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-corollary" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-lemma" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-axiom" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-remark" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="paragraph-remark" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="definition" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="example" style="display:none;" data-ftml-counter="para"></span><span data-ftml-sectionlevel="0"></span><div class="rustex-contents" data-ftml-invisible="true" data-ftml-doctitle="" style="display:none;">
-	<div class="rustex-hbox-container"><div class="rustex-hbox">All<div class="rustex-space-in-hbox"></div>FTML<div class="rustex-space-in-hbox"></div>Tests</div></div></div>
-	<div class="rustex-vskip" style="height:15px;margin-top:auto;"></div>
-	<div class="rustex-hbox-container"><div class="rustex-hbox"></div></div>
-	<div class="rustex-vskip" style="height:30px;"></div>
-	<div class="rustex-paragraph rustex-withwidth" style="margin-left:0px;margin-right:0px;text-align:center;font-size:173%;"><div class="rustex-hbox-container"><div class="rustex-hbox"><div class="rustex-hskip" style="margin-left:-7.5px;"></div><div class="rustex-hbox-container"><div class="rustex-hbox" style="justify-content:space-between;width:0;"></div></div><div class="rustex-hskip" style="margin-left:7.5px;"></div></div></div>All FTML Tests</div>
-	<div class="rustex-vskip" style="height:22.5px;"></div>
-	<div class="rustex-paragraph rustex-withwidth" style="margin-left:0px;margin-right:0px;text-align:center;font-size:120%;"><div class="rustex-hbox-container"><div class="rustex-hbox"><math class="rustex-math">
+</head><body class="rustex-body" style="--rustex-text-width:517.5;--rustex-page-width:921.44238;font-family:Computer Modern Serif;font-size:15px;">
+	<div class="rustex-box-vv"><div class="rustex-vbox-to" style="height:0px;">
+	<div class="rustex-vskip" style="margin-bottom:-108.40498px;"></div>
+	<div class="rustex-box-vhc" style="height:0px;margin-bottom:0px;"><div class="rustex-box-vh"><div class="rustex-box-vh" style="width:0;"><div class="rustex-hskip" style="margin-left:0px;margin-right:auto;"></div></div></div></div>
+	<div class="rustex-vskip" style="margin-bottom:0px;margin-top:auto;"></div></div><div class="rustex-box-after-v"></div></div>
+	<div class="rustex-box-vh"><div class="rustex-box-hh"><div class="rustex-box-hh rustex-scalewidth" style="justify-content:space-between;"></div></div></div>
+	<div class="rustex-paragraph rustex-withwidth"><div class="rustex-parindent" style="margin-left:22.5px;"></div><span class="rustex-contents" data-ftml-document-kind="article"><!--empty--></span><span class="rustex-contents" data-ftml-invisible="true" data-ftml-sectionlevel="0" style="display:none;"><!--empty--></span>   <a id="Doc-Start" name="Doc-Start"></a></div><span data-ftml-counter="para" style="display:none;" data-ftml-counter-parent="2"></span><span data-ftml-style="assertion-theorem" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-observation" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-corollary" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-lemma" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-axiom" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-remark" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="paragraph-remark" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="definition" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="example" style="display:none;" data-ftml-counter="para"></span><span data-ftml-sectionlevel="0"></span><div class="rustex-contents" data-ftml-invisible="true" data-ftml-doctitle="" style="display:none;">
+	<div class="rustex-box-vh">All<div class="rustex-space-in-hbox"></div>FTML<div class="rustex-space-in-hbox"></div>Tests</div></div>
+	<div class="rustex-vskip" style="min-height:15px;margin-top:auto;"></div>
+	<div class="rustex-box-vh"><div class="rustex-box-hh"><div class="rustex-box-hh rustex-scalewidth" style="justify-content:space-between;"></div></div></div>
+	<div class="rustex-box-vv"><div class="rustex-vbox-to" style="height:0px;">
+	<div class="rustex-vskip" style="margin-bottom:-108.40498px;"></div>
+	<div class="rustex-box-vhc" style="height:0px;margin-bottom:0px;"><div class="rustex-box-vh"><div class="rustex-box-vh" style="width:0;"><div class="rustex-hskip" style="margin-left:0px;margin-right:auto;"></div></div></div></div>
+	<div class="rustex-vskip" style="margin-bottom:0px;margin-top:auto;"></div></div><div class="rustex-box-after-v"></div></div>
+	<div class="rustex-box-vh"><div class="rustex-box-hh"><div class="rustex-box-hh rustex-scalewidth" style="justify-content:space-between;"></div></div></div>
+	<div class="rustex-box-vh"></div>
+	<div class="rustex-vskip" style="min-height:30px;"></div>
+	<div class="rustex-paragraph rustex-withwidth" style="margin-left:0px;margin-right:0px;text-align:center;font-size:173%;"><div class="rustex-box-hh" style="margin-left:-7.5px;margin-right:7.5px;"><div class="rustex-hskip" style="margin-left:-7.5px;"></div><div class="rustex-box-hh"><div class="rustex-box-hh" style="width:0;"></div></div><div class="rustex-hskip" style="margin-left:7.5px;"></div></div>All FTML Tests</div>
+	<div class="rustex-vskip" style="min-height:22.5px;"></div>
+	<div class="rustex-paragraph rustex-withwidth" style="margin-left:0px;margin-right:0px;text-align:center;font-size:120%;"><div class="rustex-box-hh"><math class="rustex-math">
 		<mrow>
 
-			<mtext class="rustex-math-escape"><div class="rustex-vtop-container"><div class="rustex-vtop">
+			<mtext class="rustex-math-escape"><div class="rustex-box-hh"><div class="rustex-box-ht" style="top:21px;margin-bottom:21px;margin-top:-21px;">
 				<table class="rustex-halign" style="--rustex-align-num:1;"><tbody>
 					<tr>
 						<td class="rustex-halign-cell"><div class="rustex-hskip" style="margin-left:9.00002px;margin-right:auto;"></div>Dennis<div class="rustex-space-in-hbox"></div>Müller<div class="rustex-hskip" style="margin-left:9px;margin-right:auto;"></div>
@@ -60,28 +72,35 @@
 					</tr></tbody>
 				</table></div></div>
 			</mtext>
-		</mrow></math></div></div></div>
-	<div class="rustex-vskip" style="height:15px;"></div>
-	<div class="rustex-paragraph rustex-withwidth" style="margin-left:0px;margin-right:0px;text-align:center;"><span class="rustex-contents" style="font-size:120%;">2025-08-11</span></div>
-	<div class="rustex-vskip" style="height:37.5px;"></div>
-	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-invisible="true" data-ftml-usemodule="https://mathhub.info?a=FTML/meta&m=Metatheory" style="display:none;"><!--empty--></span></div></div>
+		</mrow></math></div></div>
+	<div class="rustex-vskip" style="min-height:15px;"></div>
+	<div class="rustex-paragraph rustex-withwidth" style="margin-left:0px;margin-right:0px;text-align:center;"><span class="rustex-contents" style="font-size:120%;">2025-10-30</span></div>
+	<div class="rustex-vskip" style="min-height:37.5px;"></div>
+	<div class="rustex-box-vh"><span class="rustex-contents" data-ftml-invisible="true" data-ftml-usemodule="http://mathhub.info?a=FTML/meta&m=Metatheory" style="display:none;"><!--empty--></span></div>
 	<div class="rustex-paragraph rustex-withwidth"><div class="rustex-parindent" style="margin-left:22.5px;"></div><span class="rustex-contents" data-ftml-ifinputref="true">In inputref</span><span class="rustex-contents" data-ftml-ifinputref="false">Not in inputref</span> <span class="rustex-contents" data-ftml-currentsectionlevel="" data-ftml-capitalize="false"><!--empty--></span>: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam viverra ullamcorper <math class="rustex-math">
 		<mrow>
-			<mrow data-ftml-term="OMID" data-ftml-head="https://mathhub.info?a=FTML/meta&m=Metatheory&s=bind" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">·</mo><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo>
+			<mrow data-ftml-term="OMID" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=bind" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">·</mo><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo>
 
 			<mspace class="rustex-mkern" width="0.27778em"></mspace><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">→</mo>
 
 			<mspace class="rustex-mkern" width="0.27778em"></mspace><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">·</mo></mrow></mrow>
 		</mrow></math> nisi sed faucibus.</div>
 	<div class="rustex-paragraph rustex-withwidth"><div class="rustex-parindent" style="margin-left:22.5px;"></div><span class="rustex-contents" data-ftml-currentsectionlevel="" data-ftml-capitalize="true"><!--empty--></span>: Interdum et malesuada fames ac ante ipsum primis in faucibus. Duis vel dolor libero.  </div>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=symbolsmodules&l=en" ><!-----></span>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=paragraphs&l=en" ><!-----></span>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=structures&l=en" ><!-----></span>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=morphisms&l=en" ><!-----></span>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=slides&l=en" ><!-----></span>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=problems&l=en" ><!-----></span>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=proof&l=en" ><!-----></span>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=sections&l=en" ><!-----></span>
-	<span data-ftml-inputref="https://mathhub.info?a=FTML/meta&p=tests&d=metatheory&l=en" ><!-----></span>
-	<div class="rustex-vskip" style="height:15px;margin-top:auto;"></div>
+	<span data-ftml-inputref="http://mathhub.info?a=FTML/meta&p=tests&d=symbolsmodules&l=en" ><!-----></span>
+	<span data-ftml-inputref="http://mathhub.info?a=FTML/meta&p=tests&d=paragraphs&l=en" ><!-----></span>
+	<span data-ftml-inputref="http://mathhub.info?a=FTML/meta&p=tests&d=structures&l=en" ><!-----></span>
+	<span data-ftml-inputref="http://mathhub.info?a=FTML/meta&p=tests&d=morphisms&l=en" ><!-----></span>
+	<span data-ftml-inputref="http://mathhub.info?a=FTML/meta&p=tests&d=slides&l=en" ><!-----></span>
+	<span data-ftml-inputref="http://mathhub.info?a=FTML/meta&p=tests&d=problems&l=en" ><!-----></span>
+	<span data-ftml-inputref="http://mathhub.info?a=FTML/meta&p=tests&d=proof&l=en" ><!-----></span>
+	<!--<span data-ftml-inputref="http://mathhub.info?a=FTML/meta&p=tests&d=sections&l=en" ><!-----></span>-->
+	<div class="rustex-vskip" style="min-height:15px;margin-top:auto;"></div>
+	<div class="rustex-box-vh"><div class="rustex-box-hh"><div class="rustex-box-hh rustex-scalewidth" style="justify-content:space-between;"></div></div></div>
+	<div class="rustex-box-vv"><div class="rustex-vbox-to" style="height:0px;">
+	<div class="rustex-vskip" style="margin-bottom:-108.40498px;"></div>
+	<div class="rustex-box-vhc" style="height:0px;margin-bottom:0px;"><div class="rustex-box-vh"><div class="rustex-box-vh" style="width:0;"><div class="rustex-hskip" style="margin-left:0px;margin-right:auto;"></div></div></div></div>
+	<div class="rustex-vskip" style="margin-bottom:0px;margin-top:auto;"></div></div><div class="rustex-box-after-v"></div></div>
+	<div class="rustex-box-vh"><div class="rustex-box-hh"><div class="rustex-box-hh rustex-scalewidth" style="justify-content:space-between;"></div></div></div>
+	<div class="rustex-vskip" style="min-height:15px;margin-top:auto;"></div>
+	<div class="rustex-box-vh"><div class="rustex-box-hh"><div class="rustex-box-hh rustex-scalewidth" style="justify-content:space-between;"></div></div></div>
 </body></html>
