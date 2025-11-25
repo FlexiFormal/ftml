@@ -1504,6 +1504,14 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             children: children.into_boxed_slice(),
             fors: fors.into_boxed_slice(),
         };
+        if self
+            .narrative
+            .iter()
+            .any(|e| matches!(e, OpenNarrativeElement::Solution(_)))
+        {
+            tracing::info!("Skipping paragraph in solutions block");
+            return;
+        }
         tracing::info!("Adding paragraph {p:#?}");
         self.push_elem(DocumentElement::Paragraph(p));
     }
