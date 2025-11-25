@@ -213,6 +213,9 @@ impl Default for Delta {
     }
 }
 impl Delta {
+    pub fn seconds(self) -> f32 {
+        self.0.get() as f32 / 1000.0
+    }
     #[must_use]
     pub fn max_seconds(self) -> impl Display {
         MaxSeconds(self)
