@@ -303,9 +303,9 @@ fn do_toc<Be: SendBackend>(
                         <Caption1Strong>
                             {visible.map(|visible|
                                 view!{
-                                    <a href on:click=move |_| visible.set(!visible.get_untracked())>
+                                    <span on:click=move |_| visible.set(!visible.get_untracked())>
                                         {collapse_marker(visible,true)}
-                                    </a>
+                                    </span>
                                     " "
                                 }
                             )}
