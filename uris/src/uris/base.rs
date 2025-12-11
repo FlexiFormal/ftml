@@ -74,6 +74,11 @@ impl FtmlUri for BaseUri {
             .all(|c| matches!(c,'a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '.'))
             && !maybe_uri[i + 1..].contains(['?', '&', '\\'])
     }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        oxrdf::NamedNode::new(self.as_str()).expect("Valid URLs are valid IRIs")
+    }
 }
 impl PartialEq<str> for BaseUri {
     #[inline]

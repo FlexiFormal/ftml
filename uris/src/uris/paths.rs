@@ -271,6 +271,15 @@ impl PathUri {
             f(p, n, split)
         })
     }
+
+    pub(crate) fn iri_encode(&self) -> String {
+        let mut s = self.archive.iri_encode();
+        if let Some(p) = &self.path {
+            s.push_str("&p=");
+            crate::traits::iri_encode(p.as_ref(), &mut s);
+        }
+        s
+    }
 }
 impl std::fmt::Display for PathUri {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -373,6 +382,11 @@ impl FtmlUri for PathUri {
         } else {
             ArchiveUri::could_be(maybe_uri)
         }
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        oxrdf::NamedNode::new(self.iri_encode()).expect("All illegal characters are replaced")
     }
 }
 impl PartialEq<str> for PathUri {

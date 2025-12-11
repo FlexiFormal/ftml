@@ -303,6 +303,13 @@ impl ArchiveUri {
         };
         f(archive, split)
     }
+
+    pub(crate) fn iri_encode(&self) -> String {
+        let mut s = self.base.to_string();
+        s.push_str("?a=");
+        crate::traits::iri_encode(self.id.as_ref(), &mut s);
+        s
+    }
 }
 impl From<ArchiveUri> for BaseUri {
     #[inline]
@@ -352,6 +359,11 @@ impl FtmlUri for ArchiveUri {
             return false;
         };
         BaseUri::could_be(start) && e.starts_with("a=") && !e.contains(['&', '?', '\\'])
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        oxrdf::NamedNode::new(self.iri_encode()).expect("All illegal characters are replaced")
     }
 }
 impl PartialEq<str> for ArchiveUri {

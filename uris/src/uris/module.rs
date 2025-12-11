@@ -385,6 +385,13 @@ impl ModuleUri {
         }
         STeXDisplay(self)
     }
+
+    pub(crate) fn iri_encode(&self) -> String {
+        let mut s = self.path.iri_encode();
+        s.push_str("&m=");
+        crate::traits::iri_encode(self.name.as_ref(), &mut s);
+        s
+    }
 }
 impl FromStr for ModuleUri {
     type Err = UriParseError;
@@ -457,6 +464,11 @@ impl FtmlUri for ModuleUri {
             return false;
         };
         PathUri::could_be(a) && p.starts_with("m=") && !p.contains(['&', '?', '\\'])
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        oxrdf::NamedNode::new(self.iri_encode()).expect("All illegal characters are replaced")
     }
 }
 impl PartialEq<str> for ModuleUri {

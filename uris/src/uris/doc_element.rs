@@ -143,6 +143,13 @@ impl DocumentElementUri {
                 )
         })
     }
+
+    pub(crate) fn iri_encode(&self) -> String {
+        let mut s = self.document.iri_encode();
+        s.push_str("&e=");
+        crate::traits::iri_encode(self.name.as_ref(), &mut s);
+        s
+    }
 }
 
 impl NamedUri for DocumentElementUri {
@@ -235,6 +242,11 @@ impl FtmlUri for DocumentElementUri {
             return false;
         };
         DocumentUri::could_be(a) && p.starts_with("e=") && !p.contains(['&', '?', '\\'])
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        oxrdf::NamedNode::new(self.iri_encode()).expect("All illegal characters are replaced")
     }
 }
 impl PartialEq<str> for DocumentElementUri {

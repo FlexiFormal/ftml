@@ -496,6 +496,7 @@ impl KeyList {
     }
     #[inline]
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

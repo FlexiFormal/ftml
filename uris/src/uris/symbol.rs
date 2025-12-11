@@ -164,6 +164,13 @@ impl SymbolUri {
                 )
         })
     }
+
+    pub(crate) fn iri_encode(&self) -> String {
+        let mut s = self.module.iri_encode();
+        s.push_str("&s=");
+        crate::traits::iri_encode(self.name.as_ref(), &mut s);
+        s
+    }
 }
 
 impl FromStr for SymbolUri {
@@ -244,6 +251,11 @@ impl FtmlUri for SymbolUri {
             return false;
         };
         ModuleUri::could_be(a) && p.starts_with("s=") && !p.contains(['&', '?', '\\'])
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        oxrdf::NamedNode::new(self.iri_encode()).expect("All illegal characters are replaced")
     }
 }
 impl PartialEq<str> for SymbolUri {

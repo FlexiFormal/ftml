@@ -112,10 +112,9 @@ pub(crate) mod sealed {
 ///     println!("Base: {}", uri.base());
 /// }
 /// ```
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, PartialEq, Eq, Hash, strum::EnumDiscriminants)]
-#[strum_discriminants(vis(pub))]
-#[strum_discriminants(name(UriKind))]
-#[strum_discriminants(derive(strum::Display))]
+#[strum_discriminants(vis(pub), name(UriKind), derive(strum::Display))]
 #[cfg_attr(
     feature = "serde",
     strum_discriminants(derive(
@@ -157,6 +156,23 @@ pub enum Uri {
 impl crate::sealed::Sealed for Uri {}
 crate::ts!(Uri);
 crate::debugdisplay!(Uri);
+
+#[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
+impl Uri {
+    #[must_use]
+    pub fn rdf_encode(s: &str) -> Option<String> {
+        let s: Self = s.parse().ok()?;
+        match s {
+            Self::Base(u) => Some(u.to_string()),
+            Self::Archive(u) => Some(u.iri_encode()),
+            Self::Path(u) => Some(u.iri_encode()),
+            Self::Module(u) => Some(u.iri_encode()),
+            Self::Symbol(u) => Some(u.iri_encode()),
+            Self::Document(u) => Some(u.iri_encode()),
+            Self::DocumentElement(u) => Some(u.iri_encode()),
+        }
+    }
+}
 
 /// Like [Uri], but on references rather than owned values
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -746,7 +762,6 @@ impl FtmlUri for Uri {
         }
     }
 
-    #[inline]
     fn as_uri(&self) -> UriRef<'_> {
         match self {
             Self::Base(b) => UriRef::Base(b),
@@ -769,6 +784,19 @@ impl FtmlUri for Uri {
             DomainUri::could_be(maybe_uri)
         } else {
             PathUri::could_be(maybe_uri)
+        }
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        match self {
+            Self::Base(b) => b.to_iri(),
+            Self::Archive(a) => a.to_iri(),
+            Self::Path(p) => p.to_iri(),
+            Self::Module(m) => m.to_iri(),
+            Self::Symbol(s) => s.to_iri(),
+            Self::Document(d) => d.to_iri(),
+            Self::DocumentElement(e) => e.to_iri(),
         }
     }
 }
@@ -903,6 +931,14 @@ impl FtmlUri for DomainUri {
             SymbolUri::could_be(maybe_uri)
         } else {
             ModuleUri::could_be(maybe_uri)
+        }
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        match self {
+            Self::Module(m) => m.to_iri(),
+            Self::Symbol(s) => s.to_iri(),
         }
     }
 }
@@ -1064,43 +1100,6 @@ impl PartialEq<str> for DomainUriRef<'_> {
         }
     }
 }
-/*
-impl<'a> FtmlUri for DomainUriRef<'a> {
-    fn base(&self) -> &'a BaseUri {
-        match self {
-            Self::Module(m) => m.base(),
-            Self::Symbol(s) => s.base(),
-        }
-    }
-}
-impl<'a> UriWithArchive for DomainUriRef<'a> {
-    fn archive_uri(&self) -> &'a ArchiveUri {
-        match self {
-            Self::Module(m) => m.archive_uri(),
-            Self::Symbol(s) => s.archive_uri(),
-        }
-    }
-}
-
-impl<'a> UriWithPath for DomainUriRef<'a> {
-    #[inline]
-    fn path_uri(&self) -> &'a PathUri {
-        match self {
-            Self::Module(m) => m.path_uri(),
-            Self::Symbol(s) => s.path_uri(),
-        }
-    }
-}
-impl<'a> NamedUri for DomainUriRef<'a> {
-    #[inline]
-    fn name(&self) -> &'a UriName {
-        match self {
-            Self::Module(m) => m.name(),
-            Self::Symbol(s) => s.name(),
-        }
-    }
-}
- */
 
 impl<'u> NarrativeUriRef<'u> {
     #[inline]
@@ -1158,43 +1157,6 @@ impl std::fmt::Debug for NarrativeUriRef<'_> {
         <Self as std::fmt::Display>::fmt(self, f)
     }
 }
-/*
-impl<'a> FtmlUri for NarrativeUriRef<'a> {
-    fn base(&self) -> &'a BaseUri {
-        match self {
-            Self::Document(m) => m.base(),
-            Self::Element(s) => s.base(),
-        }
-    }
-}
-impl<'a> UriWithArchive for NarrativeUriRef<'a> {
-    fn archive_uri(&self) -> &'a ArchiveUri {
-        match self {
-            Self::Document(m) => m.archive_uri(),
-            Self::Element(s) => s.archive_uri(),
-        }
-    }
-}
-
-impl<'a> UriWithPath for NarrativeUriRef<'a> {
-    #[inline]
-    fn path_uri(&self) -> &'a PathUri {
-        match self {
-            Self::Document(m) => m.path_uri(),
-            Self::Element(s) => s.path_uri(),
-        }
-    }
-}
-impl<'a> NamedUri for NarrativeUriRef<'a> {
-    #[inline]
-    fn name(&self) -> &'a UriName {
-        match self {
-            Self::Document(m) => m.name(),
-            Self::Element(s) => s.name(),
-        }
-    }
-}
- */
 
 impl std::fmt::Display for NarrativeUri {
     #[inline]
@@ -1239,6 +1201,14 @@ impl FtmlUri for NarrativeUri {
             DocumentElementUri::could_be(maybe_uri)
         } else {
             DocumentUri::could_be(maybe_uri)
+        }
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        match self {
+            Self::Document(d) => d.to_iri(),
+            Self::Element(e) => e.to_iri(),
         }
     }
 }
@@ -1377,6 +1347,14 @@ impl FtmlUri for LeafUri {
             SymbolUri::could_be(maybe_uri)
         } else {
             DocumentElementUri::could_be(maybe_uri)
+        }
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        match self {
+            Self::Symbol(s) => s.to_iri(),
+            Self::Element(e) => e.to_iri(),
         }
     }
 }

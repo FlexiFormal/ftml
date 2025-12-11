@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{hint::unreachable_unchecked, str::FromStr};
 
 use crate::{
     ArchiveId, ArchiveUri, BaseUri, DocumentUri, DomainUri, Language, ModuleUri, NarrativeUri,
@@ -42,35 +42,35 @@ pub trait FtmlUri:
     fn as_uri(&self) -> UriRef<'_>;
     #[cfg(feature = "rdf")]
     /// Returns this URI as an RDF-IRI; possibly escaping invalid characters.
-    fn to_iri(&self) -> oxrdf::NamedNode {
-        struct Writer(String);
-        impl std::fmt::Write for Writer {
-            fn write_str(&mut self, s: &str) -> std::fmt::Result {
-                for c in s.chars() {
-                    self.write_char(c)?;
-                }
-                Ok(())
-            }
-            fn write_char(&mut self, c: char) -> std::fmt::Result {
-                self.0.push_str(match c {
-                    ' ' => "%20",
-                    '\\' => "%5C",
-                    '^' => "%5E",
-                    '[' => "%5B",
-                    ']' => "%5D",
-                    '|' => "%7C",
-                    c => {
-                        self.0.push(c);
-                        return Ok(());
-                    }
-                });
-                Ok(())
-            }
-        }
-        let mut s = Writer(String::with_capacity(64));
-        let _ = std::fmt::Write::write_fmt(&mut s, format_args!("{self}"));
-        oxrdf::NamedNode::new(s.0).expect("All illegal characters are replaced")
+    fn to_iri(&self) -> oxrdf::NamedNode; /* {
+    struct Writer(String);
+    impl std::fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+    for c in s.chars() {
+    self.write_char(c)?;
     }
+    Ok(())
+    }
+    fn write_char(&mut self, c: char) -> std::fmt::Result {
+    self.0.push_str(match c {
+    ' ' => "%20",
+    '\\' => "%5C",
+    '^' => "%5E",
+    '[' => "%5B",
+    ']' => "%5D",
+    '|' => "%7C",
+    c => {
+    self.0.push(c);
+    return Ok(());
+    }
+    });
+    Ok(())
+    }
+    }
+    let mut s = Writer(String::with_capacity(64));
+    let _ = std::fmt::Write::write_fmt(&mut s, format_args!("{self}"));
+    oxrdf::NamedNode::new(s.0).expect("All illegal characters are replaced")
+    } */
 
     #[cfg(feature = "rdf")]
     /// Parses this URI from an RDF-IRI; possibly unescaping characters.
@@ -78,11 +78,18 @@ pub trait FtmlUri:
     /// # Errors
     /// if the iri is not a valid `Self`.
     fn from_iri(iri: oxrdf::NamedNodeRef) -> Result<Self, crate::errors::UriParseError> {
-        let mut s = iri.as_str();
-        if !s.contains('%') {
+        let s = iri.as_str();
+        if !s.contains('%') || !s.contains("?a=") {
             return s.parse();
         }
-        let mut out = String::with_capacity(64);
+        urlencoding::decode(s)
+            .map_err(|_| {
+                crate::errors::UriParseError::Name(crate::errors::SegmentParseError::IllegalChar(
+                    ' ',
+                ))
+            })?
+            .parse()
+        /*let mut out = String::with_capacity(64);
         while !s.is_empty() {
             if s.len() > 3 {
                 match &s[..3] {
@@ -107,7 +114,7 @@ pub trait FtmlUri:
                 break;
             }
         }
-        out.parse()
+        out.parse()*/
     }
 
     /// Display as this Uri url-encoded
@@ -222,5 +229,103 @@ pub trait IsNarrativeUri: NamedUri + Into<DocumentUri> + Into<NarrativeUri> {
     #[inline]
     fn language(&self) -> Language {
         self.document_uri().language
+    }
+}
+
+pub fn iri_encode(segment: &str, into: &mut String) {
+    use std::fmt::Write;
+    const TAG_CONT: u8 = 0b1000_0000;
+    const TAG_TWO_B: u8 = 0b1100_0000;
+    const TAG_THREE_B: u8 = 0b1110_0000;
+    const TAG_FOUR_B: u8 = 0b1111_0000;
+    /*
+    iquery         = *( ipchar / iprivate / "/" / "?" )
+    ipchar         = iunreserved / pct-encoded / sub-delims / ":"
+                   / "@"
+    iprivate       = %xE000-F8FF / %xF0000-FFFFD / %x100000-10FFFD
+    iunreserved    = ALPHA / DIGIT / "-" / "." / "_" / "~" / ucschar
+    pct-encoded    = "%" HEXDIG HEXDIG
+    sub-delims     = "!" / "$" / "&" / "'" / "(" / ")"
+                   / "*" / "+" / "," / ";" / "="
+    ucschar        = %xA0-D7FF / %xF900-FDCF / %xFDF0-FFEF
+                    / %x10000-1FFFD / %x20000-2FFFD / %x30000-3FFFD
+                    / %x40000-4FFFD / %x50000-5FFFD / %x60000-6FFFD
+                    / %x70000-7FFFD / %x80000-8FFFD / %x90000-9FFFD
+                    / %xA0000-AFFFD / %xB0000-BFFFD / %xC0000-CFFFD
+                    / %xD0000-DFFFD / %xE1000-EFFFD
+     */
+    for c in segment.chars() {
+        if "/?:@-._~!$'()*+,;=&".contains(c) || c.is_ascii_alphanumeric() {
+            into.push(c);
+            continue;
+        }
+        let num = c as u32;
+        macro_rules! ranges {
+            ($($l:literal-$r:literal),*$(,)?) => {
+                $( ($l..=$r).contains(&num) )||*
+            }
+        }
+        if ranges!(
+            0xE000 - 0xF8FF,
+            0xF0000 - 0xFFFFD,
+            0x100_000 - 0x10F_FFD,
+            0xA0 - 0xD7FF,
+            0xF900 - 0xFDCF,
+            0xFDF0 - 0xFFEF,
+            0x10000 - 0x1FFFD,
+            0x20000 - 0x2FFFD,
+            0x30000 - 0x3FFFD,
+            0x40000 - 0x4FFFD,
+            0x50000 - 0x5FFFD,
+            0x60000 - 0x6FFFD,
+            0x70000 - 0x7FFFD,
+            0x80000 - 0x8FFFD,
+            0x90000 - 0x9FFFD,
+            0xA0000 - 0xAFFFD,
+            0xB0000 - 0xBFFFD,
+            0xC0000 - 0xCFFFD,
+            0xD0000 - 0xDFFFD,
+            0xE1000 - 0xEFFFD
+        ) {
+            into.push(c);
+            continue;
+        }
+        match c.len_utf8() {
+            1 => {
+                #[allow(clippy::cast_possible_truncation)]
+                let _ = write!(into, "%{:02X}", num as u8);
+            }
+            2 => {
+                let _ = write!(
+                    into,
+                    "%{:02X}%{:02X}",
+                    (num >> 6 & 0x1F) as u8 | TAG_TWO_B,
+                    (num & 0x3F) as u8 | TAG_CONT
+                );
+            }
+            3 => {
+                let _ = write!(
+                    into,
+                    "%{:02X}%{:02X}%{:02X}",
+                    (num >> 12 & 0x0F) as u8 | TAG_THREE_B,
+                    (num >> 6 & 0x3F) as u8 | TAG_CONT,
+                    (num & 0x3F) as u8 | TAG_CONT
+                );
+            }
+            4 => {
+                let _ = write!(
+                    into,
+                    "%{:02X}%{:02X}%{:02X}%{:02X}",
+                    (num >> 18 & 0x07) as u8 | TAG_FOUR_B,
+                    (num >> 12 & 0x3F) as u8 | TAG_CONT,
+                    (num >> 6 & 0x3F) as u8 | TAG_CONT,
+                    (num & 0x3F) as u8 | TAG_CONT
+                );
+            }
+            _ => {
+                // SAFETY: character length is between 1 and 4
+                unsafe { unreachable_unchecked() }
+            }
+        }
     }
 }

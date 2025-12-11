@@ -279,6 +279,15 @@ impl DocumentUri {
                 )
         })
     }
+
+    pub(crate) fn iri_encode(&self) -> String {
+        let mut s = self.path.iri_encode();
+        s.push_str("&d=");
+        crate::traits::iri_encode(self.name.as_ref(), &mut s);
+        s.push_str("&l=");
+        s.push_str(self.language.into());
+        s
+    }
 }
 impl FromStr for DocumentUri {
     type Err = UriParseError;
@@ -349,6 +358,11 @@ impl FtmlUri for DocumentUri {
             return false;
         };
         PathUri::could_be(a) && p.starts_with("d=") && !p.contains(['&', '?', '\\', '/'])
+    }
+
+    #[cfg(feature = "rdf")]
+    fn to_iri(&self) -> oxrdf::NamedNode {
+        oxrdf::NamedNode::new(self.iri_encode()).expect("All illegal characters are replaced")
     }
 }
 
