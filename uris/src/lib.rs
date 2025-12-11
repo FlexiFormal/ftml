@@ -158,19 +158,17 @@ crate::ts!(Uri);
 crate::debugdisplay!(Uri);
 
 #[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
-impl Uri {
-    #[must_use]
-    pub fn rdf_encode(s: &str) -> Option<String> {
-        let s: Self = s.parse().ok()?;
-        match s {
-            Self::Base(u) => Some(u.to_string()),
-            Self::Archive(u) => Some(u.iri_encode()),
-            Self::Path(u) => Some(u.iri_encode()),
-            Self::Module(u) => Some(u.iri_encode()),
-            Self::Symbol(u) => Some(u.iri_encode()),
-            Self::Document(u) => Some(u.iri_encode()),
-            Self::DocumentElement(u) => Some(u.iri_encode()),
-        }
+#[must_use]
+pub fn rdf_encode(s: &str) -> Option<String> {
+    let s: Uri = s.parse().ok()?;
+    match s {
+        Uri::Base(u) => Some(u.to_string()),
+        Uri::Archive(u) => Some(u.iri_encode()),
+        Uri::Path(u) => Some(u.iri_encode()),
+        Uri::Module(u) => Some(u.iri_encode()),
+        Uri::Symbol(u) => Some(u.iri_encode()),
+        Uri::Document(u) => Some(u.iri_encode()),
+        Uri::DocumentElement(u) => Some(u.iri_encode()),
     }
 }
 
