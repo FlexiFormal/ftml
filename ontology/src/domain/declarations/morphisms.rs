@@ -3,10 +3,11 @@ use ftml_uris::{DomainUriRef, Id, ModuleUri, SimpleUriName, SymbolUri};
 use crate::{
     domain::{
         HasDeclarations,
-        declarations::{AnyDeclarationRef, IsDeclaration, symbols::Symbol},
+        declarations::{AnyDeclarationRef, Declaration, IsDeclaration, symbols::Symbol},
         modules::ModuleLike,
     },
     terms::Term,
+    utils::TreeIter,
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -25,6 +26,8 @@ pub struct Morphism {
     pub domain: ModuleUri,
     pub total: bool,
     pub elements: Box<[Assignment]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(skip))]
+    elaboration: Elaboration,
 }
 
 impl crate::__private::Sealed for Morphism {}
@@ -65,11 +68,21 @@ impl HasDeclarations for Morphism {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
-        std::iter::empty() //self.elements.iter().map(Declaration::as_ref)
+        self.elaboration.get().iter().map(|d| d.as_ref()) //std::iter::empty() //self.elements.iter().map(Declaration::as_ref)
     }
     #[inline]
     fn domain_uri(&self) -> DomainUriRef<'_> {
         DomainUriRef::Symbol(&self.uri)
+    }
+
+    #[inline]
+    fn initialize<E: std::fmt::Display>(
+        &self,
+        get: &mut dyn FnMut(&ModuleUri) -> Result<ModuleLike, E>,
+    ) {
+        if let Err(e) = Elaboration::initialize(self, get) {
+            tracing::error!("Error elaborating: {e}");
+        }
     }
 }
 
@@ -139,143 +152,114 @@ impl deepsize::DeepSizeOf for Morphism {
 
 // -------------------------------------------------------------------------
 
-/*
-pub struct ElaborationI {
-    modules: Option<std::collections::HashSet<ModuleLike, rustc_hash::FxBuildHasher>>,
-    decls: Vec<std::pin::Pin<Box<Symbol>>>,
+#[derive(Default, Debug, Clone)]
+struct Elaboration {
+    contents: std::sync::OnceLock<Vec<Declaration>>,
 }
-impl ElaborationI {
-    fn compute(&mut self, uri: SymbolUri) -> Option<&Symbol> {
-        let mut cp = orig.clone();
-        cp.uri = uri;
-        todo!()
+
+impl Elaboration {
+    pub fn get(&self) -> &[Declaration] {
+        self.contents.get().map_or(&[], Vec::as_slice)
     }
 
-    fn initialize(
-        &mut self,
-        domain: &ModuleUri,
-        get: impl Fn(&ModuleUri) -> Option<ModuleLike>,
-    ) -> Vec<ModuleUri> {
-        if self.modules.is_some() {
-            return Vec::new();
-        }
-        let mut ret = std::collections::HashSet::default();
-        let Some(dom) = get(domain) else {
-            self.modules = Some(ret);
-            return vec![domain.clone()];
-        };
-        let mut stack = Vec::new();
-        ret.insert(dom.clone());
-        let mut curr = dom
-            .declarations()
-            .filter_map(|e| {
-                if let AnyDeclarationRef::Import(e) = e {
-                    Some(e.clone())
-                } else {
-                    None
+    pub fn initialize<E: std::fmt::Display>(
+        m: &Morphism,
+        get: impl FnMut(&ModuleUri) -> Result<ModuleLike, E>,
+    ) -> Result<(), E> {
+        let mut err = None;
+        let errp = &mut err;
+        m.elaboration
+            .contents
+            .get_or_init(move || match Self::initialize_i(m, get) {
+                Ok(v) => v,
+                Err(e) => {
+                    *errp = Some(e);
+                    Vec::new()
                 }
-            })
-            .collect::<Vec<_>>()
-            .into_iter();
-        let mut missing = Vec::new();
-        loop {
-            if let Some(m) = curr.next() {
-                if ret
-                    .iter()
-                    .any(|e| matches!(e.domain_uri(),DomainUriRef::Module(e) if *e == m))
-                {
-                    continue;
-                }
-                if let Some(n) = get(&m) {
-                    ret.insert(n.clone());
-                    let old = std::mem::replace(
-                        &mut curr,
-                        n.declarations()
-                            .filter_map(|e| {
-                                if let AnyDeclarationRef::Import(e) = e {
-                                    Some(e.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .into_iter(),
-                    );
-                    stack.push(old);
-                } else {
-                    missing.push(m.clone());
-                }
-            } else if let Some(n) = stack.pop() {
-                curr = n;
-            } else {
-                break;
-            }
-        }
-        self.modules = Some(ret);
-        missing
+            });
+        err.map_or(Ok(()), Err)
     }
-    async fn initialize_async<F: Future<Output = Option<ModuleLike>> + Send>(
-        &mut self,
-        domain: ModuleUri,
-        get: impl Fn(ModuleUri) -> F,
-    ) -> Vec<ModuleUri> {
-        if self.modules.is_some() {
-            return Vec::new();
-        }
-        let mut ret = std::collections::HashSet::default();
-        let Some(dom) = get(domain.clone()).await else {
-            self.modules = Some(ret);
-            return vec![domain];
-        };
-        let mut stack = Vec::new();
-        ret.insert(dom.clone());
-        let mut curr = dom
-            .declarations()
-            .filter_map(|e| {
-                if let AnyDeclarationRef::Import(e) = e {
-                    Some(e.clone())
-                } else {
-                    None
+
+    pub fn initialize_i<E: std::fmt::Display>(
+        m: &Morphism,
+        mut get: impl FnMut(&ModuleUri) -> Result<ModuleLike, E>,
+    ) -> Result<Vec<Declaration>, E> {
+        let full_domain = Self::collect_deps(m.domain.clone(), &mut get)?;
+        let mut ret = Vec::new();
+        let mut assigns = m.elements.iter().collect::<Vec<_>>();
+
+        for d in full_domain.iter().flat_map(ModuleLike::declarations) {
+            match d {
+                AnyDeclarationRef::Import(_) => (),
+                AnyDeclarationRef::Morphism(_) => todo!("???"),
+                AnyDeclarationRef::MathStructure(_) => todo!("???"),
+                AnyDeclarationRef::Extension(_) => todo!("???"),
+                AnyDeclarationRef::NestedModule(_) => todo!("???"),
+                AnyDeclarationRef::Symbol(s) => {
+                    // Do something
                 }
-            })
-            .collect::<Vec<_>>()
-            .into_iter();
-        let mut missing = Vec::new();
-        loop {
-            if let Some(m) = curr.next() {
-                if ret
-                    .iter()
-                    .any(|e| matches!(e.domain_uri(),DomainUriRef::Module(e) if *e == m))
-                {
-                    continue;
-                }
-                if let Some(n) = get(m.clone()).await {
-                    ret.insert(n.clone());
-                    let old = std::mem::replace(
-                        &mut curr,
-                        n.declarations()
-                            .filter_map(|e| {
-                                if let AnyDeclarationRef::Import(e) = e {
-                                    Some(e.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                            .into_iter(),
-                    );
-                    stack.push(old);
-                } else {
-                    missing.push(m.clone());
-                }
-            } else if let Some(n) = stack.pop() {
-                curr = n;
-            } else {
-                break;
             }
         }
-        self.modules = Some(ret);
-        missing
+        Ok(ret)
+    }
+
+    fn collect_deps<E: std::fmt::Display>(
+        init: ModuleUri,
+        mut get: impl FnMut(&ModuleUri) -> Result<ModuleLike, E>,
+    ) -> Result<Vec<ModuleLike>, E> {
+        let mut dones = rustc_hash::FxHashSet::<ModuleUri>::default();
+        let mut todos = vec![init];
+        let mut ret = Vec::new();
+        while let Some(todo) = todos.pop() {
+            if dones.contains(&todo) {
+                continue;
+            }
+            let module = get(&todo)?;
+            for d in module.declarations() {
+                if let AnyDeclarationRef::Import(uri) = d {
+                    todos.push(uri.clone());
+                }
+            }
+            dones.insert(todo);
+            ret.push(module);
+        }
+        Ok(ret)
     }
 }
- */
+
+// --------------------------------------------------------------------------
+
+impl std::hash::Hash for Elaboration {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {}
+}
+impl PartialEq for Elaboration {
+    fn eq(&self, other: &Self) -> bool {
+        true
+    }
+}
+impl Eq for Elaboration {}
+#[cfg(feature = "serde")]
+impl bincode::Encode for Elaboration {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        Ok(())
+    }
+}
+#[cfg(feature = "serde")]
+impl<'de, C> bincode::BorrowDecode<'de, C> for Elaboration {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = C>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Ok(Self::default())
+    }
+}
+#[cfg(feature = "serde")]
+impl<C> bincode::Decode<C> for Elaboration {
+    fn decode<D: bincode::de::Decoder<Context = C>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        Ok(Self::default())
+    }
+}

@@ -2,13 +2,17 @@ pub mod morphisms;
 pub mod structures;
 pub mod symbols;
 
-use crate::domain::{
-    declarations::{
-        morphisms::Morphism,
-        structures::{MathStructure, StructureExtension},
-        symbols::Symbol,
+use crate::{
+    domain::{
+        HasDeclarations,
+        declarations::{
+            morphisms::Morphism,
+            structures::{MathStructure, StructureExtension},
+            symbols::Symbol,
+        },
+        modules::NestedModule,
     },
-    modules::NestedModule,
+    utils::TreeChild,
 };
 use ftml_uris::{ModuleUri, SymbolUri};
 
@@ -93,6 +97,19 @@ pub enum AnyDeclarationRef<'d> {
     MathStructure(&'d MathStructure),
     Morphism(&'d Morphism),
     Extension(&'d StructureExtension),
+}
+
+impl<'r> TreeChild<'r> for AnyDeclarationRef<'r> {
+    fn tree_children(self) -> impl Iterator<Item = Self> {
+        use either_of::EitherOf5::{A, B, C, D, E};
+        match self {
+            Self::NestedModule(nm) => A(nm.declarations()),
+            Self::MathStructure(ms) => B(ms.declarations()),
+            Self::Morphism(ms) => C(ms.declarations()),
+            Self::Extension(ext) => D(ext.declarations()),
+            Self::Import(_) | Self::Symbol(_) => E(std::iter::empty()),
+        }
+    }
 }
 
 impl crate::__private::Sealed for AnyDeclarationRef<'_> {}
