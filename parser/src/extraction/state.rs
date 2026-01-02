@@ -1056,6 +1056,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             domain,
             total,
             elements: children.into_boxed_slice(),
+            #[allow(clippy::default_trait_access)]
+            elaboration: Default::default(),
         };
         tracing::trace!("New morphism {morphism:?}");
         let parent_uri = self.push_domain(morphism, Declaration::Morphism, |m| {
