@@ -59,7 +59,7 @@ pub enum SlideElement {
     Section {
         uri: DocumentElementUri,
         title: Option<Box<str>>,
-        children: Vec<SlideElement>,
+        children: Vec<Self>,
     },
 }
 
@@ -172,6 +172,7 @@ impl crate::__private::Sealed for DocumentTerm {}
 impl crate::Ftml for DocumentTerm {
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use crate::terms::IsTerm;
         use ftml_uris::FtmlUri;
         use ulo::triple;
         macro_rules! syms {

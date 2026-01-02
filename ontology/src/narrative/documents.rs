@@ -285,10 +285,10 @@ pub enum TocElem {
         title: Option<Box<str>>,
         uri: DocumentElementUri,
         id: String,
-        children: Vec<TocElem>,
+        children: Vec<Self>,
     },
     SkippedSection {
-        children: Vec<TocElem>,
+        children: Vec<Self>,
     },
     /// An inputref to some other document; the URI is the one for the
     /// referenced Document.
@@ -296,7 +296,7 @@ pub enum TocElem {
         uri: DocumentUri,
         title: Option<Box<str>>,
         id: String,
-        children: Vec<TocElem>,
+        children: Vec<Self>,
     },
     Paragraph {
         styles: Vec<Id>,

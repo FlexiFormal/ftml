@@ -11,7 +11,7 @@ use crate::{
             structures::{MathStructure, StructureExtension},
         },
     },
-    utils::SharedArc,
+    utils::{RefTree, SharedArc},
 };
 
 #[derive(Clone, Hash, Debug, PartialEq, Eq)]
@@ -161,6 +161,16 @@ impl Borrow<ModuleUri> for Module {
     #[inline]
     fn borrow(&self) -> &ModuleUri {
         &self.uri
+    }
+}
+impl RefTree for Module {
+    type Child<'a>
+        = AnyDeclarationRef<'a>
+    where
+        Self: 'a;
+    #[inline]
+    fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
+        self.declarations()
     }
 }
 

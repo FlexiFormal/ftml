@@ -2,6 +2,8 @@ use std::fmt::{Debug, Display, Formatter};
 
 use ftml_uris::{DocumentElementUri, Id};
 
+use crate::terms::IsTerm;
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serde",
@@ -24,6 +26,24 @@ pub enum Variable {
         #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         is_sequence: Option<bool>,
     },
+}
+
+impl IsTerm for Variable {
+    #[inline]
+    fn head(&self) -> Option<either::Either<&ftml_uris::SymbolUri, &Variable>> {
+        Some(either::Right(self))
+    }
+    #[inline]
+    fn subterms(&self) -> impl Iterator<Item = &super::Term> {
+        std::iter::empty()
+    }
+    #[inline]
+    fn symbols(&self) -> impl Iterator<Item = &ftml_uris::SymbolUri> {
+        std::iter::empty()
+    }
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        std::iter::once(self)
+    }
 }
 
 impl Display for Variable {

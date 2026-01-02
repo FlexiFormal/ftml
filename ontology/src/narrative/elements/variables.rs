@@ -55,6 +55,7 @@ impl crate::Ftml for VariableDeclaration {
     #[cfg(feature = "rdf")]
     #[allow(clippy::enum_glob_use)]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use crate::terms::IsTerm;
         use either_of::EitherOf6::*;
         use ftml_uris::FtmlUri;
         use rustc_hash::FxHashSet;

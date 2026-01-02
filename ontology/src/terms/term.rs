@@ -1,7 +1,8 @@
 use super::{BoundArgument, arguments::Argument, variables::Variable};
+use crate::terms::IsTerm;
 use crate::terms::opaque::OpaqueNode;
 use crate::terms::{VarOrSym, arguments::MaybeSequence};
-use crate::utils::TreeIter;
+use crate::utils::{RefTree, TreeIter};
 use ftml_uris::{SymbolUri, UriName};
 use std::fmt::Write;
 
@@ -59,11 +60,117 @@ pub enum Term {
     /// `expressions`.
     Opaque(OpaqueTerm),
 }
+impl IsTerm for Term {
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        match self {
+            Self::Symbol { uri, .. } => Some(either::Left(uri)),
+            Self::Var { variable, .. } => Some(either::Right(variable)),
+            Self::Application(a) => a.head(),
+            Self::Bound(b) => b.head(),
+            Self::Field(f) => f.head(),
+            Self::Opaque(_) | Self::Label { .. } => None,
+        }
+    }
+    #[inline]
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        self.tree_children()
+    }
+
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        use either_of::EitherOf3 as E;
+        match self {
+            Self::Symbol { uri, .. } => E::A(std::iter::once(uri)),
+            Self::Var { .. } => E::B(std::iter::empty()),
+            o => E::C(SubtermIter::One(o).dfs().filter_map(|t| {
+                if let Self::Symbol { uri, .. } = t {
+                    Some(uri)
+                } else {
+                    None
+                }
+            })),
+        }
+    }
+
+    // TODO: does this need to be boxed? -.-
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        use either_of::EitherOf3 as E;
+        match self {
+            Self::Symbol { .. } | Self::Label { .. } => E::A(std::iter::empty::<&Variable>()),
+            Self::Var { variable, .. } => E::B(std::iter::once(variable)),
+            Self::Application(a) => E::C(Box::new(a.variables()) as Box<dyn Iterator<Item = _>>),
+            Self::Bound(b) => E::C(Box::new(b.variables()) as Box<dyn Iterator<Item = _>>),
+            Self::Opaque(o) => E::C(Box::new(o.variables()) as Box<dyn Iterator<Item = _>>),
+            Self::Field(f) => E::C(Box::new(f.record.variables()) as Box<dyn Iterator<Item = _>>),
+        }
+    }
+}
 
 #[derive(Clone)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ApplicationTerm(pub(crate) triomphe::Arc<Application>);
+impl IsTerm for ApplicationTerm {
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        self.head.head()
+    }
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        std::iter::once(&self.head).chain(self.arguments.iter().flat_map(Argument::terms))
+    }
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        SubtermIter::App(Some(&self.head), &self.arguments)
+            .dfs()
+            .filter_map(|t| {
+                if let Term::Symbol { uri, .. } = t {
+                    Some(uri)
+                } else {
+                    None
+                }
+            })
+    }
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        SubtermIter::App(Some(&self.head), &self.arguments)
+            .dfs()
+            .filter_map(|t| {
+                if let Term::Var { variable, .. } = t {
+                    Some(variable)
+                } else {
+                    None
+                }
+            })
+    }
+}
+impl IsTerm for Application {
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        self.head.head()
+    }
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        std::iter::once(&self.head).chain(self.arguments.iter().flat_map(Argument::terms))
+    }
+
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        SubtermIter::App(Some(&self.head), &self.arguments)
+            .dfs()
+            .filter_map(|t| {
+                if let Term::Symbol { uri, .. } = t {
+                    Some(uri)
+                } else {
+                    None
+                }
+            })
+    }
+
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        SubtermIter::App(Some(&self.head), &self.arguments)
+            .dfs()
+            .filter_map(|t| {
+                if let Term::Var { variable, .. } = t {
+                    Some(variable)
+                } else {
+                    None
+                }
+            })
+    }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(
@@ -90,6 +197,86 @@ pub struct Application {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct BindingTerm(pub(crate) triomphe::Arc<Binding>);
 
+impl IsTerm for BindingTerm {
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        self.head.head()
+    }
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        std::iter::once(&self.head).chain(self.arguments.iter().flat_map(BoundArgument::terms))
+    }
+
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        SubtermIter::Bound(Some(&self.head), &self.arguments)
+            .dfs()
+            .filter_map(|t| {
+                if let Term::Symbol { uri, .. } = t {
+                    Some(uri)
+                } else {
+                    None
+                }
+            })
+    }
+
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        use either_of::EitherOf3 as E;
+        SubtermIter::Bound(Some(&self.head), &self.arguments)
+            .dfs()
+            .filter_map(|t| {
+                if let Term::Var { variable, .. } = t {
+                    Some(variable)
+                } else {
+                    None
+                }
+            })
+            .chain(self.arguments.iter().flat_map(|ba| match ba {
+                BoundArgument::Bound(v) | BoundArgument::BoundSeq(MaybeSequence::One(v)) => {
+                    E::A(std::iter::once(v))
+                }
+                BoundArgument::BoundSeq(MaybeSequence::Seq(s)) => E::B(s.iter()),
+                _ => E::C(std::iter::empty()),
+            }))
+    }
+}
+impl IsTerm for Binding {
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        self.head.head()
+    }
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        std::iter::once(&self.head).chain(self.arguments.iter().flat_map(BoundArgument::terms))
+    }
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        SubtermIter::Bound(Some(&self.head), &self.arguments)
+            .dfs()
+            .filter_map(|t| {
+                if let Term::Symbol { uri, .. } = t {
+                    Some(uri)
+                } else {
+                    None
+                }
+            })
+    }
+
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        use either_of::EitherOf3 as E;
+        SubtermIter::Bound(Some(&self.head), &self.arguments)
+            .dfs()
+            .filter_map(|t| {
+                if let Term::Var { variable, .. } = t {
+                    Some(variable)
+                } else {
+                    None
+                }
+            })
+            .chain(self.arguments.iter().flat_map(|ba| match ba {
+                BoundArgument::Bound(v) | BoundArgument::BoundSeq(MaybeSequence::One(v)) => {
+                    E::A(std::iter::once(v))
+                }
+                BoundArgument::BoundSeq(MaybeSequence::Seq(s)) => E::B(s.iter()),
+                _ => E::C(std::iter::empty()),
+            }))
+    }
+}
+
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
@@ -115,6 +302,41 @@ pub struct Binding {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RecordFieldTerm(pub(crate) triomphe::Arc<RecordField>);
+
+impl IsTerm for RecordFieldTerm {
+    #[inline]
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        self.record.head()
+    }
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        std::iter::once(&self.record)
+    }
+    #[inline]
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        self.record.symbols()
+    }
+    #[inline]
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        self.record.variables()
+    }
+}
+impl IsTerm for RecordField {
+    #[inline]
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        self.record.head()
+    }
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        std::iter::once(&self.record)
+    }
+    #[inline]
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        self.record.symbols()
+    }
+    #[inline]
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        self.record.variables()
+    }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(
@@ -143,6 +365,49 @@ pub struct RecordField {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct OpaqueTerm(pub(crate) triomphe::Arc<Opaque>);
+
+impl IsTerm for OpaqueTerm {
+    #[inline]
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        None
+    }
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        self.terms.iter()
+    }
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        self.terms.iter().dfs().filter_map(|t| {
+            if let Term::Symbol { uri, .. } = t {
+                Some(uri)
+            } else {
+                None
+            }
+        })
+    }
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        self.terms.iter().flat_map(Term::variables)
+    }
+}
+impl IsTerm for Opaque {
+    #[inline]
+    fn head(&self) -> Option<either::Either<&SymbolUri, &Variable>> {
+        None
+    }
+    fn subterms(&self) -> impl Iterator<Item = &Term> {
+        self.terms.iter()
+    }
+    fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
+        self.terms.iter().dfs().filter_map(|t| {
+            if let Term::Symbol { uri, .. } = t {
+                Some(uri)
+            } else {
+                None
+            }
+        })
+    }
+    fn variables(&self) -> impl Iterator<Item = &Variable> {
+        self.terms.iter().flat_map(Term::variables)
+    }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(
@@ -175,18 +440,6 @@ impl Term {
     #[must_use]
     pub fn debug_short(&self) -> impl std::fmt::Debug {
         Short(self)
-    }
-
-    /// Iterates over all symbols occuring in this expression.
-    #[inline]
-    pub fn symbols(&self) -> impl Iterator<Item = &SymbolUri> {
-        ExprChildrenIter::One(self).dfs().filter_map(|e| {
-            if let Self::Symbol { uri, .. } = e {
-                Some(uri)
-            } else {
-                None
-            }
-        })
     }
 
     #[must_use]
@@ -244,26 +497,26 @@ impl crate::utils::RefTree for Term {
         Self: 'a;
 
     #[allow(refining_impl_trait_reachable)]
-    fn tree_children(&self) -> ExprChildrenIter<'_> {
+    fn tree_children(&self) -> SubtermIter<'_> {
         match self {
             Self::Symbol{..}
             | Self::Var{..}
             //| Self::Module(_)
             | Self::Label {
                 df: None, tp: None, ..
-            } => ExprChildrenIter::E,
-            Self::Application(a) => ExprChildrenIter::App(Some(&a.head), &a.arguments),
-            Self::Bound(b) => ExprChildrenIter::Bound(Some(&b.head), &b.arguments),//, &b.body),
+            } => SubtermIter::E,
+            Self::Application(a) => SubtermIter::App(Some(&a.head), &a.arguments),
+            Self::Bound(b) => SubtermIter::Bound(Some(&b.head), &b.arguments),//, &b.body),
             Self::Label {
                 df: Some(df),
                 tp: Some(tp),
                 ..
-            } => ExprChildrenIter::Two(tp, df),
-            Self::Field(f) => ExprChildrenIter::One(&f.record),
+            } => SubtermIter::Two(tp, df),
+            Self::Field(f) => SubtermIter::One(&f.record),
             Self::Label { df: Some(t), .. } | Self::Label { tp: Some(t), .. } => {
-                ExprChildrenIter::One(t)
+                SubtermIter::One(t)
             }
-            Self::Opaque(o) => ExprChildrenIter::Slice(o.terms.iter()),
+            Self::Opaque(o) => SubtermIter::Slice(o.terms.iter()),
         }
     }
 }
@@ -398,7 +651,7 @@ impl std::fmt::Debug for Short<'_> {
     }
 }
 
-pub enum ExprChildrenIter<'a> {
+pub enum SubtermIter<'a> {
     E,
     App(Option<&'a Term>, &'a [Argument]),
     Bound(Option<&'a Term>, &'a [BoundArgument]), //, &'a Term),
@@ -408,7 +661,7 @@ pub enum ExprChildrenIter<'a> {
     Two(&'a Term, &'a Term),
     Slice(std::slice::Iter<'a, Term>),
 }
-impl<'a> Iterator for ExprChildrenIter<'a> {
+impl<'a> Iterator for SubtermIter<'a> {
     type Item = &'a Term;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
