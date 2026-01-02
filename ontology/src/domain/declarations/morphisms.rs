@@ -27,7 +27,7 @@ pub struct Morphism {
     pub total: bool,
     pub elements: Box<[Assignment]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(skip))]
-    elaboration: Elaboration,
+    pub elaboration: Elaboration,
 }
 
 impl crate::__private::Sealed for Morphism {}
@@ -153,7 +153,7 @@ impl deepsize::DeepSizeOf for Morphism {
 // -------------------------------------------------------------------------
 
 #[derive(Default, Debug, Clone)]
-struct Elaboration {
+pub struct Elaboration {
     contents: std::sync::OnceLock<Vec<Declaration>>,
 }
 
@@ -162,7 +162,7 @@ impl Elaboration {
         self.contents.get().map_or(&[], Vec::as_slice)
     }
 
-    pub fn initialize<E: std::fmt::Display>(
+    fn initialize<E: std::fmt::Display>(
         m: &Morphism,
         get: impl FnMut(&ModuleUri) -> Result<ModuleLike, E>,
     ) -> Result<(), E> {
@@ -180,7 +180,7 @@ impl Elaboration {
         err.map_or(Ok(()), Err)
     }
 
-    pub fn initialize_i<E: std::fmt::Display>(
+    fn initialize_i<E: std::fmt::Display>(
         m: &Morphism,
         mut get: impl FnMut(&ModuleUri) -> Result<ModuleLike, E>,
     ) -> Result<Vec<Declaration>, E> {
