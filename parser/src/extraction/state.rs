@@ -35,13 +35,13 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{ApplicationTerm, BindingTerm, Term, VarOrSym, Variable},
+    terms::{ApplicationTerm, ArgumentMode, BindingTerm, Term, VarOrSym, Variable},
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, DomainUriRef, Id, IsDomainUri, Language, LeafUri, ModuleUri,
     SymbolUri,
 };
-use std::{borrow::Cow, hint::unreachable_unchecked};
+use std::{borrow::Cow, hint::unreachable_unchecked, mem::MaybeUninit};
 
 #[derive(Debug)]
 pub struct IdCounter {
@@ -1901,35 +1901,59 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         terms: Vec<(Term, crate::NodePath)>,
         node: &N,
     ) -> super::Result<()> {
-        let term = node.as_term(terms)?.simplify();
-        match self.domain.last_mut() {
-            Some(OpenDomainElement::OMA { arguments, .. }) => {
-                OpenArgument::set(arguments, position, term)
+        fn merge<N:FtmlNode>(elem:&mut OpenDomainElement<N>,position: ArgumentPosition,term:Term,cont:u8) -> Result<Result<(),std::ops::ControlFlow<(),Term>>,FtmlExtractionError> {
+            match elem {
+            OpenDomainElement::OMA { arguments, .. } => {
+                OpenArgument::set(arguments, position, term).map(Ok)
             }
-            Some(OpenDomainElement::OMBIND { arguments, .. }) => {
-                OpenBoundArgument::set(arguments, position, term)
+            OpenDomainElement::OMBIND { arguments, .. } => {
+                OpenBoundArgument::set(arguments, position, term).map(Ok)
             }
-            None
-            | Some(
-                OpenDomainElement::Argument { .. }
-                | OpenDomainElement::HeadTerm { .. }
-                | OpenDomainElement::Assign { .. }
-                | OpenDomainElement::Type { .. }
-                | OpenDomainElement::ArgTypes(_)
-                | OpenDomainElement::ReturnType { .. }
-                | OpenDomainElement::Definiens { .. }
-                | OpenDomainElement::Module { .. }
-                | OpenDomainElement::MathStructure { .. }
-                | OpenDomainElement::Morphism { .. }
-                | OpenDomainElement::SymbolDeclaration { .. }
-                | OpenDomainElement::SymbolReference { .. }
-                | OpenDomainElement::ComplexTerm { .. }
-                | OpenDomainElement::OML { .. }
-                | OpenDomainElement::Comp
-                | OpenDomainElement::DefComp
-                | OpenDomainElement::VariableReference { .. },
-            ) => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg)),
+            // decent chance this is in an argsep over a sequence variable;
+            // try the next ancestor instead
+            OpenDomainElement::VariableReference { .. } if cont == 0 => {
+                Ok(Err(std::ops::ControlFlow::Continue(term)))
+            }
+            OpenDomainElement::Argument { position, .. } 
+                if cont == 1 && matches!(position.mode(),ArgumentMode::Sequence|ArgumentMode::BoundVariableSequence) => {
+                Ok(Err(std::ops::ControlFlow::Continue(term)))
+            }
+            OpenDomainElement::Argument { .. }
+            | OpenDomainElement::HeadTerm { .. }
+            | OpenDomainElement::Assign { .. }
+            | OpenDomainElement::Type { .. }
+            | OpenDomainElement::ArgTypes(_)
+            | OpenDomainElement::ReturnType { .. }
+            | OpenDomainElement::Definiens { .. }
+            | OpenDomainElement::Module { .. }
+            | OpenDomainElement::MathStructure { .. }
+            | OpenDomainElement::Morphism { .. }
+            | OpenDomainElement::SymbolDeclaration { .. }
+            | OpenDomainElement::SymbolReference { .. }
+            | OpenDomainElement::ComplexTerm { .. }
+            | OpenDomainElement::OML { .. }
+            | OpenDomainElement::Comp
+            | OpenDomainElement::DefComp
+            | OpenDomainElement::VariableReference { .. }
+                => Ok(Err(std::ops::ControlFlow::Break(())))
         }
+        }
+        let mut term = MaybeUninit::new(node.as_term(terms)?.simplify());
+        let mut des = self.domain.iter_mut();
+        let mut cont = 0u8;
+        while let Some(next) = des.next() {
+            // SAFETY: term is initialized initially
+            match merge(next,position,unsafe{term.assume_init_read()},cont)? {
+                Ok(()) => return Ok(()),
+                Err(std::ops::ControlFlow::Continue(t)) => {
+                    cont += 1;
+                    // term is initialized again
+                    term.write(t);
+                }
+                Err(std::ops::ControlFlow::Break(())) => return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg))
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Arg))
     }
 
     fn close_argtypes(&mut self, terms: Vec<Term>, node: &N) -> super::Result<()> {
