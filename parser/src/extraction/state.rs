@@ -35,7 +35,8 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{ApplicationTerm, BindingTerm, Term, VarOrSym, Variable},
+    terms::{ApplicationTerm, BindingTerm, Term, TermContainer, VarOrSym, Variable},
+    utils::SourceRange,
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, DomainUriRef, Id, IsDomainUri, Language, LeafUri, ModuleUri,
@@ -149,6 +150,7 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     pub domain: StackVec<OpenDomainElement<N>>,
     pub narrative: StackVec<OpenNarrativeElement<N>>,
     pub kind: DocumentKind,
+    pub current_source_range: SourceRange,
     top_section_level: Option<SectionLevel>,
     pub(crate) ids: IdCounter,
     #[allow(dead_code)]
@@ -189,6 +191,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             kind: DocumentKind::default(),
             domain: StackVec::default(),
             narrative: StackVec::default(),
+            current_source_range: SourceRange::DEFAULT,
             #[cfg(feature = "rdf")]
             rdf: Vec::new(),
         }
@@ -273,16 +276,26 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             MetaDatum::Style(s) => self.styles.push(s),
             MetaDatum::Counter(c) => self.counters.push(c),
             MetaDatum::InputRef { target, uri } => {
-                self.push_elem(DocumentElement::DocumentReference { uri, target });
+                self.push_elem(DocumentElement::DocumentReference {
+                    uri,
+                    target,
+                    source: self.current_source_range,
+                });
             }
             MetaDatum::SetSectionLevel(lvl) => {
                 self.top_section_level = Some(lvl);
             }
-            MetaDatum::UseModule(uri) => self.push_elem(DocumentElement::UseModule(uri)),
+            MetaDatum::UseModule(uri) => self.push_elem(DocumentElement::UseModule {
+                uri,
+                source: self.current_source_range,
+            }),
             MetaDatum::ImportModule(uri) => {
-                self.push_domain(uri.clone(), Declaration::Import, |uri| {
-                    Ok(StructureDeclaration::Import(uri))
-                })?;
+                let source = self.current_source_range;
+                self.push_domain(
+                    uri.clone(),
+                    |uri| Declaration::Import { uri, source },
+                    |uri| Ok(StructureDeclaration::Import { uri, source }),
+                )?;
                 self.push_elem(DocumentElement::ImportModule(uri));
             }
             MetaDatum::Rename {
@@ -304,6 +317,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                             refined_type: None,
                             new_name: name,
                             macroname,
+                            source: self.current_source_range,
                         });
                     }
                 } else {
@@ -406,6 +420,12 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     children,
                 }) => self.close_morphism(uri, domain, total, children, node),
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Morphism)),
+            },
+            CloseFtmlElement::Rule => match self.domain.pop() {
+                Some(OpenDomainElement::InferenceRule { rule, parameters }) => {
+                    self.close_inferencerule(rule, parameters)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::InferenceRule)),
             },
             CloseFtmlElement::Comp => match self.domain.pop() {
                 Some(OpenDomainElement::Comp) => Ok(()),
@@ -690,6 +710,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                         title,
                         preconditions: preconditions.into_boxed_slice(),
                         objectives: objectives.into_boxed_slice(),
+                        source: self.current_source_range,
                     });
                     self.push_elem(DocumentElement::Problem(Problem {
                         uri,
@@ -1003,11 +1024,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         node: &N,
     ) -> Result<(), FtmlExtractionError> {
         let Some((i,_)) = children.iter().enumerate().find(|(_,i)|
-            matches!(i,StructureDeclaration::Import(i) if !i.module_name().last().starts_with("EXTSTRUCT"))
+            matches!(i,StructureDeclaration::Import{uri:i,..} if !i.module_name().last().starts_with("EXTSTRUCT"))
         ) else {
             return Err(FtmlExtractionError::MissingArgument(0))
         };
-        let StructureDeclaration::Import(i) = children.remove(i) else {
+        let StructureDeclaration::Import { uri: i, .. } = children.remove(i) else {
             // SAFETY: match above
             unsafe { unreachable_unchecked() }
         };
@@ -1018,6 +1039,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             uri,
             target,
             elements: children.into_boxed_slice(),
+            source: self.current_source_range,
         };
 
         let Some(OpenNarrativeElement::MathStructure { uri, children }) = self.narrative.pop()
@@ -1056,6 +1078,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             domain,
             total,
             elements: children.into_boxed_slice(),
+            source: self.current_source_range,
         };
         tracing::trace!("New morphism {morphism:?}");
         let parent_uri = self.push_domain(morphism, Declaration::Morphism, |m| {
@@ -1097,6 +1120,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                         refined_type,
                         new_name: None,
                         macroname: None,
+                        source: self.current_source_range,
                     });
                 }
                 return Ok(());
@@ -1124,6 +1148,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             uri,
             elements: children.into_boxed_slice(),
             macroname,
+            source: self.current_source_range,
         };
         tracing::trace!("New structure {structure:?}");
         let parent_uri = self.push_domain(structure, Declaration::MathStructure, |s| {
@@ -1185,6 +1210,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             meta_module: meta,
             signature,
             declarations: children.into_boxed_slice(),
+            source: self.current_source_range,
         };
         #[cfg(feature = "rdf")]
         {
@@ -1206,6 +1232,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             // SAFETY: uri is not is_top() verified above
             uri: unsafe { uri.into_symbol().unwrap_unchecked() },
             declarations: children.into_boxed_slice(),
+            source: self.current_source_range,
         };
         self.push_domain(module, Declaration::NestedModule, |m| {
             Err(FtmlExtractionError::InvalidIn(
@@ -1219,7 +1246,6 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     }
 
     fn close_symbol(&mut self, uri: SymbolUri, data: Box<SymbolData>) -> super::Result<()> {
-        //get_module!(parent,parent_uri <- self);
         let uricl = uri.clone();
         let symbol = Symbol { uri, data };
         tracing::info!("New symbol {symbol:#?}");
@@ -1227,17 +1253,33 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             Ok(StructureDeclaration::Symbol(s))
         })?;
         self.push_elem(DocumentElement::SymbolDeclaration(uricl));
-        //add_triples!(DOM self,symbol -> parent_uri);
-        //parent.push(Declaration::Symbol(symbol));
         Ok(())
+    }
+
+    fn close_inferencerule(&mut self, id: Id, parameters: Vec<Term>) -> super::Result<()> {
+        let source = self.current_source_range;
+        self.push_domain(
+            (id, parameters.into_boxed_slice()),
+            |(id, parameters)| Declaration::Rule {
+                id,
+                parameters,
+                source,
+            },
+            |(id, parameters)| {
+                Ok(StructureDeclaration::Rule {
+                    id,
+                    parameters,
+                    source,
+                })
+            },
+        )
+        .map(|_| ())
     }
 
     fn close_vardecl(&mut self, uri: DocumentElementUri, data: Box<VariableData>) {
         let var = VariableDeclaration { uri, data };
         tracing::info!("New variable {var:#?}");
         self.push_elem(DocumentElement::VariableDeclaration(var));
-        //add_triples!(DOM self,symbol -> parent_uri);
-        //parent.push(Declaration::Symbol(symbol));
     }
 
     fn close_definiendum(
@@ -1252,7 +1294,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     fors.push((uri.clone(), None));
                 }
                 drop(iter);
-                self.push_elem(DocumentElement::Definiendum { range, uri });
+                self.push_elem(DocumentElement::Definiendum {
+                    range,
+                    uri,
+                    source: self.current_source_range,
+                });
                 return Ok(());
             }
         }
@@ -1271,6 +1317,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             range,
             title,
             children: children.into_boxed_slice(),
+            source: self.current_source_range,
         };
         self.push_elem(DocumentElement::Section(sec));
     }
@@ -1503,6 +1550,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             styles,
             children: children.into_boxed_slice(),
             fors: fors.into_boxed_slice(),
+            source: self.current_source_range,
         };
         if self
             .narrative
@@ -1529,6 +1577,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             title,
             range,
             children: children.into_boxed_slice(),
+            source: self.current_source_range,
         });
         tracing::info!("Adding slide {p:#?}");
         self.push_elem(p);
@@ -1567,6 +1616,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     symbol: s.clone(),
                     uri: uri.clone(),
                     notation,
+                    source: self.current_source_range,
                 }),
                 s.into(),
             ),
@@ -1575,6 +1625,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     variable: declaration.clone(),
                     uri: uri.clone(),
                     notation,
+                    source: self.current_source_range,
                 }),
                 declaration.into(),
             ),
@@ -1909,6 +1960,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             Some(OpenDomainElement::OMBIND { arguments, .. }) => {
                 OpenBoundArgument::set(arguments, position, term)
             }
+            Some(OpenDomainElement::InferenceRule { parameters, .. }) => {
+                parameters.push(term);
+                Ok(())
+            }
             None
             | Some(
                 OpenDomainElement::Argument { .. }
@@ -1957,7 +2012,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         let term = node.as_term(terms)?.simplify();
         match self.domain.last_mut() {
             Some(OpenDomainElement::SymbolDeclaration { uri, data }) if data.tp.is_none() => {
-                data.tp = Some(term);
+                data.tp = TermContainer::new(term, None);
                 return Ok(());
             }
             Some(OpenDomainElement::OML { tp, .. }) if tp.is_none() => {
@@ -1980,6 +2035,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
                 | OpenDomainElement::ComplexTerm { .. }
@@ -1997,7 +2053,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         for n in self.narrative.iter_mut() {
             match n {
                 OpenNarrativeElement::VariableDeclaration { uri, data } if data.tp.is_none() => {
-                    data.tp = Some(term);
+                    data.tp = TermContainer::new(term, None);
                     return Ok(());
                 }
                 OpenNarrativeElement::Invisible => (),
@@ -2054,6 +2110,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
                 | OpenDomainElement::ComplexTerm { .. }
@@ -2108,6 +2165,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn close_definiens(
         &mut self,
         terms: Vec<(Term, crate::NodePath)>,
@@ -2117,7 +2175,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         let term = node.as_term(terms)?.simplify();
         match self.domain.last_mut() {
             Some(OpenDomainElement::SymbolDeclaration { uri, data }) if data.df.is_none() => {
-                data.df = Some(term);
+                data.df = TermContainer::new(term, None);
                 return Ok(());
             }
             Some(OpenDomainElement::OML { df, .. }) if df.is_none() => {
@@ -2137,6 +2195,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
                 | OpenDomainElement::OML { .. }
@@ -2155,7 +2214,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         for n in self.narrative.iter_mut() {
             match n {
                 OpenNarrativeElement::VariableDeclaration { uri, data } if data.df.is_none() => {
-                    data.df = Some(term);
+                    data.df = TermContainer::new(term, None);
                     return Ok(());
                 }
                 OpenNarrativeElement::Paragraph {
@@ -2165,7 +2224,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                         if let Some(data) = Self::find_symbol(&mut self.domain, &of)
                             && data.df.is_none()
                         {
-                            data.df = Some(term.clone());
+                            data.df = TermContainer::new(term.clone(), None);
                         }
                         if let Some((a, b)) = fors.iter_mut().find(|(k, v)| *k == of) {
                             *b = Some(term);
@@ -2176,7 +2235,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                         if let Some(data) = Self::find_symbol(&mut self.domain, k)
                             && data.df.is_none()
                         {
-                            data.df = Some(term.clone());
+                            data.df = TermContainer::new(term.clone(), None);
                         }
                         *v = Some(term);
                     } else {
@@ -2246,6 +2305,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::DefComp
                 | OpenDomainElement::Definiens { .. }
                 | OpenDomainElement::HeadTerm { .. }
+                | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
                 | OpenDomainElement::OML { .. }
@@ -2281,7 +2341,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     }
                 }
                 Declaration::Symbol(s) if s.uri == *uri => return Some(&mut s.data),
-                Declaration::Symbol(_) | Declaration::Import(_) | Declaration::Morphism(_) => (),
+                Declaration::Symbol(_)
+                | Declaration::Import { .. }
+                | Declaration::Morphism(_)
+                | Declaration::Rule { .. } => (),
             }
         }
         None
@@ -2295,7 +2358,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             match d {
                 StructureDeclaration::Symbol(s) if s.uri == *uri => return Some(&mut s.data),
                 StructureDeclaration::Symbol(_)
-                | StructureDeclaration::Import(_)
+                | StructureDeclaration::Rule { .. }
+                | StructureDeclaration::Import { .. }
                 | StructureDeclaration::Morphism(_) => (),
             }
         }
@@ -2342,6 +2406,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenDomainElement::Module { .. }
                 | OpenDomainElement::MathStructure { .. }
                 | OpenDomainElement::Morphism { .. }
+                | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
                 | OpenDomainElement::OML { .. }
@@ -2411,7 +2476,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
                 },
                 |uri| {
-                    slf.push_elem(DocumentElement::Term(DocumentTerm { uri, term }));
+                    slf.push_elem(DocumentElement::Term(DocumentTerm::new(uri, term, None)));
                     Ok(())
                 },
             )
@@ -2546,7 +2611,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
                 },
                 |uri| {
-                    slf.push_elem(DocumentElement::Term(DocumentTerm { uri, term }));
+                    slf.push_elem(DocumentElement::Term(DocumentTerm::new(uri, term, None)));
                     Ok(())
                 },
             )
@@ -2554,6 +2619,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     }
 
     fn close_oms(&mut self, uri: SymbolUri, notation: Option<Id>, node: &N) -> super::Result<()> {
+        let source = self.current_source_range;
         self.close_term(
             Term::Symbol {
                 uri,
@@ -2569,6 +2635,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     range: node.range(),
                     uri,
                     notation,
+                    source,
                 });
                 Ok(())
             },
@@ -2576,6 +2643,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     }
 
     fn close_omv(&mut self, var: Variable, notation: Option<Id>, node: &N) -> super::Result<()> {
+        let source = self.current_source_range;
         self.close_term(
             Term::Var {
                 variable: var,
@@ -2598,6 +2666,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     range: node.range(),
                     uri,
                     notation,
+                    source,
                 });
                 Ok(())
             },
