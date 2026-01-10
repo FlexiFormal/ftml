@@ -498,7 +498,8 @@ impl Marker {
             | OpenFtmlElement::ProblemChoiceVerdict
             | OpenFtmlElement::ProblemChoiceFeedback
             | OpenFtmlElement::ArgTypes
-            | OpenFtmlElement::HeadTerm => None,
+            | OpenFtmlElement::HeadTerm
+            | OpenFtmlElement::Rule(_) => None,
         }
     }
 }

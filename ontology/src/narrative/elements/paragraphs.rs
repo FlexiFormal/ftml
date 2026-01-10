@@ -4,6 +4,7 @@ use crate::{
         elements::{DocumentElement, DocumentElementRef, IsDocumentElement},
     },
     terms::Term,
+    utils::SourceRange,
 };
 use ftml_uris::{DocumentElementUri, Id, SymbolUri};
 
@@ -22,11 +23,17 @@ pub struct LogicalParagraph {
     pub kind: ParagraphKind,
     pub uri: DocumentElementUri,
     pub formatting: ParagraphFormatting,
-    pub title: Option<Box<str>>,
     pub range: DocumentRange,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub title: Option<Box<str>>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub styles: Box<[Id]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub children: Box<[DocumentElement]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub fors: Box<[(SymbolUri, Option<Term>)]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl crate::__private::Sealed for LogicalParagraph {}
 impl crate::Ftml for LogicalParagraph {
@@ -50,6 +57,10 @@ impl crate::Ftml for LogicalParagraph {
             .chain(std::iter::once(
                 triple!(<(iri)> : <(self.kind.rdf_type().into_owned())>),
             ))
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl Narrative for LogicalParagraph {

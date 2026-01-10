@@ -1,21 +1,25 @@
 use crate::{
-    components::content::FtmlViewable,
+    components::content::{CommaSep, FtmlViewable},
     utils::{
         Header,
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
 use ftml_dom::{notations::TermExt, utils::local_cache::SendBackend};
-use ftml_ontology::domain::{
-    HasDeclarations,
-    declarations::{
-        AnyDeclarationRef,
-        morphisms::{Assignment, Morphism},
-        structures::{MathStructure, StructureExtension},
-        symbols::ArgumentSpec,
+use ftml_ontology::{
+    domain::{
+        HasDeclarations,
+        declarations::{
+            AnyDeclarationRef,
+            morphisms::{Assignment, Morphism},
+            structures::{MathStructure, StructureExtension},
+            symbols::ArgumentSpec,
+        },
+        modules::{Module, ModuleLike, NestedModule},
     },
-    modules::{Module, ModuleLike, NestedModule},
+    terms::Term,
 };
+use ftml_uris::Id;
 use leptos::prelude::*;
 use thaw::{Caption1, Caption1Strong, Divider};
 
@@ -34,22 +38,49 @@ impl FtmlViewable for ModuleLike {
 impl FtmlViewable for AnyDeclarationRef<'_> {
     fn as_view<Be: SendBackend>(&self) -> AnyView {
         match self {
-            Self::Import(_) => ().into_any(),
+            Self::Import { .. } => ().into_any(),
             Self::Morphism(m) => m.as_view::<Be>(),
             Self::Symbol(s) => super::symbols::symbol_view::<Be>(s, true),
             Self::MathStructure(m) => m.as_view::<Be>(),
             Self::Extension(e) => e.as_view::<Be>(),
             Self::NestedModule(m) => m.as_view::<Be>(),
+            Self::Rule {
+                id,
+                parameters: args,
+                ..
+            } => rule::<Be>(id, args),
         }
     }
+}
+
+fn rule<Be: SendBackend>(id: &Id, args: &[Term]) -> AnyView {
+    use thaw::Text;
+    let id = id.to_string();
+    let header = view! {
+        <Caption1Strong>"Inference Rule "{id}</Caption1Strong>
+    };
+    let fors = CommaSep(
+        "for",
+        args.iter()
+            .map(|t| t.clone().into_view::<crate::Views<Be>, Be>(false)),
+    )
+    .into_view();
+    view! {
+        <Block show_separator=false>
+            <Header slot>{header}</Header>
+            <HeaderRight slot><Text>{fors}</Text></HeaderRight>
+            ""
+        </Block>
+    }
+    .into_any()
 }
 
 impl FtmlViewable for MathStructure {
     fn as_view<Be: SendBackend>(&self) -> AnyView {
         let name = self.uri.as_view::<Be>();
         let imports = self.declarations().filter_map(|e| {
-            if let AnyDeclarationRef::Import(u) = e {
-                Some(u)
+            if let AnyDeclarationRef::Import { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }
@@ -82,8 +113,8 @@ impl FtmlViewable for StructureExtension {
         let name = self.uri.as_view::<Be>();
         let target = self.target.as_view::<Be>();
         let imports = self.declarations().filter_map(|e| {
-            if let AnyDeclarationRef::Import(u) = e {
-                Some(u)
+            if let AnyDeclarationRef::Import { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }
@@ -115,8 +146,8 @@ impl FtmlViewable for NestedModule {
     fn as_view<Be: SendBackend>(&self) -> AnyView {
         let name = super::module_with_hover(&self.uri.clone().into_module());
         let imports = self.declarations().filter_map(|e| {
-            if let AnyDeclarationRef::Import(u) = e {
-                Some(u)
+            if let AnyDeclarationRef::Import { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }
@@ -141,8 +172,8 @@ impl FtmlViewable for Module {
     fn as_view<Be: SendBackend>(&self) -> AnyView {
         let name = super::module_with_hover(&self.uri);
         let imports = self.declarations().filter_map(|e| {
-            if let AnyDeclarationRef::Import(u) = e {
-                Some(u)
+            if let AnyDeclarationRef::Import { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }

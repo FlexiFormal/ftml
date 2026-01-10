@@ -14,14 +14,14 @@ use crate::{
 use ftml_ontology::{
     narrative::elements::Notation,
     terms::{
-        Argument, BoundArgument, MaybeSequence, Term, VarOrSym, Variable,
+        Argument, BoundArgument, ComponentVar, MaybeSequence, Numeric, Term, VarOrSym, Variable,
         opaque::{AnyOpaque, OpaqueNode},
     },
 };
 use ftml_uris::{DocumentElementUri, Id, LeafUri, NamedUri, SymbolUri};
 use leptos::{
     either::Either,
-    math::{mi, mo},
+    math::{mi, mn, mo},
     tachys::view::any_view::AnyViewWithAttrs,
 };
 use leptos::{math::mtext, prelude::*};
@@ -251,6 +251,11 @@ impl TermExt for Term {
                 )
                 .into_any()
             }
+
+            Self::Number(n) => match n {
+                Numeric::Int(i) => mn().child(i.to_string()).into_any(),
+                Numeric::Float(f) => mn().child(f.to_string()).into_any(),
+            },
             t => mtext().child(format!("{t:?}")).into_any(),
         }
         //})
@@ -570,13 +575,21 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                     })
                     .collect::<Vec<_>>(),
             ),
-            BoundArgument::Bound(Variable::Ref {
-                declaration,
-                is_sequence,
+            BoundArgument::Bound(ComponentVar {
+                var:
+                    Variable::Ref {
+                        declaration,
+                        is_sequence,
+                    },
+                ..
             })
-            | BoundArgument::BoundSeq(MaybeSequence::One(Variable::Ref {
-                declaration,
-                is_sequence,
+            | BoundArgument::BoundSeq(MaybeSequence::One(ComponentVar {
+                var:
+                    Variable::Ref {
+                        declaration,
+                        is_sequence,
+                    },
+                ..
             })) => {
                 let declaration = declaration.clone();
                 let is_sequence = *is_sequence;
@@ -607,7 +620,7 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                             if let Variable::Ref {
                                 declaration,
                                 is_sequence,
-                            } = &v
+                            } = &v.var
                             {
                                 let declaration = declaration.clone();
                                 let is_sequence = *is_sequence;

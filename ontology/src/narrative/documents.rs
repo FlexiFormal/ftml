@@ -11,7 +11,7 @@ use crate::{
             sections::SectionLevel,
         },
     },
-    utils::{RefTree, TreeChild, time::Timestamp},
+    utils::{RefTree, SourceRange, TreeChild, time::Timestamp},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -45,6 +45,10 @@ impl DocumentData {
 
 impl crate::__private::Sealed for DocumentData {}
 impl crate::Ftml for DocumentData {
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        SourceRange::DEFAULT
+    }
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
         use either_of::EitherOf3::{A, B, C};
@@ -282,23 +286,32 @@ impl std::fmt::Display for DocumentKind {
 pub enum TocElem {
     /// A section; the title is assumed to be an HTML string
     Section {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         title: Option<Box<str>>,
         uri: DocumentElementUri,
         id: String,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        #[cfg_attr(feature = "typescript", tsify(type = "TocElem[]"))]
         children: Vec<Self>,
     },
     SkippedSection {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        #[cfg_attr(feature = "typescript", tsify(type = "TocElem[]"))]
         children: Vec<Self>,
     },
     /// An inputref to some other document; the URI is the one for the
     /// referenced Document.
     Inputref {
         uri: DocumentUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         title: Option<Box<str>>,
         id: String,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        #[cfg_attr(feature = "typescript", tsify(type = "TocElem[]"))]
         children: Vec<Self>,
     },
     Paragraph {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         styles: Vec<Id>,
         kind: ParagraphKind,
     },
@@ -354,6 +367,16 @@ impl std::str::FromStr for DocumentStyle {
 }
 
 impl RefTree for Document {
+    type Child<'a>
+        = DocumentElementRef<'a>
+    where
+        Self: 'a;
+    #[inline]
+    fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
+        self.children()
+    }
+}
+impl RefTree for DocumentData {
     type Child<'a>
         = DocumentElementRef<'a>
     where

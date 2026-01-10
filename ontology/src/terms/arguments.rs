@@ -49,8 +49,25 @@ impl Argument {
 pub enum BoundArgument {
     Simple(Term),
     Sequence(MaybeSequence<Term>),
-    Bound(Variable),
-    BoundSeq(MaybeSequence<Variable>),
+    Bound(ComponentVar),
+    BoundSeq(MaybeSequence<ComponentVar>),
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct ComponentVar {
+    pub var: Variable,
+    pub tp: Option<Term>,
+    pub df: Option<Term>,
 }
 
 #[cfg(not(feature = "serde-lite"))]
@@ -182,6 +199,23 @@ impl deepsize::DeepSizeOf for Argument {
                 .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
                 .sum(),
         }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for ComponentVar {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.var.deep_size_of_children(context)
+            + self
+                .tp
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
+            + self
+                .df
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
     }
 }
 

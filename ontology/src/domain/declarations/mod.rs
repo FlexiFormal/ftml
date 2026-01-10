@@ -12,9 +12,10 @@ use crate::{
         },
         modules::NestedModule,
     },
-    utils::TreeChild,
+    terms::Term,
+    utils::{SourceRange, TreeChild},
 };
-use ftml_uris::{ModuleUri, SymbolUri};
+use ftml_uris::{Id, ModuleUri, SymbolUri};
 
 pub trait IsDeclaration: crate::Ftml {
     fn uri(&self) -> Option<&SymbolUri>;
@@ -35,11 +36,21 @@ pub trait IsDeclaration: crate::Ftml {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Declaration {
     NestedModule(NestedModule),
-    Import(ModuleUri),
+    Import {
+        uri: ModuleUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
+    },
     Symbol(Symbol),
     MathStructure(MathStructure),
     Morphism(Morphism),
     Extension(StructureExtension),
+    Rule {
+        id: Id,
+        parameters: Box<[Term]>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
+    },
 }
 
 impl crate::__private::Sealed for Declaration {}
@@ -53,7 +64,7 @@ impl Declaration {
             Self::MathStructure(s) => s.uri(),
             Self::Extension(e) => e.uri(),
             Self::Morphism(m) => m.uri(),
-            Self::Import(_) => None,
+            Self::Import { .. } | Self::Rule { .. } => None,
         }
     }
 
@@ -66,7 +77,19 @@ impl Declaration {
             Self::MathStructure(s) => AnyDeclarationRef::MathStructure(s),
             Self::Extension(e) => AnyDeclarationRef::Extension(e),
             Self::Morphism(m) => AnyDeclarationRef::Morphism(m),
-            Self::Import(i) => AnyDeclarationRef::Import(i),
+            Self::Import { uri, source } => AnyDeclarationRef::Import {
+                uri,
+                source: *source,
+            },
+            Self::Rule {
+                id,
+                parameters: args,
+                source,
+            } => AnyDeclarationRef::Rule {
+                id,
+                parameters: args,
+                source: *source,
+            },
         }
     }
 }
@@ -81,7 +104,17 @@ impl crate::Ftml for Declaration {
             Self::MathStructure(s) => C(s.triples().into_iter()),
             Self::Extension(e) => D(e.triples().into_iter()),
             Self::Morphism(m) => E(m.triples().into_iter()),
-            Self::Import(_) => F(std::iter::empty()),
+            Self::Import { .. } | Self::Rule { .. } => F(std::iter::empty()),
+        }
+    }
+    fn source_range(&self) -> SourceRange {
+        match self {
+            Self::NestedModule(m) => m.source_range(),
+            Self::Symbol(s) => s.source_range(),
+            Self::MathStructure(s) => s.source_range(),
+            Self::Extension(e) => e.source_range(),
+            Self::Morphism(m) => m.source_range(),
+            Self::Import { source, .. } | Self::Rule { source, .. } => *source,
         }
     }
 }
@@ -92,11 +125,21 @@ impl crate::Ftml for Declaration {
 #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 pub enum AnyDeclarationRef<'d> {
     NestedModule(&'d NestedModule),
-    Import(&'d ModuleUri),
+    Import {
+        uri: &'d ModuleUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
+    },
     Symbol(&'d Symbol),
     MathStructure(&'d MathStructure),
     Morphism(&'d Morphism),
     Extension(&'d StructureExtension),
+    Rule {
+        id: &'d Id,
+        parameters: &'d [Term],
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
+    },
 }
 impl<'d> TreeChild<'d> for AnyDeclarationRef<'d> {
     fn tree_children(self) -> impl Iterator<Item = Self> {
@@ -122,7 +165,7 @@ impl<'d> AnyDeclarationRef<'d> {
             Self::MathStructure(s) => s.uri(),
             Self::Extension(e) => e.uri(),
             Self::Morphism(m) => m.uri(),
-            Self::Import(_) => None,
+            Self::Import { .. } | Self::Rule { .. } => None,
         }
     }
 }
@@ -137,7 +180,17 @@ impl crate::Ftml for AnyDeclarationRef<'_> {
             Self::MathStructure(s) => C(s.triples().into_iter()),
             Self::Extension(e) => D(e.triples().into_iter()),
             Self::Morphism(m) => E(m.triples().into_iter()),
-            Self::Import(_) => F(std::iter::empty()),
+            Self::Import { .. } | Self::Rule { .. } => F(std::iter::empty()),
+        }
+    }
+    fn source_range(&self) -> SourceRange {
+        match self {
+            Self::NestedModule(m) => m.source_range(),
+            Self::Symbol(s) => s.source_range(),
+            Self::MathStructure(s) => s.source_range(),
+            Self::Extension(e) => e.source_range(),
+            Self::Morphism(m) => m.source_range(),
+            Self::Import { source, .. } | Self::Rule { source, .. } => *source,
         }
     }
 }
@@ -151,7 +204,14 @@ impl deepsize::DeepSizeOf for Declaration {
             Self::MathStructure(s) => s.deep_size_of_children(context),
             Self::Morphism(s) => s.deep_size_of_children(context),
             Self::Extension(s) => s.deep_size_of_children(context),
-            Self::Import(_) => 0,
+            Self::Import { .. } => 0,
+            Self::Rule { parameters, .. } => {
+                parameters.len() * std::mem::size_of::<Term>()
+                    + parameters
+                        .iter()
+                        .map(|t| t.deep_size_of_children(context))
+                        .sum::<usize>()
+            }
         }
     }
 }

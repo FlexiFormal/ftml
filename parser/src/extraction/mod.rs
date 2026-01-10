@@ -4,6 +4,7 @@ use either::Either::{Left, Right};
 use ftml_ontology::{
     narrative::elements::{DocumentElement, DocumentTerm, LogicalParagraph, VariableDeclaration},
     terms::{Term, Variable},
+    utils::SourceRange,
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, Id, ModuleUri, NarrativeUriRef, UriName,
@@ -42,6 +43,8 @@ pub trait FtmlExtractor: 'static + Sized {
     /// ### Errors
     fn close(&mut self, elem: CloseFtmlElement, node: &Self::Node) -> Result<()>;
 
+    fn current_source(&self) -> SourceRange;
+
     fn forced_element_uri(&mut self) -> Option<DocumentElementUri>;
     /// ### Errors
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id>;
@@ -66,6 +69,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::ArgTypes(_)
+                | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::Assign { .. } => {
                     return Err(FtmlExtractionError::NotIn(
                         in_elem,
@@ -185,6 +189,7 @@ pub trait FtmlExtractor: 'static + Sized {
                     | OpenDomainElement::Type { .. }
                     | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. }
+                    | OpenDomainElement::InferenceRule { .. }
                     | OpenDomainElement::Comp
                     | OpenDomainElement::DefComp,
                 ) => true,
@@ -319,7 +324,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::Slide { children, .. }
                 | OpenNarrativeElement::Problem { children, .. }
                 | OpenNarrativeElement::SkipSection { children } => match children.last() {
-                    Some(DocumentElement::Term(DocumentTerm { term, .. })) => return Some(term),
+                    Some(DocumentElement::Term(term)) => {
+                        return Some(term.parsed());
+                    }
                     _ => break,
                 },
                 OpenNarrativeElement::Notation { .. }
@@ -341,10 +348,8 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::NotationArg(_) => break,
             }
         }
-        if let Some(DocumentElement::Term(DocumentTerm { term, .. })) =
-            self.iterate_dones().next_back()
-        {
-            return Some(term);
+        if let Some(DocumentElement::Term(term)) = self.iterate_dones().next_back() {
+            return Some(term.parsed());
         }
         self.iterate_domain().next().and_then(|d| match d {
             OpenDomainElement::Argument { terms, .. }
@@ -352,7 +357,10 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::Type { terms, .. }
             | OpenDomainElement::ReturnType { terms, .. }
             | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
-            OpenDomainElement::ArgTypes(terms) => terms.last(),
+            OpenDomainElement::ArgTypes(terms)
+            | OpenDomainElement::InferenceRule {
+                parameters: terms, ..
+            } => terms.last(),
             OpenDomainElement::Module { .. }
             | OpenDomainElement::MathStructure { .. }
             | OpenDomainElement::Assign { .. }
@@ -422,6 +430,7 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::Comp
             | OpenDomainElement::DefComp
             | OpenDomainElement::Assign { .. }
+            | OpenDomainElement::InferenceRule { .. }
             | OpenDomainElement::VariableReference { .. } => None,
         })
     }
@@ -452,6 +461,10 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
 
     const RULES: &'static FtmlRuleSet<Self> = <Self as FtmlStateExtractor>::RULES;
     const DO_RDF: bool = <Self as FtmlStateExtractor>::DO_RDF;
+    #[inline]
+    fn current_source(&self) -> SourceRange {
+        self.state().current_source_range
+    }
     #[inline]
     fn iterate_domain(&self) -> impl Iterator<Item = &OpenDomainElement<Self::Node>> {
         self.state().domain()

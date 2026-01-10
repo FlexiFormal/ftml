@@ -36,10 +36,25 @@ impl Term {
             "class",
         ];
         match self {
+            // Numbers
+            Self::Opaque(o)
+                if (o.node.tag.as_ref() == "mi" || o.node.tag.as_ref() == "mn")
+                    && o.terms.is_empty()
+                    && matches!(&*o.node.children, [AnyOpaque::Text(_)]) =>
+            {
+                let Some(AnyOpaque::Text(txt)) = o.node.children.first() else {
+                    return Self::Opaque(o);
+                };
+                let Ok(num) = txt.parse() else {
+                    return Self::Opaque(o);
+                };
+                Self::Number(num)
+            }
             // Opaques
             Self::Opaque(o)
                 if (o.node.tag.as_ref() == "mrow"
-                    || o.node.tag.as_ref().eq_ignore_ascii_case("span"))
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("span")
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("div"))
                     && o.terms.len() == 1
                     && *o.node.children == [AnyOpaque::Term(0)]
                     && o.node
@@ -83,7 +98,8 @@ impl Term {
             }
             Self::Opaque(o)
                 if (o.node.tag.as_ref() == "mrow"
-                    || o.node.tag.as_ref().eq_ignore_ascii_case("span"))
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("span")
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("div"))
                     && matches!(*o.node.children, [AnyOpaque::Node { .. }])
                     && o.node
                         .attributes

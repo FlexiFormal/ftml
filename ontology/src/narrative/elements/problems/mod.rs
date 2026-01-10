@@ -2,9 +2,12 @@ mod feedback;
 pub mod quizzes;
 mod solutions;
 
-use crate::narrative::{
-    DataRef, DocumentRange, Narrative,
-    elements::{DocumentElement, DocumentElementRef, IsDocumentElement},
+use crate::{
+    narrative::{
+        DataRef, DocumentRange, Narrative,
+        elements::{DocumentElement, DocumentElementRef, IsDocumentElement},
+    },
+    utils::SourceRange,
 };
 pub use feedback::*;
 use ftml_uris::{DocumentElementUri, Id, SymbolUri};
@@ -64,6 +67,8 @@ pub struct ProblemData {
     pub preconditions: Box<[(CognitiveDimension, SymbolUri)]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub objectives: Box<[(CognitiveDimension, SymbolUri)]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 
 impl crate::__private::Sealed for Problem {}
@@ -99,6 +104,10 @@ impl crate::Ftml for Problem {
             } else {
                 triple!(<(iri)> : ulo:problem)
             }))
+    }
+    #[inline]
+    fn source_range(&self) -> crate::utils::SourceRange {
+        self.data.source
     }
 }
 impl Narrative for Problem {

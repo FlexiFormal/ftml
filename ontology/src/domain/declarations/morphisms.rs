@@ -7,6 +7,7 @@ use crate::{
         modules::ModuleLike,
     },
     terms::Term,
+    utils::SourceRange,
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -25,6 +26,8 @@ pub struct Morphism {
     pub domain: ModuleUri,
     pub total: bool,
     pub elements: Box<[Assignment]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 
 impl crate::__private::Sealed for Morphism {}
@@ -41,6 +44,10 @@ impl crate::Ftml for Morphism {
         ]
         .into_iter()
         .chain(self.declares_triples())
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl IsDeclaration for Morphism {
@@ -96,6 +103,8 @@ pub struct Assignment {
     pub new_name: Option<SimpleUriName>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub macroname: Option<Id>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl Assignment {
     #[must_use]

@@ -184,14 +184,16 @@ fn from_structure(
                     }
                 })));
             }
-            StructureDeclaration::Import(m) => {
-                if let Some(s) = m.clone().into_symbol()
+            StructureDeclaration::Import { uri, .. } => {
+                if let Some(s) = uri.clone().into_symbol()
                     && let Some(r) = from_structure(&s, dones, name, &get_struct)
                 {
                     return Some(r);
                 }
             }
-            StructureDeclaration::Symbol(_) | StructureDeclaration::Morphism(_) => (), // TODO
+            StructureDeclaration::Symbol(_)
+            | StructureDeclaration::Morphism(_)
+            | StructureDeclaration::Rule { .. } => (), // TODO
         }
     }
     None
@@ -247,8 +249,8 @@ fn from_structure_async<
                         }
                     }))));
                 }
-                StructureDeclaration::Import(m) => {
-                    if let Some(s) = m.clone().into_symbol()
+                StructureDeclaration::Import { uri, .. } => {
+                    if let Some(s) = uri.clone().into_symbol()
                         && let Some(r) =
                             from_structure_async(s, dones.clone(), name.clone(), get_struct.clone())
                                 .await?
@@ -256,7 +258,9 @@ fn from_structure_async<
                         return Ok(Some(r));
                     }
                 }
-                StructureDeclaration::Symbol(_) | StructureDeclaration::Morphism(_) => (), // TODO
+                StructureDeclaration::Symbol(_)
+                | StructureDeclaration::Morphism(_)
+                | StructureDeclaration::Rule { .. } => (), // TODO
             }
         }
         Ok(None)

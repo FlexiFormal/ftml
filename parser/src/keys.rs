@@ -15,7 +15,8 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{ArgumentMode, Term, VarOrSym, Variable},
+    terms::{ArgumentMode, Term, TermContainer, VarOrSym, Variable},
+    utils::Permutation,
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, Id, IsNarrativeUri, Language, ModuleUri, SimpleUriName,
@@ -35,7 +36,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 123;
+pub const NUM_KEYS: u8 = 124;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -1151,15 +1152,16 @@ do_keys! {
             .unwrap_or_default();
             let reordering = attrs
                 .get(FtmlKey::ArgumentReordering)
-                .map(|s| s.as_ref().parse())
+                .map(|s| Permutation::parse(&arity,s.as_ref()))
                 .transpose()
-                .map_err(|_| (FtmlKey::ArgumentReordering, ()))?;
+                .map_err(|()| (FtmlKey::ArgumentReordering, ()))?;
             let macroname = attrs
                 .get(FtmlKey::Macroname)
                 .map(|s| s.as_ref().parse())
                 .transpose()
                 .map_err(|_| (FtmlKey::Macroname, ()))?;
             del!(keys - Role, AssocType, Args, ArgumentReordering, Macroname);
+            let source = ext.current_source();
             ret!(ext,node <- SymbolDeclaration {
                 uri,
                 data: Box::new(SymbolData {
@@ -1170,8 +1172,9 @@ do_keys! {
                     reordering,
                     return_type:None,
                     argument_types:Box::new([]),
-                    tp: None,
-                    df: None,
+                    tp: TermContainer::default(),
+                    df: TermContainer::default(),
+                    source
                 }),
             } + SymbolDeclaration)
         } => SymbolDeclaration{uri:SymbolUri,data:Box<SymbolData>},
@@ -1210,6 +1213,14 @@ do_keys! {
             let source = attrs.take_symbol_uri(FtmlKey::Assign)?;
             ret!(ext,node <- Assign(source) + Assign)
         } => Assign(source:SymbolUri),
+
+    /// Instantiates a parametric inference rule with id and parameters
+    InferenceRule = "inferencerule"
+        { = "[Id]" <= (Module) &(Arg,ArgMode) }
+        := (ext,attrs,_keys,node) => {
+            let id = attrs.get_typed(FtmlKey::InferenceRule, Id::from_str)?;
+            ret!(ext,node <- Rule(id) + Rule)
+        } => Rule(id:Id),
 
     /// Renames a [`Symbol`] in the domain of a [`Morphism`] to the new provided name with
     /// the optional provided new macroname.
@@ -1407,7 +1418,8 @@ do_keys! {
                             | OpenDomainElement::ReturnType { .. }
                             | OpenDomainElement::Assign { .. }
                             | OpenDomainElement::ArgTypes(_)
-                            | OpenDomainElement::Definiens { .. },
+                            | OpenDomainElement::Definiens { .. }
+                            | OpenDomainElement::InferenceRule { .. }
                         ) => false,
                         Some(OpenDomainElement::Argument { .. } | OpenDomainElement::HeadTerm { .. } ) => {
                             true
@@ -1760,8 +1772,9 @@ do_keys! {
                     | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. }
                     | OpenDomainElement::Assign { .. }
+                    | OpenDomainElement::InferenceRule { .. }
                     | OpenDomainElement::Comp
-                    | OpenDomainElement::DefComp,
+                    | OpenDomainElement::DefComp
                 ) => {
                     return Err(FtmlExtractionError::NotIn(FtmlKey::DefComp, "a term"));
                 }
@@ -1845,9 +1858,9 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
     .unwrap_or_default();
     let reordering = attrs
         .get(FtmlKey::ArgumentReordering)
-        .map(|s| s.as_ref().parse())
+        .map(|s| Permutation::parse(&arity, s.as_ref()))
         .transpose()
-        .map_err(|_| (FtmlKey::ArgumentReordering, ()))?;
+        .map_err(|()| (FtmlKey::ArgumentReordering, ()))?;
     let macroname = attrs
         .get(FtmlKey::Macroname)
         .map(|s| s.as_ref().parse())
@@ -1863,6 +1876,7 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
         Macroname,
         Bind
     );
+    let source = ext.current_source();
     ret!(ext,node <- VariableDeclaration {
         uri,
         data: Box::new(VariableData {
@@ -1875,8 +1889,9 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
             is_seq:is_sequence,
             argument_types:Box::default(),
             return_type:None,
-            tp: None,
-            df: None,
+            tp: TermContainer::default(),
+            df: TermContainer::default(),
+            source
         }),
     } + VariableDeclaration)
 }

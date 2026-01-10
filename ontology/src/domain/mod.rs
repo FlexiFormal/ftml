@@ -2,7 +2,7 @@ use ftml_uris::{DomainUriRef, UriName};
 
 use crate::{
     domain::{
-        declarations::{AnyDeclarationRef, IsDeclaration},
+        declarations::{AnyDeclarationRef, IsDeclaration, symbols::ArgumentSpec},
         modules::{Module, ModuleLike},
     },
     utils::SharedArc,

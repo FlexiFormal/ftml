@@ -28,7 +28,7 @@ pub trait NotationExt {
         head: &VarOrSym,
         this: Option<&ClonableView>,
         args: &R,
-    ) -> impl IntoView + use<Self, Views, R>;
+    ) -> AnyView;
     fn with_arguments_safe<Views: FtmlViews, R: ArgumentRender + ?Sized>(
         &self,
         head: &VarOrSym,
@@ -41,11 +41,7 @@ pub trait NotationExt {
             self.with_arguments::<Views, R>(head, this, args).into_any()
         })
     }
-    fn as_view<Views: FtmlViews>(
-        &self,
-        head: &VarOrSym,
-        this: Option<&ClonableView>,
-    ) -> impl IntoView + use<Self, Views>;
+    fn as_view<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView;
     fn as_view_safe<Views: FtmlViews>(
         &self,
         head: &VarOrSym,
@@ -55,11 +51,7 @@ pub trait NotationExt {
             self.as_view::<Views>(head, this).into_any()
         })
     }
-    fn as_op<Views: FtmlViews>(
-        &self,
-        head: &VarOrSym,
-        this: Option<&ClonableView>,
-    ) -> impl IntoView + use<Self, Views>;
+    fn as_op<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView;
     fn as_op_safe<Views: FtmlViews>(
         &self,
         head: &VarOrSym,

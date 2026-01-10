@@ -109,7 +109,7 @@ impl DocumentData {
                     | DocumentElement::Problem(_)
                     //| DocumentElementRef::SetSectionLevel(_)
                     | DocumentElement::SymbolDeclaration(_)
-                    | DocumentElement::UseModule(_)
+                    | DocumentElement::UseModule{..}
                     | DocumentElement::ImportModule(_)
                     | DocumentElement::SkipSection(_)
                     | DocumentElement::VariableDeclaration(_)
@@ -158,7 +158,8 @@ pub trait Narrative: crate::Ftml {
                     )
                 })
                 .filter_map(move |e| match e {
-                    DocumentElementRef::UseModule(m) | DocumentElementRef::ImportModule(m) => {
+                    DocumentElementRef::UseModule { uri: m, .. }
+                    | DocumentElementRef::ImportModule(m) => {
                         Some(triple!(<(iri.clone())> dc:requires <(m.to_iri())>))
                     }
                     DocumentElementRef::Module { module: uri, .. } => {
@@ -266,7 +267,7 @@ pub trait Narrative: crate::Ftml {
                     | DocumentElementRef::Problem(_)
                     | DocumentElementRef::Slide(_)
                     | DocumentElementRef::SymbolDeclaration(_)
-                    | DocumentElementRef::UseModule(_)
+                    | DocumentElementRef::UseModule { .. }
                     | DocumentElementRef::ImportModule(_)
                     | DocumentElementRef::SkipSection(_)
                     | DocumentElementRef::VariableDeclaration(_)

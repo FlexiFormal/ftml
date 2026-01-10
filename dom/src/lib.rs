@@ -201,6 +201,7 @@ fn close_things(
                 | ArgTypes
                 | ProblemChoiceFeedback
                 | FillinSolCase
+                | Rule
                 | ProblemChoiceVerdict => (),
             }
         }

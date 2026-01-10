@@ -6,6 +6,8 @@
  */
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
+use crate::utils::SourceRange;
+
 pub mod domain;
 pub mod narrative;
 pub mod terms;
@@ -17,4 +19,5 @@ pub(crate) mod __private {
 pub trait Ftml: __private::Sealed {
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple>;
+    fn source_range(&self) -> SourceRange;
 }

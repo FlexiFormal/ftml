@@ -378,8 +378,8 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
                 either::Either::Left(v) => v,
                 either::Either::Right(v) => &**v
             };
-            let tp = v.data.tp.as_ref();
-            let df = v.data.df.as_ref();
+            let tp = v.data.tp.parsed();
+            let df = v.data.df.parsed();
             view! {
                 {df.map(|df| {
                     let v = view!{"defined as "
@@ -558,8 +558,8 @@ fn formals<Be: SendBackend>(
                        tracing::warn!("Rendering term {t:?}");
                        ftml_dom::utils::math(|| ReactiveStore::render_term::<Be>(
                            match t {
-                               ::either::Left(t) => t.term,
-                               ::either::Right(t) => t.term.clone(),
+                               ::either::Left(t) => t.parsed().clone(),
+                               ::either::Right(t) => t.parsed().clone(),
                            }
                        )).into_any()
                    },

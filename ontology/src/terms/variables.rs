@@ -27,6 +27,21 @@ pub enum Variable {
         is_sequence: Option<bool>,
     },
 }
+impl AsRef<str> for Variable {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Name { name, .. } => name.as_ref(),
+            Self::Ref { declaration, .. } => declaration.name().last(),
+        }
+    }
+}
+impl Variable {
+    #[must_use]
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.as_ref()
+    }
+}
 
 impl IsTerm for Variable {
     #[inline]
