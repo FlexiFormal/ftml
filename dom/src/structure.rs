@@ -576,9 +576,9 @@ impl DocumentStructure {
     }
 
     pub(crate) fn insert_section_title(get: impl FnOnce() -> String) -> &'static str {
-        let cls = use_context::<LogicalLevel>()
-            .unwrap_or(LogicalLevel::None)
-            .title_class();
+        let lvl = use_context::<LogicalLevel>().unwrap_or(LogicalLevel::None);
+        let cls = lvl.title_class();
+        //tracing::warn!("Section title at {lvl:?}");
         if !with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract)).is_some_and(|b| b) {
             return cls;
         }
@@ -614,10 +614,10 @@ impl DocumentStructure {
         let new_level = {
             if let LogicalLevel::Section(s) = current_level {
                 LogicalLevel::Section(
-                    ((slf.top_level.get() as u8) + s as u8)
-                        .try_into()
-                        .unwrap_or(SectionLevel::Subparagraph)
-                        .inc(),
+                    //((slf.top_level.get_untracked() as u8) + s as u8)
+                    //    .try_into()
+                    //    .unwrap_or(SectionLevel::Subparagraph)
+                    s.inc(),
                 )
             } else if current_level == LogicalLevel::None {
                 LogicalLevel::Section(slf.top_level.get_untracked())
@@ -625,6 +625,7 @@ impl DocumentStructure {
                 current_level
             }
         };
+        //tracing::warn!("New section at {new_level:?}");
         provide_context(new_level);
         let extract =
             with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract)).is_some_and(|b| b);
@@ -986,11 +987,11 @@ impl SectionInfo {
             let LogicalLevel::Section(lvl) = lvl else {
                 return None;
             };
-            let lvl = top.map_or(lvl, |top| {
+            /*let lvl = top.map_or(lvl, |top| {
                 ((top.get() as u8) + (lvl as u8))
                     .try_into()
                     .unwrap_or(SectionLevel::Part)
-            });
+            });*/
             Some(match lvl {
                 SectionLevel::Part => "ftml-part",
                 SectionLevel::Chapter => "ftml-chapter",
