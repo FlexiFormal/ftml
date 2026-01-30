@@ -6,7 +6,10 @@
  */
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
-use ftml_ontology::{narrative::DocumentRange, utils::Css};
+use ftml_ontology::{
+    narrative::DocumentRange,
+    utils::{Css, SourcePos, SourceRange},
+};
 use ftml_parser::extraction::{
     FtmlExtractionError, FtmlStateExtractor, OpenFtmlElement,
     state::{ExtractionResult, ExtractorState},
@@ -85,3 +88,35 @@ impl FtmlStateExtractor for HtmlExtractor {
         Ok(())
     }
 }
+
+struct SourceRefSpec {
+    is: fn(&str) -> bool,
+    get: fn(&str) -> Option<SourceRange>,
+}
+
+static SOURCEREF_SPECS: [SourceRefSpec; 1] = [SourceRefSpec {
+    is: |s| s == "data-rustex-sourceref",
+    get: |s| {
+        let (_, range) = s.rsplit_once('#')?;
+        let (start, end) = range.split_once(':')?;
+        let start = start.strip_prefix('(')?.strip_suffix(')')?;
+        let end = end.strip_prefix('(')?.strip_suffix(')')?;
+
+        let (sline, scol) = start.split_once(';')?;
+        let sline = sline.parse().ok()?;
+        let scol = scol.parse().ok()?;
+        let (eline, ecol) = end.split_once(';')?;
+        let eline = eline.parse().ok()?;
+        let ecol = ecol.parse().ok()?;
+        Some(SourceRange {
+            start: SourcePos {
+                line: sline,
+                col: scol,
+            },
+            end: SourcePos {
+                line: eline,
+                col: ecol,
+            },
+        })
+    },
+}];

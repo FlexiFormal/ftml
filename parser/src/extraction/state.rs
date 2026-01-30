@@ -272,6 +272,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     #[allow(clippy::too_many_lines)]
     fn do_meta(&mut self, m: MetaDatum, node: &N) -> Result<(), FtmlExtractionError> {
         match m {
+            MetaDatum::DocumentUri(uri) => self.document = uri,
             MetaDatum::DocumentKind(k) => self.kind = k,
             MetaDatum::Style(s) => self.styles.push(s),
             MetaDatum::Counter(c) => self.counters.push(c),
@@ -2049,7 +2050,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         let term = node.as_term(terms)?.simplify();
         match self.domain.last_mut() {
             Some(OpenDomainElement::SymbolDeclaration { uri, data }) if data.tp.is_none() => {
-                data.tp = TermContainer::new(term, None);
+                data.tp = TermContainer::new(term, self.current_source_range.into_option());
                 return Ok(());
             }
             Some(OpenDomainElement::OML { tp, .. }) if tp.is_none() => {
@@ -2090,7 +2091,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         for n in self.narrative.iter_mut() {
             match n {
                 OpenNarrativeElement::VariableDeclaration { uri, data } if data.tp.is_none() => {
-                    data.tp = TermContainer::new(term, None);
+                    data.tp = TermContainer::new(term, self.current_source_range.into_option());
                     return Ok(());
                 }
                 OpenNarrativeElement::Invisible => (),
@@ -2212,7 +2213,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         let term = node.as_term(terms)?.simplify();
         match self.domain.last_mut() {
             Some(OpenDomainElement::SymbolDeclaration { uri, data }) if data.df.is_none() => {
-                data.df = TermContainer::new(term, None);
+                data.df = TermContainer::new(term, self.current_source_range.into_option());
                 return Ok(());
             }
             Some(OpenDomainElement::OML { df, .. }) if df.is_none() => {
@@ -2251,7 +2252,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         for n in self.narrative.iter_mut() {
             match n {
                 OpenNarrativeElement::VariableDeclaration { uri, data } if data.df.is_none() => {
-                    data.df = TermContainer::new(term, None);
+                    data.df = TermContainer::new(term, self.current_source_range.into_option());
                     return Ok(());
                 }
                 OpenNarrativeElement::Paragraph {
@@ -2261,7 +2262,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                         if let Some(data) = Self::find_symbol(&mut self.domain, &of)
                             && data.df.is_none()
                         {
-                            data.df = TermContainer::new(term.clone(), None);
+                            data.df = TermContainer::new(
+                                term.clone(),
+                                self.current_source_range.into_option(),
+                            );
                         }
                         if let Some((a, b)) = fors.iter_mut().find(|(k, v)| *k == of) {
                             *b = Some(term);
@@ -2272,7 +2276,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                         if let Some(data) = Self::find_symbol(&mut self.domain, k)
                             && data.df.is_none()
                         {
-                            data.df = TermContainer::new(term.clone(), None);
+                            data.df = TermContainer::new(
+                                term.clone(),
+                                self.current_source_range.into_option(),
+                            );
                         }
                         *v = Some(term);
                     } else {
@@ -2513,7 +2520,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
                 },
                 |uri| {
-                    slf.push_elem(DocumentElement::Term(DocumentTerm::new(uri, term, None)));
+                    slf.push_elem(DocumentElement::Term(DocumentTerm::new(
+                        uri,
+                        term,
+                        slf.current_source_range.into_option(),
+                    )));
                     Ok(())
                 },
             )
@@ -2648,7 +2659,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
                 },
                 |uri| {
-                    slf.push_elem(DocumentElement::Term(DocumentTerm::new(uri, term, None)));
+                    slf.push_elem(DocumentElement::Term(DocumentTerm::new(
+                        uri,
+                        term,
+                        slf.current_source_range.into_option(),
+                    )));
                     Ok(())
                 },
             )

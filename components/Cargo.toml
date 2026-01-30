@@ -19,7 +19,7 @@ csr = [
     "ftml-backend/wasm",
     "ftml-backend/cached",
 ]
-## Client-side in compbination with ssr
+## Client-side in combination with ssr
 hydrate = [
     "leptos/hydrate",
     "ftml-dom/hydrate",

@@ -1,4 +1,4 @@
-use ftml_ontology::narrative::DocumentRange;
+use ftml_ontology::{narrative::DocumentRange, utils::SourceRange};
 use ftml_parser::extraction::{CloseFtmlElement, nodes::FtmlNode};
 use html5ever::{
     LocalName, Namespace, QualName,
@@ -15,11 +15,11 @@ use std::{
 
 /// A node inside a DOM-like tree.
 pub struct Node {
-    parent: Cell<Option<Weak<Node>>>,
-    previous_sibling: Cell<Option<Weak<Node>>>,
-    next_sibling: Cell<Option<Rc<Node>>>,
-    first_child: Cell<Option<Rc<Node>>>,
-    last_child: Cell<Option<Weak<Node>>>,
+    parent: Cell<Option<Weak<Self>>>,
+    previous_sibling: Cell<Option<Weak<Self>>>,
+    next_sibling: Cell<Option<Rc<Self>>>,
+    first_child: Cell<Option<Rc<Self>>>,
+    last_child: Cell<Option<Weak<Self>>>,
     data: NodeData,
 }
 impl std::fmt::Debug for Node {
@@ -32,6 +32,11 @@ impl std::fmt::Debug for Node {
 
 #[derive(Clone, Debug)]
 pub struct NodeRef(pub Rc<Node>);
+impl NodeRef {
+    pub fn ancestors(&self) -> impl Iterator<Item = Self> {
+        Ancestors(Some(self.clone()))
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Attributes(pub Vec<(QualName, StrTendril)>);
@@ -72,6 +77,7 @@ pub struct ElementData {
     pub end_offset: Cell<usize>,
     pub closed: Cell<bool>,
     pub ftml: Cell<SmallVec<CloseFtmlElement, 2>>,
+    pub sourceref: Cell<Option<SourceRange>>,
 }
 impl std::fmt::Debug for ElementData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -372,6 +378,7 @@ impl NodeRef {
             end_offset: Cell::new(base_len + attrs_len),
             closed: Cell::new(false),
             ftml: Cell::new(SmallVec::new()),
+            sourceref: Cell::new(None),
         }))
     }
 
@@ -611,7 +618,7 @@ pub fn escaped_len(str: &str, attr_mode: bool) -> usize {
         })
         .sum()
 }
-/*
+
 pub struct Ancestors(Option<NodeRef>);
 impl Iterator for Ancestors {
     type Item = NodeRef;
@@ -624,7 +631,6 @@ impl Iterator for Ancestors {
         }
     }
 }
- */
 
 #[derive(Debug, Clone)]
 struct State<T> {

@@ -701,15 +701,18 @@ struct ShortArg<'e>(&'e Argument);
 impl std::fmt::Debug for ShortArg<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
-                t.debug_short().fmt(f)
+            Argument::Simple(t) => t.debug_short().fmt(f),
+            Argument::Sequence(MaybeSequence::One(t)) => {
+                write!(f, "({:?})", t.debug_short())
             }
             Argument::Sequence(MaybeSequence::Seq(s)) => {
+                f.write_char('[')?;
                 let mut fl = f.debug_list();
                 for t in s {
                     fl.entry(&t.debug_short());
                 }
-                fl.finish()
+                fl.finish()?;
+                f.write_char(']')
             }
         }
     }
@@ -719,8 +722,9 @@ struct ShortBoundArg<'e>(&'e BoundArgument);
 impl std::fmt::Debug for ShortBoundArg<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
-                t.debug_short().fmt(f)
+            BoundArgument::Simple(t) => t.debug_short().fmt(f),
+            BoundArgument::Sequence(MaybeSequence::One(t)) => {
+                write!(f, "({:?})", t.debug_short())
             }
             BoundArgument::Bound(ComponentVar {
                 var: Variable::Name { name, .. },
@@ -779,11 +783,13 @@ impl std::fmt::Debug for ShortBoundArg<'_> {
                 f.write_str("]}")
             }
             BoundArgument::Sequence(MaybeSequence::Seq(s)) => {
+                f.write_char('[')?;
                 let mut fl = f.debug_list();
                 for t in s {
                     fl.entry(&t.debug_short());
                 }
-                fl.finish()
+                fl.finish()?;
+                f.write_char(']')
             }
             BoundArgument::BoundSeq(MaybeSequence::Seq(s)) => {
                 f.write_char('{')?;

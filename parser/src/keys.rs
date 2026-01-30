@@ -36,7 +36,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 124;
+pub const NUM_KEYS: u8 = 125;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -381,6 +381,14 @@ impl std::fmt::Debug for FtmlKey {
 }
 
 do_keys! {
+    /// Denotes the URI of the current document. Should occur at most once before any
+    /// document elements.
+    DocUri = "document-uri"
+    := (ext,attrs,_keys,node) => {
+        let uri = attrs.get_typed(FtmlKey::DocUri,DocumentUri::from_str)?;
+        ret!(ext, node <- DocumentUri(uri))
+    } => DocumentUri(uri:DocumentUri),
+
     /// Denotes the title of the current document (if any). Should occur at most once.
     DocTitle = "doctitle"
         := (ext,_attrs,_keys,node) => {

@@ -303,6 +303,7 @@ pub enum MetaDatum {
         macroname: Option<Id>,
     },
     DocumentKind(DocumentKind),
+    DocumentUri(DocumentUri),
     Precondition(SymbolUri, CognitiveDimension),
     Objective(SymbolUri, CognitiveDimension),
     AnswerClassFeedback,
@@ -641,6 +642,7 @@ impl OpenFtmlElement {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn split<N: FtmlNode>(self, node: &N) -> AnyOpen<N> {
         match self {
+            Self::DocumentUri(uri) => AnyOpen::Meta(MetaDatum::DocumentUri(uri)),
             Self::Module {
                 uri,
                 meta,

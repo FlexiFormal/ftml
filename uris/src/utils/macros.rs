@@ -28,6 +28,18 @@ macro_rules! ts {
                 <String as ::wasm_bindgen::convert::IntoWasmAbi>::into_abi(self.to_string())
             }
         }
+        #[cfg(feature = "typescript")]
+        impl$(<$($a$(:$guard)?),+>)? ::wasm_bindgen::convert::OptionFromWasmAbi for $name$(<$($a),+>)? {
+            fn is_none(abi: &Self::Abi) -> bool {
+                <String as ::wasm_bindgen::convert::OptionFromWasmAbi>::is_none(abi)
+            }
+        }
+        #[cfg(feature = "typescript")]
+        impl$(<$($a$(:$guard)?),+>)? ::wasm_bindgen::convert::OptionIntoWasmAbi for $name$(<$($a),+>)? {
+            fn none() -> Self::Abi {
+                <String as ::wasm_bindgen::convert::OptionIntoWasmAbi>::none()
+            }
+        }
 
         #[cfg(feature = "typescript")]
         impl$(<$($a$(:$guard)?),+>)? ::wasm_bindgen::describe::WasmDescribe for $name$(<$($a),+>)? {

@@ -490,6 +490,7 @@ impl Marker {
             | OpenFtmlElement::None
             | OpenFtmlElement::Assign(_)
             | OpenFtmlElement::DocumentKind(_)
+            | OpenFtmlElement::DocumentUri(_)
             | OpenFtmlElement::OML { .. }
             | OpenFtmlElement::Rename { .. }
             | OpenFtmlElement::FillinSolCase(_)

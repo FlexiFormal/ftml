@@ -1,5 +1,6 @@
 use crate::{
     ClonableView,
+    document::WithHead,
     markers::ParagraphInfo,
     structure::{Inputref, SectionInfo},
     terms::{ReactiveApplication, TopTerm},
@@ -183,6 +184,38 @@ pub trait FtmlViews: 'static {
     }
 
     fn inputref(_info: Inputref) -> impl IntoView {}
+
+    fn new_comp_reference<V: IntoView>(
+        uri: SymbolUri,
+        then: impl Fn() -> V + Clone + 'static + Send + Sync,
+    ) -> AnyView {
+        provide_context(WithHead(Some(VarOrSym::Sym(uri.clone()))));
+        Self::symbol_reference(
+            uri,
+            None,
+            false,
+            ClonableView::new(false, move || {
+                let then = then.clone();
+                Self::comp(ClonableView::new(false, then))
+            }),
+        )
+    }
+
+    fn new_var_comp_reference<V: IntoView>(
+        var: Variable,
+        then: impl Fn() -> V + Clone + 'static + Send + Sync,
+    ) -> AnyView {
+        provide_context(WithHead(Some(VarOrSym::Var(var.clone()))));
+        Self::variable_reference(
+            var,
+            None,
+            false,
+            ClonableView::new(false, move || {
+                let then = then.clone();
+                Self::comp(ClonableView::new(false, then))
+            }),
+        )
+    }
 
     #[inline]
     fn symbol_reference(

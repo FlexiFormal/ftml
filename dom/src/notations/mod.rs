@@ -259,7 +259,7 @@ impl NotationExt for Notation {
     }
 }
 
-fn attr(
+pub(crate) fn attr(
     e: leptos::either::Either<AnyView, AnyViewWithAttrs>,
     k: impl CustomAttributeKey,
     v: impl AttributeValue,

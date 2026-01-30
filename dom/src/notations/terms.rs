@@ -18,7 +18,8 @@ use ftml_ontology::{
         opaque::{AnyOpaque, OpaqueNode},
     },
 };
-use ftml_uris::{DocumentElementUri, Id, LeafUri, NamedUri, SymbolUri};
+use ftml_parser::FtmlKey;
+use ftml_uris::{DocumentElementUri, FtmlUri, Id, LeafUri, NamedUri, SymbolUri, UriRef};
 use leptos::{
     either::Either,
     math::{mi, mn, mo},
@@ -52,6 +53,7 @@ macro_rules! maybe_comp {
 
 fn no_notation<Views: FtmlViews>(
     name: &str,
+    uri: &LeafUri,
     arguments: Vec<Either<ClonableView, Vec<ClonableView>>>,
 ) -> AnyView {
     fn do_view<Views: FtmlViews>(v: Either<ClonableView, Vec<ClonableView>>) -> AnyView {
@@ -72,15 +74,26 @@ fn no_notation<Views: FtmlViews>(
             }
         }
     }
+    let kind = match uri {
+        LeafUri::Element(_) => "OMV",
+        LeafUri::Symbol(_) => "OMID",
+    };
     if arguments.is_empty() {
         return mtext()
             .style("color:red")
             .child(name.to_string())
+            .attr(FtmlKey::Head.attr_name(), uri.to_string())
+            .attr(FtmlKey::Term.attr_name(), kind)
+            .attr(FtmlKey::Comp.attr_name(), "")
             .into_any();
     }
     let mut args = arguments.into_iter();
     view! {<mrow>
-        {mtext().style("color:red").child(name.to_string())}
+        {mtext().style("color:red").child(name.to_string())
+            .attr(FtmlKey::Head.attr_name(), uri.to_string())
+            .attr(FtmlKey::Term.attr_name(), kind)
+            .attr(FtmlKey::Comp.attr_name(), "")
+        }
         {maybe_comp!(mo().child('('))}
         {args.next().map(do_view::<Views>)}
         {args.map(|v| view!{
@@ -488,7 +501,7 @@ fn do_application_inner<Views: FtmlViews, Be: SendBackend>(
             if let Some(n) = t {
                 n.with_arguments::<Views, _>(&vos, this.as_ref(), &arguments)
             } else {
-                no_notation::<Views>(leaf.name().last(), arguments)
+                no_notation::<Views>(leaf.name().last(), &leaf, arguments)
             }
         })
     })
@@ -554,10 +567,10 @@ fn do_opaque(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
     arguments: &[BoundArgument],
 ) -> Vec<Either<ClonableView, Vec<ClonableView>>> {
-    use leptos::either::Either::{Left, Right};
     arguments
         .iter()
         .map(|a| match a {
@@ -581,7 +594,8 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                         declaration,
                         is_sequence,
                     },
-                ..
+                tp,
+                df,
             })
             | BoundArgument::BoundSeq(MaybeSequence::One(ComponentVar {
                 var:
@@ -589,14 +603,19 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                         declaration,
                         is_sequence,
                     },
-                ..
+                tp,
+                df,
             })) => {
                 let declaration = declaration.clone();
+                let tp = tp.clone();
+                let df = df.clone();
                 let is_sequence = *is_sequence;
                 Either::Left(ClonableView::new(true, move || {
                     let declaration = declaration.clone();
+                    let tp = tp.clone();
+                    let df = df.clone();
                     with_notations::<Be, _>(declaration.clone().into(), move |t| {
-                        if let Some(n) = t {
+                        let r = if let Some(n) = t {
                             n.as_view::<Views>(
                                 &VarOrSym::Var(Variable::Ref {
                                     declaration,
@@ -605,10 +624,26 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                                 None,
                             )
                         } else {
-                            mtext()
-                                .child(format!("TODO: No notation for {declaration}"))
+                            mi().child(declaration.name().last().to_string())
+                                .attr(FtmlKey::Head.attr_name(), declaration.to_string())
+                                .attr(FtmlKey::Term.attr_name(), "OMV")
+                                .attr(FtmlKey::Comp.attr_name(), "")
                                 .into_any()
+                        };
+                        if tp.is_none() && df.is_none() {
+                            return r;
                         }
+                        let tp = tp.map(|t| {
+                            view! {
+                                <mo>":"</mo>{t.into_view::<Views, Be>(true)}
+                            }
+                        });
+                        let df = df.map(|t| {
+                            view! {
+                                <mo>":="</mo>{t.into_view::<Views, Be>(true)}
+                            }
+                        });
+                        view! {<mrow>{r}{tp}{df}</mrow>}.into_any()
                     })
                 }))
             }
@@ -617,6 +652,8 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                     .map(|v| {
                         let v = v.clone();
                         ClonableView::new(true, move || {
+                            let tp = v.tp.clone();
+                            let df = v.df.clone();
                             if let Variable::Ref {
                                 declaration,
                                 is_sequence,
@@ -625,7 +662,7 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                                 let declaration = declaration.clone();
                                 let is_sequence = *is_sequence;
                                 with_notations::<Be, _>(declaration.clone().into(), move |t| {
-                                    if let Some(n) = t {
+                                    let r = if let Some(n) = t {
                                         n.as_view::<Views>(
                                             &VarOrSym::Var(Variable::Ref {
                                                 declaration,
@@ -634,13 +671,46 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                                             None,
                                         )
                                     } else {
-                                        mtext()
-                                            .child(format!("TODO: No notation for {declaration}"))
+                                        mi().child(declaration.name().last().to_string())
+                                            .attr(
+                                                FtmlKey::Head.attr_name(),
+                                                declaration.to_string(),
+                                            )
+                                            .attr(FtmlKey::Term.attr_name(), "OMV")
+                                            .attr(FtmlKey::Comp.attr_name(), "")
                                             .into_any()
+                                    };
+                                    if tp.is_none() && df.is_none() {
+                                        return r;
                                     }
+                                    let tp = tp.map(|t| {
+                                        view! {
+                                            <mo>":"</mo>{t.into_view::<Views, Be>(true)}
+                                        }
+                                    });
+                                    let df = df.map(|t| {
+                                        view! {
+                                            <mo>":="</mo>{t.into_view::<Views, Be>(true)}
+                                        }
+                                    });
+                                    view! {<mrow>{r}{tp}{df}</mrow>}.into_any()
                                 })
                             } else {
-                                mtext().child("TODO: unresolved variable").into_any()
+                                let r = mtext().child("TODO: unresolved variable"); //.into_any();
+                                if tp.is_none() && df.is_none() {
+                                    return r.into_any();
+                                }
+                                let tp = tp.map(|t| {
+                                    view! {
+                                        <mo>":"</mo>{t.into_view::<Views, Be>(true)}
+                                    }
+                                });
+                                let df = df.map(|t| {
+                                    view! {
+                                        <mo>":="</mo>{t.into_view::<Views, Be>(true)}
+                                    }
+                                });
+                                view! {<mrow>{r}{tp}{df}</mrow>}.into_any()
                             }
                         })
                     })

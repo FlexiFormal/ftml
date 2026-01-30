@@ -3,7 +3,10 @@ use std::hint::unreachable_unchecked;
 #[allow(clippy::wildcard_imports)]
 use super::ever::*;
 use crate::{FtmlResult, HtmlExtractor};
-use ftml_ontology::{narrative::DocumentRange, utils::Css};
+use ftml_ontology::{
+    narrative::DocumentRange,
+    utils::{Css, SourceRange},
+};
 use ftml_parser::{
     FtmlKey,
     extraction::{
@@ -20,43 +23,11 @@ use smallvec::SmallVec;
 
 pub struct HtmlParser<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> {
     pub(crate) document_node: NodeRef,
-    //rel_path: &'p str,
     pub(crate) extractor: std::cell::RefCell<HtmlExtractor>,
     pub(crate) body: std::cell::Cell<(DocumentRange, usize)>,
     pub(crate) errors: std::cell::RefCell<Vec<FtmlExtractionError>>,
     pub(crate) img: Img,
-    /*
-    let path = std::path::Path::new(src);
-    if let Some(newsrc) =
-        self.extractor.borrow().backend.archive_of(path, |a, rp| {
-            format!("srv:/img?a={}&rp={}", a.id(), &rp[1..])
-        })
-    {
-        attributes.set("src", "");
-        attributes.new_attr("data-flams-src", newsrc);
-    } else {
-        let kpsewhich = &*tex_engine::engine::filesystem::kpathsea::KPATHSEA;
-        let last = src.rsplit_once('/').map_or(src, |(_, p)| p);
-        if let Some(file) = kpsewhich.which(last) {
-            if file == path {
-                let file = format!("srv:/img?kpse={last}");
-                attributes.set("src", "");
-                attributes.new_attr("data-flams-src", file);
-            }
-        } else {
-            let file = format!("srv:/img?file={src}");
-            attributes.set("src", "");
-            attributes.new_attr("data-flams-src", file);
-        }
-    };
-    */
     pub(crate) css: CS,
-    /*
-    static CSS_SUBSTS: [(&str, &str); 1] = [(
-        "https://raw.githack.com/Jazzpirate/RusTeX/main/rustex/src/resources/rustex.css",
-        "srv:/rustex.css",
-    )];
-     */
 }
 
 impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
@@ -77,11 +48,7 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
         let HtmlExtractor {
             parse_errors,
             mut css,
-            //refs,
-            //title,
-            //triples,
             mut state,
-            //backend,
             ..
         } = self.extractor.into_inner();
         if !parse_errors.is_empty() {
@@ -189,6 +156,19 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                         let len = child.len();
                         child_elem.start_offset.set(new_start);
                         child_elem.end_offset.set(new_start + len);
+                        let attributes = child_elem.attributes.borrow();
+                        if let Some(sourceref) = attributes.0.iter().find_map(|(a, b)| {
+                            crate::SOURCEREF_SPECS.iter().find_map(|spec| {
+                                if (spec.is)(&a.local) {
+                                    (spec.get)(b)
+                                } else {
+                                    None
+                                }
+                            })
+                        }) {
+                            child_elem.sourceref.set(Some(sourceref));
+                            self.extractor.borrow_mut().state.current_source_range = sourceref;
+                        }
                     }
                 } else if let Some(parent_elem) = parent.as_element() {
                     let new_start = parent_elem.end_offset.get() - tag_len(&parent_elem.name) - 1;
@@ -196,6 +176,21 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                         {
                             let attributes = child_elem.attributes.borrow();
                             let mut extractor = self.extractor.borrow_mut();
+                            #[allow(clippy::option_if_let_else)]
+                            if let Some(sourceref) = attributes.0.iter().find_map(|(a, b)| {
+                                crate::SOURCEREF_SPECS.iter().find_map(|spec| {
+                                    if (spec.is)(&a.local) {
+                                        (spec.get)(b)
+                                    } else {
+                                        None
+                                    }
+                                })
+                            }) {
+                                child_elem.sourceref.set(Some(sourceref));
+                                extractor.state.current_source_range = sourceref;
+                            } else {
+                                child_elem.sourceref.set(parent_elem.sourceref.get());
+                            }
                             let rules: KeyList = attributes
                                 .0
                                 .iter()
@@ -207,9 +202,9 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                                     }
                                 })
                                 .collect();
-                            let mut attrs = attributes.clone();
-                            drop(attributes);
                             if !rules.is_empty() {
+                                let mut attrs = attributes.clone();
+                                drop(attributes);
                                 let mut closes = SmallVec::<_, 2>::new();
                                 for r in rules.apply(&mut *extractor, &mut attrs, &child) {
                                     match r {
@@ -357,16 +352,21 @@ impl<Img: Fn(&str) -> Option<String>, CS: Fn(&str) -> Option<Box<str>>> TreeSink
                 _ => unreachable!(),
             }
         }
+        let mut extractor = self.extractor.borrow_mut();
         let closes = elem.ftml.take();
-        if !closes.is_empty() {
-            let mut extractor = self.extractor.borrow_mut();
-            for c in closes {
-                if let Err(e) = extractor.close(c, node) {
-                    let s = node.string();
-                    tracing::error!("errors: {e}\n in: {s}");
-                    self.errors.borrow_mut().push(e);
-                }
+        for c in closes {
+            if let Err(e) = extractor.close(c, node) {
+                let s = node.string();
+                tracing::error!("errors: {e}\n in: {s}");
+                self.errors.borrow_mut().push(e);
             }
+        }
+        if let Some(parent) = node.parent()
+            && let Some(range) = parent.as_element().and_then(|e| e.sourceref.get())
+        {
+            extractor.state.current_source_range = range;
+        } else {
+            extractor.state.current_source_range = SourceRange::DEFAULT;
         }
     }
 

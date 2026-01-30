@@ -54,6 +54,10 @@ impl SourceRange {
         start: SourcePos { line: 0, col: 0 },
         end: SourcePos { line: 0, col: 0 },
     };
+    #[must_use]
+    pub const fn into_option(self) -> Option<Self> {
+        if self.is_defined() { Some(self) } else { None }
+    }
     #[inline]
     #[must_use]
     pub const fn is_defined(&self) -> bool {

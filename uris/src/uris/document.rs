@@ -74,6 +74,12 @@ impl std::fmt::Display for SimpleUriName {
         self.0.fmt(f)
     }
 }
+impl From<SimpleUriName> for UriName {
+    #[inline]
+    fn from(value: SimpleUriName) -> Self {
+        value.0
+    }
+}
 
 /// A URI that identifies a specific document within an FTML archive.
 ///
