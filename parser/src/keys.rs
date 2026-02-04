@@ -1562,7 +1562,7 @@ do_keys! {
             if fragment.as_ref().is_some_and(String::is_empty) {
                 fragment = None;
             }
-            let id = if let Some(id) = fragment {
+            let id:Option<Id> = if let Some(id) = fragment {
                 Some(
                     id.parse()
                         .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::NotationFragment))?,
@@ -1571,7 +1571,9 @@ do_keys! {
                 None
             };
             let uri = if let Some(id) = &id {
-                ext.get_narrative_uri() & id
+                let nid = ext.id_store().new_id(id.to_string()).parse::<Id>()
+                    .map_err(|e| FtmlExtractionError::Uri(FtmlKey::NotationFragment, e.into()))?;
+                ext.get_narrative_uri() & &nid
             } else {
                 let name = ext.new_id(FtmlKey::NotationFragment, Cow::Borrowed("notation"))?;
                 ext.get_narrative_uri() & &name

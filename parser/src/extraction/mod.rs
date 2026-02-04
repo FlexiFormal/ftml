@@ -13,7 +13,10 @@ use ftml_uris::{
 
 use crate::{
     FtmlKey,
-    extraction::{nodes::FtmlNode, state::ExtractorState},
+    extraction::{
+        nodes::FtmlNode,
+        state::{ExtractorState, IdCounter},
+    },
 };
 
 pub mod attributes;
@@ -48,6 +51,7 @@ pub trait FtmlExtractor: 'static + Sized {
     fn forced_element_uri(&mut self) -> Option<DocumentElementUri>;
     /// ### Errors
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id>;
+    fn id_store(&mut self) -> &mut IdCounter;
     /// ### Errors
     fn get_domain_uri(&self, in_elem: FtmlKey) -> Result<Cow<'_, ModuleUri>> {
         for e in self.iterate_domain() {
@@ -488,6 +492,9 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
     #[inline]
     fn forced_element_uri(&mut self) -> Option<DocumentElementUri> {
         self.state_mut().ids.forced()
+    }
+    fn id_store(&mut self) -> &mut IdCounter {
+        &mut self.state_mut().ids
     }
     #[inline]
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id> {
