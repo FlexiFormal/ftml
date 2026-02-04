@@ -18,6 +18,7 @@ csr = [
     "dep:gloo-storage",
     "ftml-backend/wasm",
     "ftml-backend/cached",
+    "dep:web-sys"
 ]
 ## Client-side in combination with ssr
 hydrate = [
@@ -25,6 +26,7 @@ hydrate = [
     "ftml-dom/hydrate",
     "thaw/hydrate",
     "dep:gloo-storage",
+    "dep:web-sys"
 ]
 ## Server-side rendering
 ssr = ["leptos/ssr", "thaw/ssr", "ftml-dom/ssr"]
@@ -83,8 +85,10 @@ smallvec = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 thaw_utils = { workspace = true }
 wasm-bindgen = { workspace = true }
+uuid = {workspace = true}
 
 gloo-storage = { workspace = true, optional = true }
 
 tsify = { workspace = true, optional = true }
 leptos-react = { workspace = true, optional = true }
+web-sys = {workspace = true,features=["Selection","Range","Node"],optional=true}

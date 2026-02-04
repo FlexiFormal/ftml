@@ -22,7 +22,7 @@ wasm = [
 ## reqwest
 reqwest = ["dep:reqwest"]
 ## cached
-cached = ["dep:dashmap", "dep:parking_lot", "dep:kanal", "dep:rustc-hash"]
+cached = ["dep:dashmap", "dep:parking_lot", "dep:kanal"]
 ## Generates typescript exports for `wasm-pack`
 typescript = ["wasm", "dep:tsify", "ftml-ontology/typescript"]
 ## Adds memory monitoring for cached backends
@@ -63,6 +63,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde-lite = { workspace = true,optional=true }
 tracing = { workspace = true }
+rustc-hash = { workspace = true }
 
 ftml-uris = { workspace = true, features = ["components"] }
 ftml-ontology = { workspace = true,features=["serde"] }
@@ -78,4 +79,3 @@ parking_lot = { workspace = true, optional = true }
 kanal = { workspace = true, optional = true }
 bytesize = { workspace = true, optional = true }
 deepsize = { workspace = true, optional = true }
-rustc-hash = { workspace = true, optional = true }

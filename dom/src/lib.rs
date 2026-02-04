@@ -147,7 +147,10 @@ fn close_things(
             #[allow(clippy::enum_glob_use)]
             use CloseFtmlElement::*;
             match c {
-                OMA | OMBIND => ReactiveApplication::close(),
+                OMA | OMBIND => {
+                    let term = sig.with_untracked(|ext| ext.last_term().cloned());
+                    ReactiveApplication::close(term);
+                }
                 Paragraph => {
                     if sig.with_untracked(|r| r.state.document == *DocumentUri::no_doc()) {
                         tracing::debug!("No document; paragraph ignored");

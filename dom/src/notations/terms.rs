@@ -14,7 +14,8 @@ use crate::{
 use ftml_ontology::{
     narrative::elements::Notation,
     terms::{
-        Argument, BoundArgument, ComponentVar, MaybeSequence, Numeric, Term, VarOrSym, Variable,
+        ApplicationTerm, Argument, BindingTerm, BoundArgument, ComponentVar, MaybeSequence,
+        Numeric, Term, VarOrSym, Variable,
         opaque::{AnyOpaque, OpaqueNode},
     },
 };
@@ -140,7 +141,7 @@ impl TermExt for Term {
             {
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(app.head.clone()) };
-                application::<Views, Be>(vos, leaf, None, &app.arguments).into_any()
+                application::<Views, Be>(vos, leaf, None, app).into_any()
             }
             Self::Application(app) if app.presentation.is_some() => {
                 let head = match &app.head {
@@ -158,7 +159,7 @@ impl TermExt for Term {
                         return "TODO: unresolved variable".into_any();
                     }
                 };
-                application::<Views, Be>(pres.clone(), uri, Some(head), &app.arguments).into_any()
+                application::<Views, Be>(pres.clone(), uri, Some(head), app).into_any()
             }
             Self::Bound(b)
                 if b.presentation.is_none()
@@ -173,7 +174,7 @@ impl TermExt for Term {
             {
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(b.head.clone()) };
-                bound::<Views, Be>(vos, leaf, /*b.body.clone(),*/ None, &b.arguments).into_any()
+                bound::<Views, Be>(vos, leaf, /*b.body.clone(),*/ None, b).into_any()
             }
             Self::Bound(b) if b.presentation.is_some() => {
                 // SAFETY: presentation.is_some();
@@ -191,8 +192,7 @@ impl TermExt for Term {
                         return "TODO: unresolved variable".into_any();
                     }
                 };
-                bound::<Views, Be>(pres, uri, /*b.body.clone(),*/ Some(head), &b.arguments)
-                    .into_any()
+                bound::<Views, Be>(pres, uri, /*b.body.clone(),*/ Some(head), b).into_any()
             }
             Self::Opaque(o) => {
                 let mut terms = o
@@ -244,7 +244,7 @@ impl TermExt for Term {
                 let record =
                     ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
                 // TODO I think this clone can be avoided
-                let arguments = app.arguments.clone();
+                //let arguments = app.arguments.clone();
                 FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
@@ -258,7 +258,7 @@ impl TermExt for Term {
                             VarOrSym::Sym(r.uri.clone()),
                             r.uri.clone().into(),
                             Some(record),
-                            &arguments,
+                            app,
                         ),
                     },
                 )
@@ -281,19 +281,32 @@ fn application<Views: FtmlViews, Be: SendBackend>(
     head: VarOrSym,
     uri: LeafUri,
     real_term: Option<ClonableView>,
-    arguments: &[Argument],
+    app: ApplicationTerm,
 ) -> AnyView {
-    let arguments = do_args::<Views, Be>(arguments);
+    let arguments = do_args::<Views, Be>(&app.arguments);
     DocumentState::with_head(head.clone(), move || {
         if with_context::<CurrentUri, _>(|_| ()).is_some() {
             Views::application(
                 head.clone(),
                 None,
                 None,
-                do_application_inner::<Views, Be>(uri, head, real_term, arguments),
+                do_application_inner::<Views, Be>(
+                    Some(Term::Application(app)),
+                    uri,
+                    head,
+                    real_term,
+                    arguments,
+                ),
             )
         } else {
-            do_application_inner::<Views, Be>(uri, head, real_term, arguments).into_view::<Views>()
+            do_application_inner::<Views, Be>(
+                Some(Term::Application(app)),
+                uri,
+                head,
+                real_term,
+                arguments,
+            )
+            .into_view::<Views>()
         }
     })
 }
@@ -303,9 +316,9 @@ fn bound<Views: FtmlViews, Be: SendBackend>(
     uri: LeafUri,
     //body: Term,
     real_term: Option<ClonableView>,
-    arguments: &[BoundArgument],
+    app: BindingTerm,
 ) -> AnyView {
-    let arguments = do_bound_args::<Views, Be>(arguments);
+    let arguments = do_bound_args::<Views, Be>(&app.arguments);
     /*arguments.push(Either::Left(ClonableView::new(true, move || {
         body.clone().into_view::<Views, Be>(true)
     })));*/
@@ -315,10 +328,23 @@ fn bound<Views: FtmlViews, Be: SendBackend>(
                 head.clone(),
                 None,
                 None,
-                do_application_inner::<Views, Be>(uri, head, real_term, arguments),
+                do_application_inner::<Views, Be>(
+                    Some(Term::Bound(app)),
+                    uri,
+                    head,
+                    real_term,
+                    arguments,
+                ),
             )
         } else {
-            do_application_inner::<Views, Be>(uri, head, real_term, arguments).into_view::<Views>()
+            do_application_inner::<Views, Be>(
+                Some(Term::Bound(app)),
+                uri,
+                head,
+                real_term,
+                arguments,
+            )
+            .into_view::<Views>()
         }
     })
 }
@@ -486,6 +512,7 @@ fn var_name<Views: FtmlViews>(
 }
 
 fn do_application_inner<Views: FtmlViews, Be: SendBackend>(
+    term: Option<Term>,
     leaf: LeafUri,
     vos: VarOrSym,
     this: Option<ClonableView>,
@@ -497,9 +524,10 @@ fn do_application_inner<Views: FtmlViews, Be: SendBackend>(
         let vos = vos.clone();
         let arguments = arguments.clone();
         let this = this.clone();
+        let term = term.clone();
         with_notations::<Be, _>(leaf.clone(), move |t| {
             if let Some(n) = t {
-                n.with_arguments::<Views, _>(&vos, this.as_ref(), &arguments)
+                n.with_arguments::<Views, _>(term, &vos, this.as_ref(), &arguments)
             } else {
                 no_notation::<Views>(leaf.name().last(), &leaf, arguments)
             }

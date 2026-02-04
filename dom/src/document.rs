@@ -4,7 +4,7 @@ use crate::{
     extractor::DomExtractor,
     markers::ParagraphInfo,
     structure::{DocumentStructure, Inputref, SectionInfo},
-    utils::{ContextChain, local_cache::SendBackend, owned},
+    utils::{ContextChain, ModuleContext, local_cache::SendBackend, owned},
 };
 use ftml_ontology::{
     narrative::{
@@ -62,6 +62,7 @@ pub fn setup_document<Be: SendBackend, Ch: IntoView + 'static>(
     provide_context(ContextUri(uri.into()));
     DocumentStructure::set::<Be>();
     DocumentStructure::navigate_to_fragment();
+    ModuleContext::reset();
 
     /*
     provide_context(SectionCounters::default());
@@ -194,6 +195,7 @@ impl DocumentState {
         provide_context(CurrentUri(target.clone().into()));
         provide_context(InDocument(target));
         provide_context(ContextUri(context.into()));
+        ModuleContext::reset();
         f()
     }
 
@@ -207,6 +209,7 @@ impl DocumentState {
         provide_context(ContextUri(DocumentUri::no_doc().clone().into()));
         provide_context(CurrentUri(DocumentUri::no_doc().clone().into()));
         DocumentStructure::set_empty();
+        ModuleContext::reset();
         f()
     }
 

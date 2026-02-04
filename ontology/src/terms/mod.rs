@@ -1,5 +1,6 @@
 mod arguments;
 mod bank;
+pub mod eq;
 mod macros;
 #[cfg(feature = "openmath")]
 pub mod om;
@@ -8,6 +9,7 @@ pub mod records;
 pub mod simplify;
 pub mod subst;
 mod term;
+pub mod termpaths;
 //pub mod traverser;
 mod variables;
 

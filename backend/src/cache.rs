@@ -109,6 +109,19 @@ where
     type Error = CacheError<B::Error>;
 
     #[inline]
+    fn check_term(
+        &self,
+        global_context: &[ModuleUri],
+        term: &ftml_ontology::terms::Term,
+        in_path: &ftml_ontology::terms::termpaths::TermPath,
+    ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>> + Send + use<B>
+    {
+        self.inner
+            .check_term(global_context, term, in_path)
+            .map_err(|e| BackendError::ToDo(e.to_string()))
+    }
+
+    #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         self.inner.document_link_url(uri)
     }

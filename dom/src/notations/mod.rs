@@ -4,7 +4,7 @@ use crate::ClonableView;
 use crate::document::CurrentUri;
 use crate::terms::{ReactiveApplication, ReactiveTerm, TopTerm};
 use crate::{DocumentState, FtmlViews};
-use ftml_ontology::terms::VarOrSym;
+use ftml_ontology::terms::{Term, VarOrSym};
 use ftml_ontology::{
     narrative::elements::{
         Notation,
@@ -25,12 +25,14 @@ pub use terms::*;
 pub trait NotationExt {
     fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(
         &self,
+        term: Option<Term>,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         args: &R,
     ) -> AnyView;
     fn with_arguments_safe<Views: FtmlViews, R: ArgumentRender + ?Sized>(
         &self,
+        term: Option<Term>,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         args: &R,
@@ -38,7 +40,8 @@ pub trait NotationExt {
         DocumentState::with_head(head.clone(), move || {
             provide_context(None::<TopTerm>);
             provide_context(None::<ReactiveTerm>);
-            self.with_arguments::<Views, R>(head, this, args).into_any()
+            self.with_arguments::<Views, R>(term, head, this, args)
+                .into_any()
         })
     }
     fn as_view<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView;
@@ -193,6 +196,7 @@ fn do_arg<Views: FtmlViews>(
 impl NotationExt for Notation {
     fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(
         &self,
+        term: Option<Term>,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         args: &R,
@@ -207,7 +211,7 @@ impl NotationExt for Notation {
             let r = view_component_with_args::<Views>(&self.component, args, this)
                 .attr(FtmlKey::Term.attr_name(), "OMBIND")
                 .attr(FtmlKey::Head.attr_name(), h);
-            ReactiveApplication::close();
+            ReactiveApplication::close(term);
             r.into_any()
         } //)
     }

@@ -152,6 +152,7 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     pub kind: DocumentKind,
     pub current_source_range: SourceRange,
     top_section_level: Option<SectionLevel>,
+    pub(crate) last_term: Option<Term>,
     pub(crate) ids: IdCounter,
     #[allow(dead_code)]
     do_rdf: bool,
@@ -191,6 +192,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             kind: DocumentKind::default(),
             domain: StackVec::default(),
             narrative: StackVec::default(),
+            last_term: None,
             current_source_range: SourceRange::DEFAULT,
             #[cfg(feature = "rdf")]
             rdf: Vec::new(),
@@ -2416,6 +2418,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         node: &N,
     ) -> super::Result<()> {
         let term = node.as_term(terms)?.simplify();
+        self.last_term = Some(term.clone());
         tracing::trace!("Closed head term: {term:?}");
         if let Some(
             OpenDomainElement::ComplexTerm {
@@ -2445,6 +2448,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         node: &N,
         otherwise: impl FnOnce(&mut Self, Term) -> super::Result<()>,
     ) -> super::Result<()> {
+        self.last_term = Some(term.clone());
         match &mut self.domain.last {
             Some(
                 OpenDomainElement::Module { .. }
@@ -2516,8 +2520,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         self.close_term(term, node, |slf, term| {
             uri.map_or_else(
                 || {
-                    tracing::debug!("Error: 1");
-                    Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
+                    Ok(())
+                    //tracing::debug!("Error: 1");
+                    //Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
                 },
                 |uri| {
                     slf.push_elem(DocumentElement::Term(DocumentTerm::new(
@@ -2655,8 +2660,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         self.close_term(term, node, |slf, term| {
             uri.map_or_else(
                 || {
-                    tracing::debug!("Error: 1");
-                    Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
+                    Ok(())
+                    //tracing::debug!("Error: 1");
+                    //Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Term))
                 },
                 |uri| {
                     slf.push_elem(DocumentElement::Term(DocumentTerm::new(

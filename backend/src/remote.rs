@@ -48,6 +48,7 @@ pub struct RemoteBackend<
     Url: std::fmt::Display = &'static str,
     Re: Redirects = NoRedirects,
 > {
+    pub check_url: Url,
     pub fragment_url: Url,
     pub document_html_url: Url,
     pub solutions_url: Url,
@@ -90,9 +91,11 @@ where
         modules_url: Url,
         documents_url: Url,
         toc_url: Url,
+        check_url: Url,
         redirects: Re,
     ) -> Self {
         Self {
+            check_url,
             fragment_url,
             document_html_url,
             notations_url,
@@ -122,8 +125,10 @@ where
         modules_url: Url,
         documents_url: Url,
         toc_url: Url,
+        check_url: Url,
     ) -> Self {
         Self {
+            check_url,
             fragment_url,
             document_html_url,
             notations_url,
@@ -171,6 +176,47 @@ where
     E::Err: Into<BackendError<E>>,
 {
     type Error = E;
+
+    fn check_term(
+        &self,
+        global_context: &[ModuleUri],
+        term: &ftml_ontology::terms::Term,
+        in_path: &ftml_ontology::terms::termpaths::TermPath,
+    ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>>
+    + Send
+    + use<Url, E, Re> {
+        fn body(
+            global_context: &[ModuleUri],
+            term: &ftml_ontology::terms::Term,
+            in_path: &ftml_ontology::terms::termpaths::TermPath,
+        ) -> Result<String, serde_json::Error> {
+            Ok(format!(
+                "{{\"global_context\":{},\"term\":{},\"in_path\":{}}}",
+                serde_json::to_string(global_context)?,
+                serde_json::to_string(term)?,
+                serde_json::to_string(in_path)?
+            ))
+        }
+        let url = self.check_url.to_string();
+        let body = body(global_context, term, in_path);
+        crate::utils::FutWrap::new(async move {
+            let body = body.map_err(|e| BackendError::ToDo(e.to_string()))?;
+            let res = reqwasm::http::Request::post(&url)
+                .body(body)
+                .send()
+                .await
+                .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+            let status = res.status();
+            if (400..=599).contains(&status) {
+                let str = res
+                    .text()
+                    .await
+                    .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+                return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
+            }
+            res.get().await
+        })
+    }
 
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         self.redirects.for_documents(uri).map_or_else(
@@ -353,7 +399,7 @@ mod server_fn {
     use ::server_fn::error::ServerFnErrorErr;
     use ftml_ontology::{narrative::elements::problems::Solutions, utils::Css};
     use ftml_uris::{
-        DocumentElementUri, DocumentUri, FtmlUri, LeafUri, NarrativeUri, Uri,
+        DocumentElementUri, DocumentUri, FtmlUri, LeafUri, ModuleUri, NarrativeUri, Uri,
         components::UriComponentTuple,
     };
     use futures_util::TryFutureExt;
@@ -375,6 +421,53 @@ mod server_fn {
                 self.url,
                 uri.url_encoded()
             ))
+        }
+
+        fn check_term(
+            &self,
+            global_context: &[ftml_uris::ModuleUri],
+            term: &ftml_ontology::terms::Term,
+            in_path: &ftml_ontology::terms::termpaths::TermPath,
+        ) -> impl Future<
+            Output = Result<
+                crate::BackendCheckResult,
+                BackendError<server_fn::error::ServerFnErrorErr>,
+            >,
+        > + Send
+        + use<Url, Re> {
+            fn body(
+                global_context: &[ModuleUri],
+                term: &ftml_ontology::terms::Term,
+                in_path: &ftml_ontology::terms::termpaths::TermPath,
+            ) -> Result<String, serde_json::Error> {
+                Ok(format!(
+                    "{{\"global_context\":{},\"term\":{},\"in_path\":{}}}",
+                    serde_json::to_string(global_context)?,
+                    serde_json::to_string(term)?,
+                    serde_json::to_string(in_path)?
+                ))
+            }
+            let url = format!("{}/content/check_term", self.url);
+            let body = body(global_context, term, in_path);
+            crate::utils::FutWrap::new(async move {
+                let body = body.map_err(|e| BackendError::ToDo(e.to_string()))?;
+                let res = reqwasm::http::Request::post(&url)
+                    .body(body)
+                    .send()
+                    .await
+                    .map_err(|e| BackendError::ToDo(e.to_string()))?;
+                let status = res.status();
+                if (400..=599).contains(&status) {
+                    let str = res
+                        .text()
+                        .await
+                        .map_err(|e| BackendError::ToDo(e.to_string()))?;
+                    return Err(BackendError::ToDo(str));
+                }
+                res.json()
+                    .await
+                    .map_err(|e| BackendError::ToDo(e.to_string()))
+            })
         }
 
         ftml_uris::compfun! {!!

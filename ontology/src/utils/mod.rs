@@ -162,6 +162,37 @@ impl<T, const N: usize> Default for SVec<T, N> {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<T: bincode::Encode, const N: usize> bincode::Encode for SVec<T, N> {
+    #[inline]
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
+        self.0.as_slice().encode(encoder)
+    }
+}
+#[cfg(feature = "serde")]
+impl<Ctx, T: bincode::Decode<Ctx>, const N: usize> bincode::Decode<Ctx> for SVec<T, N> {
+    fn decode<D: bincode::de::Decoder<Context = Ctx>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let v = Vec::<T>::decode(decoder)?;
+        Ok(Self(v.into()))
+    }
+}
+#[cfg(feature = "serde")]
+impl<'de, Ctx, T: bincode::BorrowDecode<'de, Ctx>, const N: usize> bincode::BorrowDecode<'de, Ctx>
+    for SVec<T, N>
+{
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Ctx>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let v = Vec::<T>::borrow_decode(decoder)?;
+        Ok(Self(v.into()))
+    }
+}
+
 #[cfg(feature = "serde-lite")]
 impl<T: serde_lite::Serialize, const N: usize> serde_lite::Serialize for SVec<T, N> {
     #[inline]
@@ -199,6 +230,7 @@ impl Permutation {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
     /// ### Errors
     /// (obviously)
     pub fn parse(spec: &ArgumentSpec, s: &str) -> Result<Self, ()> {
@@ -231,6 +263,12 @@ impl Permutation {
             return Err(());
         }
         Ok(unsafe { self.apply_unchecked(arguments) })
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    #[must_use]
+    pub fn of(&self, num: u8) -> Option<u8> {
+        self.0.iter().position(|i| *i == num).map(|i| i as u8)
     }
 
     /// ### Safety

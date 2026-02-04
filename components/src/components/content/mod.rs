@@ -12,8 +12,8 @@ use ftml_dom::{
         local_cache::{LocalCache, SendBackend},
     },
 };
-use ftml_ontology::terms::VarOrSym;
-use ftml_uris::{DocumentElementUri, DocumentUri, IsDomainUri, ModuleUri, SymbolUri};
+use ftml_ontology::terms::{VarOrSym, Variable};
+use ftml_uris::{DocumentElementUri, DocumentUri, IsDomainUri, LeafUri, ModuleUri, SymbolUri};
 use leptos::prelude::*;
 
 pub trait FtmlViewable {
@@ -23,6 +23,14 @@ impl<F: FtmlViewable> FtmlViewable for &F {
     #[allow(refining_impl_trait_reachable)]
     fn as_view<Be: SendBackend>(&self) -> AnyView {
         F::as_view::<Be>(self)
+    }
+}
+impl FtmlViewable for LeafUri {
+    fn as_view<Be: SendBackend>(&self) -> AnyView {
+        match self {
+            Self::Symbol(s) => s.as_view::<Be>(),
+            Self::Element(v) => variable_uri::<Be>(v.name().last().to_string(), v),
+        }
     }
 }
 
@@ -176,6 +184,21 @@ pub fn symbol_uri<Be: SendBackend>(name: String, uri: &SymbolUri) -> AnyView {
         return view!(<Text class="ftml-comp">{name}</Text>).into_any();
     }
     let vos = VarOrSym::Sym(uri.clone());
+    super::terms::comp_like::<Be, _>(vos, None, false, move || view!(<Text>{name}</Text>))
+        .into_any()
+}
+
+pub fn variable_uri<Be: SendBackend>(name: String, uri: &DocumentElementUri) -> AnyView {
+    use thaw::Text;
+    inject_css("ftml-comp", include_str!("../comp.css"));
+    if !FtmlConfig::allow_hovers() {
+        tracing::trace!("hovers disabled");
+        return view!(<Text class="ftml-comp">{name}</Text>).into_any();
+    }
+    let vos = VarOrSym::Var(Variable::Ref {
+        declaration: uri.clone(),
+        is_sequence: None,
+    });
     super::terms::comp_like::<Be, _>(vos, None, false, move || view!(<Text>{name}</Text>))
         .into_any()
 }

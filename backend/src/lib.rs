@@ -40,6 +40,7 @@ use ftml_ontology::{
             problems::Solutions,
         },
     },
+    terms::{ComponentVar, Term, termpaths::TermPath},
     utils::Css,
 };
 use ftml_uris::{
@@ -120,6 +121,17 @@ pub trait GlobalBackend: 'static {
     fn get() -> &'static Self::Backend;
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
+pub struct BackendCheckResult {
+    pub context: Vec<ComponentVar>,
+    pub inferred_type: Option<Term>,
+    pub simplified: Term,
+}
+
 pub trait FtmlBackend {
     type Error: std::fmt::Display + std::fmt::Debug;
 
@@ -135,6 +147,13 @@ pub trait FtmlBackend {
 
     fn document_link_url(&self, uri: &DocumentUri) -> String;
     fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String>;
+
+    fn check_term(
+        &self,
+        global_context: &[ModuleUri],
+        term: &Term,
+        in_path: &TermPath,
+    ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>> + Send + use<Self>;
 
     fn get_fragment(
         &self,
@@ -431,6 +450,16 @@ pub trait FlamsBackend {
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
     > + Send;
+
+    fn check_term(
+        &self,
+        global_context: &[ModuleUri],
+        term: &Term,
+        in_path: &TermPath,
+    ) -> impl Future<
+        Output = Result<BackendCheckResult, BackendError<server_fn::error::ServerFnErrorErr>>,
+    > + Send
+    + use<Self>;
 }
 
 #[cfg(feature = "server_fn")]
@@ -447,6 +476,16 @@ where
     #[inline]
     fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String> {
         <Self as FlamsBackend>::resource_link_url(self, uri, kind)
+    }
+
+    fn check_term(
+        &self,
+        global_context: &[ModuleUri],
+        term: &Term,
+        in_path: &TermPath,
+    ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>> + Send + use<FB>
+    {
+        <Self as FlamsBackend>::check_term(&self, global_context, term, in_path)
     }
 
     fn get_fragment(

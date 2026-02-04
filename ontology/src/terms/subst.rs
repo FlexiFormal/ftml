@@ -1,8 +1,14 @@
 use std::borrow::Cow;
 
-use crate::terms::{
-    ApplicationTerm, Argument, BindingTerm, BoundArgument, ComponentVar, MaybeSequence, OpaqueTerm,
-    RecordFieldTerm, Term, Variable,
+use ftml_uris::{DocumentUri, IsDomainUri, IsNarrativeUri, ModuleUri};
+
+use crate::{
+    narrative::{documents::Document, elements::DocumentElementRef},
+    terms::{
+        ApplicationTerm, Argument, BindingTerm, BoundArgument, ComponentVar, IsTerm, MaybeSequence,
+        OpaqueTerm, RecordFieldTerm, Term, Variable,
+    },
+    utils::RefTree,
 };
 
 impl AsRef<Self> for Term {
@@ -401,6 +407,58 @@ pub enum FreeOrBound {
 }
 
 impl Term {
+    pub fn full_context(
+        &self,
+        get_doc: &mut dyn FnMut(&DocumentUri) -> Option<Document>,
+    ) -> rustc_hash::FxHashSet<ModuleUri> {
+        let mut mods = rustc_hash::FxHashSet::default();
+        let mut docs = rustc_hash::FxHashSet::default();
+        self.full_context_i(&mut mods, get_doc, &mut docs);
+        mods
+    }
+    fn full_context_i(
+        &self,
+        mods: &mut rustc_hash::FxHashSet<ModuleUri>,
+        get_doc: &mut dyn FnMut(&DocumentUri) -> Option<Document>,
+        all_docs: &mut rustc_hash::FxHashSet<Document>,
+    ) {
+        match self {
+            Self::Symbol { uri, .. } => {
+                if !mods.contains(uri.module_uri()) {
+                    mods.insert(uri.module_uri().clone());
+                }
+            }
+            Self::Var {
+                variable: Variable::Ref { declaration, .. },
+                ..
+            } => {
+                if all_docs.get(declaration.document_uri()).is_none()
+                    && let Some(d) = get_doc(declaration.document_uri())
+                {
+                    for e in d.dfs() {
+                        match e {
+                            DocumentElementRef::Module { module: uri, .. }
+                            | DocumentElementRef::UseModule { uri, .. } => {
+                                if !mods.contains(uri) {
+                                    mods.insert(uri.clone());
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                    all_docs.insert(d);
+                } else {
+                    return;
+                }
+            }
+            o => {
+                for t in o.subterms() {
+                    t.full_context_i(mods, get_doc, all_docs);
+                }
+            }
+        }
+    }
+
     #[must_use]
     pub fn free_variables(&self) -> smallvec::SmallVec<&Variable, 4> {
         let mut vars = smallvec::SmallVec::new();

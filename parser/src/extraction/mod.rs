@@ -312,70 +312,74 @@ pub trait FtmlExtractor: 'static + Sized {
         }
     }
 
-    fn last_term(&self) -> Option<&Term> {
-        for e in self.iterate_narrative() {
-            match e {
-                OpenNarrativeElement::Invisible => (),
-                OpenNarrativeElement::Module { children, .. }
-                | OpenNarrativeElement::MathStructure { children, .. }
-                | OpenNarrativeElement::Morphism { children, .. }
-                | OpenNarrativeElement::Section { children, .. }
-                | OpenNarrativeElement::Paragraph { children, .. }
-                | OpenNarrativeElement::Slide { children, .. }
-                | OpenNarrativeElement::Problem { children, .. }
-                | OpenNarrativeElement::SkipSection { children } => match children.last() {
-                    Some(DocumentElement::Term(term)) => {
-                        return Some(term.parsed());
-                    }
-                    _ => break,
-                },
-                OpenNarrativeElement::Notation { .. }
-                | OpenNarrativeElement::NotationComp { .. }
-                | OpenNarrativeElement::ArgSep { .. }
-                | OpenNarrativeElement::VariableDeclaration { .. }
-                | OpenNarrativeElement::Definiendum(_)
-                | OpenNarrativeElement::Solution(_)
-                | OpenNarrativeElement::FillinSol { .. }
-                | OpenNarrativeElement::ProblemHint
-                | OpenNarrativeElement::ProblemExNote
-                | OpenNarrativeElement::ProblemGradingNote(_)
-                | OpenNarrativeElement::AnswerClass { .. }
-                | OpenNarrativeElement::ChoiceBlock { .. }
-                | OpenNarrativeElement::ProblemChoice { .. }
-                | OpenNarrativeElement::ProblemChoiceVerdict
-                | OpenNarrativeElement::ProblemChoiceFeedback
-                | OpenNarrativeElement::FillinSolCase(_)
-                | OpenNarrativeElement::NotationArg(_) => break,
-            }
-        }
-        if let Some(DocumentElement::Term(term)) = self.iterate_dones().next_back() {
-            return Some(term.parsed());
-        }
-        self.iterate_domain().next().and_then(|d| match d {
-            OpenDomainElement::Argument { terms, .. }
-            | OpenDomainElement::HeadTerm { terms, .. }
-            | OpenDomainElement::Type { terms, .. }
-            | OpenDomainElement::ReturnType { terms, .. }
-            | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
-            OpenDomainElement::ArgTypes(terms)
-            | OpenDomainElement::InferenceRule {
-                parameters: terms, ..
-            } => terms.last(),
-            OpenDomainElement::Module { .. }
-            | OpenDomainElement::MathStructure { .. }
-            | OpenDomainElement::Assign { .. }
-            | OpenDomainElement::Morphism { .. }
-            | OpenDomainElement::OMA { .. }
-            | OpenDomainElement::OMBIND { .. }
-            | OpenDomainElement::OML { .. }
-            | OpenDomainElement::ComplexTerm { .. }
-            | OpenDomainElement::SymbolDeclaration { .. }
-            | OpenDomainElement::SymbolReference { .. }
-            | OpenDomainElement::Comp
-            | OpenDomainElement::DefComp
-            | OpenDomainElement::VariableReference { .. } => None,
-        })
+    fn last_term(&self) -> Option<&Term>; /* {
+    for e in self.iterate_narrative() {
+    match e {
+    OpenNarrativeElement::Invisible => (),
+    OpenNarrativeElement::Module { children, .. }
+    | OpenNarrativeElement::MathStructure { children, .. }
+    | OpenNarrativeElement::Morphism { children, .. }
+    | OpenNarrativeElement::Section { children, .. }
+    | OpenNarrativeElement::Paragraph { children, .. }
+    | OpenNarrativeElement::Slide { children, .. }
+    | OpenNarrativeElement::Problem { children, .. }
+    | OpenNarrativeElement::SkipSection { children } => match children.last() {
+    Some(DocumentElement::Term(term)) => {
+    return Some(term.parsed());
     }
+    _ => break,
+    },
+    OpenNarrativeElement::Notation { .. }
+    | OpenNarrativeElement::NotationComp { .. }
+    | OpenNarrativeElement::ArgSep { .. }
+    | OpenNarrativeElement::VariableDeclaration { .. }
+    | OpenNarrativeElement::Definiendum(_)
+    | OpenNarrativeElement::Solution(_)
+    | OpenNarrativeElement::FillinSol { .. }
+    | OpenNarrativeElement::ProblemHint
+    | OpenNarrativeElement::ProblemExNote
+    | OpenNarrativeElement::ProblemGradingNote(_)
+    | OpenNarrativeElement::AnswerClass { .. }
+    | OpenNarrativeElement::ChoiceBlock { .. }
+    | OpenNarrativeElement::ProblemChoice { .. }
+    | OpenNarrativeElement::ProblemChoiceVerdict
+    | OpenNarrativeElement::ProblemChoiceFeedback
+    | OpenNarrativeElement::FillinSolCase(_)
+    | OpenNarrativeElement::NotationArg(_) => break,
+    }
+    }
+    if let Some(d) = self.iterate_domain().next().and_then(|d| match d {
+    OpenDomainElement::Argument { terms, .. }
+    | OpenDomainElement::HeadTerm { terms, .. }
+    | OpenDomainElement::Type { terms, .. }
+    | OpenDomainElement::ReturnType { terms, .. }
+    | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
+    OpenDomainElement::ArgTypes(terms)
+    | OpenDomainElement::InferenceRule {
+    parameters: terms, ..
+    } => terms.last(),
+    OpenDomainElement::Module { .. }
+    | OpenDomainElement::MathStructure { .. }
+    | OpenDomainElement::Assign { .. }
+    | OpenDomainElement::Morphism { .. }
+    | OpenDomainElement::OMA { .. }
+    | OpenDomainElement::OMBIND { .. }
+    | OpenDomainElement::OML { .. }
+    | OpenDomainElement::ComplexTerm { .. }
+    | OpenDomainElement::SymbolDeclaration { .. }
+    | OpenDomainElement::SymbolReference { .. }
+    | OpenDomainElement::Comp
+    | OpenDomainElement::DefComp
+    | OpenDomainElement::VariableReference { .. } => None,
+    }) {
+    return Some(d);
+    }
+    if let Some(DocumentElement::Term(term)) = self.iterate_dones().next_back() {
+    Some(term.parsed())
+    } else {
+    None
+    }
+    } */
 
     fn term_at(&self, pos: ArgumentPosition) -> Option<&Term> {
         self.iterate_domain().next().and_then(|e| match e {
@@ -472,6 +476,9 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
     #[inline]
     fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement<Self::Node>> {
         self.state().narrative()
+    }
+    fn last_term(&self) -> Option<&Term> {
+        self.state().last_term.as_ref()
     }
     fn iterate_dones(
         &self,

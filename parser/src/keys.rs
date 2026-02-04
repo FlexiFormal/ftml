@@ -1407,7 +1407,10 @@ do_keys! {
             let kind: OpenTermKind = attrs.get_typed(FtmlKey::Term, str::parse)?;
             let notation = opt!(attrs.get_typed(FtmlKey::NotationId, str::parse));
 
-            let in_term = |ext: &mut E| {
+            let has_uri = |ext: &mut E| {
+                if ext.iterate_narrative().any(|e| matches!(e,OpenNarrativeElement::Invisible)) {
+                    return Ok(true);
+                }
                 Ok(!ext.in_notation()
                     && match ext.iterate_domain().next() {
                         None
@@ -1416,6 +1419,11 @@ do_keys! {
                             | OpenDomainElement::MathStructure { .. }
                             | OpenDomainElement::Morphism { .. }
                             | OpenDomainElement::SymbolDeclaration { .. }
+                            | OpenDomainElement::Definiens { .. }
+                        ) => false,
+                        Some(OpenDomainElement::Argument { .. }
+                            | OpenDomainElement::HeadTerm { .. }
+                            | OpenDomainElement::InferenceRule { .. }
                             | OpenDomainElement::SymbolReference { .. }
                             | OpenDomainElement::VariableReference { .. }
                             | OpenDomainElement::OMA { .. }
@@ -1426,10 +1434,7 @@ do_keys! {
                             | OpenDomainElement::ReturnType { .. }
                             | OpenDomainElement::Assign { .. }
                             | OpenDomainElement::ArgTypes(_)
-                            | OpenDomainElement::Definiens { .. }
-                            | OpenDomainElement::InferenceRule { .. }
-                        ) => false,
-                        Some(OpenDomainElement::Argument { .. } | OpenDomainElement::HeadTerm { .. } ) => {
+                        ) => {
                             true
                         }
                         Some(OpenDomainElement::Comp | OpenDomainElement::DefComp) => {
@@ -1453,7 +1458,7 @@ do_keys! {
                     ret!(ext,node <- VariableReference{var,notation} + VariableReference)
                 }
                 (OpenTermKind::OMA, head) => {
-                    let uri = if in_term(ext)? {
+                    let uri = if has_uri(ext)? {
                         None
                     } else {
                         Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
@@ -1461,7 +1466,7 @@ do_keys! {
                     ret!(ext,node <- OMA{head,notation,uri} + OMA)
                 }
                 (OpenTermKind::OMBIND, head) => {
-                    let uri = if in_term(ext)? {
+                    let uri = if has_uri(ext)? {
                         None
                     } else {
                         Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
@@ -1469,7 +1474,7 @@ do_keys! {
                     ret!(ext,node <- OMBIND{head,notation,uri} + OMBIND)
                 }
                 (OpenTermKind::Complex, head) => {
-                    let uri = if in_term(ext)? {
+                    let uri = if has_uri(ext)? {
                         None
                     } else {
                         Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
