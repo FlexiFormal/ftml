@@ -20,7 +20,10 @@ use ftml_ontology::{
     },
 };
 use ftml_parser::FtmlKey;
-use ftml_uris::{DocumentElementUri, FtmlUri, Id, LeafUri, NamedUri, SymbolUri, UriRef};
+use ftml_uris::{
+    DocumentElementUri, FtmlUri, Id, IsDomainUri, IsNarrativeUri, LeafUri, NamedUri, SymbolUri,
+    UriRef, UriWithArchive, UriWithPath,
+};
 use leptos::{
     either::Either,
     math::{mi, mn, mo},
@@ -762,19 +765,66 @@ fn with_notations<
     then: F,
 ) -> AnyView {
     use crate::utils::FutureExt;
+    let uricl = uri.clone();
     FutureExt::into_view(
-        move || WithLocalCache::<Be>::default().get_notations(uri.clone()),
+        move || WithLocalCache::<Be>::default().get_notations(uricl.clone()),
         move |gl| {
-            let not = gl
-                .local
-                .and_then(|v| v.first().cloned().map(|p| p.1))
-                .or_else(|| {
-                    gl.global
-                        .and_then(|r| r.ok().and_then(|v| v.first().cloned().map(|p| p.1)))
-                });
+            let not = gl.local.and_then(|v| select_notation(v, &uri)).or_else(|| {
+                gl.global
+                    .and_then(|r| r.ok().and_then(|v| select_notation(v, &uri)))
+            });
             then(not)
         },
     )
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn select_notation(
+    notations: Vec<(DocumentElementUri, Notation)>,
+    uri: &LeafUri,
+) -> Option<Notation> {
+    fn score(not: &DocumentElementUri, sym: &LeafUri) -> u8 {
+        let mut ret = 0;
+        if not.name.as_ref().starts_with("notation") {
+            ret += 1;
+        }
+        if not.archive_uri() == sym.archive_uri() {
+            ret += 1;
+        } else {
+            return ret;
+        }
+        if not.path().is_none() && sym.path().is_none() {
+            ret += 1;
+        } else if let Some(np) = not.path()
+            && let Some(up) = sym.path()
+        {
+            if np == up {
+                ret += np.steps().count() as u8;
+            } else {
+                let mut i = np.steps().zip(up.steps());
+                while let Some((a, b)) = i.next()
+                    && a == b
+                {
+                    ret += 1;
+                }
+                return ret;
+            }
+        } else {
+            return ret;
+        }
+        match sym {
+            LeafUri::Element(e) if not.document_name() == e.document_name() => ret += 1,
+            LeafUri::Symbol(s) if not.document_name().as_ref() == s.module_name().first() => {
+                ret += 1;
+            }
+            _ => (),
+        }
+        ret
+    }
+    notations
+        .into_iter()
+        .max_by_key(|(u, _)| score(u, uri))
+        .map(|(_, n)| n)
 }
 
 // SAFETY: requires head be Sym or Var::Ref

@@ -9,7 +9,7 @@ use leptos::{
     html::ElementChild,
     prelude::{
         AnyView, Effect, Get, GetUntracked, IntoAny, RwSignal, StyleAttribute, Suspend, Update,
-        With, WithUntracked, expect_context, provide_context, use_context,
+        UpdateUntracked, With, WithUntracked, expect_context, provide_context, use_context,
     },
 };
 

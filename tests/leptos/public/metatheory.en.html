@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>	<meta charset="UTF-8">
+	<link rel="stylesheet" type="text/css" href="https://raw.githack.com/Jazzpirate/RusTeX/main/rustex/src/resources/rustex.css">
+	<style>
+.ftml-assertion-theorem{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Theorem" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<style>
+.ftml-assertion-observation{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Observation" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<style>
+.ftml-assertion-corollary{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Corollary" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<style>
+.ftml-assertion-lemma{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Lemma" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<style>
+.ftml-assertion-axiom{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Axiom" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<style>
+.ftml-assertion-remark{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Remark" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<style>
+.ftml-paragraph-remark{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Remark" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<style>
+.ftml-definition{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Definition" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<style>
+.ftml-example{& .ftml-title-paragraph {display:inline-block; font-weight: bold;font-size:inherit;&::before {content: "Example" " "counter(ftml-section) "." counter(ftml-para);}&::after {content:". ";}}}</style>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/dreampulse/computer-modern-web-font@master/font/Serif/cmun-serif.css">
+	<link rel="stylesheet" href="https://fonts.cdnfonts.com/css/latin-modern-math">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/dreampulse/computer-modern-web-font@master/font/Typewriter/cmun-typewriter.css">
+</head><body class="rustex-body" style="--rustex-text-width:517.5;--rustex-page-width:921.44238;font-family:Computer Modern Serif;font-size:15px;"><div class="rustex-contents" data-ftml-invisible="true" data-ftml-sectionlevel="0" style="display:none;"><!--empty--></div>
+	<a id="Doc-Start"></a><span data-ftml-counter="para" style="display:none;" data-ftml-counter-parent="2"></span><span data-ftml-style="assertion-theorem" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-observation" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-corollary" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-lemma" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-axiom" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="assertion-remark" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="paragraph-remark" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="definition" style="display:none;" data-ftml-counter="para"></span><span data-ftml-style="example" style="display:none;" data-ftml-counter="para"></span><div class="rustex-contents" data-ftml-module="Metatheory"><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty--></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="ellipses" data-ftml-args="" data-ftml-macroname="ellipses"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=ellipses" data-ftml-notationfragment="ldots" data-ftml-precedence="-2147483647" data-ftml-argprecs=""><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid="ldots"><!--empty--><mrow data-ftml-maincomp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">...</mo></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid="ldots"><!--empty--><mrow data-ftml-maincomp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">...</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="sequence expression" data-ftml-args="a" data-ftml-macroname="sequence expression"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=sequence expression" data-ftml-notationfragment="comma" data-ftml-precedence="0" data-ftml-argprecs="0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid="comma"><!--empty--><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="sequence type" data-ftml-args="i" data-ftml-macroname="sequence type"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=sequence type" data-ftml-notationfragment="" data-ftml-precedence="0" data-ftml-argprecs="0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow>
+		<msup><mi class="rustex-math-ord"></mi><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">∗</mo>
+		</msup></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="sequence map" data-ftml-args="ia" data-ftml-macroname="sequence map"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=sequence map" data-ftml-notationfragment="" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty-->
+		<mrow class="rustex-math-ord"><mi class="rustex-math-ord">map</mi><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo>
+		</mrow><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo><!--empty--><!--empty--><mrow data-ftml-arg="21" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-paragraph="" data-ftml-inline="false" data-ftml-fors="http://mathhub.info?a=FTML/meta&m=Metatheory&s=ellipses,http://mathhub.info?a=FTML/meta&m=Metatheory&s=sequence expression,http://mathhub.info?a=FTML/meta&m=Metatheory&s=sequence type" data-ftml-styles="symdoc">
+	<div class="rustex-paragraph rustex-withwidth"><span class="rustex-contents" data-ftml-title="" style="display:none;"><!--empty--></span> <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMA" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=sequence type" data-ftml-notationid=""><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mi class="rustex-math-ord">𝐴</mi></mrow>
+			<msup><mi class="rustex-math-ord"></mi><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">∗</mo></mrow>
+			</msup></mrow>
+		</mrow></math> represents the collection of <span class="rustex-contents" data-ftml-definiendum="http://mathhub.info?a=FTML/meta&m=Metatheory&s=sequence expression">sequences</span> <math class="rustex-math">
+		<mrow>
+
+			<msub><mi class="rustex-math-ord">𝑎</mi><mi class="rustex-math-ord">1</mi>
+			</msub>
+			<mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo>
+			<mrow data-ftml-term="OMID" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=ellipses" data-ftml-notationid="ldots"><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">...</mo></mrow></mrow>
+			<mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo>
+
+			<msub><mi class="rustex-math-ord">𝑎</mi><mi class="rustex-math-ord">𝑛</mi>
+			</msub>
+		</mrow></math> of elements of <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝐴</mi>
+		</mrow></math>. The symbol <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMID" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=ellipses" data-ftml-notationid="ldots"><!--empty--><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">...</mo></mrow></mrow>
+		</mrow></math> means “<span class="rustex-contents" style="font-style:italic;">until</span>”. </div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="of type" data-ftml-args="ii" data-ftml-macroname="of type"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=of type" data-ftml-notationfragment="invisible" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid="invisible"><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-invisible="true" style="display:none;"><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=of type" data-ftml-notationfragment="colon" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid="colon"><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">:</mo></mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-paragraph="" data-ftml-inline="false" data-ftml-fors="http://mathhub.info?a=FTML/meta&m=Metatheory&s=of type" data-ftml-styles="symdoc">
+	<div class="rustex-paragraph rustex-withwidth"><span class="rustex-contents" data-ftml-title="" style="display:none;"><!--empty--></span> The expression <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMA" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=of type" data-ftml-notationid="colon"><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mi class="rustex-math-ord">𝑎</mi></mrow><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">:</mo></mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mi class="rustex-math-ord">𝐴</mi></mrow></mrow>
+		</mrow></math> asserts that <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝑎</mi>
+		</mrow></math> <span class="rustex-contents" style="font-style:italic;">is an</span> <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝐴</mi>
+		</mrow></math>, <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝑎</mi>
+		</mrow></math> <span class="rustex-contents" style="font-style:italic;">has type</span> <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝐴</mi>
+		</mrow></math> or <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝑎</mi>
+		</mrow></math> <span class="rustex-contents" style="font-style:italic;">is an element of</span> <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝐴</mi>
+		</mrow></math>. </div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="apply" data-ftml-args="ia" data-ftml-macroname="apply"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=apply" data-ftml-notationfragment="" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="21" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=apply" data-ftml-notationfragment="infixop" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid="infixop"><!--empty--><mrow data-ftml-argsep=""><!--empty--><!--empty--><mrow data-ftml-arg="21" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow>
+		<mrow class="rustex-math-bin"><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow>
+		</mrow></mrow><mrow data-ftml-invisible="true" style="display:none;"><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=apply" data-ftml-notationfragment="infixrel" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid="infixrel"><!--empty--><mrow data-ftml-argsep=""><!--empty--><!--empty--><mrow data-ftml-arg="21" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow>
+		<mrow class="rustex-math-rel"><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow>
+		</mrow></mrow><mrow data-ftml-invisible="true" style="display:none;"><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-paragraph="" data-ftml-inline="false" data-ftml-styles="symdoc">
+	<div class="rustex-paragraph rustex-withwidth"><span class="rustex-contents" data-ftml-title="" style="display:none;"><!--empty--></span> Given a function <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝑓</mi>
+		</mrow></math> and elements <math class="rustex-math">
+		<mrow>
+
+			<msub><mi class="rustex-math-ord">𝑎</mi><mi class="rustex-math-ord">1</mi>
+			</msub>
+			<mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo>
+			<mi class="rustex-math-ord">...</mi>
+			<mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo>
+
+			<msub><mi class="rustex-math-ord">𝑎</mi><mi class="rustex-math-ord">𝑛</mi>
+			</msub>
+		</mrow></math>, the expression <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMA" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=apply" data-ftml-notationid=""><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mi class="rustex-math-ord">𝑓</mi></mrow><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="21" data-ftml-argmode="a"><!--empty-->
+			<msub><mi class="rustex-math-ord">𝑎</mi><mi class="rustex-math-ord">1</mi>
+			</msub></mrow><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo></mrow><!--empty--><mrow data-ftml-arg="22" data-ftml-argmode="a"><!--empty--><mrow data-ftml-term="OMID" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=ellipses" data-ftml-notationid="ldots"><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">...</mo></mrow></mrow></mrow><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo></mrow><!--empty--><mrow data-ftml-arg="23" data-ftml-argmode="a"><!--empty-->
+			<msub><mi class="rustex-math-ord">𝑎</mi><mi class="rustex-math-ord">𝑛</mi>
+			</msub></mrow><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow></mrow>
+		</mrow></math> represents the <span class="rustex-contents" data-ftml-definiendum="http://mathhub.info?a=FTML/meta&m=Metatheory&s=apply">application</span> of <math class="rustex-math">
+		<mrow>
+			<mi class="rustex-math-ord">𝑓</mi>
+		</mrow></math> to the arguments <math class="rustex-math">
+		<mrow>
+
+			<msub><mi class="rustex-math-ord">𝑎</mi><mi class="rustex-math-ord">1</mi>
+			</msub>
+			<mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo>
+			<mi class="rustex-math-ord">...</mi>
+			<mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo>
+
+			<msub><mi class="rustex-math-ord">𝑎</mi><mi class="rustex-math-ord">𝑛</mi>
+			</msub>
+		</mrow></math>. </div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="module type" data-ftml-args="i" data-ftml-macroname="module type"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=module type" data-ftml-notationfragment="" data-ftml-precedence="0" data-ftml-argprecs="0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝙼𝙾𝙳</mi><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo></mrow><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">𝙼𝙾𝙳</mi></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="module type merge" data-ftml-args="a" data-ftml-macroname="module type merge"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=module type merge" data-ftml-notationfragment="" data-ftml-precedence="0" data-ftml-argprecs="0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-argsep=""><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">⊕</mo></mrow></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">⊕</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="anonymous record" data-ftml-args="a" data-ftml-macroname="anonymous record"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=anonymous record" data-ftml-notationfragment="" data-ftml-precedence="0" data-ftml-argprecs="0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">[[</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">]]</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="record field" data-ftml-args="ii" data-ftml-macroname="record field"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=record field" data-ftml-notationfragment="" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mi class="rustex-math-ord">.</mi></mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="mathematical structure" data-ftml-args="a" data-ftml-macroname="mathstruct"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=mathematical structure" data-ftml-notationfragment="angle" data-ftml-precedence="-2147483647" data-ftml-argprecs="2147483647"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid="angle"><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">⟨</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">⟩</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=mathematical structure" data-ftml-notationfragment="parens" data-ftml-precedence="-2147483647" data-ftml-argprecs="2147483647"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid="parens"><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="a"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-paragraph="" data-ftml-inline="false" data-ftml-styles="symdoc">
+	<div class="rustex-paragraph rustex-withwidth"><span class="rustex-contents" data-ftml-title="" style="display:none;"><!--empty--></span> A <span class="rustex-contents" data-ftml-definiendum="http://mathhub.info?a=FTML/meta&m=Metatheory&s=mathematical structure">mathematical structure</span> is a tuple <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMA" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=mathematical structure" data-ftml-notationid="angle"><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">⟨</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="a"><!--empty-->
+			<msub><mi class="rustex-math-ord">𝑠</mi><mi class="rustex-math-ord">1</mi>
+			</msub></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo></mrow><!--empty--><mrow data-ftml-arg="12" data-ftml-argmode="a"><!--empty--><mrow data-ftml-term="OMID" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=ellipses" data-ftml-notationid="ldots"><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">...</mo></mrow></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-punct" stretchy="false">,</mo></mrow><!--empty--><mrow data-ftml-arg="13" data-ftml-argmode="a"><!--empty-->
+			<msub><mi class="rustex-math-ord">𝑠</mi><mi class="rustex-math-ord">𝑛</mi>
+			</msub></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">⟩</mo></mrow></mrow>
+		</mrow></math> of interdependent sets, functions and relations. </div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="record type" data-ftml-args=""><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="fold right" data-ftml-args="bbiii"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="last" data-ftml-args="a"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="init" data-ftml-args="a"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="bind" data-ftml-args="Bi" data-ftml-macroname="bind" data-ftml-assoctype="pre"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=bind" data-ftml-notationfragment="depfun" data-ftml-precedence="-2147483647" data-ftml-argprecs="2147483647,2147483647"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMBIND" data-ftml-head="" data-ftml-notationid="depfun"><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="B"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow>
+		<mrow class="rustex-math-close"><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">→</mo></mrow>
+		</mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid="depfun"><!--empty--><mrow data-ftml-maincomp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">·</mo><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo>
+
+		<mspace class="rustex-mkern" width="0.27778em"></mspace><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">→</mo>
+
+		<mspace class="rustex-mkern" width="0.27778em"></mspace><mo lspace="0" rspace="0" class="rustex-math-bin" stretchy="false">·</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=bind" data-ftml-notationfragment="forall" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMBIND" data-ftml-head="" data-ftml-notationid="forall"><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">∀</mi></mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="B"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mi class="rustex-math-ord">.</mi>
+
+		<mspace class="rustex-mkern" width="0.27778em"></mspace><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=bind" data-ftml-notationfragment="Pi" data-ftml-precedence="0" data-ftml-argprecs="0,0"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMBIND" data-ftml-head="" data-ftml-notationid="Pi"><!--empty-->
+		<msub><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-op" stretchy="false">∏</mo></mrow>
+			<mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="B"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow>
+			</mrow>
+		</msub><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="implicit bind" data-ftml-args="Bi" data-ftml-macroname="implicit bind" data-ftml-assoctype="pre"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=implicit bind" data-ftml-notationfragment="" data-ftml-precedence="-2147483647" data-ftml-argprecs="2147483647,2147483647"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMBIND" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">{</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="B"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp="">
+		<msub><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">}</mo><mi class="rustex-math-ord">𝐼</mi>
+		</msub></mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="2"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="integer literal" data-ftml-args=""><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=integer literal" data-ftml-notationfragment="" data-ftml-precedence="-2147483647" data-ftml-argprecs=""><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">ℤ</mi></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">ℤ</mi></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="ordinal" data-ftml-args=""><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=ordinal" data-ftml-notationfragment="" data-ftml-precedence="-2147483647" data-ftml-argprecs=""><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">𝙾𝚛𝚍</mi></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">𝙾𝚛𝚍</mi></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="proposition" data-ftml-args="" data-ftml-macroname="prop"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=proposition" data-ftml-notationfragment="" data-ftml-precedence="-2147483647" data-ftml-argprecs=""><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">𝙿𝚛𝚘𝚙</mi></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">𝙿𝚛𝚘𝚙</mi></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="judgment holds" data-ftml-args="i" data-ftml-macroname="judgment holds" data-ftml-role="judgment"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=judgment holds" data-ftml-notationfragment="" data-ftml-precedence="2147483647" data-ftml-argprecs="2147483647"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">⊢</mo></mrow>
+
+		<mspace class="rustex-mkern" width="0.27778em"></mspace><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">⊢</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="object" data-ftml-args="" data-ftml-macroname="object"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=object" data-ftml-notationfragment="" data-ftml-precedence="-2147483647" data-ftml-argprecs=""><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">𝙾𝚋𝚓</mi></mrow></mrow></mrow>
+	</mrow></math><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationopcomp=""><mrow data-ftml-term="OMID" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-maincomp=""><mi class="rustex-math-ord">𝙾𝚋𝚓</mi></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;">
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-symdecl="internal parentheses" data-ftml-args="i" data-ftml-macroname="internal parentheses"><!--empty--></span></div></div></div><div class="rustex-contents" data-ftml-invisible="true" style="display:none;"><!--empty-->
+	<div class="rustex-hbox-container"><div class="rustex-hbox"><span class="rustex-contents" data-ftml-notation="http://mathhub.info?a=FTML/meta&m=Metatheory&s=internal parentheses" data-ftml-notationfragment="" data-ftml-precedence="-2147483647" data-ftml-argprecs="2147483647"><math class="rustex-math">
+	<mrow>
+		<mrow data-ftml-notationcomp=""><mrow data-ftml-term="OMA" data-ftml-head="" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo></mrow><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-argnum="1"><mi class="rustex-math-ord">𝑥</mi></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow></mrow></mrow>
+	</mrow></math></span></div></div></div><div class="rustex-contents" data-ftml-paragraph="" data-ftml-inline="false" data-ftml-fors="http://mathhub.info?a=FTML/meta&m=Metatheory&s=judgment holds" data-ftml-styles="symdoc">
+	<div class="rustex-paragraph rustex-withwidth"><span class="rustex-contents" data-ftml-title="" style="display:none;"><!--empty--></span> A <span class="rustex-contents" data-ftml-definiendum="http://mathhub.info?a=FTML/meta&m=Metatheory&s=proposition">proposition</span> is a statement that can be assigned a <span class="rustex-contents" style="font-style:italic;">truth value</span> (most commonly <span class="rustex-contents" style="font-style:italic;">true</span> or <span class="rustex-contents" style="font-style:italic;">false</span>). </div>
+	<div class="rustex-paragraph rustex-withwidth"><div class="rustex-parindent" style="margin-left:22.5px;"></div>If <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMV" data-ftml-head="A" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝐴</mi></mrow></mrow>
+		</mrow></math> is a <span class="rustex-contents" data-ftml-term="OMID" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=proposition" data-ftml-notationid=""><!--empty--><span class="rustex-contents" data-ftml-comp="">proposition</span></span>, then by <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMA" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=judgment holds" data-ftml-notationid=""><!--empty--><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">⊢</mo></mrow>
+
+			<mspace class="rustex-mkern" width="0.27778em"></mspace><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-term="OMV" data-ftml-head="A" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝐴</mi></mrow></mrow></mrow></mrow>
+		</mrow></math> we assert that the <span class="rustex-contents" data-ftml-term="OMID" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=proposition" data-ftml-notationid=""><!--empty--><span class="rustex-contents" data-ftml-comp="">proposition</span></span> <span class="rustex-contents" style="font-style:italic;">holds</span>, and simultaneously represent the collection of <span class="rustex-contents" style="font-style:italic;">proofs</span> for <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMV" data-ftml-head="A" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝐴</mi></mrow></mrow>
+		</mrow></math>. </div></div><div class="rustex-contents" data-ftml-paragraph="" data-ftml-inline="false" data-ftml-fors="http://mathhub.info?a=FTML/meta&m=Metatheory&s=bind" data-ftml-styles="symdoc">
+	<div class="rustex-paragraph rustex-withwidth"><span class="rustex-contents" data-ftml-title="" style="display:none;"><!--empty--></span> For a variable <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMA" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=of type" data-ftml-notationid="colon"><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-term="OMV" data-ftml-head="a" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑎</mi></mrow></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">:</mo></mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-term="OMV" data-ftml-head="A" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝐴</mi></mrow></mrow></mrow></mrow>
+		</mrow></math>, and an inhabitable term <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMV" data-ftml-head="T" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑇</mi></mrow></mrow>
+			<mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo>
+			<mrow data-ftml-term="OMV" data-ftml-head="a" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑎</mi></mrow></mrow>
+			<mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo>
+		</mrow></math>, by <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMBIND" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=bind" data-ftml-notationid="depfun"><!--empty--><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo></mrow><!--empty--><!--empty--><mrow data-ftml-arg="11" data-ftml-argmode="B"><!--empty--><mrow data-ftml-term="OMA" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=of type" data-ftml-notationid="colon"><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-term="OMV" data-ftml-head="a" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑎</mi></mrow></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">:</mo></mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-term="OMV" data-ftml-head="A" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝐴</mi></mrow></mrow></mrow></mrow></mrow>
+			<mrow class="rustex-math-close"><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow><mrow data-ftml-defcomp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">→</mo></mrow>
+			</mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-term="OMV" data-ftml-head="T" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑇</mi></mrow></mrow><mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo><mrow data-ftml-term="OMV" data-ftml-head="a" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑎</mi></mrow></mrow><mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo></mrow></mrow>
+		</mrow></math> we designate the collection of all functions that map any <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMA" data-ftml-head="http://mathhub.info?a=FTML/meta&m=Metatheory&s=of type" data-ftml-notationid="colon"><!--empty--><!--empty--><mrow data-ftml-arg="1" data-ftml-argmode="i"><!--empty--><mrow data-ftml-term="OMV" data-ftml-head="a" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑎</mi></mrow></mrow></mrow><mrow data-ftml-comp=""><mo lspace="0" rspace="0" class="rustex-math-rel" stretchy="false">:</mo></mrow><!--empty--><mrow data-ftml-arg="2" data-ftml-argmode="i"><!--empty--><mrow data-ftml-term="OMV" data-ftml-head="A" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝐴</mi></mrow></mrow></mrow></mrow>
+		</mrow></math> to some element of <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMV" data-ftml-head="T" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑇</mi></mrow></mrow>
+			<mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo>
+			<mrow data-ftml-term="OMV" data-ftml-head="a" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑎</mi></mrow></mrow>
+			<mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo>
+		</mrow></math>. Note, that the term <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMV" data-ftml-head="T" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑇</mi></mrow></mrow>
+			<mo lspace="0" rspace="0" class="rustex-math-open" stretchy="false">(</mo>
+			<mrow data-ftml-term="OMV" data-ftml-head="a" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑎</mi></mrow></mrow>
+			<mo lspace="0" rspace="0" class="rustex-math-close" stretchy="false">)</mo>
+		</mrow></math> may be parametric in <math class="rustex-math">
+		<mrow>
+			<mrow data-ftml-term="OMV" data-ftml-head="a" data-ftml-notationid=""><!--empty--><mrow data-ftml-comp=""><mi class="rustex-math-ord">𝑎</mi></mrow></mrow>
+		</mrow></math>. </div></div></div>
+	<div class="rustex-vskip" style="margin-bottom:0px;margin-top:auto;"></div>
+</body></html>

@@ -103,18 +103,18 @@ static SOURCEREF_SPECS: [SourceRefSpec; 1] = [SourceRefSpec {
         let end = end.strip_prefix('(')?.strip_suffix(')')?;
 
         let (sline, scol) = start.split_once(';')?;
-        let sline = sline.parse().ok()?;
+        let sline: u32 = sline.parse().ok()?;
         let scol = scol.parse().ok()?;
         let (eline, ecol) = end.split_once(';')?;
-        let eline = eline.parse().ok()?;
+        let eline: u32 = eline.parse().ok()?;
         let ecol = ecol.parse().ok()?;
         Some(SourceRange {
             start: SourcePos {
-                line: sline,
+                line: sline.saturating_sub(1),
                 col: scol,
             },
             end: SourcePos {
-                line: eline,
+                line: eline.saturating_sub(1),
                 col: ecol,
             },
         })

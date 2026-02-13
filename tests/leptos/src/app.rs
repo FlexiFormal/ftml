@@ -1,5 +1,5 @@
 use ftml_components::{config::FtmlConfig, SidebarPosition};
-use ftml_dom::structure::TocSource;
+use ftml_dom::toc::TocSource;
 use ftml_ontology::utils::Css;
 use ftml_uris::DocumentUri;
 use leptos::prelude::*;
@@ -129,8 +129,12 @@ fn Ftml() -> impl IntoView {
     const HTML: &str = include_str!("../public/all.en.html");
     let html = extract_body_as_div(HTML);
     tracing::info!("Here");
-    FtmlConfig::set_toc_source(TocSource::Extract);
-    Views::setup_document::<GlobalBackend>(uri, SidebarPosition::Find, false, || {
-        Views::render_ftml(html, None).into_any()
-    })
+    //FtmlConfig::set_toc_source(TocSource::Extract);
+    Views::setup_document::<GlobalBackend>(
+        uri,
+        SidebarPosition::Find,
+        false,
+        TocSource::Extract,
+        || Views::render_ftml(html, None).into_any(),
+    )
 }

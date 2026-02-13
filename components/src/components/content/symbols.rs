@@ -56,8 +56,8 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
         reordering,
         ..
     } = &**data;
-    let tp = tp.parsed();
-    let df = df.parsed();
+    let tp = tp.presentation();
+    let df = df.presentation();
     let symbol_str = if role.iter().any(|s| s.as_ref() == "textsymdecl") {
         "Text Symbol "
     } else {
@@ -68,11 +68,11 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
         .title(uri.to_string());
     let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
     let tp = tp.map(|t| {
-        let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+        let t = t.into_view::<crate::Views<Be>, Be>(false);
         view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
     });
     let df = df.map(|t| {
-        let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+        let t = t.into_view::<crate::Views<Be>, Be>(false);
         view! {<Caption1>
             "Definiens: "{ftml_dom::utils::math(|| t)}
             </Caption1>
@@ -153,18 +153,18 @@ impl super::FtmlViewable for VariableDeclaration {
             is_seq,
             ..
         } = &**data;
-        let tp = tp.parsed();
-        let df = df.parsed();
+        let tp = tp.presentation();
+        let df = df.presentation();
         let name = span()
             .child(uri.name().last().to_string())
             .title(uri.to_string());
         let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
         let tp = tp.map(|t| {
-            let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+            let t = t.into_view::<crate::Views<Be>, Be>(false);
             view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
         });
         let df = df.map(|t| {
-            let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+            let t = t.into_view::<crate::Views<Be>, Be>(false);
             view! {<Caption1>"Definiens: "{ftml_dom::utils::math(|| t)}</Caption1>}
                 .attr("style", "white-space:nowrap;")
         });

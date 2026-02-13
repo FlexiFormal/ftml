@@ -16,6 +16,7 @@ pub mod mathml;
 pub mod notations;
 pub mod structure;
 pub mod terms;
+pub mod toc;
 pub mod utils;
 pub use clonable_views::ClonableView;
 use ftml_ontology::narrative::elements::{ParagraphOrProblemKind, paragraphs::ParagraphKind};

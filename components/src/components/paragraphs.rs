@@ -31,11 +31,15 @@ pub fn paragraph<V: IntoView>(
             }</span>
         })
     } else {
-        C(view! {
-            <div class=info.class style=info.style>{
-                FtmlConfig::wrap_paragraph(&info.uri,info.kind,then)
-            }</div>
-        })
+        //let uri = info.uri.to_string();
+        //leptos::logging::log!("Here: Class: {:?}; Style: {:?}", info.class, info.style);
+        C(
+            view! {
+                <div class=info.class style=info.style>{
+                    FtmlConfig::wrap_paragraph(&info.uri,info.kind,then)
+                }</div>
+            }, //.attr("data-uri", uri)
+        )
     }
 }
 

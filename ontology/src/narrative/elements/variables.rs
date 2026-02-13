@@ -79,7 +79,7 @@ impl crate::Ftml for VariableDeclaration {
                     .map(move |s| triple!(<(iri2.clone())> dc:hasPart <(s.to_iri())>))
             }};
         }
-        match (self.data.tp.parsed(), self.data.df.parsed()) {
+        match (self.data.tp.get_parsed(), self.data.df.get_parsed()) {
             (Some(Term::Symbol { uri: tp, .. }), Some(df)) => A(syms!(df).chain([
                 triple!(<(iri.clone())> : ulo:variable),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),

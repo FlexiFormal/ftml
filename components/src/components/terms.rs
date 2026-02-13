@@ -11,6 +11,7 @@ use ftml_dom::{
     ClonableView, DocumentState, FtmlViews, TermTrackedViews,
     notations::TermExt,
     terms::ReactiveApplication,
+    toc::TocSource,
     utils::{
         ContextChain, ModuleContext,
         css::{CssExt, inject_css},
@@ -173,6 +174,8 @@ pub fn oma<V: FtmlViews, B: SendBackend>(
         VarOrSym::Var(_) => None,
     });
 
+    let allow_subterms = FtmlConfig::allow_subterms();
+
     #[allow(clippy::option_if_let_else)]
     if let Some(uri) = uri {
         let r = super::notations::has_notation::<B>(
@@ -181,7 +184,11 @@ pub fn oma<V: FtmlViews, B: SendBackend>(
             children,
             Some(head),
         );
-        with_subterm::<V, B>(head.with_untracked(ReactiveApplication::term), r)
+        if allow_subterms {
+            with_subterm::<V, B>(head.with_untracked(ReactiveApplication::term), r)
+        } else {
+            r
+        }
     } else {
         children.into_view::<crate::Views<B>>()
     }
@@ -407,13 +414,13 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
                 either::Either::Left(v) => v,
                 either::Either::Right(v) => &**v
             };
-            let tp = v.data.tp.parsed();
-            let df = v.data.df.parsed();
+            let tp = v.data.tp.presentation();
+            let df = v.data.df.presentation();
             view! {
                 {df.map(|df| {
                     let v = view!{"defined as "
                         {
-                            let t = df.clone().into_view::<crate::Views<B>,B>(false);
+                            let t = df.into_view::<crate::Views<B>,B>(false);
                             ftml_dom::utils::math(move || t)
                         }};
                     view!{<div><Text>{v}</Text></div>}
@@ -421,7 +428,7 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
                 {tp.map(|tp| {
                     let v = view!{"of type "
                         {
-                            let t = tp.clone().into_view::<crate::Views<B>,B>(false);
+                            let t = tp.into_view::<crate::Views<B>,B>(false);
                             ftml_dom::utils::math(move || t)
                         }
                     };
@@ -583,8 +590,8 @@ fn formals<Be: SendBackend>(
                        tracing::warn!("Rendering term {t:?}");
                        ftml_dom::utils::math(|| ReactiveStore::render_term::<Be>(
                            match t {
-                               ::either::Left(t) => t.parsed().clone(),
-                               ::either::Right(t) => t.parsed().clone(),
+                               ::either::Left(t) => t.presentation(),
+                               ::either::Right(t) => t.presentation(),
                            }
                        )).into_any()
                    },
@@ -688,6 +695,7 @@ fn para_window<Be: SendBackend>(selected: RwSignal<Option<String>>) -> impl Into
                                 Some(uri.into()),
                                 crate::SidebarPosition::None,
                                 stripped,
+                                TocSource::None,
                                 || {
                                     crate::Views::<Be>::render_ftml(html.into_string(), None)
                                         .into_any()
@@ -767,7 +775,10 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
     selected: RwSignal<bool>,
     dialog_open: RwSignal<bool>,
 ) -> AnyView {
-    use thaw::{Dialog, DialogBody, DialogSurface, DialogTitle, Tooltip};
+    use thaw::{
+        Dialog, DialogBody, DialogSurface, DialogTitle, Table, TableBody, TableCell,
+        TableCellLayout, TableRow, Tooltip,
+    };
 
     let nv = v.directive(move |e| selection_listener(e, &owner, selected), ());
 
@@ -801,11 +812,16 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
                 res.get().and_then(|r| {
                     r.ok().map(|t| {
                         let t = match t {
-                            ::either::Left(t) => t.parsed().clone(),
-                            ::either::Right(t) => t.parsed().clone(),
+                            ::either::Left(t) => t.presentation(),
+                            ::either::Right(t) => t.presentation(),
                         };
                         view!{
-                            <div>"In full term: "{ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(t))}</div>
+                            <TableRow>
+                                <TableCell><TableCellLayout>"In full term: "</TableCellLayout></TableCell>
+                                <TableCell><TableCellLayout>
+                                    {ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(t))}
+                                </TableCellLayout></TableCell>
+                            </TableRow>
                         }
                     })
                 })
@@ -829,8 +845,8 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
                                     Ok(full_term) => {
                                         //leptos::logging::log!("Term is here!");
                                         let t = match full_term {
-                                            ::either::Left(t) => t.parsed(),
-                                            ::either::Right(t) => t.parsed(),
+                                            ::either::Left(t) => t.get_parsed(),
+                                            ::either::Right(t) => t.get_parsed(),
                                         };
                                         if let Some(path) = t.path_of_subterm(sub) {
                                             //leptos::logging::log!("Path: {path:?}");
@@ -859,25 +875,44 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
             });
             move || {
                 sig.get().map_or_else(
-                    || leptos::either::Either::Left(view! {<Spinner/>}),
+                    || {
+                        leptos::either::Either::Left(view! {
+                            <TableRow>
+                                <TableCell><TableCellLayout><Spinner/></TableCellLayout></TableCell>
+                            </TableRow>
+                        })
+                    },
                     |r| {
                         leptos::either::Either::Right(match r {
                             Ok(r) => leptos::either::Either::Left(check_result::<Be>(r)),
-                            Err(e) => leptos::either::Either::Right(
-                                view! {<div style="color:red">"Error: "{e}</div>},
-                            ),
+                            Err(e) => leptos::either::Either::Right(view! {
+                                <TableRow>
+                                    <TableCell><TableCellLayout>
+                                        <span style="color:red;">"Error"</span>
+                                    </TableCellLayout></TableCell>
+                                    <TableCell><TableCellLayout>
+                                        {e}
+                                    </TableCellLayout></TableCell>
+                                </TableRow>
+                            }),
                         })
                     },
                 )
             }
         });
         view! {
-            <div style="display:flex;flex-direction:column;">
-                <div><b>"Selected term: "</b>{term}</div>
-                {rendered_term}
-                {inferred}
-            </div>
+            <Table>
+                <TableBody>
+                    <TableRow>
+                        <TableCell><TableCellLayout>"Selected term: "</TableCellLayout></TableCell>
+                        <TableCell><TableCellLayout>{term}</TableCellLayout></TableCell>
+                    </TableRow>
+                    {rendered_term}
+                    {inferred}
+                </TableBody>
+            </Table>
         }
+        .attr("style", "width:max-content;")
     };
     view! {
         {nv}
@@ -896,19 +931,31 @@ fn check_result<Be: SendBackend>(
         simplified,
     }: BackendCheckResult,
 ) -> impl IntoView {
+    use thaw::{TableCell, TableCellLayout, TableRow};
     #[allow(clippy::option_if_let_else)]
     let tp = if let Some(tp) = inferred_type {
         let tp = ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(tp));
         leptos::either::Either::Left(view! {
-            <div>"Inferred type: "{tp}</div>
+            <TableRow>
+                <TableCell><TableCellLayout>"Inferred type:"</TableCellLayout></TableCell>
+                <TableCell><TableCellLayout>{tp}</TableCellLayout></TableCell>
+            </TableRow>
         })
     } else {
-        leptos::either::Either::Right(view! {<div>"(Type inferrence failed)"</div>})
+        leptos::either::Either::Right(view! {
+            <TableRow>
+                <TableCell>""</TableCell>
+                <TableCell><TableCellLayout>"(Type inferrence failed)"</TableCellLayout></TableCell>
+            </TableRow>
+        })
     };
     let simplified = view! {
-        <div>"Simplified: "
-            {ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(simplified))}
-        </div>
+        <TableRow>
+            <TableCell><TableCellLayout>"Simplified:"</TableCellLayout></TableCell>
+            <TableCell><TableCellLayout>
+                {ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(simplified))}
+            </TableCellLayout></TableCell>
+        </TableRow>
     };
     let ctx = if context.is_empty() {
         None
@@ -920,7 +967,12 @@ fn check_result<Be: SendBackend>(
             .map(|v| view! {<mo>", "</mo>{cv::<Be>(v)}})
             .collect_view();
         let inner = ftml_dom::utils::math(move || view! {<mrow>{first}{rest}</mrow>});
-        Some(view! {<div>"...where " {inner}</div>})
+        Some(view! {
+            <TableRow>
+                <TableCell>""</TableCell>
+                <TableCell><TableCellLayout>"...where " {inner}</TableCellLayout></TableCell>
+            </TableRow>
+        })
     };
     view! {{simplified}{tp}{ctx}}
 }

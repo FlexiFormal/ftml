@@ -2,8 +2,8 @@
 rustdocflags = [
     "--cfg",
     "docsrs",
-    "-Zunstable-options",
-    "--generate-link-to-definition",
+   # "-Zunstable-options",
+   # "--generate-link-to-definition",
     "--html-in-header",
     "parser/doc/katex-header.html",
     "--html-in-header",

@@ -50,7 +50,10 @@ pub struct TermContainer {
     parsed: Option<Term>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
-    checked: CheckedContainer,
+    presentation: MutableTerm,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    #[cfg_attr(feature = "typescript", tsify(type = "Term | undefined"))]
+    checked: MutableTerm,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub source: SourceRange,
 }
@@ -59,9 +62,15 @@ impl TermContainer {
     pub fn new(t: Term, source: Option<SourceRange>) -> Self {
         Self {
             parsed: Some(t),
+            presentation: MutableTerm::default(),
+            checked: MutableTerm::default(),
             source: source.unwrap_or_default(),
-            checked: CheckedContainer::default(),
         }
+    }
+
+    #[must_use]
+    pub fn inferred(&self) -> bool {
+        self.parsed.is_none() && self.has_checked()
     }
 
     #[must_use]
@@ -78,10 +87,20 @@ impl TermContainer {
     pub fn has_checked(&self) -> bool {
         self.checked.0.lock().is_some()
     }
+
     #[inline]
     #[must_use]
-    pub const fn parsed(&self) -> Option<&Term> {
+    pub const fn get_parsed(&self) -> Option<&Term> {
         self.parsed.as_ref()
+    }
+
+    #[must_use]
+    pub fn presentation(&self) -> Option<Term> {
+        self.presentation
+            .0
+            .lock()
+            .clone()
+            .or_else(|| self.parsed.clone())
     }
 
     #[must_use]
@@ -91,8 +110,12 @@ impl TermContainer {
             |t| Some((t.clone(), true)),
         )
     }
+
     pub fn set_checked(&self, t: Term) {
         *self.checked.0.lock() = Some(t);
+    }
+    pub fn set_presentation(&self, t: Term) {
+        *self.presentation.0.lock() = Some(t);
     }
 }
 
@@ -183,8 +206,8 @@ impl PartialEq for TermContainer {
 impl Eq for TermContainer {}
 
 #[derive(Default, Debug, Clone)]
-struct CheckedContainer(std::sync::Arc<parking_lot::Mutex<Option<Term>>>);
-impl From<Option<Term>> for CheckedContainer {
+pub(crate) struct MutableTerm(pub std::sync::Arc<parking_lot::Mutex<Option<Term>>>);
+impl From<Option<Term>> for MutableTerm {
     fn from(value: Option<Term>) -> Self {
         Self(std::sync::Arc::new(parking_lot::Mutex::new(value)))
     }
@@ -200,9 +223,9 @@ impl deepsize::DeepSizeOf for TermContainer {
 
 #[cfg(feature = "serde")]
 mod serde_impl {
-    use crate::terms::{CheckedContainer, Term};
+    use crate::terms::{MutableTerm, Term};
 
-    impl serde::Serialize for CheckedContainer {
+    impl serde::Serialize for MutableTerm {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
@@ -210,7 +233,7 @@ mod serde_impl {
             self.0.lock().serialize(serializer)
         }
     }
-    impl<'de> serde::Deserialize<'de> for CheckedContainer {
+    impl<'de> serde::Deserialize<'de> for MutableTerm {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
@@ -218,7 +241,7 @@ mod serde_impl {
             Ok(Option::<Term>::deserialize(deserializer)?.into())
         }
     }
-    impl bincode::Encode for CheckedContainer {
+    impl bincode::Encode for MutableTerm {
         fn encode<E: bincode::enc::Encoder>(
             &self,
             encoder: &mut E,
@@ -226,14 +249,14 @@ mod serde_impl {
             self.0.lock().encode(encoder)
         }
     }
-    impl<'de, Ctx> bincode::BorrowDecode<'de, Ctx> for CheckedContainer {
+    impl<'de, Ctx> bincode::BorrowDecode<'de, Ctx> for MutableTerm {
         fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Ctx>>(
             decoder: &mut D,
         ) -> Result<Self, bincode::error::DecodeError> {
             Ok(Option::<Term>::borrow_decode(decoder)?.into())
         }
     }
-    impl<Ctx> bincode::Decode<Ctx> for CheckedContainer {
+    impl<Ctx> bincode::Decode<Ctx> for MutableTerm {
         fn decode<D: bincode::de::Decoder<Context = Ctx>>(
             decoder: &mut D,
         ) -> Result<Self, bincode::error::DecodeError> {
@@ -244,14 +267,14 @@ mod serde_impl {
 
 #[cfg(feature = "serde-lite")]
 mod serde_lite_impl {
-    use crate::terms::{CheckedContainer, Term};
+    use crate::terms::{MutableTerm, Term};
 
-    impl serde_lite::Serialize for CheckedContainer {
+    impl serde_lite::Serialize for MutableTerm {
         fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
             self.0.lock().serialize()
         }
     }
-    impl serde_lite::Deserialize for CheckedContainer {
+    impl serde_lite::Deserialize for MutableTerm {
         fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
         where
             Self: Sized,

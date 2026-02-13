@@ -145,18 +145,14 @@ fn position_sidebar(position: &HtmlDivElement, sidebar: &HtmlDivElement) {
         // SAFETY: we added the node above
         unsafe { position.first_element_child().unwrap_unchecked() }
     };
-    while {
-        parent.get_bounding_client_rect().width() < 10.0
-    } //&& parent.child_element_count() == 1
+    while { parent.get_bounding_client_rect().width() < 10.0 }
         && let Some(fc) = max_child(&parent)
-    //parent.first_element_child()
     {
         parent = fc;
     }
     // first, add it to the end; since width=100%, this will get us a reasonable actual width of
     // the container, which we use as margin-left
     let _ = parent.append_child(sidebar);
-    //let rect = get_true_rect(sidebar);
     let _ = sidebar.set_attribute(
         "style",
         &format!(

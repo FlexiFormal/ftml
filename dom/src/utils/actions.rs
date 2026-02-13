@@ -6,13 +6,13 @@ use leptos::prelude::{
 pub struct OneShot {
     click: WriteSignal<bool>,
     done: ReadSignal<bool>,
-    then: StoredValue<Option<Box<dyn FnOnce() + Send + Sync>>>,
+    then: StoredValue<Vec<Box<dyn FnOnce() + Send + Sync>>>,
 }
 impl OneShot {
     pub(crate) fn new() -> (Self, SetOneShotDone) {
         let click = RwSignal::new(false);
         let done_sig = RwSignal::new(false);
-        let then = StoredValue::new(None);
+        let then = StoredValue::new(Vec::new());
         let done = SetOneShotDone {
             was_set: click.read_only(),
             is_done: done_sig.write_only(),
@@ -41,14 +41,7 @@ impl OneShot {
     }
     pub fn on_set(&self, f: impl FnOnce() + Send + Sync + 'static) {
         self.then.update_value(move |v| {
-            let old = v.take();
-            let new = Box::new(move || {
-                if let Some(old) = old {
-                    old();
-                }
-                f();
-            });
-            *v = Some(new);
+            v.push(Box::new(f));
         });
     }
 }
@@ -61,7 +54,7 @@ pub struct OneShotNotSet;
 pub struct SetOneShotDone {
     was_set: ReadSignal<bool>,
     is_done: WriteSignal<bool>,
-    then: StoredValue<Option<Box<dyn FnOnce() + Send + Sync>>>,
+    then: StoredValue<Vec<Box<dyn FnOnce() + Send + Sync>>>,
 }
 impl SetOneShotDone {
     pub fn was_clicked(self) -> bool {
@@ -76,7 +69,7 @@ impl SetOneShotDone {
         if self.was_set.get_untracked() {
             self.is_done.set(true);
             self.then.update_value(|f| {
-                if let Some(f) = f.take() {
+                for f in std::mem::take(f) {
                     f();
                 }
             });

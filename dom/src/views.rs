@@ -282,8 +282,9 @@ pub trait TermTrackedViews: 'static {
         info: SectionInfo,
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
+        let style = info.style();
         view! {
-            <div id=info.id.to_string() style=info.style() class=info.class()>
+            <div id=info.id.to_string() style=style class=info.class()>
               {then()}
             </div>
         }

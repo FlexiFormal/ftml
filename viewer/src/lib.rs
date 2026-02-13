@@ -7,7 +7,7 @@
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
 use ftml_components::SidebarPosition;
-use ftml_dom::structure::TocSource;
+use ftml_dom::toc::TocSource;
 use leptos::prelude::{IntoAny, provide_context};
 
 pub mod backend;
@@ -58,12 +58,13 @@ pub fn iterate_body(cfg: config::FtmlViewerConfig) {
     leptos_posthoc::hydrate_body(move |orig| {
         use ftml_uris::DocumentUri;
 
-        provide_context(TocSource::Extract);
+        //provide_context(TocSource::Extract);
         let uri = cfg.apply().unwrap_or_else(|| DocumentUri::no_doc().clone());
         ftml_components::Views::<backend::GlobalBackend>::setup_document::<backend::GlobalBackend>(
             uri,
             SidebarPosition::Find,
             false,
+            TocSource::Extract,
             || ftml_components::Views::<backend::GlobalBackend>::cont(orig, false).into_any(),
         )
     });

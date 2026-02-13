@@ -1,4 +1,4 @@
-use ftml_dom::{counters::LogicalLevel, structure::TocSource};
+use ftml_dom::{counters::LogicalLevel, toc::TocSource};
 use ftml_js_utils::JsDisplay;
 use ftml_ontology::narrative::elements::SectionLevel;
 use ftml_uris::{DocumentElementUri, DocumentUri, LeafUri};
@@ -24,6 +24,7 @@ export interface FtmlConfig {
     allowFullscreen?:boolean;
     allowFormalInfo?:boolean;
     allowNotationChanges?:boolean;
+    allowSubterms?:boolean;
     chooseHighlightStyle?:boolean;
     showContent?:boolean;
     pdfLink?:boolean;
@@ -58,6 +59,9 @@ pub struct FtmlConfig {
 
     #[cfg_attr(feature = "csr", serde(default, rename = "allowNotationChanges"))]
     pub allow_notation_changes: Option<bool>,
+
+    #[cfg_attr(feature = "csr", serde(default, rename = "allowSubterms"))]
+    pub allow_subterms: Option<bool>,
 
     #[cfg_attr(feature = "csr", serde(default, rename = "chooseHighlightStyle"))]
     pub choose_highlight_style: Option<bool>,
@@ -167,6 +171,9 @@ pub struct AutoexpandLimit(pub LogicalLevel);
 #[derive(Copy, Clone)]
 pub struct AllowNotationChanges(bool);
 
+#[derive(Copy, Clone)]
+pub struct AllowSubterms(pub bool);
+
 #[derive(thiserror::Error, Debug)]
 pub enum FtmlConfigParseError {
     #[error("not a javascript object")]
@@ -219,6 +226,7 @@ impl ftml_js_utils::conversion::FromJs for FtmlConfig {
         get!("allowFormalInfo"+allow_formals:bool);
         get!("pdfLink"+pdf_link:bool);
         get!("allowNotationChanges"+allow_notation_changes:bool);
+        get!("allowSubterms"+allow_subterms:bool);
         get!("chooseHighlightStyle"+choose_highlight_style:bool);
         get!("documentUri"+document_uri:DocumentUri);
         get!("highlightStyle"+highlight_style:HighlightStyle);
@@ -270,6 +278,9 @@ impl FtmlConfig {
         }
         if let Some(b) = self.allow_notation_changes {
             provide_context(AllowNotationChanges(b));
+        }
+        if let Some(b) = self.allow_subterms {
+            provide_context(AllowSubterms(b));
         }
         if let Some(h) = self.highlight_style {
             let style = RwSignal::new(h);
@@ -392,6 +403,12 @@ impl FtmlConfig {
 
     #[inline]
     #[must_use]
+    pub fn allow_subterms() -> bool {
+        use_context::<AllowSubterms>().is_some_and(|b| b.0)
+    }
+
+    #[inline]
+    #[must_use]
     pub fn highlight_style() -> ReadSignal<HighlightStyle> {
         expect_context()
     }
@@ -407,7 +424,7 @@ impl FtmlConfig {
     pub fn autoexpand_limit() -> ReadSignal<AutoexpandLimit> {
         expect_context()
     }
-
+    /*
     #[inline]
     pub fn set_toc_source(src: TocSource) {
         provide_context(src);
@@ -418,6 +435,7 @@ impl FtmlConfig {
     pub fn with_toc_source<R>(f: impl FnOnce(&TocSource) -> R) -> Option<R> {
         with_context(f)
     }
+     */
 
     /// ### Panics
     pub fn disable_hovers<F: FnOnce() -> AnyView>(f: F) -> AnyView {

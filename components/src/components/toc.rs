@@ -1,6 +1,7 @@
 use ftml_dom::{
     FtmlViews,
     structure::DocumentStructure,
+    toc::FinalTocEntry,
     utils::{css::inject_css, local_cache::SendBackend},
 };
 use ftml_ontology::{
@@ -62,11 +63,11 @@ impl Gottos {
         }
     }
 
-    fn new(v: TocProgresses, toc: &[TocElem]) -> Self {
+    fn new(v: TocProgresses, toc: &[FinalTocEntry]) -> Self {
         let mut v = v.0.into_vec();
         v.retain(|e| {
             toc.dfs().any(|s| {
-                if let TocElem::Section { uri, .. } = s {
+                if let FinalTocEntry::Section { uri, .. } = s {
                     *uri == e.uri
                 } else {
                     false
@@ -83,102 +84,28 @@ impl Gottos {
 
 #[must_use]
 pub fn toc<Be: SendBackend>() -> impl IntoView {
+    use thaw::Spinner;
     wrap_toc(move |data| {
-        move || {
-            DocumentStructure::with_toc(|toc| {
-                let gottos: TocProgresses = use_context().unwrap_or_default();
-                let mut gottos = Gottos::new(gottos, toc);
-                do_toc::<Be>(toc, &mut gottos, data, SectionLevel::Part)
-            })
-        }
+        //move || {
+        // TODO: eliminate non-toc gottos
+        let gottos = StoredValue::new(Gottos::default()); //new(use_context().unwrap_or_default(), &[]));
+        let data = StoredValue::new(data);
+        let ctx: TocProgresses = use_context().unwrap_or_default();
+        DocumentStructure::render_toc::<crate::Views<Be>, _, _, _>(
+            move |s, u, l, c| do_toc(gottos, data, s, u, l, c),
+            move |es| {
+                gottos.update_value(|g| *g = Gottos::new(ctx.clone(), es));
+            },
+            || view!(<Spinner/>).into_any(),
+        )
+
+        /*DocumentStructure::with_toc(|toc| {
+            let gottos: TocProgresses = use_context().unwrap_or_default();
+            let mut gottos = Gottos::new(gottos, toc);
+            do_toc::<Be>(toc, &mut gottos, data, SectionLevel::Part)
+        })*/
+        //}
     })
-    //use leptos::either::EitherOf4::{A, B, C, D};
-    /*
-    let Some(toc) = FtmlConfig::with_toc_source(Clone::clone) else {
-        return A(());
-    };
-    match toc {
-        TocSource::None => A(()),
-        TocSource::Get => B({
-            let csr = RwSignal::new(false);
-            let _ = Effect::new(move || {
-                csr.set(true);
-            });
-            move || {
-                let uri = uri.clone();
-                if csr.get() {
-                    Some(LocalCache::with_or_toast::<Be, _, _, _, _>(
-                        move |c| c.get_toc(uri),
-                        move |(css, toc)| {
-                            for c in css {
-                                c.inject();
-                            }
-                            let gottos: TocProgresses = use_context().unwrap_or_default();
-                            let mut gottos = Gottos::new(gottos, &toc);
-                            wrap_toc(move |data| {
-                                CurrentTOC::set(toc.clone().into_vec());
-                                NavElems::update_untracked(|nav| {
-                                    tracing::debug!("Initializing titles");
-                                    for e in TocElem::iter(&toc) {
-                                        if let TocElem::Inputref {
-                                            uri,
-                                            title: Some(title),
-                                            ..
-                                        } = e
-                                            && !title.is_empty()
-                                        {
-                                            nav.set_title(uri.clone(), title.to_string());
-                                        }
-                                    }
-                                });
-                                let r = do_toc::<Be>(&toc, &mut gottos, data);
-                                r
-                            })
-                        },
-                        || "error",
-                    ))
-                } else {
-                    None
-                }
-            }
-        }), // TODO
-        TocSource::Extract => {
-            let toc = DocumentState::get_toc();
-            C(wrap_toc(move |data| {
-                move || {
-                    let gottos: TocProgresses = use_context().unwrap_or_default();
-                    toc.with(|toc| {
-                        toc.toc.as_ref().map(|v| {
-                            let mut gottos = Gottos::new(gottos, v);
-                            do_toc::<Be>(v, &mut gottos, data)
-                        })
-                    })
-                }
-            }))
-        }
-        TocSource::Ready(toc) => {
-            NavElems::update_untracked(|nav| {
-                tracing::debug!("Initializing titles");
-                for e in TocElem::iter(&toc) {
-                    if let TocElem::Inputref {
-                        uri,
-                        title: Some(title),
-                        ..
-                    } = e
-                        && !title.is_empty()
-                    {
-                        nav.set_title(uri.clone(), title.to_string());
-                    }
-                }
-            });
-            D(wrap_toc(move |data| {
-                let gottos: TocProgresses = use_context().unwrap_or_default();
-                let mut gottos = Gottos::new(gottos, &toc);
-                do_toc::<Be>(&toc, &mut gottos, data)
-            }))
-        }
-    }
-     */
 }
 
 fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl IntoView {
@@ -224,6 +151,102 @@ fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl I
     //})
 }
 
+fn do_toc(
+    gottos: StoredValue<Gottos>,
+    data: StoredValue<AnchorData>,
+    href: String,
+    uri: &DocumentElementUri,
+    line: AnyView,
+    children: Option<AnyView>,
+) -> AnyView {
+    use thaw::Caption1Strong;
+    let mut style = "";
+    let mut after = None;
+    gottos.update_value(|gottos| {
+        if let Some(g) = gottos.current.as_ref() {
+            style = "background-color:var(--colorPaletteYellowBorder1);";
+            after = g.timestamp.map(|ts| {
+                view! {
+                    <sup><i>" Covered: "{ts.into_date().to_string()}</i></sup>
+                }
+            });
+        }
+        gottos.next(uri);
+    });
+    let href = StoredValue::new(href);
+    let title_ref = NodeRef::<leptos::html::A>::new();
+    let active_id = data.with_value(|data| {
+        let r = data.active_id;
+        data.append_id(href);
+        r
+    });
+
+    let is_active = Memo::new(move |_| {
+        active_id.with(|active_id| {
+            active_id
+                .as_ref()
+                .is_some_and(|s| href.with_value(|v| s.with_value(|s| s == v)))
+        })
+    });
+    on_cleanup(move || href.with_value(|s| data.with_value(|data| data.remove_id(s))));
+    Effect::new(move |_| {
+        let Some(title_el) = title_ref.get() else {
+            return;
+        };
+
+        if is_active.get() {
+            let title_rect = ftml_dom::utils::get_true_rect(&title_el);
+            data.with_value(|data| data.update_background_position(&title_rect));
+        }
+    });
+    let class = Memo::new(move |_| {
+        if is_active.get() {
+            "thaw-anchor-link thaw-anchor-link--active"
+        } else {
+            "thaw-anchor-link"
+        }
+    });
+    let visible = if children.is_some() {
+        Some(RwSignal::new(true))
+    } else {
+        None
+    };
+    let children = children.map(|ch| {
+        fancy_collapsible(
+            move || ch,
+            // SAFETY: visible is Some iff children.is_some()
+            unsafe { visible.unwrap_unchecked() },
+            "",
+            "",
+        )
+    });
+    view! {
+        <div class=class>
+            <Caption1Strong>
+                {visible.map(|visible|
+                    view!{
+                        <span on:click=move |_| visible.set(!visible.get_untracked())>
+                            {collapse_marker(visible,true)}
+                        </span>
+                        " "
+                    }
+                )}
+                <a
+                    href=href.get_value()
+                    class="thaw-anchor-link__title"
+                    node_ref=title_ref
+                    style=style
+                >
+                    {line}{after}
+                </a>
+            </Caption1Strong>
+            {children}
+        </div>
+    }
+    .into_any()
+}
+
+/*
 fn do_toc<Be: SendBackend>(
     toc: &[TocElem],
     gottos: &mut Gottos,
@@ -347,6 +370,7 @@ fn has_section(elems: &[TocElem]) -> bool {
     }
     false
 }
+*/
 
 #[cfg(any(feature = "csr", feature = "hydrate"))]
 fn scroll_listener(
@@ -372,9 +396,6 @@ fn scroll_listener(
                 } else if temp_link.is_some() {
                     break;
                 }
-                /*else {
-                id.with_value(|id| tracing::warn!("Element with id {id} disappeared!"));
-                }*/
             }
             active_id.set(temp_link);
         });
@@ -438,37 +459,3 @@ impl AnchorData {
         }
     }
 }
-
-/*
-{
-    gottos.next(&uri);
-    let id = format!("#{id}");
-    let ch = children
-        .into_iter()
-        .map(|e| e.into_view(gottos))
-        .collect_view();
-    Some(Either::Left(view! {
-      <AnchorLink href=id>
-        <Header slot>
-          <div style=style><DomStringCont html=title cont=crate::iterate/>{after}</div>
-        </Header>
-        {ch}
-      </AnchorLink>
-    }))
-}
-Self::Section {
-    title: None,
-    children,
-    uri,
-    ..
-} => {
-    gottos.next(&uri);
-    Some(Either::Right(
-        children
-            .into_iter()
-            .map(|e| e.into_view(gottos))
-            .collect_view()
-            .into_any(),
-    ))
-}
- */

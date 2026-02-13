@@ -1,6 +1,7 @@
 use crate::{
     FtmlViews,
     clonable_views::MarkedNode,
+    counters::CurrentCounters,
     document::{CurrentUri, DocumentState, WithHead},
     extractor::{DomExtractor, FtmlDomElement},
     structure::DocumentStructure,
@@ -90,7 +91,7 @@ pub enum Marker {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ParagraphInfo {
     pub uri: DocumentElementUri,
-    pub style: Memo<String>,
+    pub style: crate::structure::utils::Style,
     pub class: Option<String>,
     pub kind: ParagraphKind,
     pub formatting: ParagraphFormatting,
@@ -292,7 +293,7 @@ impl Marker {
                 let lvl = DocumentState::current_section_level();
                 lvl.into_view(cap).into_any()
             }
-            Self::SlideNumber => DocumentStructure::get_slide().into_any(),
+            Self::SlideNumber => CurrentCounters::slide().into_view(),
             Self::Comp => {
                 Views::comp(MarkedNode::new(markers, orig, is_math, true).into()).into_any()
             }

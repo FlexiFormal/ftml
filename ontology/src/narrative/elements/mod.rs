@@ -170,7 +170,7 @@ pub enum DocumentElement {
 impl crate::__private::Sealed for DocumentElement {}
 
 #[allow(clippy::unsafe_derive_deserialize)]
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
@@ -185,7 +185,21 @@ impl crate::__private::Sealed for DocumentElement {}
 pub struct DocumentTerm {
     pub uri: DocumentElementUri,
     pub term: TermContainer,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    inferred_type: crate::terms::MutableTerm,
 }
+impl PartialEq for DocumentTerm {
+    fn eq(&self, other: &Self) -> bool {
+        self.uri == other.uri && self.term == other.term
+    }
+}
+impl std::hash::Hash for DocumentTerm {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uri.hash(state);
+    }
+}
+impl Eq for DocumentTerm {}
 impl crate::__private::Sealed for DocumentTerm {}
 impl DocumentTerm {
     #[must_use]
@@ -193,12 +207,25 @@ impl DocumentTerm {
         Self {
             uri,
             term: TermContainer::new(t, range),
+            inferred_type: crate::terms::MutableTerm::default(),
         }
     }
     #[must_use]
-    pub const fn parsed(&self) -> &Term {
+    pub fn get_type(&self) -> Option<Term> {
+        self.inferred_type.0.lock().clone()
+    }
+    pub fn set_type(&self, tp: Term) {
+        *self.inferred_type.0.lock() = Some(tp);
+    }
+    #[must_use]
+    pub const fn get_parsed(&self) -> &Term {
         // SAFETY: by construction, self.term should never be empty
-        unsafe { self.term.parsed().unwrap_unchecked() }
+        unsafe { self.term.get_parsed().unwrap_unchecked() }
+    }
+    #[must_use]
+    pub fn presentation(&self) -> Term {
+        // SAFETY: by construction, self.term should never be empty
+        unsafe { self.term.presentation().unwrap_unchecked() }
     }
 }
 impl crate::Ftml for DocumentTerm {
@@ -215,7 +242,7 @@ impl crate::Ftml for DocumentTerm {
         }
         let iri = self.uri.to_iri();
         let iri2 = iri.clone();
-        let term = self.parsed();
+        let term = self.get_parsed();
         syms!(iri term).chain(std::iter::once(triple!(<(iri2)>: ulo:term)))
     }
     #[inline]
