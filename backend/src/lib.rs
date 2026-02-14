@@ -36,7 +36,7 @@ use ftml_ontology::{
         SharedDocumentElement,
         documents::{Document, TocElem},
         elements::{
-            DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration,
+            DocumentTerm, Notation, ParagraphOrProblemKind, SectionLevel, VariableDeclaration,
             problems::Solutions,
         },
     },
@@ -185,7 +185,9 @@ pub trait FtmlBackend {
     fn get_toc(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<Self::Error>>> + Send;
+    ) -> impl Future<
+        Output = Result<(Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<Self::Error>>,
+    > + Send;
 
     fn get_symbol(
         &self,
@@ -381,7 +383,7 @@ pub trait FlamsBackend {
         l: Option<ftml_uris::Language>,
     ) -> impl Future<
         Output = Result<
-            (Box<[Css]>, Box<[TocElem]>),
+            (Box<[Css]>, SectionLevel, Box<[TocElem]>),
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
     > + Send;
@@ -531,8 +533,9 @@ where
     fn get_toc(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<Self::Error>>> + Send
-    {
+    ) -> impl Future<
+        Output = Result<(Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<Self::Error>>,
+    > + Send {
         <Self as FlamsBackend>::get_toc(self, Some(uri), None, None, None, None, None)
     }
 

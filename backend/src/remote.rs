@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 
-use ftml_ontology::utils::Css;
+use ftml_ontology::{narrative::elements::SectionLevel, utils::Css};
 use ftml_uris::{DocumentUri, FtmlUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri};
 
 use crate::BackendError;
@@ -260,6 +260,7 @@ where
         Output = Result<
             (
                 Box<[Css]>,
+                SectionLevel,
                 Box<[ftml_ontology::narrative::documents::TocElem]>,
             ),
             BackendError<Self::Error>,
@@ -388,7 +389,10 @@ mod server_fn {
         BackendError, FlamsBackend, ParagraphOrProblemKind, Redirects, RemoteFlamsBackend,
     };
     use ::server_fn::error::ServerFnErrorErr;
-    use ftml_ontology::{narrative::elements::problems::Solutions, utils::Css};
+    use ftml_ontology::{
+        narrative::elements::{SectionLevel, problems::Solutions},
+        utils::Css,
+    };
     use ftml_uris::{
         DocumentElementUri, DocumentUri, FtmlUri, LeafUri, ModuleUri, NarrativeUri, Uri,
         components::UriComponentTuple,
@@ -571,6 +575,7 @@ mod server_fn {
             Output = Result<
                 (
                     Box<[Css]>,
+                    SectionLevel,
                     Box<[ftml_ontology::narrative::documents::TocElem]>,
                 ),
                 BackendError<server_fn::error::ServerFnErrorErr>,

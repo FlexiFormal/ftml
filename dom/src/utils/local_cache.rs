@@ -14,7 +14,7 @@ use ftml_ontology::{
         SharedDocumentElement,
         documents::{Document, TocElem},
         elements::{
-            DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration,
+            DocumentTerm, Notation, ParagraphOrProblemKind, SectionLevel, VariableDeclaration,
             problems::Solutions,
         },
     },
@@ -233,8 +233,10 @@ impl<B: SendBackend> WithLocalCache<B> {
     pub fn get_toc(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<B::Error>>> + Send + use<B>
-    {
+    ) -> impl Future<
+        Output = Result<(Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<B::Error>>,
+    > + Send
+    + use<B> {
         B::get().get_toc(uri)
     }
 

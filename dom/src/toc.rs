@@ -676,7 +676,7 @@ impl TocStateGet {
             {
                 leptos::task::spawn_local(async move {
                     let r = fut.await;
-                    if let Ok((_, elems)) = r {
+                    if let Ok((_, _, elems)) = r {
                         orig_toc.set(Some(elems));
                     }
                 });
