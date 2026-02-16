@@ -55,7 +55,7 @@ pub enum TocStyle {
 pub(crate) enum Toc {
     None,
     Extract {
-        toc: RwSignal<Vec<FinalTocEntry>>,
+        toc: RwSignal<Option<Vec<FinalTocEntry>>>,
     },
     Get {
         state: StoredValue<either::Either<TocStateGet, TocStateReady>>,
@@ -167,7 +167,9 @@ impl Toc {
             },
             Self::Extract { toc } => {
                 toc.update_untracked(|toc| {
-                    if let Some((v, _)) = get_toc_at(toc, id.as_ref()) {
+                    if let Some(toc) = toc
+                        && let Some((v, _)) = get_toc_at(toc, id.as_ref())
+                    {
                         v.push(FinalTocEntry::Inputref {
                             id: id.clone(),
                             children: Vec::new(),
@@ -187,7 +189,7 @@ impl Toc {
         match self {
             Self::Ready(state) => {
                 if let Some((sig, ret)) = state.init(lvl) {
-                    sig.set(ret);
+                    sig.set(Some(ret));
                 }
                 DocumentStructure::retry();
             }
@@ -205,7 +207,7 @@ impl Toc {
         match source {
             TocSource::None => Self::None,
             TocSource::Extract => Self::Extract {
-                toc: RwSignal::new(Vec::new()),
+                toc: RwSignal::new(None),
             },
             TocSource::Get => {
                 let (state, in_level) = TocStateGet::new::<Be>(styles);
@@ -225,7 +227,9 @@ impl Toc {
             };
             let counter = CurrentCounters::current();
             toc.update(|toc| {
-                if let Some((v, lvl)) = get_toc_at(toc, id.as_ref()) {
+                if let Some(toc) = toc
+                    && let Some((v, lvl)) = get_toc_at(toc, id.as_ref())
+                {
                     let level = lvl.map_or(top, SectionLevel::inc);
                     v.push(FinalTocEntry::Section {
                         level,
@@ -381,7 +385,7 @@ impl Toc {
             OnRender: Fn(&[FinalTocEntry]) + Clone + Send + 'static,
             FallBack: Fn() -> AnyView + Clone + Send + 'static,
         >(
-            v: RwSignal<Vec<FinalTocEntry>>,
+            v: RwSignal<Option<Vec<FinalTocEntry>>>,
             cont: Cont,
             on_render: OnRender,
             fallback: FallBack,
@@ -389,16 +393,17 @@ impl Toc {
         ) -> impl IntoView + use<V, Cont, OnRender, FallBack> {
             move || {
                 v.with(|v| {
-                    if v.is_empty() {
-                        leptos::either::Either::Left(fallback())
-                    } else {
-                        on_render(v);
-                        leptos::either::Either::Right(render_toc::<V, _>(
-                            v,
-                            &cont,
-                            max_level.get_value().unwrap_or(SectionLevel::Part),
-                        ))
-                    }
+                    v.as_ref().map_or_else(
+                        || leptos::either::Either::Left(fallback()),
+                        |v| {
+                            on_render(v);
+                            leptos::either::Either::Right(render_toc::<V, _>(
+                                v,
+                                &cont,
+                                max_level.get_value().unwrap_or(SectionLevel::Part),
+                            ))
+                        },
+                    )
                 })
             }
         }
@@ -412,7 +417,7 @@ impl Toc {
                 state.toc.update_value(|st| match st {
                     either::Left((Some(sig), _)) => toc = Some(either::Left(*sig)),
                     either::Left((n @ None, _)) => {
-                        let sig = RwSignal::new(Vec::new());
+                        let sig = RwSignal::new(None);
                         *n = Some(sig);
                         toc = Some(either::Left(sig));
                     }
@@ -440,13 +445,13 @@ impl Toc {
                         if let Some(sig) = t.get_value() {
                             toc = Some(either::Left(sig));
                         } else {
-                            let sig = RwSignal::new(Vec::new());
+                            let sig = RwSignal::new(None);
                             t.set_value(Some(sig));
                             toc = Some(either::Left(sig));
                         }
                     }
                     either::Either::Right(TocStateReady { toc: t, .. }) => {
-                        let newsig = RwSignal::new(Vec::new());
+                        let newsig = RwSignal::new(None);
                         t.update_value(|t| match t {
                             either::Left((Some(sig), ..)) => {
                                 toc = Some(either::Left(*sig));
@@ -642,7 +647,7 @@ fn toc_find<R>(toc: &[FinalTocEntry], pred: impl Fn(&FinalTocEntry) -> Option<R>
 struct TocStateGet {
     section_counters: StoredValue<rustc_hash::FxHashMap<Id, DynamicCounter>>,
     inputrefs: StoredValue<rustc_hash::FxHashMap<Id, InputrefStateGet>>,
-    toc: StoredValue<Option<RwSignal<Vec<FinalTocEntry>>>>,
+    toc: StoredValue<Option<RwSignal<Option<Vec<FinalTocEntry>>>>>,
 }
 impl TocStateGet {
     fn new<Be: SendBackend>(
@@ -719,7 +724,7 @@ impl TocStateGet {
                         }
                     });
                     if let Some(new) = new {
-                        old.set(new);
+                        old.set(Some(new));
                     }
                 }
                 for t in todos {
@@ -802,7 +807,10 @@ impl TocStateGet {
 struct TocStateReady {
     inputrefs: StoredValue<rustc_hash::FxHashMap<Id, InputrefStateReady>>,
     toc: StoredValue<
-        either::Either<(Option<RwSignal<Vec<FinalTocEntry>>>, Box<[TocElem]>), Vec<FinalTocEntry>>,
+        either::Either<
+            (Option<RwSignal<Option<Vec<FinalTocEntry>>>>, Box<[TocElem]>),
+            Vec<FinalTocEntry>,
+        >,
     >,
 }
 impl TocStateReady {
@@ -815,7 +823,7 @@ impl TocStateReady {
     fn init(
         &self,
         top: SectionLevel,
-    ) -> Option<(RwSignal<Vec<FinalTocEntry>>, Vec<FinalTocEntry>)> {
+    ) -> Option<(RwSignal<Option<Vec<FinalTocEntry>>>, Vec<FinalTocEntry>)> {
         let mut r = None;
         let (styles, counters) = with_context::<DocumentStructure, _>(|d| d.styles)
             .expect("Not in a document context")
