@@ -34,5 +34,5 @@ dependencies = [
 [tasks.doc]
 command = "cargo"
 install_crate = false
-args = ["doc","--no-deps","--all-features"]#["+nightly", "doc", "--no-deps", "--all-features"]
-# ^currently errors on nightly; once fixed, readd --generate-link-to-definition in .cargo/config.toml
+args = ["+nightly", "doc", "--no-deps", "--all-features"]
+# ^ --generate-link-to-definition currently errors on nightly; once fixed, readd --generate-link-to-definition in .cargo/config.toml
