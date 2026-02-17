@@ -203,7 +203,7 @@ pub const fn comp_class(is_hovered: bool, is_var: bool, style: HighlightStyle) -
         (false, false, HL::Subtle) => "ftml-comp-subtle",
         (true, false, HL::Subtle) => "ftml-comp-subtle ftml-comp-hover",
         (true, false, HL::Colored | HL::None) => "ftml-comp ftml-comp-hover",
-        (false, _, HL::Off) => "",
+        (false, _, HL::Off) => "ftml-comp-off",
         (true, _, HL::Off) => "ftml-comp-hover",
     }
 }
@@ -224,7 +224,7 @@ pub fn defcomp<Be: SendBackend>(uri: Option<SymbolUri>, children: ClonableView) 
             (false, HL::Subtle) => "ftml-def-comp-subtle",
             (true, HL::Colored | HL::None) => "ftml-def-comp ftml-comp-hover",
             (true, HL::Subtle) => "ftml-def-comp-subtle ftml-comp-hover",
-            (false, HL::Off) => "",
+            (false, HL::Off) => "ftml-comp-off",
             (true, HL::Off) => "ftml-comp-hover",
         },
     );

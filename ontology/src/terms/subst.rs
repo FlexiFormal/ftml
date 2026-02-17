@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
-use ftml_uris::{DocumentUri, IsDomainUri, IsNarrativeUri, ModuleUri};
+use ftml_uris::{DocumentUri, Id, IsDomainUri, IsNarrativeUri, ModuleUri};
+use smallvec::SmallVec;
 
 use crate::{
     narrative::{documents::Document, elements::DocumentElementRef},
@@ -324,6 +325,54 @@ impl BindingTerm {
 }
 
 impl Term {
+    /// #### Panics
+    #[must_use]
+    pub fn fresh_variable(&self, prefix: &Id, num: Option<u16>) -> (Variable, Option<u16>) {
+        let prefix = prefix.as_ref();
+        let mut frees = self
+            .free_variables()
+            .into_iter()
+            .filter_map(|v| {
+                if v.name().starts_with(prefix) {
+                    let rest = &v.name()[prefix.len()..];
+                    if rest.is_empty() && num.is_none_or(|i| i == 0) {
+                        Some(0)
+                    } else if let Some(rest) = rest.strip_prefix('_') {
+                        rest.parse::<u16>().ok().and_then(|i| {
+                            num.map_or(Some(i), |num| if num >= i { Some(i) } else { None })
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<SmallVec<_, 2>>();
+        frees.sort_unstable();
+        let mut current = num.unwrap_or_default();
+        for f in frees {
+            if current != f {
+                break;
+            }
+            current += 1;
+        }
+        let name = if current == 0 {
+            prefix.parse::<Id>().expect("shouldn't be possible")
+        } else {
+            format!("{prefix}_{current}")
+                .parse::<Id>()
+                .expect("shouldn't be possible")
+        };
+        (
+            Variable::Name {
+                name,
+                notated: None,
+            },
+            if current == 0 { None } else { Some(current) },
+        )
+    }
+
     fn subst<'s, S: AsRef<str> + 's, T: AsRef<Self>>(
         &self,
         substs: &'s [(S, T)],
@@ -495,56 +544,14 @@ impl Term {
             Self::Application(a) => {
                 a.head.free_vars_i(vars, ctx);
                 for a in &a.arguments {
-                    match a {
-                        Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
-                            t.free_vars_i(vars, ctx);
-                        }
-                        Argument::Sequence(MaybeSequence::Seq(ts)) => {
-                            for t in ts {
-                                t.free_vars_i(vars, ctx);
-                            }
-                        }
-                    }
+                    a.free_vars_i(vars, ctx);
                 }
             }
             Self::Bound(b) => {
                 b.head.free_vars_i(vars, ctx);
                 let mut added = 0;
                 for a in &b.arguments {
-                    match a {
-                        BoundArgument::Simple(t)
-                        | BoundArgument::Sequence(MaybeSequence::One(t)) => {
-                            t.free_vars_i(vars, ctx);
-                        }
-                        BoundArgument::Sequence(MaybeSequence::Seq(ts)) => {
-                            for t in ts {
-                                t.free_vars_i(vars, ctx);
-                            }
-                        }
-                        BoundArgument::Bound(v)
-                        | BoundArgument::BoundSeq(MaybeSequence::One(v)) => {
-                            if let Some(tp) = &v.tp {
-                                tp.free_vars_i(vars, ctx);
-                            }
-                            if let Some(df) = &v.df {
-                                df.free_vars_i(vars, ctx);
-                            }
-                            added += 1;
-                            ctx.push(v.var.name());
-                        }
-                        BoundArgument::BoundSeq(MaybeSequence::Seq(vs)) => {
-                            for v in vs {
-                                if let Some(tp) = &v.tp {
-                                    tp.free_vars_i(vars, ctx);
-                                }
-                                if let Some(df) = &v.df {
-                                    df.free_vars_i(vars, ctx);
-                                }
-                                added += 1;
-                                ctx.push(v.var.name());
-                            }
-                        }
-                    }
+                    a.free_vars_i(vars, ctx, &mut added);
                 }
                 for _ in 0..added {
                     let _ = ctx.pop();
@@ -586,65 +593,163 @@ impl Term {
             Self::Application(a) => {
                 a.head.all_vars_i(vars, ctx);
                 for a in &a.arguments {
-                    match a {
-                        Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
-                            t.all_vars_i(vars, ctx);
-                        }
-                        Argument::Sequence(MaybeSequence::Seq(ts)) => {
-                            for t in ts {
-                                t.all_vars_i(vars, ctx);
-                            }
-                        }
-                    }
+                    a.all_vars_i(vars, ctx);
                 }
             }
             Self::Bound(b) => {
                 b.head.all_vars_i(vars, ctx);
                 let mut added = 0;
                 for a in &b.arguments {
-                    match a {
-                        BoundArgument::Simple(t)
-                        | BoundArgument::Sequence(MaybeSequence::One(t)) => {
-                            t.all_vars_i(vars, ctx);
-                        }
-                        BoundArgument::Sequence(MaybeSequence::Seq(ts)) => {
-                            for t in ts {
-                                t.all_vars_i(vars, ctx);
-                            }
-                        }
-                        BoundArgument::Bound(var)
-                        | BoundArgument::BoundSeq(MaybeSequence::One(var)) => {
-                            added += 1;
-                            ctx.push(var.var.name());
-                            if let Some(v) =
-                                vars.iter_mut().find(|(v, _)| v.name() == var.var.name())
-                            {
-                                if v.1 == FreeOrBound::Free {
-                                    v.1 = FreeOrBound::Both;
-                                }
-                            } else {
-                                vars.push((&var.var, FreeOrBound::Bound));
-                            }
-                        }
-                        BoundArgument::BoundSeq(MaybeSequence::Seq(vs)) => {
-                            for var in vs {
-                                added += 1;
-                                ctx.push(var.var.name());
-                                if let Some(v) =
-                                    vars.iter_mut().find(|(v, _)| v.name() == var.var.name())
-                                {
-                                    if v.1 == FreeOrBound::Free {
-                                        v.1 = FreeOrBound::Both;
-                                    }
-                                } else {
-                                    vars.push((&var.var, FreeOrBound::Bound));
-                                }
-                            }
-                        }
-                    }
+                    a.all_vars_i(vars, ctx, &mut added);
                 }
                 for _ in 0..added {
                     let _ = ctx.pop();
+                }
+            }
+        }
+    }
+}
+
+impl Argument {
+    #[must_use]
+    pub fn free_variables(&self) -> smallvec::SmallVec<&Variable, 4> {
+        let mut vars = smallvec::SmallVec::new();
+        self.free_vars_i(&mut vars, &mut smallvec::SmallVec::new());
+        vars
+    }
+
+    #[must_use]
+    pub fn all_variables(&self) -> smallvec::SmallVec<(&Variable, FreeOrBound), 4> {
+        let mut vars = smallvec::SmallVec::new();
+        self.all_vars_i(&mut vars, &mut smallvec::SmallVec::new());
+        vars
+    }
+    fn free_vars_i<'t>(
+        &'t self,
+        vars: &mut smallvec::SmallVec<&'t Variable, 4>,
+        ctx: &mut smallvec::SmallVec<&'t str, 4>,
+    ) {
+        match self {
+            Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
+                t.free_vars_i(vars, ctx);
+            }
+            Argument::Sequence(MaybeSequence::Seq(ts)) => {
+                for t in ts {
+                    t.free_vars_i(vars, ctx);
+                }
+            }
+        }
+    }
+
+    fn all_vars_i<'t>(
+        &'t self,
+        vars: &mut smallvec::SmallVec<(&'t Variable, FreeOrBound), 4>,
+        ctx: &mut smallvec::SmallVec<&'t str, 4>,
+    ) {
+        match self {
+            Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
+                t.all_vars_i(vars, ctx);
+            }
+            Argument::Sequence(MaybeSequence::Seq(ts)) => {
+                for t in ts {
+                    t.all_vars_i(vars, ctx);
+                }
+            }
+        }
+    }
+}
+
+impl BoundArgument {
+    #[must_use]
+    pub fn free_variables(&self) -> smallvec::SmallVec<&Variable, 4> {
+        let mut vars = smallvec::SmallVec::new();
+        self.free_vars_i(&mut vars, &mut smallvec::SmallVec::new(), &mut 0);
+        vars
+    }
+
+    #[must_use]
+    pub fn all_variables(&self) -> smallvec::SmallVec<(&Variable, FreeOrBound), 4> {
+        let mut vars = smallvec::SmallVec::new();
+        self.all_vars_i(&mut vars, &mut smallvec::SmallVec::new(), &mut 0);
+        vars
+    }
+    fn free_vars_i<'t>(
+        &'t self,
+        vars: &mut smallvec::SmallVec<&'t Variable, 4>,
+        ctx: &mut smallvec::SmallVec<&'t str, 4>,
+        added: &mut usize,
+    ) {
+        match self {
+            BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
+                t.free_vars_i(vars, ctx);
+            }
+            BoundArgument::Sequence(MaybeSequence::Seq(ts)) => {
+                for t in ts {
+                    t.free_vars_i(vars, ctx);
+                }
+            }
+            BoundArgument::Bound(v) | BoundArgument::BoundSeq(MaybeSequence::One(v)) => {
+                if let Some(tp) = &v.tp {
+                    tp.free_vars_i(vars, ctx);
+                }
+                if let Some(df) = &v.df {
+                    df.free_vars_i(vars, ctx);
+                }
+                *added += 1;
+                ctx.push(v.var.name());
+            }
+            BoundArgument::BoundSeq(MaybeSequence::Seq(vs)) => {
+                for v in vs {
+                    if let Some(tp) = &v.tp {
+                        tp.free_vars_i(vars, ctx);
+                    }
+                    if let Some(df) = &v.df {
+                        df.free_vars_i(vars, ctx);
+                    }
+                    *added += 1;
+                    ctx.push(v.var.name());
+                }
+            }
+        }
+    }
+
+    fn all_vars_i<'t>(
+        &'t self,
+        vars: &mut smallvec::SmallVec<(&'t Variable, FreeOrBound), 4>,
+        ctx: &mut smallvec::SmallVec<&'t str, 4>,
+        added: &mut usize,
+    ) {
+        match self {
+            BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
+                t.all_vars_i(vars, ctx);
+            }
+            BoundArgument::Sequence(MaybeSequence::Seq(ts)) => {
+                for t in ts {
+                    t.all_vars_i(vars, ctx);
+                }
+            }
+            BoundArgument::Bound(var) | BoundArgument::BoundSeq(MaybeSequence::One(var)) => {
+                *added += 1;
+                ctx.push(var.var.name());
+                if let Some(v) = vars.iter_mut().find(|(v, _)| v.name() == var.var.name()) {
+                    if v.1 == FreeOrBound::Free {
+                        v.1 = FreeOrBound::Both;
+                    }
+                } else {
+                    vars.push((&var.var, FreeOrBound::Bound));
+                }
+            }
+            BoundArgument::BoundSeq(MaybeSequence::Seq(vs)) => {
+                for var in vs {
+                    *added += 1;
+                    ctx.push(var.var.name());
+                    if let Some(v) = vars.iter_mut().find(|(v, _)| v.name() == var.var.name()) {
+                        if v.1 == FreeOrBound::Free {
+                            v.1 = FreeOrBound::Both;
+                        }
+                    } else {
+                        vars.push((&var.var, FreeOrBound::Bound));
+                    }
                 }
             }
         }

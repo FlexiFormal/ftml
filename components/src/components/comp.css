@@ -11,7 +11,11 @@ div.ftml-def-comp,
 span.ftml-comp-subtle,
 div.ftml-comp-subtle,
 span.ftml-def-comp-subtle,
-div.ftml-def-comp-subtle {
+div.ftml-def-comp-subtle,
+span.ftml-comp-off,
+div.ftml-comp-off,
+span.ftml-comp-hover,
+div.ftml-comp-hover {
     display: inline;
 }
 .ftml-def-comp {

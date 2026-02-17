@@ -685,34 +685,57 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                         ClonableView::new(true, move || {
                             let tp = v.tp.clone();
                             let df = v.df.clone();
-                            if let Variable::Ref {
-                                declaration,
-                                is_sequence,
-                            } = &v.var
-                            {
-                                let declaration = declaration.clone();
-                                let is_sequence = *is_sequence;
-                                with_notations::<Be, _>(declaration.clone().into(), move |t| {
-                                    let r = if let Some(n) = t {
-                                        n.as_view::<Views>(
-                                            &VarOrSym::Var(Variable::Ref {
-                                                declaration,
-                                                is_sequence,
-                                            }),
-                                            None,
-                                        )
-                                    } else {
-                                        mi().child(declaration.name().last().to_string())
-                                            .attr(
-                                                FtmlKey::Head.attr_name(),
-                                                declaration.to_string(),
+                            match &v.var {
+                                Variable::Ref {
+                                    declaration,
+                                    is_sequence,
+                                } => {
+                                    let declaration = declaration.clone();
+                                    let is_sequence = *is_sequence;
+                                    with_notations::<Be, _>(declaration.clone().into(), move |t| {
+                                        let r = if let Some(n) = t {
+                                            n.as_view::<Views>(
+                                                &VarOrSym::Var(Variable::Ref {
+                                                    declaration,
+                                                    is_sequence,
+                                                }),
+                                                None,
                                             )
-                                            .attr(FtmlKey::Term.attr_name(), "OMV")
-                                            .attr(FtmlKey::Comp.attr_name(), "")
-                                            .into_any()
-                                    };
+                                        } else {
+                                            mi().child(declaration.name().last().to_string())
+                                                .attr(
+                                                    FtmlKey::Head.attr_name(),
+                                                    declaration.to_string(),
+                                                )
+                                                .attr(FtmlKey::Term.attr_name(), "OMV")
+                                                .attr(FtmlKey::Comp.attr_name(), "")
+                                                .into_any()
+                                        };
+                                        if tp.is_none() && df.is_none() {
+                                            return r;
+                                        }
+                                        let tp = tp.map(|t| {
+                                            view! {
+                                                <mo>":"</mo>{t.into_view::<Views, Be>(true)}
+                                            }
+                                        });
+                                        let df = df.map(|t| {
+                                            view! {
+                                                <mo>":="</mo>{t.into_view::<Views, Be>(true)}
+                                            }
+                                        });
+                                        view! {<mrow>{r}{tp}{df}</mrow>}.into_any()
+                                    })
+                                }
+                                Variable::Name { name, notated } => {
+                                    let r = var_name::<Views>(
+                                        name.clone(),
+                                        notated.clone(),
+                                        None,
+                                        true,
+                                    ); //mtext().child("TODO: unresolved variable"); //.into_any();
                                     if tp.is_none() && df.is_none() {
-                                        return r;
+                                        return r.into_any();
                                     }
                                     let tp = tp.map(|t| {
                                         view! {
@@ -725,23 +748,7 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
                                         }
                                     });
                                     view! {<mrow>{r}{tp}{df}</mrow>}.into_any()
-                                })
-                            } else {
-                                let r = mtext().child("TODO: unresolved variable"); //.into_any();
-                                if tp.is_none() && df.is_none() {
-                                    return r.into_any();
                                 }
-                                let tp = tp.map(|t| {
-                                    view! {
-                                        <mo>":"</mo>{t.into_view::<Views, Be>(true)}
-                                    }
-                                });
-                                let df = df.map(|t| {
-                                    view! {
-                                        <mo>":="</mo>{t.into_view::<Views, Be>(true)}
-                                    }
-                                });
-                                view! {<mrow>{r}{tp}{df}</mrow>}.into_any()
                             }
                         })
                     })

@@ -222,8 +222,30 @@ impl crate::Ftml for ModuleData {
         if let Some(sig) = &self.signature {
             others.push(triple!(<(iri.clone())> ulo:has_signature = (sig.to_string())));
         }
-        others.push(triple!(<(iri)> : ulo:theory));
-        others.into_iter().chain(self.declares_triples())
+        others.push(triple!(<(iri.clone())> : ulo:theory));
+        others
+            .into_iter()
+            .chain(self.declarations().filter_map(move |e| match e {
+                AnyDeclarationRef::Import { uri, .. } => {
+                    Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
+                }
+                AnyDeclarationRef::Extension(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::MathStructure(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Morphism(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::NestedModule(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Symbol(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Rule { .. } => None,
+            }))
     }
     #[inline]
     fn source_range(&self) -> SourceRange {
@@ -256,7 +278,29 @@ impl crate::Ftml for NestedModule {
         use ulo::triple;
         let iri = self.uri.to_iri();
 
-        std::iter::once(triple!(<(iri)> : ulo:theory)).chain(self.declares_triples())
+        std::iter::once(triple!(<(iri.clone())> : ulo:theory)).chain(
+            self.declarations().filter_map(move |e| match e {
+                AnyDeclarationRef::Import { uri, .. } => {
+                    Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
+                }
+                AnyDeclarationRef::Extension(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::MathStructure(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Morphism(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::NestedModule(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Symbol(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Rule { .. } => None,
+            }),
+        )
     }
     #[inline]
     fn source_range(&self) -> SourceRange {

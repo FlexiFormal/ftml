@@ -35,7 +35,29 @@ impl crate::Ftml for MathStructure {
         use ulo::triple;
 
         let iri = self.uri.to_iri();
-        std::iter::once(triple!(<(iri)> : ulo:structure)).chain(self.declares_triples())
+        std::iter::once(triple!(<(iri.clone())> : ulo:structure)).chain(
+            self.declarations().filter_map(move |e| match e {
+                AnyDeclarationRef::Import { uri, .. } => {
+                    Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
+                }
+                AnyDeclarationRef::Extension(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::MathStructure(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Morphism(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::NestedModule(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Symbol(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Rule { .. } => None,
+            }),
+        )
     }
     #[inline]
     fn source_range(&self) -> SourceRange {

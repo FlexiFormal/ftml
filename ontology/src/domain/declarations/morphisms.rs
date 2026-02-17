@@ -40,10 +40,30 @@ impl crate::Ftml for Morphism {
         let iri = self.uri.to_iri();
         [
             triple!(<(iri.clone())> : ulo:morphism),
-            triple!(<(iri)> rdfs:DOMAIN <(self.domain.to_iri())>),
+            triple!(<(iri.clone())> rdfs:DOMAIN <(self.domain.to_iri())>),
         ]
         .into_iter()
-        .chain(self.declares_triples())
+        .chain(self.declarations().filter_map(move |e| match e {
+            AnyDeclarationRef::Import { uri, .. } => {
+                Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
+            }
+            AnyDeclarationRef::Extension(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::MathStructure(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::Morphism(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::NestedModule(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::Symbol(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::Rule { .. } => None,
+        }))
     }
     #[inline]
     fn source_range(&self) -> SourceRange {
