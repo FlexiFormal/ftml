@@ -12,7 +12,12 @@ pub mod config;
 pub mod utils;
 
 use crate::{components::paragraphs::Slides, config::FtmlConfig};
-use ftml_dom::{DocumentState, structure::TocSource, utils::local_cache::SendBackend};
+use ftml_dom::{
+    DocumentState,
+    structure::DocumentStructure,
+    toc::{TocSource, TocStyle},
+    utils::local_cache::SendBackend,
+};
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::{
     IntoView,
@@ -66,11 +71,12 @@ impl<B: SendBackend> Views<B> {
         uri: DocumentUri,
         sidebar: SidebarPosition,
         is_stripped: bool,
+        toc: TocSource,
         children: impl FnOnce() -> AnyView + Send + 'static,
     ) -> AnyView {
         use leptos::prelude::*;
         Self::maybe_top(move || {
-            ftml_dom::setup_document::<Be, _>(uri, is_stripped, move || {
+            ftml_dom::setup_document::<Be, _>(uri, is_stripped, toc, move || {
                 let (v, s) = Slides::new();
                 provide_context(s);
                 let children = move || view! {{children()}{v}}.into_any();
@@ -78,11 +84,13 @@ impl<B: SendBackend> Views<B> {
                 let pdf_link = FtmlConfig::pdf_link();
                 let choose_highlight_style = FtmlConfig::choose_highlight_style();
                 let do_sidebar = sidebar != SidebarPosition::None
-                    && (show_content
-                        || pdf_link
-                        || choose_highlight_style
-                        || FtmlConfig::with_toc_source(|toc| !matches!(toc, TocSource::None))
-                            .is_some_and(|b| b));
+                    && (
+                        show_content
+                            || pdf_link
+                            || choose_highlight_style
+                            || DocumentStructure::toc_style() != TocStyle::None
+                        //FtmlConfig::with_toc_source(|toc| !matches!(toc, TocSource::None)).is_some_and(|b| b)
+                    );
                 if do_sidebar {
                     components::sidebar::do_sidebar::<B>(
                         show_content,
@@ -103,6 +111,7 @@ impl<B: SendBackend> Views<B> {
         uri: Option<NarrativeUri>,
         sidebar: SidebarPosition,
         is_stripped: bool,
+        toc: TocSource,
         children: impl FnOnce() -> AnyView + Send + 'static,
     ) -> AnyView {
         let (doc, wrap) = if let Some(NarrativeUri::Document(d)) = &uri {
@@ -111,7 +120,7 @@ impl<B: SendBackend> Views<B> {
             (DocumentUri::no_doc().clone(), true)
         };
         let inner = Self::maybe_top(move || {
-            Self::setup_document::<Be>(doc, sidebar, is_stripped, move || {
+            Self::setup_document::<Be>(doc, sidebar, is_stripped, toc, move || {
                 if let Some(NarrativeUri::Element(uri)) = uri {
                     DocumentState::force_uri(uri);
                 }

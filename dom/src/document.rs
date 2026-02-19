@@ -4,7 +4,8 @@ use crate::{
     extractor::DomExtractor,
     markers::ParagraphInfo,
     structure::{DocumentStructure, Inputref, SectionInfo},
-    utils::{ContextChain, local_cache::SendBackend, owned},
+    toc::TocSource,
+    utils::{ContextChain, ModuleContext, local_cache::SendBackend, owned},
 };
 use ftml_ontology::{
     narrative::{
@@ -43,45 +44,29 @@ impl DocumentMeta {
             }
         }
         meta
-        //document.document_uri()
     }
 }
 
 pub fn setup_document<Be: SendBackend, Ch: IntoView + 'static>(
     uri: DocumentUri,
     is_stripped: bool,
+    toc: TocSource,
     children: impl FnOnce() -> Ch,
 ) -> impl IntoView {
-    provide_context(RwSignal::new(DomExtractor::new(
-        uri.clone(),
-        uri.clone().into(),
-        is_stripped,
-    )));
-    provide_context(InDocument(uri.clone()));
-    provide_context(CurrentUri(uri.clone().into()));
-    provide_context(ContextUri(uri.into()));
-    DocumentStructure::set::<Be>();
-    DocumentStructure::navigate_to_fragment();
-
-    /*
-    provide_context(SectionCounters::default());
-    let current_toc = match with_context::<TocSource, _>(|c| {
-        if let TocSource::Ready(r) = c {
-            Some(r.clone())
-        } else {
-            None
-        }
-    }) {
-        Some(Some(c)) => CurrentTOC { toc: Some(c) },
-        Some(None) => CurrentTOC::default(),
-        None => {
-            provide_context(TocSource::default());
-            CurrentTOC::default()
-        }
-    };
-    provide_context(RwSignal::new(current_toc));
-    provide_context(RwSignal::new(NavElems::new()));
-     */
+    fn setup<Be: SendBackend>(uri: DocumentUri, is_stripped: bool, toc: TocSource) {
+        provide_context(RwSignal::new(DomExtractor::new(
+            uri.clone(),
+            uri.clone().into(),
+            is_stripped,
+        )));
+        provide_context(InDocument(uri.clone()));
+        provide_context(CurrentUri(uri.clone().into()));
+        provide_context(ContextUri(uri.into()));
+        DocumentStructure::set::<Be>(toc);
+        DocumentStructure::navigate_to_fragment();
+        ModuleContext::reset();
+    }
+    setup::<Be>(uri, is_stripped, toc);
     children()
 }
 
@@ -101,18 +86,12 @@ pub struct DocumentState;
 impl DocumentState {
     /// ### Panics
     pub fn current_uri() -> NarrativeUri {
-        with_context::<CurrentUri, _>(|s| {
-            s.0.clone() //s.with_untracked(|e| e.state.document.clone())
-        })
-        .expect("Not in a document context")
+        with_context::<CurrentUri, _>(|s| s.0.clone()).expect("Not in a document context")
     }
 
     /// ### Panics
     pub fn document_uri() -> DocumentUri {
-        with_context::<InDocument, _>(|s| {
-            s.0.clone() //s.with_untracked(|e| e.state.document.clone())
-        })
-        .expect("Not in a document context")
+        with_context::<InDocument, _>(|s| s.0.clone()).expect("Not in a document context")
     }
 
     /// ### Panics
@@ -158,25 +137,6 @@ impl DocumentState {
     #[inline]
     pub(crate) fn do_inputref(target: DocumentUri, uri: DocumentElementUri) -> Inputref {
         DocumentStructure::new_inputref(uri, target)
-        /*
-        let (id, replace, replacing_done) = NavElems::new_inputref(uri.name.last());
-        let counters = SectionCounters::inputref(target.clone(), id.clone());
-        let title = NavElems::get_title(target.clone());
-        if with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract)).is_some_and(|b| b) {
-            let current_toc = expect_context::<RwSignal<CurrentTOC>>();
-            current_toc.update(|t| t.insert_inputref(id.clone(), target.clone()));
-        }
-        provide_context(counters);
-        provide_context(CurrentId(id.clone()));
-        f(InputrefInfo {
-            uri,
-            target,
-            replace,
-            replacing_done,
-            id,
-            title,
-        })
-        */
     }
 
     pub fn inner_document<F: FnOnce() -> AnyView>(
@@ -185,58 +145,49 @@ impl DocumentState {
         is_stripped: bool,
         f: F,
     ) -> AnyView {
-        let context = Self::context_uri() & uri.name();
-        provide_context(RwSignal::new(DomExtractor::new(
-            target.clone(),
-            context.clone().into(),
-            is_stripped,
-        )));
-        provide_context(CurrentUri(target.clone().into()));
-        provide_context(InDocument(target));
-        provide_context(ContextUri(context.into()));
+        fn setup(target: DocumentUri, uri: &DocumentElementUri, is_stripped: bool) {
+            let context = DocumentState::context_uri() & uri.name();
+            provide_context(RwSignal::new(DomExtractor::new(
+                target.clone(),
+                context.clone().into(),
+                is_stripped,
+            )));
+            provide_context(CurrentUri(target.clone().into()));
+            provide_context(InDocument(target));
+            provide_context(ContextUri(context.into()));
+            ModuleContext::reset();
+        }
+        setup(target, uri, is_stripped);
         f()
     }
 
     pub fn no_document<V: IntoView, F: FnOnce() -> V>(f: F) -> impl IntoView + use<V, F> {
-        provide_context(RwSignal::new(DomExtractor::new(
-            DocumentUri::no_doc().clone(),
-            DocumentUri::no_doc().clone().into(),
-            true,
-        )));
-        provide_context(InDocument(DocumentUri::no_doc().clone()));
-        provide_context(ContextUri(DocumentUri::no_doc().clone().into()));
-        provide_context(CurrentUri(DocumentUri::no_doc().clone().into()));
-        DocumentStructure::set_empty();
+        fn setup() {
+            provide_context(RwSignal::new(DomExtractor::new(
+                DocumentUri::no_doc().clone(),
+                DocumentUri::no_doc().clone().into(),
+                true,
+            )));
+            provide_context(InDocument(DocumentUri::no_doc().clone()));
+            provide_context(ContextUri(DocumentUri::no_doc().clone().into()));
+            provide_context(CurrentUri(DocumentUri::no_doc().clone().into()));
+            DocumentStructure::set_empty();
+            ModuleContext::reset();
+        }
+        setup();
         f()
     }
 
     #[inline]
     pub(crate) fn new_section(uri: DocumentElementUri) -> SectionInfo {
         DocumentStructure::new_section(uri)
-        /*
-        let id = NavElems::new_section(uri.name.last());
-        let mut counters: SectionCounters = expect_context();
-        let (style, class) = counters.next_section();
-        let lvl = counters.current_level();
-        if with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract)).is_some_and(|b| b) {
-            let current_toc = expect_context::<RwSignal<CurrentTOC>>();
-            current_toc.update(|t| t.insert_section(id.clone(), uri.clone()));
-        }
-        provide_context(counters);
-        provide_context(CurrentId(id.clone()));
-        f(SectionInfo {
-            uri,
-            style,
-            class,
-            lvl,
-            id,
-        })
-         */
     }
 
+    /*
     pub fn get_toc() -> ReadSignal<Vec<TocElem>> {
         expect_context::<DocumentStructure>().toc.read_only()
     }
+     */
 
     pub(crate) fn new_paragraph<V: IntoView>(
         uri: DocumentElementUri,
@@ -247,7 +198,8 @@ impl DocumentState {
         f: impl FnOnce(ParagraphInfo) -> V,
     ) -> impl IntoView {
         provide_context(CurrentUri(uri.clone().into()));
-        let (style, class) = expect_context::<DocumentStructure>().get_para(kind, &styles);
+        //leptos::logging::log!("Paragraph {uri}");
+        let (style, class) = DocumentStructure::get_para(kind, &styles);
         f(ParagraphInfo {
             uri,
             style,
@@ -261,7 +213,7 @@ impl DocumentState {
 
     pub(crate) fn new_problem(uri: DocumentElementUri, styles: &[Id]) -> (Memo<String>, String) {
         provide_context(CurrentUri(uri.into()));
-        expect_context::<DocumentStructure>().get_problem(styles)
+        DocumentStructure::get_problem(styles)
     }
 
     pub(crate) fn new_slide(uri: DocumentElementUri) {

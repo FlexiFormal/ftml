@@ -5,7 +5,7 @@ use crate::{
         elements::{DocumentElementRef, IsDocumentElement},
     },
     terms::ArgumentMode,
-    utils::RefTree,
+    utils::{RefTree, SourceRange},
 };
 use ftml_uris::{DocumentElementUri, Id, NarrativeUriRef, SymbolUri};
 
@@ -25,6 +25,8 @@ pub struct NotationReference {
     pub uri: DocumentElementUri,
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
     pub notation: DataRef<Notation>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -43,6 +45,8 @@ pub struct VariableNotationReference {
     pub uri: DocumentElementUri,
     #[cfg_attr(feature = "typescript", tsify(type = "DataRef"))]
     pub notation: DataRef<Notation>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -133,6 +137,10 @@ impl Ftml for NotationReference {
             triple!(<(iri)> ulo:notation_for <(self.symbol.to_iri())>),
         ]
     }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
+    }
 }
 impl Narrative for NotationReference {
     fn narrative_uri(&self) -> Option<NarrativeUriRef<'_>> {
@@ -174,6 +182,10 @@ impl Ftml for VariableNotationReference {
             triple!(<(iri.clone())>: ulo:notation),
             triple!(<(iri)> ulo:notation_for <(self.variable.to_iri())>),
         ]
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl Narrative for VariableNotationReference {

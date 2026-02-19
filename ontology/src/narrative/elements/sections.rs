@@ -1,8 +1,11 @@
 use ftml_uris::DocumentElementUri;
 
-use crate::narrative::{
-    DocumentRange, Narrative,
-    elements::{DocumentElement, DocumentElementRef, IsDocumentElement},
+use crate::{
+    narrative::{
+        DocumentRange, Narrative,
+        elements::{DocumentElement, DocumentElementRef, IsDocumentElement},
+    },
+    utils::SourceRange,
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -20,8 +23,12 @@ pub struct Section {
     pub range: DocumentRange,
     pub uri: DocumentElementUri,
     //pub level: SectionLevel,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub title: Option<Box<str>>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub children: Box<[DocumentElement]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl crate::__private::Sealed for Section {}
 impl crate::Ftml for Section {
@@ -33,6 +40,10 @@ impl crate::Ftml for Section {
         self.contains_triples()
             .into_iter()
             .chain(std::iter::once(triple!(<(iri)> : ulo:section)))
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl Narrative for Section {
@@ -82,9 +93,12 @@ impl IsDocumentElement for Section {
 pub struct Slide {
     pub range: DocumentRange,
     pub uri: DocumentElementUri,
-    //pub level: SectionLevel,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub title: Option<Box<str>>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub children: Box<[DocumentElement]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl crate::__private::Sealed for Slide {}
 impl crate::Ftml for Slide {
@@ -96,6 +110,10 @@ impl crate::Ftml for Slide {
         self.contains_triples()
             .into_iter()
             .chain(std::iter::once(triple!(<(iri)> : ulo:slide)))
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl Narrative for Slide {

@@ -242,7 +242,7 @@ mod document_quiz_impl {
                             push!(children.iter().map(DocumentElement::as_ref);None);
                         }
                     }
-                    DocumentElementRef::UseModule(_)
+                    DocumentElementRef::UseModule { .. }
                     | DocumentElementRef::Slide(_)
                     | DocumentElementRef::SymbolDeclaration(_)
                     | DocumentElementRef::ImportModule(_)

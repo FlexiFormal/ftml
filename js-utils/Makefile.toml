@@ -8,10 +8,10 @@ command = "cargo"
 install_crate = false
 args = ["+nightly", "test", "--features=serde"]
 
-[tasks.test-miniserde]
+[tasks.test-serde-lite]
 command = "cargo"
 install_crate = false
-args = ["+nightly", "test", "--features=miniserde"]
+args = ["+nightly", "test", "--features=serde-lite"]
 
 [tasks.test-all-features]
 command = "cargo"
@@ -22,7 +22,7 @@ args = ["+nightly", "test", "--all-features"]
 dependencies = [
     "test-no-features",
     "test-serde",
-    "test-miniserde",
+    "test-serde-lite",
     "test-all-features",
     "clean"
 ]

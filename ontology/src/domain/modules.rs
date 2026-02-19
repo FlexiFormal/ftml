@@ -11,7 +11,7 @@ use crate::{
             structures::{MathStructure, StructureExtension},
         },
     },
-    utils::SharedArc,
+    utils::{RefTree, SharedArc, SourceRange},
 };
 
 #[derive(Clone, Hash, Debug, PartialEq, Eq)]
@@ -112,6 +112,15 @@ impl crate::Ftml for ModuleLike {
             Self::Nested(n) => E(n.triples().into_iter()),
         }
     }
+    fn source_range(&self) -> SourceRange {
+        match self {
+            Self::Module(m) => m.source_range(),
+            Self::Structure(s) => s.source_range(),
+            Self::Extension(s) => s.source_range(),
+            Self::Morphism(s) => s.source_range(),
+            Self::Nested(s) => s.source_range(),
+        }
+    }
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -132,6 +141,8 @@ pub struct ModuleData {
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub signature: Option<Language>,
     pub declarations: Box<[Declaration]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl crate::__private::Sealed for ModuleData {}
 impl ModuleData {
@@ -163,6 +174,26 @@ impl Borrow<ModuleUri> for Module {
         &self.uri
     }
 }
+impl RefTree for Module {
+    type Child<'a>
+        = AnyDeclarationRef<'a>
+    where
+        Self: 'a;
+    #[inline]
+    fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
+        self.declarations()
+    }
+}
+impl RefTree for ModuleData {
+    type Child<'a>
+        = AnyDeclarationRef<'a>
+    where
+        Self: 'a;
+    #[inline]
+    fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
+        self.declarations()
+    }
+}
 
 impl HasDeclarations for ModuleData {
     #[inline]
@@ -191,8 +222,34 @@ impl crate::Ftml for ModuleData {
         if let Some(sig) = &self.signature {
             others.push(triple!(<(iri.clone())> ulo:has_signature = (sig.to_string())));
         }
-        others.push(triple!(<(iri)> : ulo:theory));
-        others.into_iter().chain(self.declares_triples())
+        others.push(triple!(<(iri.clone())> : ulo:theory));
+        others
+            .into_iter()
+            .chain(self.declarations().filter_map(move |e| match e {
+                AnyDeclarationRef::Import { uri, .. } => {
+                    Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
+                }
+                AnyDeclarationRef::Extension(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::MathStructure(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Morphism(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::NestedModule(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Symbol(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Rule { .. } => None,
+            }))
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 
@@ -210,6 +267,8 @@ impl crate::Ftml for ModuleData {
 pub struct NestedModule {
     pub uri: SymbolUri,
     pub declarations: Box<[Declaration]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl crate::__private::Sealed for NestedModule {}
 impl crate::Ftml for NestedModule {
@@ -219,7 +278,33 @@ impl crate::Ftml for NestedModule {
         use ulo::triple;
         let iri = self.uri.to_iri();
 
-        std::iter::once(triple!(<(iri)> : ulo:theory)).chain(self.declares_triples())
+        std::iter::once(triple!(<(iri.clone())> : ulo:theory)).chain(
+            self.declarations().filter_map(move |e| match e {
+                AnyDeclarationRef::Import { uri, .. } => {
+                    Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
+                }
+                AnyDeclarationRef::Extension(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::MathStructure(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Morphism(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::NestedModule(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Symbol(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Rule { .. } => None,
+            }),
+        )
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl HasDeclarations for NestedModule {

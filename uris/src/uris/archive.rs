@@ -269,8 +269,8 @@ impl ArchiveUri {
     /// Returns a default "no archive" URI.
     ///
     #[must_use]
-    pub fn no_archive() -> Self {
-        NO_ARCHIVE_URI.clone()
+    pub fn no_archive() -> &'static Self {
+        &NO_ARCHIVE_URI
     }
 
     /// Internal parsing method used by URI parsing infrastructure.

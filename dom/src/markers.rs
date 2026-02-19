@@ -1,31 +1,30 @@
 use crate::{
     FtmlViews,
     clonable_views::MarkedNode,
-    counters::LogicalLevel,
+    counters::CurrentCounters,
     document::{CurrentUri, DocumentState, WithHead},
     extractor::{DomExtractor, FtmlDomElement},
-    structure::{DocumentStructure, TocSource},
+    structure::DocumentStructure,
     terms::ReactiveTerm,
-    utils::{ContextChain, local_cache::LOCAL_CACHE},
+    utils::{ContentModuleContext, ContextChain, ModuleContext, local_cache::LOCAL_CACHE},
 };
 use ftml_ontology::{
     narrative::elements::{
-        SectionLevel,
         paragraphs::{ParagraphFormatting, ParagraphKind},
         problems::ChoiceBlockStyle,
     },
     terms::{VarOrSym, Variable},
 };
 use ftml_parser::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, nodes::FtmlNode};
-use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, NarrativeUri, SymbolUri};
-use leptos::prelude::{
-    AnyView, CustomAttribute, Get, IntoAny, Memo, RwSignal, Update, expect_context,
-    provide_context, use_context, with_context,
-};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, ModuleUri, SymbolUri};
+use leptos::prelude::{AnyView, CustomAttribute, IntoAny, Memo, provide_context, use_context};
 use leptos_posthoc::OriginalNode;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Marker {
+    Module(ModuleUri, Option<ModuleUri>),
+    ImportModule(ModuleUri),
+    UseModule(ModuleUri),
     Section(DocumentElementUri),
     SymbolReference {
         in_term: bool,
@@ -92,7 +91,7 @@ pub enum Marker {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ParagraphInfo {
     pub uri: DocumentElementUri,
-    pub style: Memo<String>,
+    pub style: crate::structure::utils::Style,
     pub class: Option<String>,
     pub kind: ParagraphKind,
     pub formatting: ParagraphFormatting,
@@ -135,11 +134,28 @@ impl Marker {
             {
                 Self::apply::<Views>(markers, invisible, is_math, orig)
             }
+            Self::Module(m, o) => {
+                ModuleContext::barrier();
+                ContentModuleContext::make_new(Some(m));
+                if let Some(m) = o {
+                    ContentModuleContext::add(m);
+                }
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            }
+            Self::ImportModule(m) => {
+                ContentModuleContext::add(m);
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            }
+            Self::UseModule(m) => {
+                ModuleContext::add(m);
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            }
             Self::IfInputref(b) if DocumentState::in_inputref() == b => {
                 Self::apply::<Views>(markers, invisible, is_math, orig)
             }
             Self::IfInputref(_) => orig.attr("style", "display:none;").into_any(),
             Self::Section(uri) => {
+                ModuleContext::barrier();
                 let info = DocumentState::new_section(uri);
                 Views::section(info, move || {
                     Self::apply::<Views>(markers, invisible, is_math, orig)
@@ -157,6 +173,7 @@ impl Marker {
                 styles,
                 fors,
             } => {
+                ModuleContext::barrier();
                 if *uri.document_uri() != *DocumentUri::no_doc() {
                     LOCAL_CACHE
                         .paragraphs
@@ -169,7 +186,10 @@ impl Marker {
                 })
                 .into_any()
             }
-            Self::ProofBody => Views::proof_body(orig).into_any(),
+            Self::ProofBody => {
+                ModuleContext::barrier();
+                Views::proof_body(orig).into_any()
+            }
             Self::Problem {
                 is_subproblem,
                 styles,
@@ -178,6 +198,7 @@ impl Marker {
                 points,
                 minutes,
             } => {
+                ModuleContext::barrier();
                 let (style, class) = DocumentState::new_problem(uri.clone(), &styles);
                 Views::problem(
                     uri,
@@ -193,6 +214,7 @@ impl Marker {
                 .into_any()
             }
             Self::Solution => {
+                ModuleContext::barrier();
                 // parse node content:
                 let _ = Self::apply::<Views>(markers, invisible, is_math, orig.clone());
                 orig.set_inner_html("");
@@ -235,6 +257,7 @@ impl Marker {
             })
             .into_any(),
             Self::Slide(uri) => {
+                ModuleContext::barrier();
                 DocumentState::new_slide(uri.clone());
                 Views::slide(uri, move || {
                     Self::apply::<Views>(markers, invisible, is_math, orig)
@@ -242,24 +265,6 @@ impl Marker {
                 .into_any()
             }
             Self::SectionTitle => {
-                /*
-                let (LogicalLevel::Section(lvl), cls) = DocumentState::title_class() else {
-                    tracing::error!("Unexpected section title");
-                    return Self::apply::<Views>(markers, invisible, is_math, orig);
-                };
-
-                if with_context::<TocSource, _>(|s| matches!(s, TocSource::Extract))
-                    .is_some_and(|b| b)
-                    && let NarrativeUri::Element(uri) = expect_context::<CurrentUri>().0
-                {
-                    let current_toc = expect_context::<RwSignal<CurrentTOC>>();
-                    let node = FtmlDomElement::new((*orig).clone());
-                    let title = node.inner_string().into_owned();
-                    if !title.is_empty() {
-                        current_toc.update(|toc| toc.set_title(&uri, title.into_boxed_str()));
-                    }
-                }
-                 */
                 let cls = DocumentStructure::insert_section_title(|| {
                     FtmlDomElement::new((*orig).clone())
                         .inner_string()
@@ -288,7 +293,7 @@ impl Marker {
                 let lvl = DocumentState::current_section_level();
                 lvl.into_view(cap).into_any()
             }
-            Self::SlideNumber => DocumentStructure::get_slide().into_any(),
+            Self::SlideNumber => CurrentCounters::slide().into_view(),
             Self::Comp => {
                 Views::comp(MarkedNode::new(markers, orig, is_math, true).into()).into_any()
             }
@@ -468,9 +473,13 @@ impl Marker {
             }
             OpenFtmlElement::ProblemChoice(_) => Some(Self::Choice),
             OpenFtmlElement::ProofBody => Some(Self::ProofBody),
+            OpenFtmlElement::Module { uri, meta, .. } => {
+                Some(Self::Module(uri.clone(), meta.clone()))
+            }
+            OpenFtmlElement::ImportModule(uri) => Some(Self::ImportModule(uri.clone())),
+            OpenFtmlElement::UseModule(uri) => Some(Self::UseModule(uri.clone())),
             OpenFtmlElement::Counter(_)
             | OpenFtmlElement::Invisible
-            | OpenFtmlElement::Module { .. }
             | OpenFtmlElement::MathStructure { .. }
             | OpenFtmlElement::Morphism { .. }
             | OpenFtmlElement::Style(_)
@@ -484,12 +493,11 @@ impl Marker {
             | OpenFtmlElement::SymbolDeclaration { .. }
             | OpenFtmlElement::NotationComp
             | OpenFtmlElement::ArgSep
-            | OpenFtmlElement::ImportModule(_)
-            | OpenFtmlElement::UseModule(_)
             | OpenFtmlElement::VariableDeclaration { .. }
             | OpenFtmlElement::None
             | OpenFtmlElement::Assign(_)
             | OpenFtmlElement::DocumentKind(_)
+            | OpenFtmlElement::DocumentUri(_)
             | OpenFtmlElement::OML { .. }
             | OpenFtmlElement::Rename { .. }
             | OpenFtmlElement::FillinSolCase(_)
@@ -498,7 +506,8 @@ impl Marker {
             | OpenFtmlElement::ProblemChoiceVerdict
             | OpenFtmlElement::ProblemChoiceFeedback
             | OpenFtmlElement::ArgTypes
-            | OpenFtmlElement::HeadTerm => None,
+            | OpenFtmlElement::HeadTerm
+            | OpenFtmlElement::Rule(_) => None,
         }
     }
 }

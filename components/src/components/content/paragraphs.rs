@@ -30,8 +30,8 @@ pub(super) fn slide<Be: ftml_dom::utils::local_cache::SendBackend>(
         .into_any(),
     );
     let uses = children.iter().flat().filter_map(|e| {
-        if let DocumentElement::UseModule(u) = e {
-            Some(u)
+        if let DocumentElement::UseModule { uri, .. } = e {
+            Some(uri)
         } else {
             None
         }
@@ -68,8 +68,8 @@ impl FtmlViewable for Section {
             |t| Left(crate::Views::<Be>::render_ftml(t.to_string(), None)),
         );
         let uses = children.iter().flat().filter_map(|e| {
-            if let DocumentElement::UseModule(u) = e {
-                Some(u)
+            if let DocumentElement::UseModule { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }
@@ -118,8 +118,8 @@ impl FtmlViewable for LogicalParagraph {
             },
         );
         let uses = children.iter().flat().filter_map(|e| {
-            if let DocumentElement::UseModule(u) = e {
-                Some(u)
+            if let DocumentElement::UseModule { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }

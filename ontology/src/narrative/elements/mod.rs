@@ -10,7 +10,8 @@ use crate::{
         DocumentRange,
         elements::notations::{NotationReference, VariableNotationReference},
     },
-    terms::Term,
+    terms::{Term, TermContainer},
+    utils::SourceRange,
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, ModuleUri, SymbolUri};
 pub use notations::Notation;
@@ -58,8 +59,11 @@ pub enum SlideElement {
     },
     Section {
         uri: DocumentElementUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         title: Option<Box<str>>,
-        children: Vec<SlideElement>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        #[cfg_attr(feature = "typescript", tsify(type = "SlideElement[]"))]
+        children: Vec<Self>,
     },
 }
 
@@ -85,7 +89,11 @@ pub trait IsDocumentElement: super::Narrative {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum DocumentElement {
     //SetSectionLevel(SectionLevel),
-    UseModule(ModuleUri),
+    UseModule {
+        uri: ModuleUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
+    },
     Module {
         range: DocumentRange,
         module: ModuleUri,
@@ -129,6 +137,8 @@ pub enum DocumentElement {
     DocumentReference {
         uri: DocumentElementUri,
         target: DocumentUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
     },
     Notation(NotationReference),
     VariableDeclaration(VariableDeclaration),
@@ -136,24 +146,31 @@ pub enum DocumentElement {
     Definiendum {
         range: DocumentRange,
         uri: SymbolUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
     },
     SymbolReference {
         range: DocumentRange,
         uri: SymbolUri,
         #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         notation: Option<Id>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
     },
     VariableReference {
         range: DocumentRange,
         uri: DocumentElementUri,
         #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         notation: Option<Id>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
     },
     Term(DocumentTerm),
 }
 impl crate::__private::Sealed for DocumentElement {}
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[allow(clippy::unsafe_derive_deserialize)]
+#[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
@@ -164,14 +181,57 @@ impl crate::__private::Sealed for DocumentElement {}
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[non_exhaustive]
 pub struct DocumentTerm {
     pub uri: DocumentElementUri,
-    pub term: Term,
+    pub term: TermContainer,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    inferred_type: crate::terms::MutableTerm,
 }
+impl PartialEq for DocumentTerm {
+    fn eq(&self, other: &Self) -> bool {
+        self.uri == other.uri && self.term == other.term
+    }
+}
+impl std::hash::Hash for DocumentTerm {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uri.hash(state);
+    }
+}
+impl Eq for DocumentTerm {}
 impl crate::__private::Sealed for DocumentTerm {}
+impl DocumentTerm {
+    #[must_use]
+    pub fn new(uri: DocumentElementUri, t: Term, range: Option<SourceRange>) -> Self {
+        Self {
+            uri,
+            term: TermContainer::new(t, range),
+            inferred_type: crate::terms::MutableTerm::default(),
+        }
+    }
+    #[must_use]
+    pub fn get_type(&self) -> Option<Term> {
+        self.inferred_type.0.lock().clone()
+    }
+    pub fn set_type(&self, tp: Term) {
+        *self.inferred_type.0.lock() = Some(tp);
+    }
+    #[must_use]
+    pub const fn get_parsed(&self) -> &Term {
+        // SAFETY: by construction, self.term should never be empty
+        unsafe { self.term.get_parsed().unwrap_unchecked() }
+    }
+    #[must_use]
+    pub fn presentation(&self) -> Term {
+        // SAFETY: by construction, self.term should never be empty
+        unsafe { self.term.presentation().unwrap_unchecked() }
+    }
+}
 impl crate::Ftml for DocumentTerm {
     #[cfg(feature = "rdf")]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use crate::terms::IsTerm;
         use ftml_uris::FtmlUri;
         use ulo::triple;
         macro_rules! syms {
@@ -182,8 +242,12 @@ impl crate::Ftml for DocumentTerm {
         }
         let iri = self.uri.to_iri();
         let iri2 = iri.clone();
-        let term = &self.term;
+        let term = self.get_parsed();
         syms!(iri term).chain(std::iter::once(triple!(<(iri2)>: ulo:term)))
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.term.source
     }
 }
 impl IsDocumentElement for DocumentTerm {
@@ -231,9 +295,9 @@ impl super::Narrative for DocumentElement {
         use either_of::EitherOf6::*;
         match self {
             //Self::SetSectionLevel(_) |
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::SymbolDeclaration(_)
-            | Self::ImportModule(_)
+            | Self::ImportModule { .. }
             | Self::VariableDeclaration(_)
             | Self::DocumentReference { .. }
             | Self::Definiendum { .. }
@@ -259,9 +323,9 @@ impl Ftml for DocumentElement {
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
         match self {
             //Self::SetSectionLevel(_) |
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::SymbolDeclaration(_)
-            | Self::ImportModule(_)
+            | Self::ImportModule { .. }
             | Self::DocumentReference { .. }
             | Self::Definiendum { .. }
             | Self::SymbolReference { .. }
@@ -283,13 +347,39 @@ impl Ftml for DocumentElement {
             Self::Term(t) => RdfIterator::Term(t.triples().into_iter()),
         }
     }
+
+    fn source_range(&self) -> SourceRange {
+        match self {
+            //Self::SetSectionLevel(_) |
+            Self::UseModule { source, .. }
+            | Self::DocumentReference { source, .. }
+            | Self::Definiendum { source, .. }
+            | Self::SymbolReference { source, .. }
+            | Self::VariableReference { source, .. } => *source,
+            Self::Term(t) => t.source_range(),
+            Self::Module { .. }
+            | Self::MathStructure { .. }
+            | Self::Extension { .. }
+            | Self::Morphism { .. }
+            | Self::SymbolDeclaration(_)
+            | Self::ImportModule(_)
+            | Self::SkipSection(_) => SourceRange::DEFAULT,
+            Self::VariableDeclaration(e) => e.source_range(),
+            Self::Notation(e) => e.source_range(),
+            Self::VariableNotation(e) => e.source_range(),
+            Self::Section(e) => e.source_range(),
+            Self::Slide(e) => e.source_range(),
+            Self::Paragraph(e) => e.source_range(),
+            Self::Problem(e) => e.source_range(),
+        }
+    }
 }
 impl DocumentElement {
     #[must_use]
     pub fn children_lt(&self) -> Option<&[Self]> {
         match self {
             //Self::SetSectionLevel(_) |
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::VariableDeclaration(_)
@@ -318,8 +408,11 @@ impl DocumentElement {
 #[cfg_attr(feature = "serde-lite", derive(serde_lite::Serialize))]
 pub enum DocumentElementRef<'d> {
     //SetSectionLevel(SectionLevel),
-    UseModule(&'d ModuleUri),
-
+    UseModule {
+        uri: &'d ModuleUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
+    },
     Module {
         range: DocumentRange,
         module: &'d ModuleUri,
@@ -352,6 +445,8 @@ pub enum DocumentElementRef<'d> {
     DocumentReference {
         uri: &'d DocumentElementUri,
         target: &'d DocumentUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
     },
     Notation(&'d NotationReference),
     VariableDeclaration(&'d VariableDeclaration),
@@ -359,16 +454,22 @@ pub enum DocumentElementRef<'d> {
     Definiendum {
         range: DocumentRange,
         uri: &'d SymbolUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
     },
     SymbolReference {
         range: DocumentRange,
         uri: &'d SymbolUri,
         notation: Option<&'d Id>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
     },
     VariableReference {
         range: DocumentRange,
         uri: &'d DocumentElementUri,
         notation: Option<&'d Id>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
     },
     Term(&'d DocumentTerm),
 }
@@ -382,7 +483,7 @@ impl<'r> DocumentElementRef<'r> {
         use either_of::EitherOf6::*;
         match self {
             //Self::SetSectionLevel(_) |
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::VariableDeclaration(_)
@@ -424,7 +525,7 @@ impl crate::Ftml for DocumentElementRef<'_> {
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
         match self {
             //Self::SetSectionLevel(_)
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::DocumentReference { .. }
@@ -446,6 +547,32 @@ impl crate::Ftml for DocumentElementRef<'_> {
             Self::Notation(n) => RdfIterator::Notation(n.triples().into_iter()),
             Self::VariableNotation(n) => RdfIterator::VarNotation(n.triples().into_iter()),
             Self::Term(t) => RdfIterator::Term(t.triples().into_iter()),
+        }
+    }
+
+    fn source_range(&self) -> SourceRange {
+        match self {
+            //Self::SetSectionLevel(_) |
+            Self::UseModule { source, .. }
+            | Self::DocumentReference { source, .. }
+            | Self::Definiendum { source, .. }
+            | Self::SymbolReference { source, .. }
+            | Self::VariableReference { source, .. } => *source,
+            Self::Term(t) => t.source_range(),
+            Self::Module { .. }
+            | Self::MathStructure { .. }
+            | Self::Extension { .. }
+            | Self::Morphism { .. }
+            | Self::SymbolDeclaration(_)
+            | Self::ImportModule(_)
+            | Self::SkipSection(_) => SourceRange::DEFAULT,
+            Self::VariableDeclaration(e) => e.source_range(),
+            Self::Notation(e) => e.source_range(),
+            Self::VariableNotation(e) => e.source_range(),
+            Self::Section(e) => e.source_range(),
+            Self::Slide(e) => e.source_range(),
+            Self::Paragraph(e) => e.source_range(),
+            Self::Problem(e) => e.source_range(),
         }
     }
 }
@@ -473,7 +600,7 @@ impl DocumentElement {
     pub fn flat_children(&self) -> &[Self] {
         match self {
             //Self::SetSectionLevel(_) |
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::Definiendum { .. }
@@ -499,7 +626,7 @@ impl DocumentElement {
     pub const fn element_uri(&self) -> Option<&DocumentElementUri> {
         Some(match self {
             // Self::SetSectionLevel(_) |
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::Module { .. }
             | Self::MathStructure { .. }
             | Self::Extension { .. }
@@ -526,7 +653,10 @@ impl DocumentElement {
     pub fn as_ref(&self) -> DocumentElementRef<'_> {
         match self {
             //Self::SetSectionLevel(l) => DocumentElementRef::SetSectionLevel(*l),
-            Self::UseModule(u) => DocumentElementRef::UseModule(u),
+            Self::UseModule { uri, source } => DocumentElementRef::UseModule {
+                uri,
+                source: *source,
+            },
             Self::Module {
                 range,
                 module,
@@ -572,32 +702,44 @@ impl DocumentElement {
             Self::Paragraph(p) => DocumentElementRef::Paragraph(p),
             Self::Problem(p) => DocumentElementRef::Problem(p),
             Self::Slide(s) => DocumentElementRef::Slide(s),
-            Self::DocumentReference { uri, target } => {
-                DocumentElementRef::DocumentReference { uri, target }
-            }
+            Self::DocumentReference {
+                uri,
+                target,
+                source,
+            } => DocumentElementRef::DocumentReference {
+                uri,
+                target,
+                source: *source,
+            },
             Self::Notation(n) => DocumentElementRef::Notation(n),
             Self::VariableDeclaration(v) => DocumentElementRef::VariableDeclaration(v),
             Self::VariableNotation(n) => DocumentElementRef::VariableNotation(n),
-            Self::Definiendum { range, uri } => {
-                DocumentElementRef::Definiendum { range: *range, uri }
-            }
+            Self::Definiendum { range, uri, source } => DocumentElementRef::Definiendum {
+                range: *range,
+                uri,
+                source: *source,
+            },
             Self::SymbolReference {
                 range,
                 uri,
                 notation,
+                source,
             } => DocumentElementRef::SymbolReference {
                 range: *range,
                 uri,
                 notation: notation.as_ref(),
+                source: *source,
             },
             Self::VariableReference {
                 range,
                 uri,
                 notation,
+                source,
             } => DocumentElementRef::VariableReference {
                 range: *range,
                 uri,
                 notation: notation.as_ref(),
+                source: *source,
             },
             Self::Term(t) => DocumentElementRef::Term(t),
         }
@@ -612,7 +754,7 @@ impl<'e> DocumentElementRef<'e> {
     {
         match self {
             //Self::SetSectionLevel(_)
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::SymbolDeclaration(_)
             | Self::ImportModule(_)
             | Self::Definiendum { .. }
@@ -638,7 +780,7 @@ impl<'e> DocumentElementRef<'e> {
     pub const fn element_uri(self) -> Option<&'e DocumentElementUri> {
         Some(match self {
             //Self::SetSectionLevel(_)
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::Module { .. }
             | Self::MathStructure { .. }
             | Self::Extension { .. }

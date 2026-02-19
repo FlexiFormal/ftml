@@ -16,6 +16,7 @@ pub mod mathml;
 pub mod notations;
 pub mod structure;
 pub mod terms;
+pub mod toc;
 pub mod utils;
 pub use clonable_views::ClonableView;
 use ftml_ontology::narrative::elements::{ParagraphOrProblemKind, paragraphs::ParagraphKind};
@@ -147,7 +148,10 @@ fn close_things(
             #[allow(clippy::enum_glob_use)]
             use CloseFtmlElement::*;
             match c {
-                OMA | OMBIND => ReactiveApplication::close(),
+                OMA | OMBIND => {
+                    let term = sig.with_untracked(|ext| ext.last_term().cloned());
+                    ReactiveApplication::close(term);
+                }
                 Paragraph => {
                     if sig.with_untracked(|r| r.state.document == *DocumentUri::no_doc()) {
                         tracing::debug!("No document; paragraph ignored");
@@ -201,6 +205,7 @@ fn close_things(
                 | ArgTypes
                 | ProblemChoiceFeedback
                 | FillinSolCase
+                | Rule
                 | ProblemChoiceVerdict => (),
             }
         }

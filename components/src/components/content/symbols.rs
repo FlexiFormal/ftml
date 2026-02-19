@@ -54,7 +54,10 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
         argument_types,
         assoctype,
         reordering,
+        ..
     } = &**data;
+    let tp = tp.presentation();
+    let df = df.presentation();
     let symbol_str = if role.iter().any(|s| s.as_ref() == "textsymdecl") {
         "Text Symbol "
     } else {
@@ -64,12 +67,12 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
         .child(uri.name().last().to_string())
         .title(uri.to_string());
     let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
-    let tp = tp.as_ref().map(|t| {
-        let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+    let tp = tp.map(|t| {
+        let t = t.into_view::<crate::Views<Be>, Be>(false);
         view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
     });
-    let df = df.as_ref().map(|t| {
-        let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+    let df = df.map(|t| {
+        let t = t.into_view::<crate::Views<Be>, Be>(false);
         view! {<Caption1>
             "Definiens: "{ftml_dom::utils::math(|| t)}
             </Caption1>
@@ -79,6 +82,10 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
     let header = view! {
         <Caption1Strong>{symbol_str}{name}</Caption1Strong>
         {macroname}
+        {if role.is_empty() {None} else {Some(role.iter().map(|r| {
+            let s = r.to_string();
+            view!{<Text tag=TextTag::Code>{s}</Text>}
+        }).collect_view())}}
     };
     let notations = do_notations::<Be>(LeafUri::Symbol(uri.clone()), arity.clone());
     let paragraphs = if show_paras {
@@ -144,17 +151,20 @@ impl super::FtmlViewable for VariableDeclaration {
             reordering,
             bind,
             is_seq,
+            ..
         } = &**data;
+        let tp = tp.presentation();
+        let df = df.presentation();
         let name = span()
             .child(uri.name().last().to_string())
             .title(uri.to_string());
         let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
-        let tp = tp.as_ref().map(|t| {
-            let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+        let tp = tp.map(|t| {
+            let t = t.into_view::<crate::Views<Be>, Be>(false);
             view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
         });
-        let df = df.as_ref().map(|t| {
-            let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+        let df = df.map(|t| {
+            let t = t.into_view::<crate::Views<Be>, Be>(false);
             view! {<Caption1>"Definiens: "{ftml_dom::utils::math(|| t)}</Caption1>}
                 .attr("style", "white-space:nowrap;")
         });

@@ -4,6 +4,7 @@ use either::Either::{Left, Right};
 use ftml_ontology::{
     narrative::elements::{DocumentElement, DocumentTerm, LogicalParagraph, VariableDeclaration},
     terms::{Term, Variable},
+    utils::SourceRange,
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, Id, ModuleUri, NarrativeUriRef, UriName,
@@ -12,7 +13,10 @@ use ftml_uris::{
 
 use crate::{
     FtmlKey,
-    extraction::{nodes::FtmlNode, state::ExtractorState},
+    extraction::{
+        nodes::FtmlNode,
+        state::{ExtractorState, IdCounter},
+    },
 };
 
 pub mod attributes;
@@ -42,9 +46,12 @@ pub trait FtmlExtractor: 'static + Sized {
     /// ### Errors
     fn close(&mut self, elem: CloseFtmlElement, node: &Self::Node) -> Result<()>;
 
+    fn current_source(&self) -> SourceRange;
+
     fn forced_element_uri(&mut self) -> Option<DocumentElementUri>;
     /// ### Errors
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id>;
+    fn id_store(&mut self) -> &mut IdCounter;
     /// ### Errors
     fn get_domain_uri(&self, in_elem: FtmlKey) -> Result<Cow<'_, ModuleUri>> {
         for e in self.iterate_domain() {
@@ -66,6 +73,7 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::ArgTypes(_)
+                | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::Assign { .. } => {
                     return Err(FtmlExtractionError::NotIn(
                         in_elem,
@@ -185,6 +193,7 @@ pub trait FtmlExtractor: 'static + Sized {
                     | OpenDomainElement::Type { .. }
                     | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. }
+                    | OpenDomainElement::InferenceRule { .. }
                     | OpenDomainElement::Comp
                     | OpenDomainElement::DefComp,
                 ) => true,
@@ -307,67 +316,74 @@ pub trait FtmlExtractor: 'static + Sized {
         }
     }
 
-    fn last_term(&self) -> Option<&Term> {
-        for e in self.iterate_narrative() {
-            match e {
-                OpenNarrativeElement::Invisible => (),
-                OpenNarrativeElement::Module { children, .. }
-                | OpenNarrativeElement::MathStructure { children, .. }
-                | OpenNarrativeElement::Morphism { children, .. }
-                | OpenNarrativeElement::Section { children, .. }
-                | OpenNarrativeElement::Paragraph { children, .. }
-                | OpenNarrativeElement::Slide { children, .. }
-                | OpenNarrativeElement::Problem { children, .. }
-                | OpenNarrativeElement::SkipSection { children } => match children.last() {
-                    Some(DocumentElement::Term(DocumentTerm { term, .. })) => return Some(term),
-                    _ => break,
-                },
-                OpenNarrativeElement::Notation { .. }
-                | OpenNarrativeElement::NotationComp { .. }
-                | OpenNarrativeElement::ArgSep { .. }
-                | OpenNarrativeElement::VariableDeclaration { .. }
-                | OpenNarrativeElement::Definiendum(_)
-                | OpenNarrativeElement::Solution(_)
-                | OpenNarrativeElement::FillinSol { .. }
-                | OpenNarrativeElement::ProblemHint
-                | OpenNarrativeElement::ProblemExNote
-                | OpenNarrativeElement::ProblemGradingNote(_)
-                | OpenNarrativeElement::AnswerClass { .. }
-                | OpenNarrativeElement::ChoiceBlock { .. }
-                | OpenNarrativeElement::ProblemChoice { .. }
-                | OpenNarrativeElement::ProblemChoiceVerdict
-                | OpenNarrativeElement::ProblemChoiceFeedback
-                | OpenNarrativeElement::FillinSolCase(_)
-                | OpenNarrativeElement::NotationArg(_) => break,
-            }
-        }
-        if let Some(DocumentElement::Term(DocumentTerm { term, .. })) =
-            self.iterate_dones().next_back()
-        {
-            return Some(term);
-        }
-        self.iterate_domain().next().and_then(|d| match d {
-            OpenDomainElement::Argument { terms, .. }
-            | OpenDomainElement::HeadTerm { terms, .. }
-            | OpenDomainElement::Type { terms, .. }
-            | OpenDomainElement::ReturnType { terms, .. }
-            | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
-            OpenDomainElement::ArgTypes(terms) => terms.last(),
-            OpenDomainElement::Module { .. }
-            | OpenDomainElement::MathStructure { .. }
-            | OpenDomainElement::Assign { .. }
-            | OpenDomainElement::Morphism { .. }
-            | OpenDomainElement::OMA { .. }
-            | OpenDomainElement::OMBIND { .. }
-            | OpenDomainElement::OML { .. }
-            | OpenDomainElement::ComplexTerm { .. }
-            | OpenDomainElement::SymbolDeclaration { .. }
-            | OpenDomainElement::SymbolReference { .. }
-            | OpenDomainElement::Comp
-            | OpenDomainElement::DefComp
-            | OpenDomainElement::VariableReference { .. } => None,
-        })
+    fn last_term(&self) -> Option<&Term>; /* {
+    for e in self.iterate_narrative() {
+    match e {
+    OpenNarrativeElement::Invisible => (),
+    OpenNarrativeElement::Module { children, .. }
+    | OpenNarrativeElement::MathStructure { children, .. }
+    | OpenNarrativeElement::Morphism { children, .. }
+    | OpenNarrativeElement::Section { children, .. }
+    | OpenNarrativeElement::Paragraph { children, .. }
+    | OpenNarrativeElement::Slide { children, .. }
+    | OpenNarrativeElement::Problem { children, .. }
+    | OpenNarrativeElement::SkipSection { children } => match children.last() {
+    Some(DocumentElement::Term(term)) => {
+    return Some(term.parsed());
     }
+    _ => break,
+    },
+    OpenNarrativeElement::Notation { .. }
+    | OpenNarrativeElement::NotationComp { .. }
+    | OpenNarrativeElement::ArgSep { .. }
+    | OpenNarrativeElement::VariableDeclaration { .. }
+    | OpenNarrativeElement::Definiendum(_)
+    | OpenNarrativeElement::Solution(_)
+    | OpenNarrativeElement::FillinSol { .. }
+    | OpenNarrativeElement::ProblemHint
+    | OpenNarrativeElement::ProblemExNote
+    | OpenNarrativeElement::ProblemGradingNote(_)
+    | OpenNarrativeElement::AnswerClass { .. }
+    | OpenNarrativeElement::ChoiceBlock { .. }
+    | OpenNarrativeElement::ProblemChoice { .. }
+    | OpenNarrativeElement::ProblemChoiceVerdict
+    | OpenNarrativeElement::ProblemChoiceFeedback
+    | OpenNarrativeElement::FillinSolCase(_)
+    | OpenNarrativeElement::NotationArg(_) => break,
+    }
+    }
+    if let Some(d) = self.iterate_domain().next().and_then(|d| match d {
+    OpenDomainElement::Argument { terms, .. }
+    | OpenDomainElement::HeadTerm { terms, .. }
+    | OpenDomainElement::Type { terms, .. }
+    | OpenDomainElement::ReturnType { terms, .. }
+    | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
+    OpenDomainElement::ArgTypes(terms)
+    | OpenDomainElement::InferenceRule {
+    parameters: terms, ..
+    } => terms.last(),
+    OpenDomainElement::Module { .. }
+    | OpenDomainElement::MathStructure { .. }
+    | OpenDomainElement::Assign { .. }
+    | OpenDomainElement::Morphism { .. }
+    | OpenDomainElement::OMA { .. }
+    | OpenDomainElement::OMBIND { .. }
+    | OpenDomainElement::OML { .. }
+    | OpenDomainElement::ComplexTerm { .. }
+    | OpenDomainElement::SymbolDeclaration { .. }
+    | OpenDomainElement::SymbolReference { .. }
+    | OpenDomainElement::Comp
+    | OpenDomainElement::DefComp
+    | OpenDomainElement::VariableReference { .. } => None,
+    }) {
+    return Some(d);
+    }
+    if let Some(DocumentElement::Term(term)) = self.iterate_dones().next_back() {
+    Some(term.parsed())
+    } else {
+    None
+    }
+    } */
 
     fn term_at(&self, pos: ArgumentPosition) -> Option<&Term> {
         self.iterate_domain().next().and_then(|e| match e {
@@ -422,6 +438,7 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::Comp
             | OpenDomainElement::DefComp
             | OpenDomainElement::Assign { .. }
+            | OpenDomainElement::InferenceRule { .. }
             | OpenDomainElement::VariableReference { .. } => None,
         })
     }
@@ -453,12 +470,19 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
     const RULES: &'static FtmlRuleSet<Self> = <Self as FtmlStateExtractor>::RULES;
     const DO_RDF: bool = <Self as FtmlStateExtractor>::DO_RDF;
     #[inline]
+    fn current_source(&self) -> SourceRange {
+        self.state().current_source_range
+    }
+    #[inline]
     fn iterate_domain(&self) -> impl Iterator<Item = &OpenDomainElement<Self::Node>> {
         self.state().domain()
     }
     #[inline]
     fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement<Self::Node>> {
         self.state().narrative()
+    }
+    fn last_term(&self) -> Option<&Term> {
+        self.state().last_term.as_ref()
     }
     fn iterate_dones(
         &self,
@@ -468,6 +492,9 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
     #[inline]
     fn forced_element_uri(&mut self) -> Option<DocumentElementUri> {
         self.state_mut().ids.forced()
+    }
+    fn id_store(&mut self) -> &mut IdCounter {
+        &mut self.state_mut().ids
     }
     #[inline]
     fn new_id(&mut self, key: FtmlKey, prefix: impl Into<Cow<'static, str>>) -> Result<Id> {

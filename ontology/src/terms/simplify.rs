@@ -39,7 +39,8 @@ impl Term {
             // Opaques
             Self::Opaque(o)
                 if (o.node.tag.as_ref() == "mrow"
-                    || o.node.tag.as_ref().eq_ignore_ascii_case("span"))
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("span")
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("div"))
                     && o.terms.len() == 1
                     && *o.node.children == [AnyOpaque::Term(0)]
                     && o.node
@@ -50,40 +51,29 @@ impl Term {
                 destruct!([tm] = o.terms);
                 tm
             }
+            // Numbers
+            Self::Opaque(o)
+                if (o.node.tag.as_ref() == "mi" || o.node.tag.as_ref() == "mn")
+                    && o.terms.is_empty()
+                    && matches!(&*o.node.children, [AnyOpaque::Text(_)]) =>
+            {
+                let Some(AnyOpaque::Text(txt)) = o.node.children.first() else {
+                    return Self::Opaque(o);
+                };
+                let txt = txt.trim();
+                txt.parse().map_or_else(|()| maybe_var(o), Self::Number)
+            }
             Self::Opaque(o)
                 if o.node.tag.as_ref() == "mi"
                     && o.terms.is_empty()
                     && matches!(*o.node.children, [AnyOpaque::Text(_)]) =>
             {
-                let Some(AnyOpaque::Text(txt)) = o.node.children.first() else {
-                    // SAFETY: we just matched
-                    unsafe {
-                        unreachable_unchecked();
-                    }
-                };
-                let txt = txt.trim();
-                let mut chars = txt.chars();
-                let Some(c) = chars.next() else {
-                    return Self::Opaque(o);
-                };
-                if chars.next().is_some() {
-                    return Self::Opaque(o);
-                }
-                let Some(name) = VAR_NAMES.get(&c) else {
-                    return Self::Opaque(o);
-                };
-                // SAFETY: name is in map
-                let name: Id = unsafe { name.parse().unwrap_unchecked() };
-                // SAFETY: txt is key in map
-                let notated = Some(unsafe { txt.parse().unwrap_unchecked() });
-                Self::Var {
-                    variable: Variable::Name { name, notated },
-                    presentation: None,
-                }
+                maybe_var(o)
             }
             Self::Opaque(o)
                 if (o.node.tag.as_ref() == "mrow"
-                    || o.node.tag.as_ref().eq_ignore_ascii_case("span"))
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("span")
+                    || o.node.tag.as_ref().eq_ignore_ascii_case("div"))
                     && matches!(*o.node.children, [AnyOpaque::Node { .. }])
                     && o.node
                         .attributes
@@ -159,20 +149,33 @@ impl Term {
     }
 }
 
-/*
-macro_rules! reverse {
-    ($($a:literal => $b:literal),*) => {
-        phf::map! {
-            $(
-                $b => $a
-            ),*
-        }
+fn maybe_var(o: OpaqueTerm) -> Term {
+    let Some(AnyOpaque::Text(txt)) = o.node.children.first() else {
+        return Term::Opaque(o);
+    };
+    let txt = txt.trim();
+
+    let mut chars = txt.chars();
+    let Some(c) = chars.next() else {
+        return Term::Opaque(o);
+    };
+    if chars.next().is_some() {
+        return Term::Opaque(o);
+    }
+    let Some(name) = VAR_NAMES.get(&c) else {
+        return Term::Opaque(o);
+    };
+    // SAFETY: name is in map
+    let name: Id = unsafe { name.parse().unwrap_unchecked() };
+    // SAFETY: txt is key in map
+    let notated = Some(unsafe { txt.parse().unwrap_unchecked() });
+    Term::Var {
+        variable: Variable::Name { name, notated },
+        presentation: None,
     }
 }
-reverse! {}
- */
 
-// yes, systematically hardcoding this is actually simpler then doing the
+// yes, systematically hardcoding this is actually simpler than doing the
 // offset calculations, given that there's exceptions/gaps in unicode blocks
 // all over the place -.-
 // TODO: combinations, greek letters => copy from rustex

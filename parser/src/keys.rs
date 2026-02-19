@@ -15,7 +15,8 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{ArgumentMode, Term, VarOrSym, Variable},
+    terms::{ArgumentMode, Term, TermContainer, VarOrSym, Variable},
+    utils::Permutation,
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, Id, IsNarrativeUri, Language, ModuleUri, SimpleUriName,
@@ -35,7 +36,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 123;
+pub const NUM_KEYS: u8 = 125;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -380,6 +381,14 @@ impl std::fmt::Debug for FtmlKey {
 }
 
 do_keys! {
+    /// Denotes the URI of the current document. Should occur at most once before any
+    /// document elements.
+    DocUri = "document-uri"
+    := (ext,attrs,_keys,node) => {
+        let uri = attrs.get_typed(FtmlKey::DocUri,DocumentUri::from_str)?;
+        ret!(ext, node <- DocumentUri(uri))
+    } => DocumentUri(uri:DocumentUri),
+
     /// Denotes the title of the current document (if any). Should occur at most once.
     DocTitle = "doctitle"
         := (ext,_attrs,_keys,node) => {
@@ -1151,15 +1160,16 @@ do_keys! {
             .unwrap_or_default();
             let reordering = attrs
                 .get(FtmlKey::ArgumentReordering)
-                .map(|s| s.as_ref().parse())
+                .map(|s| Permutation::parse(&arity,s.as_ref()))
                 .transpose()
-                .map_err(|_| (FtmlKey::ArgumentReordering, ()))?;
+                .map_err(|()| (FtmlKey::ArgumentReordering, ()))?;
             let macroname = attrs
                 .get(FtmlKey::Macroname)
                 .map(|s| s.as_ref().parse())
                 .transpose()
                 .map_err(|_| (FtmlKey::Macroname, ()))?;
             del!(keys - Role, AssocType, Args, ArgumentReordering, Macroname);
+            let source = ext.current_source();
             ret!(ext,node <- SymbolDeclaration {
                 uri,
                 data: Box::new(SymbolData {
@@ -1170,8 +1180,9 @@ do_keys! {
                     reordering,
                     return_type:None,
                     argument_types:Box::new([]),
-                    tp: None,
-                    df: None,
+                    tp: TermContainer::default(),
+                    df: TermContainer::default(),
+                    source
                 }),
             } + SymbolDeclaration)
         } => SymbolDeclaration{uri:SymbolUri,data:Box<SymbolData>},
@@ -1210,6 +1221,14 @@ do_keys! {
             let source = attrs.take_symbol_uri(FtmlKey::Assign)?;
             ret!(ext,node <- Assign(source) + Assign)
         } => Assign(source:SymbolUri),
+
+    /// Instantiates a parametric inference rule with id and parameters
+    InferenceRule = "inferencerule"
+        { = "[Id]" <= (Module) &(Arg,ArgMode) }
+        := (ext,attrs,_keys,node) => {
+            let id = attrs.get_typed(FtmlKey::InferenceRule, Id::from_str)?;
+            ret!(ext,node <- Rule(id) + Rule)
+        } => Rule(id:Id),
 
     /// Renames a [`Symbol`] in the domain of a [`Morphism`] to the new provided name with
     /// the optional provided new macroname.
@@ -1388,7 +1407,10 @@ do_keys! {
             let kind: OpenTermKind = attrs.get_typed(FtmlKey::Term, str::parse)?;
             let notation = opt!(attrs.get_typed(FtmlKey::NotationId, str::parse));
 
-            let in_term = |ext: &mut E| {
+            let has_uri = |ext: &mut E| {
+                if ext.iterate_narrative().any(|e| matches!(e,OpenNarrativeElement::Invisible)) {
+                    return Ok(true);
+                }
                 Ok(!ext.in_notation()
                     && match ext.iterate_domain().next() {
                         None
@@ -1397,6 +1419,11 @@ do_keys! {
                             | OpenDomainElement::MathStructure { .. }
                             | OpenDomainElement::Morphism { .. }
                             | OpenDomainElement::SymbolDeclaration { .. }
+                            | OpenDomainElement::Definiens { .. }
+                        ) => false,
+                        Some(OpenDomainElement::Argument { .. }
+                            | OpenDomainElement::HeadTerm { .. }
+                            | OpenDomainElement::InferenceRule { .. }
                             | OpenDomainElement::SymbolReference { .. }
                             | OpenDomainElement::VariableReference { .. }
                             | OpenDomainElement::OMA { .. }
@@ -1407,9 +1434,7 @@ do_keys! {
                             | OpenDomainElement::ReturnType { .. }
                             | OpenDomainElement::Assign { .. }
                             | OpenDomainElement::ArgTypes(_)
-                            | OpenDomainElement::Definiens { .. },
-                        ) => false,
-                        Some(OpenDomainElement::Argument { .. } | OpenDomainElement::HeadTerm { .. } ) => {
+                        ) => {
                             true
                         }
                         Some(OpenDomainElement::Comp | OpenDomainElement::DefComp) => {
@@ -1433,7 +1458,7 @@ do_keys! {
                     ret!(ext,node <- VariableReference{var,notation} + VariableReference)
                 }
                 (OpenTermKind::OMA, head) => {
-                    let uri = if in_term(ext)? {
+                    let uri = if has_uri(ext)? {
                         None
                     } else {
                         Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
@@ -1441,7 +1466,7 @@ do_keys! {
                     ret!(ext,node <- OMA{head,notation,uri} + OMA)
                 }
                 (OpenTermKind::OMBIND, head) => {
-                    let uri = if in_term(ext)? {
+                    let uri = if has_uri(ext)? {
                         None
                     } else {
                         Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
@@ -1449,7 +1474,7 @@ do_keys! {
                     ret!(ext,node <- OMBIND{head,notation,uri} + OMBIND)
                 }
                 (OpenTermKind::Complex, head) => {
-                    let uri = if in_term(ext)? {
+                    let uri = if has_uri(ext)? {
                         None
                     } else {
                         Some(attrs.get_elem_uri_from_id(ext, Cow::Borrowed("term"))?)
@@ -1537,7 +1562,7 @@ do_keys! {
             if fragment.as_ref().is_some_and(String::is_empty) {
                 fragment = None;
             }
-            let id = if let Some(id) = fragment {
+            let id:Option<Id> = if let Some(id) = fragment {
                 Some(
                     id.parse()
                         .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::NotationFragment))?,
@@ -1546,7 +1571,9 @@ do_keys! {
                 None
             };
             let uri = if let Some(id) = &id {
-                ext.get_narrative_uri() & id
+                let nid = ext.id_store().new_id(id.to_string()).parse::<Id>()
+                    .map_err(|e| FtmlExtractionError::Uri(FtmlKey::NotationFragment, e.into()))?;
+                ext.get_narrative_uri() & &nid
             } else {
                 let name = ext.new_id(FtmlKey::NotationFragment, Cow::Borrowed("notation"))?;
                 ext.get_narrative_uri() & &name
@@ -1760,8 +1787,9 @@ do_keys! {
                     | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. }
                     | OpenDomainElement::Assign { .. }
+                    | OpenDomainElement::InferenceRule { .. }
                     | OpenDomainElement::Comp
-                    | OpenDomainElement::DefComp,
+                    | OpenDomainElement::DefComp
                 ) => {
                     return Err(FtmlExtractionError::NotIn(FtmlKey::DefComp, "a term"));
                 }
@@ -1845,9 +1873,9 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
     .unwrap_or_default();
     let reordering = attrs
         .get(FtmlKey::ArgumentReordering)
-        .map(|s| s.as_ref().parse())
+        .map(|s| Permutation::parse(&arity, s.as_ref()))
         .transpose()
-        .map_err(|_| (FtmlKey::ArgumentReordering, ()))?;
+        .map_err(|()| (FtmlKey::ArgumentReordering, ()))?;
     let macroname = attrs
         .get(FtmlKey::Macroname)
         .map(|s| s.as_ref().parse())
@@ -1863,6 +1891,7 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
         Macroname,
         Bind
     );
+    let source = ext.current_source();
     ret!(ext,node <- VariableDeclaration {
         uri,
         data: Box::new(VariableData {
@@ -1875,8 +1904,9 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
             is_seq:is_sequence,
             argument_types:Box::default(),
             return_type:None,
-            tp: None,
-            df: None,
+            tp: TermContainer::default(),
+            df: TermContainer::default(),
+            source
         }),
     } + VariableDeclaration)
 }

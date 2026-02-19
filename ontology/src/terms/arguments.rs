@@ -25,6 +25,14 @@ impl Argument {
             Self::Sequence(_) => ArgumentMode::Sequence,
         }
     }
+    pub fn terms(&self) -> impl Iterator<Item = &Term> {
+        match self {
+            Self::Simple(t) | Self::Sequence(MaybeSequence::One(t)) => {
+                either::Left(std::iter::once(t))
+            }
+            Self::Sequence(MaybeSequence::Seq(ts)) => either::Right(ts.iter()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -41,8 +49,25 @@ impl Argument {
 pub enum BoundArgument {
     Simple(Term),
     Sequence(MaybeSequence<Term>),
-    Bound(Variable),
-    BoundSeq(MaybeSequence<Variable>),
+    Bound(ComponentVar),
+    BoundSeq(MaybeSequence<ComponentVar>),
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct ComponentVar {
+    pub var: Variable,
+    pub tp: Option<Term>,
+    pub df: Option<Term>,
 }
 
 #[cfg(not(feature = "serde-lite"))]
@@ -85,6 +110,15 @@ impl BoundArgument {
             Self::Sequence(_) => ArgumentMode::Sequence,
             Self::Bound(_) => ArgumentMode::BoundVariable,
             Self::BoundSeq(_) => ArgumentMode::BoundVariableSequence,
+        }
+    }
+
+    pub fn terms(&self) -> impl Iterator<Item = &Term> {
+        use either_of::EitherOf3 as E;
+        match self {
+            Self::Simple(t) | Self::Sequence(MaybeSequence::One(t)) => E::A(std::iter::once(t)),
+            Self::Sequence(MaybeSequence::Seq(ts)) => E::B(ts.iter()),
+            _ => E::C(std::iter::empty()),
         }
     }
 }
@@ -165,6 +199,23 @@ impl deepsize::DeepSizeOf for Argument {
                 .map(|t| std::mem::size_of_val(t) + t.deep_size_of_children(context))
                 .sum(),
         }
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for ComponentVar {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.var.deep_size_of_children(context)
+            + self
+                .tp
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
+            + self
+                .df
+                .as_ref()
+                .map(|t| t.deep_size_of_children(context))
+                .unwrap_or_default()
     }
 }
 

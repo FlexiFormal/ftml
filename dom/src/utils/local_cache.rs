@@ -14,7 +14,7 @@ use ftml_ontology::{
         SharedDocumentElement,
         documents::{Document, TocElem},
         elements::{
-            DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration,
+            DocumentTerm, Notation, ParagraphOrProblemKind, SectionLevel, VariableDeclaration,
             problems::Solutions,
         },
     },
@@ -117,8 +117,34 @@ impl<T, E> GlobalLocal<Vec<T>, E> {
     }
 }
 
+impl LocalCache {
+    pub fn add_module(m: Module) {
+        LOCAL_CACHE.modules.insert(m);
+    }
+    pub fn remove_module(uri: &ModuleUri) {
+        LOCAL_CACHE.modules.remove(uri);
+    }
+    pub fn add_definition(
+        uri: DocumentElementUri,
+        html: Box<str>,
+        fors: impl Iterator<Item = SymbolUri>,
+    ) {
+        for s in fors {
+            let mut e = LOCAL_CACHE.fors.entry(s).or_default();
+            e.value_mut()
+                .push((uri.clone(), ParagraphOrProblemKind::Definition));
+        }
+        LOCAL_CACHE.paragraphs.insert(uri, html);
+    }
+    pub fn remove_definition(uri: &DocumentElementUri) {
+        for mut e in LOCAL_CACHE.fors.iter_mut() {
+            e.value_mut().retain(|(u, _)| *u != *uri);
+        }
+        LOCAL_CACHE.paragraphs.remove(uri);
+    }
+}
+
 impl<B: SendBackend> WithLocalCache<B> {
-    #[inline]
     pub fn get_fragment(
         &self,
         uri: ftml_uris::Uri,
@@ -134,7 +160,6 @@ impl<B: SendBackend> WithLocalCache<B> {
         }
     }
 
-    #[inline]
     pub fn get_definition(
         &self,
         uri: SymbolUri,
@@ -204,11 +229,14 @@ impl<B: SendBackend> WithLocalCache<B> {
         either::Either::Right(B::get().get_document(uri))
     }
 
+    #[inline]
     pub fn get_toc(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<B::Error>>> + Send + use<B>
-    {
+    ) -> impl Future<
+        Output = Result<(Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<B::Error>>,
+    > + Send
+    + use<B> {
         B::get().get_toc(uri)
     }
 

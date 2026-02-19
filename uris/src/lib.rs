@@ -190,6 +190,25 @@ pub enum UriRef<'u> {
     /// A document element URI identifying a named part in a document (section, paragraph, etc.).
     DocumentElement(&'u DocumentElementUri),
 }
+impl std::fmt::Display for UriRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Base(u) => u.fmt(f),
+            Self::Archive(u) => u.fmt(f),
+            Self::Path(u) => u.fmt(f),
+            Self::Module(u) => u.fmt(f),
+            Self::Symbol(u) => u.fmt(f),
+            Self::Document(u) => u.fmt(f),
+            Self::DocumentElement(u) => u.fmt(f),
+        }
+    }
+}
+impl std::fmt::Debug for UriRef<'_> {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
 impl UriRef<'_> {
     /// convert this reference into an owned [`Uri`]
     #[must_use]

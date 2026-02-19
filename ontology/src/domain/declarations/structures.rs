@@ -1,6 +1,10 @@
-use crate::domain::{
-    HasDeclarations,
-    declarations::{AnyDeclarationRef, IsDeclaration, morphisms::Morphism, symbols::Symbol},
+use crate::{
+    domain::{
+        HasDeclarations,
+        declarations::{AnyDeclarationRef, IsDeclaration, morphisms::Morphism, symbols::Symbol},
+    },
+    terms::Term,
+    utils::SourceRange,
 };
 use ftml_uris::{DomainUriRef, Id, ModuleUri, SymbolUri};
 
@@ -20,6 +24,8 @@ pub struct MathStructure {
     pub elements: Box<[StructureDeclaration]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub macroname: Option<Id>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl crate::__private::Sealed for MathStructure {}
 impl crate::Ftml for MathStructure {
@@ -29,7 +35,33 @@ impl crate::Ftml for MathStructure {
         use ulo::triple;
 
         let iri = self.uri.to_iri();
-        std::iter::once(triple!(<(iri)> : ulo:structure)).chain(self.declares_triples())
+        std::iter::once(triple!(<(iri.clone())> : ulo:structure)).chain(
+            self.declarations().filter_map(move |e| match e {
+                AnyDeclarationRef::Import { uri, .. } => {
+                    Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
+                }
+                AnyDeclarationRef::Extension(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::MathStructure(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Morphism(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::NestedModule(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Symbol(e) => {
+                    Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+                }
+                AnyDeclarationRef::Rule { .. } => None,
+            }),
+        )
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl IsDeclaration for MathStructure {
@@ -75,9 +107,19 @@ impl HasDeclarations for MathStructure {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
 pub enum StructureDeclaration {
-    Import(ModuleUri),
+    Import {
+        uri: ModuleUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
+    },
     Symbol(Symbol),
     Morphism(Morphism),
+    Rule {
+        id: Id,
+        parameters: Box<[Term]>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        source: SourceRange,
+    },
 }
 impl crate::__private::Sealed for StructureDeclaration {}
 impl crate::Ftml for StructureDeclaration {
@@ -88,7 +130,14 @@ impl crate::Ftml for StructureDeclaration {
         match self {
             Self::Symbol(s) => A(s.triples().into_iter()),
             Self::Morphism(m) => B(m.triples().into_iter()),
-            Self::Import(_) => C(std::iter::empty()),
+            Self::Import { .. } | Self::Rule { .. } => C(std::iter::empty()),
+        }
+    }
+    fn source_range(&self) -> SourceRange {
+        match self {
+            Self::Symbol(s) => s.source_range(),
+            Self::Morphism(m) => m.source_range(),
+            Self::Import { source: range, .. } | Self::Rule { source: range, .. } => *range,
         }
     }
 }
@@ -102,15 +151,27 @@ impl IsDeclaration for StructureDeclaration {
         match self {
             Self::Symbol(s) => Some(&s.uri),
             Self::Morphism(m) => Some(&m.uri),
-            Self::Import(_) => None,
+            Self::Import { .. } | Self::Rule { .. } => None,
         }
     }
     #[inline]
     fn as_ref(&self) -> AnyDeclarationRef<'_> {
         match self {
-            Self::Import(u) => AnyDeclarationRef::Import(u),
+            Self::Import { uri, source } => AnyDeclarationRef::Import {
+                uri,
+                source: *source,
+            },
             Self::Symbol(s) => AnyDeclarationRef::Symbol(s),
             Self::Morphism(m) => AnyDeclarationRef::Morphism(m),
+            Self::Rule {
+                id,
+                parameters,
+                source,
+            } => AnyDeclarationRef::Rule {
+                id,
+                parameters,
+                source: *source,
+            },
         }
     }
 }
@@ -130,6 +191,8 @@ pub struct StructureExtension {
     pub uri: SymbolUri,
     pub target: SymbolUri,
     pub elements: Box<[StructureDeclaration]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl crate::__private::Sealed for StructureExtension {}
 impl crate::Ftml for StructureExtension {
@@ -151,6 +214,10 @@ impl crate::Ftml for StructureExtension {
                 triple!(<(iri.clone())> : ulo:structure),
                 triple!(<(iri)> ulo:extends <(target)>),
             ])
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl IsDeclaration for StructureExtension {
@@ -189,7 +256,14 @@ impl deepsize::DeepSizeOf for StructureDeclaration {
         match self {
             Self::Symbol(s) => s.deep_size_of_children(context),
             Self::Morphism(m) => m.deep_size_of_children(context),
-            Self::Import(_) => 0,
+            Self::Import { .. } => 0,
+            Self::Rule { parameters, .. } => {
+                parameters.len() * std::mem::size_of::<Term>()
+                    + parameters
+                        .iter()
+                        .map(|t| t.deep_size_of_children(context))
+                        .sum::<usize>()
+            }
         }
     }
 }

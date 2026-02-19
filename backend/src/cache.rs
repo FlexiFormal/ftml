@@ -4,7 +4,7 @@ use ftml_ontology::{
     domain::modules::{Module, ModuleLike},
     narrative::{
         documents::{Document, TocElem},
-        elements::Notation,
+        elements::{Notation, SectionLevel},
     },
     utils::Css,
 };
@@ -66,7 +66,8 @@ where
         Cache<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
     modules_cache: Cache<ModuleUri, Module, BackendError<B::Error>>,
     documents_cache: Cache<DocumentUri, Document, BackendError<B::Error>>,
-    toc_cache: Cache<DocumentUri, (Box<[Css]>, Box<[TocElem]>), BackendError<B::Error>>,
+    toc_cache:
+        Cache<DocumentUri, (Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<B::Error>>,
 }
 
 impl<B: FtmlBackend> CachedBackend<B>
@@ -107,6 +108,19 @@ where
     B::Error: Clone + Send + Sync + std::fmt::Debug,
 {
     type Error = CacheError<B::Error>;
+
+    #[inline]
+    fn check_term(
+        &self,
+        global_context: &[ModuleUri],
+        term: &ftml_ontology::terms::Term,
+        in_path: &ftml_ontology::terms::termpaths::TermPath,
+    ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>> + Send + use<B>
+    {
+        self.inner
+            .check_term(global_context, term, in_path)
+            .map_err(|e| BackendError::ToDo(e.to_string()))
+    }
 
     #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
@@ -160,8 +174,9 @@ where
     fn get_toc(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<(Box<[Css]>, Box<[TocElem]>), BackendError<Self::Error>>> + Send
-    {
+    ) -> impl Future<
+        Output = Result<(Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<Self::Error>>,
+    > + Send {
         self.toc_cache
             .get(uri, |uri| self.inner.get_toc(uri))
             .map_err(Into::into)

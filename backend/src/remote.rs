@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 
-use ftml_ontology::utils::Css;
+use ftml_ontology::{narrative::elements::SectionLevel, utils::Css};
 use ftml_uris::{DocumentUri, FtmlUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri};
 
 use crate::BackendError;
@@ -48,6 +48,7 @@ pub struct RemoteBackend<
     Url: std::fmt::Display = &'static str,
     Re: Redirects = NoRedirects,
 > {
+    pub check_url: Url,
     pub fragment_url: Url,
     pub document_html_url: Url,
     pub solutions_url: Url,
@@ -90,9 +91,11 @@ where
         modules_url: Url,
         documents_url: Url,
         toc_url: Url,
+        check_url: Url,
         redirects: Re,
     ) -> Self {
         Self {
+            check_url,
             fragment_url,
             document_html_url,
             notations_url,
@@ -122,8 +125,10 @@ where
         modules_url: Url,
         documents_url: Url,
         toc_url: Url,
+        check_url: Url,
     ) -> Self {
         Self {
+            check_url,
             fragment_url,
             document_html_url,
             notations_url,
@@ -167,10 +172,42 @@ where
 impl<Url, E, Re: Redirects> super::FtmlBackend for RemoteBackend<E, Url, Re>
 where
     Url: std::fmt::Display,
-    E: std::fmt::Display + std::fmt::Debug + From<RequestError> + std::str::FromStr,
+    E: std::fmt::Display + std::fmt::Debug + From<RequestError> + std::str::FromStr + Send,
     E::Err: Into<BackendError<E>>,
 {
     type Error = E;
+
+    fn check_term(
+        &self,
+        global_context: &[ModuleUri],
+        term: &ftml_ontology::terms::Term,
+        in_path: &ftml_ontology::terms::termpaths::TermPath,
+    ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>>
+    + Send
+    + use<Url, E, Re> {
+        fn body(
+            global_context: &[ModuleUri],
+            term: &ftml_ontology::terms::Term,
+            in_path: &ftml_ontology::terms::termpaths::TermPath,
+        ) -> Result<String, serde_json::Error> {
+            Ok(format!(
+                "{{\"global_context\":{},\"term\":{},\"in_path\":{}}}",
+                serde_json::to_string(global_context)?,
+                serde_json::to_string(term)?,
+                serde_json::to_string(in_path)?
+            ))
+        }
+        let url = self.check_url.to_string();
+        let body = match body(global_context, term, in_path) {
+            Ok(body) => body,
+            Err(e) => {
+                return futures_util::future::Either::Right(std::future::ready(Err(
+                    BackendError::ToDo(e.to_string()),
+                )));
+            }
+        };
+        futures_util::future::Either::Left(post(url, body))
+    }
 
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         self.redirects.for_documents(uri).map_or_else(
@@ -223,6 +260,7 @@ where
         Output = Result<
             (
                 Box<[Css]>,
+                SectionLevel,
                 Box<[ftml_ontology::narrative::documents::TocElem]>,
             ),
             BackendError<Self::Error>,
@@ -351,9 +389,12 @@ mod server_fn {
         BackendError, FlamsBackend, ParagraphOrProblemKind, Redirects, RemoteFlamsBackend,
     };
     use ::server_fn::error::ServerFnErrorErr;
-    use ftml_ontology::{narrative::elements::problems::Solutions, utils::Css};
+    use ftml_ontology::{
+        narrative::elements::{SectionLevel, problems::Solutions},
+        utils::Css,
+    };
     use ftml_uris::{
-        DocumentElementUri, DocumentUri, FtmlUri, LeafUri, NarrativeUri, Uri,
+        DocumentElementUri, DocumentUri, FtmlUri, LeafUri, ModuleUri, NarrativeUri, Uri,
         components::UriComponentTuple,
     };
     use futures_util::TryFutureExt;
@@ -375,6 +416,41 @@ mod server_fn {
                 self.url,
                 uri.url_encoded()
             ))
+        }
+
+        fn check_term(
+            &self,
+            global_context: &[ftml_uris::ModuleUri],
+            term: &ftml_ontology::terms::Term,
+            in_path: &ftml_ontology::terms::termpaths::TermPath,
+        ) -> impl Future<
+            Output = Result<crate::BackendCheckResult, BackendError<ServerFnErrorErr>>,
+        > + Send
+        + use<Url, Re> {
+            fn body(
+                global_context: &[ModuleUri],
+                term: &ftml_ontology::terms::Term,
+                in_path: &ftml_ontology::terms::termpaths::TermPath,
+            ) -> Result<String, serde_json::Error> {
+                Ok(format!(
+                    "{{\"global_context\":{},\"term\":{},\"in_path\":{}}}",
+                    serde_json::to_string(global_context)?,
+                    serde_json::to_string(term)?,
+                    serde_json::to_string(in_path)?
+                ))
+            }
+            let url = format!("{}/content/check_term", self.url);
+            let body = match body(global_context, term, in_path) {
+                Ok(body) => body,
+                Err(e) => {
+                    return futures_util::future::Either::Right(std::future::ready(Err(
+                        BackendError::ToDo(e.to_string()),
+                    )));
+                }
+            };
+            futures_util::future::Either::Left(
+                super::post::<_, SFnE>(url, body).map_err(BackendError::from_other),
+            )
         }
 
         ftml_uris::compfun! {!!
@@ -499,6 +575,7 @@ mod server_fn {
             Output = Result<
                 (
                     Box<[Css]>,
+                    SectionLevel,
                     Box<[ftml_ontology::narrative::documents::TocElem]>,
                 ),
                 BackendError<server_fn::error::ServerFnErrorErr>,
@@ -830,6 +907,33 @@ impl JsWrap for ::reqwest::Response {
 }
 
 #[cfg(all(feature = "wasm", feature = "serde-lite"))]
+fn post<R, E>(url: String, body: String) -> impl Future<Output = Result<R, BackendError<E>>>
+where
+    R: serde_lite::Deserialize,
+    E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    let fut = async move {
+        let res = reqwasm::http::Request::post(&url)
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+        let status = res.status();
+        if (400..=599).contains(&status) {
+            let str = res
+                .text()
+                .await
+                .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+            return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
+        }
+
+        res.get().await
+    };
+    crate::utils::FutWrap::new(fut)
+}
+
+#[cfg(all(feature = "wasm", feature = "serde-lite"))]
 fn call<R, E>(url: String) -> impl Future<Output = Result<R, BackendError<E>>>
 where
     R: serde_lite::Deserialize,
@@ -897,6 +1001,33 @@ where
     crate::utils::FutWrap::new(call_i(url))
 }
 
+#[cfg(all(feature = "wasm", not(feature = "serde-lite")))]
+fn post<R, E>(url: String, body: String) -> impl Future<Output = Result<R, BackendError<E>>>
+where
+    R: serde::de::DeserializeOwned,
+    E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    let fut = async move {
+        let res = reqwasm::http::Request::post(&url)
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+        let status = res.status();
+        if (400..=599).contains(&status) {
+            let str = res
+                .text()
+                .await
+                .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+            return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
+        }
+
+        res.get().await
+    };
+    crate::utils::FutWrap::new(fut)
+}
+
 #[cfg(all(not(feature = "serde-lite"), not(feature = "wasm")))]
 async fn call<R, E>(url: String) -> Result<R, BackendError<E>>
 where
@@ -920,6 +1051,32 @@ where
     res.get().await
 }
 
+#[cfg(all(not(feature = "wasm"), not(feature = "serde-lite")))]
+async fn post<R, E>(url: String, body: String) -> Result<R, BackendError<E>>
+where
+    R: serde::de::DeserializeOwned,
+    E: From<RequestError> + std::fmt::Debug + std::fmt::Display + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    let res = ::reqwest::Client::new()
+        .post(&url)
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+
+    let status = res.status().as_u16();
+    if (400..=599).contains(&status) {
+        let str = res
+            .text()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+        return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
+    }
+
+    res.get().await
+}
+
 #[cfg(all(feature = "serde-lite", not(feature = "wasm")))]
 async fn call<R, E>(url: String) -> Result<R, BackendError<E>>
 where
@@ -928,6 +1085,32 @@ where
     E::Err: Into<BackendError<E>>,
 {
     let res = ::reqwest::get(&url)
+        .await
+        .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+
+    let status = res.status().as_u16();
+    if (400..=599).contains(&status) {
+        let str = res
+            .text()
+            .await
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?;
+        return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
+    }
+
+    res.get().await
+}
+
+#[cfg(all(not(feature = "wasm"), feature = "serde-lite"))]
+async fn post<R, E>(url: String, body: String) -> Result<R, BackendError<E>>
+where
+    R: serde_lite::Deserialize,
+    E: From<RequestError> + std::fmt::Debug + std::fmt::Display + std::str::FromStr,
+    E::Err: Into<BackendError<E>>,
+{
+    let res = ::reqwest::Client::new()
+        .post(&url)
+        .body(body)
+        .send()
         .await
         .map_err(|e| BackendError::Connection(E::from(e.into())))?;
 

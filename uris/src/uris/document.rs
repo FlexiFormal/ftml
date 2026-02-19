@@ -74,6 +74,12 @@ impl std::fmt::Display for SimpleUriName {
         self.0.fmt(f)
     }
 }
+impl From<SimpleUriName> for UriName {
+    #[inline]
+    fn from(value: SimpleUriName) -> Self {
+        value.0
+    }
+}
 
 /// A URI that identifies a specific document within an FTML archive.
 ///
@@ -173,6 +179,11 @@ impl DocumentUri {
         let (path, mut name) = rel_path.rsplit_once('/').unwrap_or(("", rel_path));
         name = name.rsplit_once('.').map_or_else(|| name, |(name, _)| name);
         let lang = Language::from_rel_path(name);
+        let path = if a == *ArchiveUri::no_archive() && path.starts_with('/') {
+            path[1..].trim()
+        } else {
+            path.trim()
+        };
         let path: Option<UriPath> = if path.is_empty() {
             None
         } else {

@@ -7,7 +7,7 @@ use crate::{
         modules::ModuleLike,
     },
     terms::Term,
-    utils::TreeIter,
+    utils::SourceRange,
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -28,6 +28,8 @@ pub struct Morphism {
     pub elements: Box<[Assignment]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(skip))]
     pub elaboration: Elaboration,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 
 impl crate::__private::Sealed for Morphism {}
@@ -40,10 +42,34 @@ impl crate::Ftml for Morphism {
         let iri = self.uri.to_iri();
         [
             triple!(<(iri.clone())> : ulo:morphism),
-            triple!(<(iri)> rdfs:DOMAIN <(self.domain.to_iri())>),
+            triple!(<(iri.clone())> rdfs:DOMAIN <(self.domain.to_iri())>),
         ]
         .into_iter()
-        .chain(self.declares_triples())
+        .chain(self.declarations().filter_map(move |e| match e {
+            AnyDeclarationRef::Import { uri, .. } => {
+                Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
+            }
+            AnyDeclarationRef::Extension(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::MathStructure(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::Morphism(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::NestedModule(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::Symbol(e) => {
+                Some(triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>))
+            }
+            AnyDeclarationRef::Rule { .. } => None,
+        }))
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.source
     }
 }
 impl IsDeclaration for Morphism {
@@ -109,6 +135,8 @@ pub struct Assignment {
     pub new_name: Option<SimpleUriName>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub macroname: Option<Id>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl Assignment {
     #[must_use]

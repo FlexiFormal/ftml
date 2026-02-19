@@ -15,7 +15,7 @@ use ftml_dom::{
     terms::ReactiveApplication,
     utils::local_cache::SendBackend,
 };
-use ftml_ontology::narrative::elements::SectionLevel;
+use ftml_ontology::{narrative::elements::SectionLevel, terms::Term};
 use ftml_uris::{DocumentElementUri, Id};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
@@ -191,7 +191,7 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> AnyView {
-        terms::oma::<B>(false, head, then)
+        terms::oma::<Self, B>(false, head, then)
     }
 
     #[inline]
@@ -201,6 +201,6 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
         _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> AnyView {
-        terms::oma::<B>(true, head, then)
+        terms::oma::<Self, B>(true, head, then)
     }
 }

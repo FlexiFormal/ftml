@@ -20,7 +20,10 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{Argument, ArgumentMode, BoundArgument, MaybeSequence, Term, VarOrSym, Variable},
+    terms::{
+        Argument, ArgumentMode, BoundArgument, ComponentVar, MaybeSequence, Term, VarOrSym,
+        Variable,
+    },
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SimpleUriName, SymbolUri, UriName,
@@ -79,6 +82,7 @@ pub enum CloseFtmlElement {
     ProblemChoiceFeedback,
     ArgTypes,
     FillinSolCase,
+    Rule,
 }
 
 #[derive(Debug, Clone)]
@@ -130,6 +134,10 @@ pub enum OpenDomainElement<N: FtmlNode> {
         name: UriName,
         tp: Option<Term>,
         df: Option<Term>,
+    },
+    InferenceRule {
+        rule: Id,
+        parameters: Vec<Term>,
     },
     ComplexTerm {
         head: VarOrSym,
@@ -295,6 +303,7 @@ pub enum MetaDatum {
         macroname: Option<Id>,
     },
     DocumentKind(DocumentKind),
+    DocumentUri(DocumentUri),
     Precondition(SymbolUri, CognitiveDimension),
     Objective(SymbolUri, CognitiveDimension),
     AnswerClassFeedback,
@@ -421,12 +430,55 @@ impl OpenBoundArgument {
             Self::Simple {
                 term: Term::Var { variable: v, .. },
                 should_be_var: true,
-            } => Some(BoundArgument::Bound(v)),
+            } => Some(BoundArgument::Bound(ComponentVar {
+                var: v,
+                tp: None,
+                df: None,
+            })),
             Self::Simple { term, .. } => Some(BoundArgument::Simple(term)),
             Self::Sequence {
                 terms: Left(Term::Var { variable: v, .. }),
                 should_be_var: true,
-            } => Some(BoundArgument::BoundSeq(MaybeSequence::One(v))),
+            } => Some(BoundArgument::BoundSeq(MaybeSequence::One(ComponentVar {
+                var: v,
+                tp: None,
+                df: None,
+            }))),
+            Self::Sequence {
+                terms: Right(mut v),
+                should_be_var,
+            } if matches!(
+                &*v,
+                [Some(Term::Var {
+                    variable: Variable::Ref {
+                        is_sequence: Some(true),
+                        ..
+                    },
+                    ..
+                })]
+            ) =>
+            {
+                let Some(Some(Term::Var {
+                    variable,
+                    presentation,
+                })) = v.pop()
+                else {
+                    // SAFETY: we just pattern matched
+                    unsafe { unreachable_unchecked() }
+                };
+                if should_be_var {
+                    Some(BoundArgument::BoundSeq(MaybeSequence::One(ComponentVar {
+                        var: variable,
+                        tp: None,
+                        df: None,
+                    })))
+                } else {
+                    Some(BoundArgument::Sequence(MaybeSequence::One(Term::Var {
+                        variable,
+                        presentation,
+                    })))
+                }
+            }
             Self::Sequence {
                 terms: Right(v),
                 should_be_var: true,
@@ -438,7 +490,11 @@ impl OpenBoundArgument {
                                 // SAFETY: iter.all() matches above
                                 unsafe { unreachable_unchecked() }
                             };
-                            variable
+                            ComponentVar {
+                                var: variable,
+                                tp: None,
+                                df: None,
+                            }
                         })
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
@@ -621,6 +677,7 @@ impl OpenFtmlElement {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn split<N: FtmlNode>(self, node: &N) -> AnyOpen<N> {
         match self {
+            Self::DocumentUri(uri) => AnyOpen::Meta(MetaDatum::DocumentUri(uri)),
             Self::Module {
                 uri,
                 meta,
@@ -696,6 +753,13 @@ impl OpenFtmlElement {
             },
             Self::VariableReference { var, notation } => AnyOpen::Open {
                 domain: Some(OpenDomainElement::VariableReference { var, notation }),
+                narrative: None,
+            },
+            Self::Rule(id) => AnyOpen::Open {
+                domain: Some(OpenDomainElement::InferenceRule {
+                    rule: id,
+                    parameters: Vec::new(),
+                }),
                 narrative: None,
             },
             Self::OMA {

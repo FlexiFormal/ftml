@@ -4,7 +4,8 @@ use std::str::FromStr;
 
 use crate::{
     domain::declarations::{AnyDeclarationRef, IsDeclaration},
-    terms::{ArgumentMode, Term},
+    terms::{ArgumentMode, Term, TermContainer},
+    utils::{Permutation, SourceRange},
 };
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -23,7 +24,7 @@ pub struct Symbol {
     pub data: Box<SymbolData>,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
@@ -38,11 +39,12 @@ pub struct SymbolData {
     pub arity: ArgumentSpec,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub macroname: Option<Id>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub role: Box<[Id]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
-    pub tp: Option<Term>,
+    pub tp: TermContainer,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
-    pub df: Option<Term>,
+    pub df: TermContainer,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub return_type: Option<Term>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
@@ -50,7 +52,9 @@ pub struct SymbolData {
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub assoctype: Option<AssocType>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
-    pub reordering: Option<Id>,
+    pub reordering: Option<Permutation>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 
 impl crate::__private::Sealed for Symbol {}
@@ -58,6 +62,7 @@ impl crate::Ftml for Symbol {
     #[cfg(feature = "rdf")]
     #[allow(clippy::enum_glob_use)]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use crate::terms::IsTerm;
         use either_of::EitherOf6::*;
         use ftml_uris::FtmlUri;
         use rustc_hash::FxHashSet;
@@ -70,7 +75,7 @@ impl crate::Ftml for Symbol {
                     .map(move |s| triple!(<(iri2.clone())> dc:hasPart <(s.to_iri())>))
             }};
         }
-        match (&self.data.tp, &self.data.df) {
+        match (self.data.tp.get_parsed(), self.data.df.get_parsed()) {
             (Some(Term::Symbol { uri: tp, .. }), Some(df)) => A(syms!(df).chain([
                 triple!(<(iri.clone())> : ulo:declaration),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
@@ -91,6 +96,10 @@ impl crate::Ftml for Symbol {
             }
             (None, None) => F(std::iter::once(triple!(<(iri)> : ulo:declaration))),
         }
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.data.source
     }
 }
 impl IsDeclaration for Symbol {
@@ -289,16 +298,8 @@ impl FromStr for ArgumentSpec {
 impl deepsize::DeepSizeOf for SymbolData {
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
         (self.role.len() * std::mem::size_of::<Id>())
-            + self
-                .tp
-                .as_ref()
-                .map(|t| t.deep_size_of_children(context))
-                .unwrap_or_default()
-            + self
-                .df
-                .as_ref()
-                .map(|t| t.deep_size_of_children(context))
-                .unwrap_or_default()
+            + self.tp.deep_size_of_children(context)
+            + self.df.deep_size_of_children(context)
             + self
                 .return_type
                 .as_ref()

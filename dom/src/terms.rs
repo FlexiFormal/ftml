@@ -1,6 +1,7 @@
+use crate::extractor::DomExtractor;
 use crate::{ClonableView, FtmlViews};
-use ftml_ontology::terms::VarOrSym;
-use ftml_parser::extraction::ArgumentPosition;
+use ftml_ontology::terms::{Term, VarOrSym};
+use ftml_parser::extraction::{ArgumentPosition, FtmlExtractor};
 use ftml_uris::DocumentElementUri;
 use leptos::either::Either::{self, Left, Right};
 use leptos::prelude::*;
@@ -22,12 +23,16 @@ pub struct OpenApp {
     pub head: VarOrSym,
     //owner: Owner,
     pub(crate) arguments: Vec<Option<Either<ClonableView, Vec<Option<ClonableView>>>>>,
+    term_write: WriteSignal<Option<Term>>,
+    term: ReadSignal<Option<Term>>,
 }
 
 pub struct ClosedApp {
     pub head: VarOrSym,
     //owner: Owner,
     pub arguments: Vec<Either<ClonableView, Vec<ClonableView>>>,
+    term_write: WriteSignal<Option<Term>>,
+    term: ReadSignal<Option<Term>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,6 +64,12 @@ impl ReactiveApplication {
             Self::Closed(a) => &a.head,
         }
     }
+    pub const fn term(&self) -> ReadSignal<Option<Term>> {
+        match self {
+            Self::Open(a) => a.term,
+            Self::Closed(a) => a.term,
+        }
+    }
 
     pub const fn is_empty(&self) -> bool {
         self.len() == 0
@@ -69,7 +80,7 @@ impl ReactiveApplication {
             Self::Closed(a) => a.arguments.len(),
         }
     }
-    pub(crate) fn close() {
+    pub(crate) fn close(parsed_term: Option<Term>) {
         tracing::trace!(
             "Closing",
             //expect_context::<crate::OwnerId>().0
@@ -84,10 +95,17 @@ impl ReactiveApplication {
                 head,
                 //owner,
                 arguments,
+                term,
+                term_write,
             }) => {
                 let head = head.clone();
                 let arguments = std::mem::take(arguments);
                 tracing::trace!("Closing {head:?} as {:?}", arguments);
+                /*leptos::logging::log!(
+                    "Closing {head:?} as {arguments:?}: {:?}",
+                    parsed_term.as_ref().map(|t| t.debug_short())
+                );*/
+                term_write.set(parsed_term);
                 *app = Self::Closed(ClosedApp {
                     head,
                     //owner: owner.clone(),
@@ -97,6 +115,8 @@ impl ReactiveApplication {
                             e.map(|o| o.map_right(|r| r.into_iter().flatten().collect()))
                         })
                         .collect(),
+                    term: *term,
+                    term_write: *term_write,
                 });
             }
             Self::Closed(_) => {
@@ -113,10 +133,13 @@ impl ReactiveApplication {
         children: impl FnOnce(ReadSignal<Self>) -> AnyView,
     ) -> AnyView {
         tracing::debug!("Tracking {head:?}");
+        let (term, term_write) = signal(None);
         let sig = RwSignal::new(Self::Open(OpenApp {
             //owner: Owner::current().expect("not in a reactive context"),
             head,
             arguments: Vec::new(),
+            term,
+            term_write,
         }));
         if let Some(uri) = uri {
             provide_context(Some(TopTerm { uri }));

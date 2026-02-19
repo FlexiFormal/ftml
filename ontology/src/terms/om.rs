@@ -91,7 +91,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
             None => self.head.as_openmath(serializer), //self.bd.as_openmath(serializer),
             Some(BoundArgument::Bound(a)) => serializer.ombind(
                 &self.head,
-                std::iter::once(a),
+                std::iter::once(&a.var),
                 &Self {
                     head: self.head,
                     args: &self.args[1..],
@@ -100,7 +100,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
             ),
             Some(BoundArgument::BoundSeq(MaybeSequence::One(v))) => serializer.ombind(
                 &self.head,
-                std::iter::once(Var(v)),
+                std::iter::once(Var(&v.var)),
                 &Self {
                     head: self.head,
                     args: &self.args[1..],
@@ -109,7 +109,7 @@ impl<H: OMSerializable> openmath::ser::OMSerializable for Args<'_, H> {
             ),
             Some(BoundArgument::BoundSeq(MaybeSequence::Seq(s))) => serializer.ombind(
                 &self.head,
-                s.iter(),
+                s.iter().map(|v| &v.var),
                 &Self {
                     head: self.head,
                     args: &self.args[1..],

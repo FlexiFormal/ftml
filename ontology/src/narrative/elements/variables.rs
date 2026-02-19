@@ -6,7 +6,8 @@ use crate::{
         Narrative,
         elements::{DocumentElementRef, IsDocumentElement},
     },
-    terms::Term,
+    terms::{Term, TermContainer},
+    utils::{Permutation, SourceRange},
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -38,23 +39,34 @@ impl crate::__private::Sealed for VariableDeclaration {}
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct VariableData {
     pub arity: ArgumentSpec,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub macroname: Option<Id>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub role: Box<[Id]>,
-    pub tp: Option<Term>,
-    pub df: Option<Term>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub tp: TermContainer,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub df: TermContainer,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub bind: bool,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub assoctype: Option<AssocType>,
-    pub reordering: Option<Id>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub reordering: Option<Permutation>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub argument_types: Box<[Term]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub return_type: Option<Term>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub is_seq: bool,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub source: SourceRange,
 }
 impl crate::Ftml for VariableDeclaration {
     #[cfg(feature = "rdf")]
     #[allow(clippy::enum_glob_use)]
     fn triples(&self) -> impl IntoIterator<Item = ulo::rdf_types::Triple> {
+        use crate::terms::IsTerm;
         use either_of::EitherOf6::*;
         use ftml_uris::FtmlUri;
         use rustc_hash::FxHashSet;
@@ -67,7 +79,7 @@ impl crate::Ftml for VariableDeclaration {
                     .map(move |s| triple!(<(iri2.clone())> dc:hasPart <(s.to_iri())>))
             }};
         }
-        match (&self.data.tp, &self.data.df) {
+        match (self.data.tp.get_parsed(), self.data.df.get_parsed()) {
             (Some(Term::Symbol { uri: tp, .. }), Some(df)) => A(syms!(df).chain([
                 triple!(<(iri.clone())> : ulo:variable),
                 triple!(<(iri)> ulo:has_type  <(tp.to_iri())>),
@@ -84,6 +96,10 @@ impl crate::Ftml for VariableDeclaration {
             (_, Some(df)) => E(syms!(df).chain(std::iter::once(triple!(<(iri)> : ulo:variable)))),
             (None, None) => F(std::iter::once(triple!(<(iri)> : ulo:variable))),
         }
+    }
+    #[inline]
+    fn source_range(&self) -> SourceRange {
+        self.data.source
     }
 }
 impl Narrative for VariableDeclaration {
@@ -123,16 +139,8 @@ impl IsDocumentElement for VariableDeclaration {
 impl deepsize::DeepSizeOf for VariableData {
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
         (self.role.len() * std::mem::size_of::<Id>())
-            + self
-                .tp
-                .as_ref()
-                .map(|t| t.deep_size_of_children(context))
-                .unwrap_or_default()
-            + self
-                .df
-                .as_ref()
-                .map(|t| t.deep_size_of_children(context))
-                .unwrap_or_default()
+            + self.tp.deep_size_of_children(context)
+            + self.df.deep_size_of_children(context)
     }
 }
 

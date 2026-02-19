@@ -5,7 +5,7 @@ use ftml_dom::{
     terms::ReactiveApplication,
     utils::local_cache::{GlobalLocal, LocalCache, SendBackend},
 };
-use ftml_ontology::narrative::elements::Notation;
+use ftml_ontology::{narrative::elements::Notation, terms::Term};
 use ftml_uris::{DocumentElementUri, LeafUri};
 use leptos::prelude::*;
 
@@ -31,7 +31,10 @@ pub fn has_notation<B: SendBackend>(
                             .as_ref()
                             .map(|v| v.with_untracked(ReactiveApplication::len))
                     );
+                    let term = arguments
+                        .and_then(|s| s.with_untracked(ReactiveApplication::term).get_untracked());
                     Right(with_notation::<B>(
+                        term,
                         uri.clone(),
                         notation,
                         arguments,
@@ -48,6 +51,7 @@ pub fn has_notation<B: SendBackend>(
 
 #[must_use]
 pub fn with_notation<B: SendBackend>(
+    term: Option<Term>,
     head: LeafUri,
     notation: DocumentElementUri,
     arguments: Option<ReadSignal<ReactiveApplication>>,
@@ -68,7 +72,7 @@ pub fn with_notation<B: SendBackend>(
                             Vec::new()
                         }
                     });
-                    n.with_arguments::<crate::Views<B>, _>(&head.into(), None, &args)
+                    n.with_arguments::<crate::Views<B>, _>(term, &head.into(), None, &args)
                 }
             }
             .attr("style", "border: 1px dotted red;")

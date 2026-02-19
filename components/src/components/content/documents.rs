@@ -25,8 +25,8 @@ use thaw::{Caption1Strong, Flex, Text};
 impl super::FtmlViewable for Document {
     fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
         let uses = self.elements.iter().flat().filter_map(|e| {
-            if let DocumentElement::UseModule(u) = e {
-                Some(u)
+            if let DocumentElement::UseModule { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }
@@ -97,7 +97,7 @@ impl super::FtmlViewable for DocumentElement {
     fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
         //use leptos::either::EitherOf10::{A, B, C, D, E, F, G, H, I, J};
         match self {
-            Self::UseModule(_)
+            Self::UseModule { .. }
             | Self::ImportModule(_)
             | Self::SymbolReference { .. }
             | Self::VariableReference { .. }
@@ -186,7 +186,7 @@ impl super::FtmlViewable for DocumentElement {
                 children,
                 ..
             }) => paragraphs::slide::<Be>(uri, title.as_deref(), children).into_any(),
-            Self::Term(DocumentTerm { uri, term }) => view_term::<Be>(uri, term.clone()).into_any(),
+            Self::Term(term) => view_term::<Be>(term).into_any(),
             Self::Problem(p) => {
                 let txt = format!("{p:?}");
                 view!(<div><Text tag=thaw::TextTag::Code>"TODO: "{txt}</Text></div>).into_any()
@@ -219,8 +219,8 @@ impl super::FtmlViewable for Problem {
             |t| Left(crate::Views::<Be>::render_ftml(t.to_string(), None)),
         );
         let uses = children.iter().flat().filter_map(|e| {
-            if let DocumentElement::UseModule(u) = e {
-                Some(u)
+            if let DocumentElement::UseModule { uri, .. } = e {
+                Some(uri)
             } else {
                 None
             }
@@ -257,12 +257,12 @@ impl super::FtmlViewable for Problem {
     }
 }
 
-fn view_term<Be: ftml_dom::utils::local_cache::SendBackend>(
-    uri: &DocumentElementUri,
-    term: Term,
-) -> AnyView {
-    let name = view!(<span title=uri.to_string()>{uri.name().last().to_string()}</span>);
-    let tm = ReactiveStore::render_term::<Be>(term);
+fn view_term<Be: ftml_dom::utils::local_cache::SendBackend>(term: &DocumentTerm) -> AnyView {
+    let name = view!(<span title=term.uri.to_string()>{term.uri.name().last().to_string()}</span>);
+    let tm = ReactiveStore::render_term::<Be>(term.presentation());
+    let tp = term
+        .get_type()
+        .map(|t| view! {<span>" of type "{ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(t))}</span>});
 
     view! {//<Block>
         <Flex>
@@ -270,6 +270,7 @@ fn view_term<Be: ftml_dom::utils::local_cache::SendBackend>(
                 <Caption1Strong>"Term "{name}</Caption1Strong>
             </div>
             <span>{ftml_dom::utils::math(|| tm)}</span>
+            {tp}
         </Flex>
         //</Block>
     }

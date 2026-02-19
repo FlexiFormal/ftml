@@ -55,6 +55,9 @@ tower-http = { version = "0.6", features = ["fs", "cors"], optional = true }
 
 thaw = { git = "https://github.com/thaw-ui/thaw" }
 
+[profile.dev]
+opt-level = 2
+split-debuginfo = "off"
 
 # Defines a size-optimized profile for the WASM bundle in release mode
 [profile.wasm-release]
