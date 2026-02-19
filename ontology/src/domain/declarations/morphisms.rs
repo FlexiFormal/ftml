@@ -3,10 +3,13 @@ use ftml_uris::{DomainUriRef, Id, ModuleUri, SimpleUriName, SymbolUri};
 use crate::{
     domain::{
         HasDeclarations,
-        declarations::{AnyDeclarationRef, Declaration, IsDeclaration, symbols::Symbol},
+        declarations::{
+            AnyDeclarationRef, Declaration, IsDeclaration,
+            symbols::{Symbol, SymbolData},
+        },
         modules::ModuleLike,
     },
-    terms::Term,
+    terms::{ApplicationTerm, Argument, Term, TermContainer},
     utils::SourceRange,
 };
 
@@ -140,14 +143,14 @@ pub struct Assignment {
 }
 impl Assignment {
     #[must_use]
+    pub fn default_uri(morphism: &SymbolUri, original: &SymbolUri) -> SymbolUri {
+        // SAFETY: segment already validated
+        unsafe { morphism.clone() / &original.name.last().parse().unwrap_unchecked() }
+    }
+    #[must_use]
     pub fn elaborated_uri(&self) -> SymbolUri {
         self.new_name.as_ref().map_or_else(
-            || {
-                // SAFETY: segment already validated
-                unsafe {
-                    self.morphism.clone() / &self.original.name.last().parse().unwrap_unchecked()
-                }
-            },
+            || Self::default_uri(&self.morphism, &self.original),
             |name| self.morphism.module.clone() | name.clone(),
         )
     }
@@ -209,26 +212,90 @@ impl Elaboration {
     }
 
     fn initialize_i<E: std::fmt::Display>(
-        m: &Morphism,
-        mut get: impl FnMut(&ModuleUri) -> Result<ModuleLike, E>,
+        morphism: &Morphism,
+        mut get_module: impl FnMut(&ModuleUri) -> Result<ModuleLike, E>,
     ) -> Result<Vec<Declaration>, E> {
-        let full_domain = Self::collect_deps(m.domain.clone(), &mut get)?;
-        let mut ret = Vec::new();
-        let mut assigns = m.elements.iter().collect::<Vec<_>>();
+        fn initialize_ii<'l>(
+            morphism: &Morphism,
+            full_domain: impl Iterator<Item = &'l ModuleLike>,
+        ) -> Vec<Declaration> {
+            let mut ret = Vec::new();
 
-        for d in full_domain.iter().flat_map(ModuleLike::declarations) {
-            match d {
-                AnyDeclarationRef::Import(_) => (),
-                AnyDeclarationRef::Morphism(_) => todo!("???"),
-                AnyDeclarationRef::MathStructure(_) => todo!("???"),
-                AnyDeclarationRef::Extension(_) => todo!("???"),
-                AnyDeclarationRef::NestedModule(_) => todo!("???"),
-                AnyDeclarationRef::Symbol(s) => {
-                    // Do something
+            for d in full_domain.flat_map(ModuleLike::declarations) {
+                match d {
+                    AnyDeclarationRef::Import { .. } | AnyDeclarationRef::Rule { .. } => (),
+                    AnyDeclarationRef::Symbol(symbol) => {
+                        let assignment = morphism
+                            .elements
+                            .iter()
+                            .find(|ass| ass.original == symbol.uri);
+                        let uri = assignment.map_or_else(
+                            || Assignment::default_uri(&morphism.uri, &symbol.uri),
+                            Assignment::elaborated_uri,
+                        );
+                        let new_data = SymbolData {
+                            arity: symbol.data.arity.clone(),
+                            macroname: assignment.and_then(|ass| ass.macroname.clone()),
+                            role: symbol.data.role.clone(),
+                            // vvv this is wrong
+                            tp: symbol
+                                .data
+                                .tp
+                                .checked_or_parsed()
+                                .map(|(t, _)| {
+                                    TermContainer::new(
+                                        Term::Application(ApplicationTerm::new(
+                                            Term::Symbol {
+                                                uri: morphism.uri.clone(),
+                                                presentation: None,
+                                            },
+                                            Box::new([Argument::Simple(t)]),
+                                            None,
+                                        )),
+                                        assignment.map(|ass| ass.source),
+                                    )
+                                })
+                                .unwrap_or_default(),
+                            // vvv this is wrong
+                            df: symbol
+                                .data
+                                .df
+                                .checked_or_parsed()
+                                .map(|(t, _)| {
+                                    TermContainer::new(
+                                        Term::Application(ApplicationTerm::new(
+                                            Term::Symbol {
+                                                uri: morphism.uri.clone(),
+                                                presentation: None,
+                                            },
+                                            Box::new([Argument::Simple(t)]),
+                                            None,
+                                        )),
+                                        assignment.map(|ass| ass.source),
+                                    )
+                                })
+                                .unwrap_or_default(),
+                            reordering: symbol.data.reordering.clone(),
+                            assoctype: symbol.data.assoctype,
+                            source: assignment.map(|ass| ass.source).unwrap_or_default(),
+                            ..SymbolData::default()
+                        };
+                        ret.push(Declaration::Symbol(Symbol {
+                            uri,
+                            data: Box::new(new_data),
+                        }));
+                        // Do something
+                    }
+                    AnyDeclarationRef::Morphism(_) => todo!("???"),
+                    AnyDeclarationRef::MathStructure(_) => todo!("???"),
+                    AnyDeclarationRef::Extension(_) => todo!("???"),
+                    AnyDeclarationRef::NestedModule(_) => todo!("???"),
                 }
             }
+            ret
         }
-        Ok(ret)
+        let full_domain = Self::collect_deps(morphism.domain.clone(), &mut get_module)?;
+        Ok(initialize_ii(morphism, full_domain.iter()))
     }
 
     fn collect_deps<E: std::fmt::Display>(
@@ -244,7 +311,7 @@ impl Elaboration {
             }
             let module = get(&todo)?;
             for d in module.declarations() {
-                if let AnyDeclarationRef::Import(uri) = d {
+                if let AnyDeclarationRef::Import { uri, .. } = d {
                     todos.push(uri.clone());
                 }
             }

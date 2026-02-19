@@ -70,7 +70,9 @@ pub trait HasDeclarations: crate::Ftml {
                 AnyDeclarationRef::MathStructure(e) => e.initialize(get),
                 AnyDeclarationRef::Morphism(e) => e.initialize(get),
                 AnyDeclarationRef::NestedModule(e) => e.initialize(get),
-                AnyDeclarationRef::Import(_) | AnyDeclarationRef::Symbol(_) => (),
+                AnyDeclarationRef::Import { .. }
+                | AnyDeclarationRef::Symbol(_)
+                | AnyDeclarationRef::Rule { .. } => (),
             }
         }
     }
@@ -101,7 +103,9 @@ pub trait HasDeclarations: crate::Ftml {
                         as std::pin::Pin<Box<dyn Future<Output = _>>>)
                         .await;
                 }
-                AnyDeclarationRef::Import(_) | AnyDeclarationRef::Symbol(_) => (),
+                AnyDeclarationRef::Import { .. }
+                | AnyDeclarationRef::Symbol(_)
+                | AnyDeclarationRef::Rule { .. } => (),
             }
         }
     }
