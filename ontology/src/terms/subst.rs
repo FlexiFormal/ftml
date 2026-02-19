@@ -496,8 +496,6 @@ impl Term {
                         }
                     }
                     all_docs.insert(d);
-                } else {
-                    return;
                 }
             }
             o => {
@@ -630,10 +628,10 @@ impl Argument {
         ctx: &mut smallvec::SmallVec<&'t str, 4>,
     ) {
         match self {
-            Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
+            Self::Simple(t) | Self::Sequence(MaybeSequence::One(t)) => {
                 t.free_vars_i(vars, ctx);
             }
-            Argument::Sequence(MaybeSequence::Seq(ts)) => {
+            Self::Sequence(MaybeSequence::Seq(ts)) => {
                 for t in ts {
                     t.free_vars_i(vars, ctx);
                 }
@@ -647,10 +645,10 @@ impl Argument {
         ctx: &mut smallvec::SmallVec<&'t str, 4>,
     ) {
         match self {
-            Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
+            Self::Simple(t) | Self::Sequence(MaybeSequence::One(t)) => {
                 t.all_vars_i(vars, ctx);
             }
-            Argument::Sequence(MaybeSequence::Seq(ts)) => {
+            Self::Sequence(MaybeSequence::Seq(ts)) => {
                 for t in ts {
                     t.all_vars_i(vars, ctx);
                 }
@@ -680,15 +678,15 @@ impl BoundArgument {
         added: &mut usize,
     ) {
         match self {
-            BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
+            Self::Simple(t) | Self::Sequence(MaybeSequence::One(t)) => {
                 t.free_vars_i(vars, ctx);
             }
-            BoundArgument::Sequence(MaybeSequence::Seq(ts)) => {
+            Self::Sequence(MaybeSequence::Seq(ts)) => {
                 for t in ts {
                     t.free_vars_i(vars, ctx);
                 }
             }
-            BoundArgument::Bound(v) | BoundArgument::BoundSeq(MaybeSequence::One(v)) => {
+            Self::Bound(v) | Self::BoundSeq(MaybeSequence::One(v)) => {
                 if let Some(tp) = &v.tp {
                     tp.free_vars_i(vars, ctx);
                 }
@@ -698,7 +696,7 @@ impl BoundArgument {
                 *added += 1;
                 ctx.push(v.var.name());
             }
-            BoundArgument::BoundSeq(MaybeSequence::Seq(vs)) => {
+            Self::BoundSeq(MaybeSequence::Seq(vs)) => {
                 for v in vs {
                     if let Some(tp) = &v.tp {
                         tp.free_vars_i(vars, ctx);
@@ -720,15 +718,15 @@ impl BoundArgument {
         added: &mut usize,
     ) {
         match self {
-            BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
+            Self::Simple(t) | Self::Sequence(MaybeSequence::One(t)) => {
                 t.all_vars_i(vars, ctx);
             }
-            BoundArgument::Sequence(MaybeSequence::Seq(ts)) => {
+            Self::Sequence(MaybeSequence::Seq(ts)) => {
                 for t in ts {
                     t.all_vars_i(vars, ctx);
                 }
             }
-            BoundArgument::Bound(var) | BoundArgument::BoundSeq(MaybeSequence::One(var)) => {
+            Self::Bound(var) | Self::BoundSeq(MaybeSequence::One(var)) => {
                 *added += 1;
                 ctx.push(var.var.name());
                 if let Some(v) = vars.iter_mut().find(|(v, _)| v.name() == var.var.name()) {
@@ -739,7 +737,7 @@ impl BoundArgument {
                     vars.push((&var.var, FreeOrBound::Bound));
                 }
             }
-            BoundArgument::BoundSeq(MaybeSequence::Seq(vs)) => {
+            Self::BoundSeq(MaybeSequence::Seq(vs)) => {
                 for var in vs {
                     *added += 1;
                     ctx.push(var.var.name());

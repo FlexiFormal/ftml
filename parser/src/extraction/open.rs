@@ -445,6 +445,41 @@ impl OpenBoundArgument {
                 df: None,
             }))),
             Self::Sequence {
+                terms: Right(mut v),
+                should_be_var,
+            } if matches!(
+                &*v,
+                [Some(Term::Var {
+                    variable: Variable::Ref {
+                        is_sequence: Some(true),
+                        ..
+                    },
+                    ..
+                })]
+            ) =>
+            {
+                let Some(Some(Term::Var {
+                    variable,
+                    presentation,
+                })) = v.pop()
+                else {
+                    // SAFETY: we just pattern matched
+                    unsafe { unreachable_unchecked() }
+                };
+                if should_be_var {
+                    Some(BoundArgument::BoundSeq(MaybeSequence::One(ComponentVar {
+                        var: variable,
+                        tp: None,
+                        df: None,
+                    })))
+                } else {
+                    Some(BoundArgument::Sequence(MaybeSequence::One(Term::Var {
+                        variable,
+                        presentation,
+                    })))
+                }
+            }
+            Self::Sequence {
                 terms: Right(v),
                 should_be_var: true,
             } if v.iter().all(|t| matches!(t, Some(Term::Var { .. }))) => {
