@@ -224,21 +224,21 @@ impl Elaboration {
             for d in full_domain.flat_map(ModuleLike::declarations) {
                 match d {
                     AnyDeclarationRef::Import { .. } | AnyDeclarationRef::Rule { .. } => (),
-                    AnyDeclarationRef::Symbol(symbol) => {
+                    AnyDeclarationRef::Symbol(original_symbol) => {
                         let assignment = morphism
                             .elements
                             .iter()
-                            .find(|ass| ass.original == symbol.uri);
-                        let uri = assignment.map_or_else(
-                            || Assignment::default_uri(&morphism.uri, &symbol.uri),
+                            .find(|ass| ass.original == original_symbol.uri);
+                        let new_uri = assignment.map_or_else(
+                            || Assignment::default_uri(&morphism.uri, &original_symbol.uri),
                             Assignment::elaborated_uri,
                         );
                         let new_data = SymbolData {
-                            arity: symbol.data.arity.clone(),
+                            arity: original_symbol.data.arity.clone(),
                             macroname: assignment.and_then(|ass| ass.macroname.clone()),
-                            role: symbol.data.role.clone(),
+                            role: original_symbol.data.role.clone(),
                             // vvv this is wrong
-                            tp: symbol
+                            tp: original_symbol
                                 .data
                                 .tp
                                 .checked_or_parsed()
@@ -257,7 +257,7 @@ impl Elaboration {
                                 })
                                 .unwrap_or_default(),
                             // vvv this is wrong
-                            df: symbol
+                            df: original_symbol
                                 .data
                                 .df
                                 .checked_or_parsed()
@@ -275,13 +275,13 @@ impl Elaboration {
                                     )
                                 })
                                 .unwrap_or_default(),
-                            reordering: symbol.data.reordering.clone(),
-                            assoctype: symbol.data.assoctype,
+                            reordering: original_symbol.data.reordering.clone(),
+                            assoctype: original_symbol.data.assoctype,
                             source: assignment.map(|ass| ass.source).unwrap_or_default(),
                             ..SymbolData::default()
                         };
                         ret.push(Declaration::Symbol(Symbol {
-                            uri,
+                            uri: new_uri,
                             data: Box::new(new_data),
                         }));
                         // Do something
