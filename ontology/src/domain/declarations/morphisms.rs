@@ -237,44 +237,81 @@ impl Elaboration {
                             arity: original_symbol.data.arity.clone(),
                             macroname: assignment.and_then(|ass| ass.macroname.clone()),
                             role: original_symbol.data.role.clone(),
-                            // vvv this is wrong
-                            tp: original_symbol
-                                .data
-                                .tp
-                                .checked_or_parsed()
-                                .map(|(t, _)| {
-                                    TermContainer::new(
-                                        Term::Application(ApplicationTerm::new(
-                                            Term::Symbol {
-                                                uri: morphism.uri.clone(),
-                                                presentation: None,
-                                            },
-                                            Box::new([Argument::Simple(t)]),
-                                            None,
+                            tp: {
+                                let original_tp = original_symbol.data.tp.clone();
+                                let new_tp = match original_tp.checked_or_parsed() {
+                                    // original symbol has a type:
+                                    Some((t, _)) => match assignment {
+                                        // original symbol is not mapped by the morphism:
+                                        None => Some(original_tp),
+                                        // original symbol is mapped by the morphism:
+                                        Some(ass) => Some(TermContainer::new(
+                                            Term::Application(ApplicationTerm::new(
+                                                Term::Symbol {
+                                                    uri: morphism.uri.clone(),
+                                                    presentation: None,
+                                                },
+                                                Box::new([Argument::Simple(t)]),
+                                                None,
+                                            )),
+                                            Some(ass.source),
                                         )),
-                                        assignment.map(|ass| ass.source),
-                                    )
-                                })
-                                .unwrap_or_default(),
-                            // vvv this is wrong
-                            df: original_symbol
-                                .data
-                                .df
-                                .checked_or_parsed()
-                                .map(|(t, _)| {
-                                    TermContainer::new(
-                                        Term::Application(ApplicationTerm::new(
-                                            Term::Symbol {
-                                                uri: morphism.uri.clone(),
-                                                presentation: None,
-                                            },
-                                            Box::new([Argument::Simple(t)]),
-                                            None,
+                                    },
+                                    // original symbol has no type:
+                                    None => match assignment {
+                                        // original symbol is not mapped by the morphism:
+                                        None => None,
+                                        // original symbol is mapped by the morphism:
+                                        Some(ass) => match &ass.refined_type {
+                                            // original symbol is not assigned a refied type:
+                                            None => None,
+                                            Some(typ) => Some(TermContainer::new(
+                                                typ.clone(),
+                                                Some(ass.source),
+                                            )),
+                                        },
+                                    },
+                                };
+                                new_tp.unwrap_or_default()
+                            },
+                            df: {
+                                let original_df = original_symbol.data.df.clone();
+                                let new_df = match original_df.checked_or_parsed() {
+                                    // original symbol has a definiens:
+                                    Some((t, _)) => match assignment {
+                                        // original symbol is not mapped by the morphism:
+                                        None => Some(original_df),
+                                        // original symbol is mapped by the morphism:
+                                        Some(ass) => Some(TermContainer::new(
+                                            Term::Application(ApplicationTerm::new(
+                                                Term::Symbol {
+                                                    uri: morphism.uri.clone(),
+                                                    presentation: None,
+                                                },
+                                                Box::new([Argument::Simple(t)]),
+                                                None,
+                                            )),
+                                            Some(ass.source),
                                         )),
-                                        assignment.map(|ass| ass.source),
-                                    )
-                                })
-                                .unwrap_or_default(),
+                                    },
+                                    // original symbol has no definiens:
+                                    None => match assignment {
+                                        // original symbol is not mapped by the morphism:
+                                        None => None,
+                                        // original symbol is mapped by the morphism:
+                                        Some(ass) => match &ass.definiens {
+                                            // original symbol is not assigned a new definiens:
+                                            None => None,
+                                            // original is assigned a new definiens:
+                                            Some(def) => Some(TermContainer::new(
+                                                def.clone(),
+                                                Some(ass.source),
+                                            )),
+                                        },
+                                    },
+                                };
+                                new_df.unwrap_or_default()
+                            },
                             reordering: original_symbol.data.reordering.clone(),
                             assoctype: original_symbol.data.assoctype,
                             source: assignment.map(|ass| ass.source).unwrap_or_default(),
