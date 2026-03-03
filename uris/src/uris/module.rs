@@ -278,6 +278,50 @@ impl ModuleUri {
         self.name.is_simple()
     }
 
+    /// Converts this module URI into a symbol URI by treating the first segment
+    /// of the module name as the top-level module name, and all remaining segments as the symbol name.
+    ///  => into_top_symbol().module().is_top()
+    ///
+    /// Returns `None` if *and only if* the module name has only one segment (is top-level).
+    ///
+    /// Useful to e.g. retrieve this ModuleLike from the top-level Module.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let module_uri = ModuleUri::from_str("http://example.com?a=math&m=algebra/groups/theorem").unwrap();
+    /// let symbol_uri = module_uri.into_top_symbol().unwrap();
+    ///
+    /// assert_eq!(symbol_uri.module.name.to_string(), "algebra");
+    /// assert_eq!(symbol_uri.name.to_string(), "groups/theorem");
+    /// ```
+    #[must_use]
+    pub fn into_top_symbol(self) -> Option<SymbolUri> {
+        if self.name.is_simple() {
+            return None;
+        }
+
+        // SAFETY: by construction, segments are non-empty (=> first() is Some()), and have no illegal
+        // characters (=> parse() return Ok()). Since !is_top(), name contains at least one '/'.
+        let (last, name) = unsafe {
+            let (first, rest) = self.name().as_ref().split_once('/').unwrap_unchecked();
+            (
+                first.parse().unwrap_unchecked(),
+                rest.parse().unwrap_unchecked(),
+            )
+        };
+
+        Some(SymbolUri {
+            module: Self {
+                path: self.path,
+                name,
+            },
+            name: last,
+        })
+    }
+
     /// Converts this module URI into a symbol URI by treating the last segment
     /// of the module name as a symbol name.
     ///
