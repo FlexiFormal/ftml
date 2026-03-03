@@ -170,6 +170,8 @@ fn close_things(
                 | Argument
                 | Type
                 | Definiens
+                | Premise
+                | Conclusion
                 | Notation
                 | CompInNotation
                 | NotationOpComp
@@ -206,7 +208,14 @@ fn close_things(
                 | ProblemChoiceFeedback
                 | FillinSolCase
                 | Rule
-                | ProblemChoiceVerdict => (),
+                | ProblemChoiceVerdict
+                | FoldExpr
+                | FoldExprShort
+                | ProofStep
+                | ProofTerm
+                | ProofMethod
+                | ProofJustification
+                | ProofArgument => (),
             }
         }
     }

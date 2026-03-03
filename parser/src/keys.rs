@@ -10,12 +10,12 @@ use ftml_ontology::{
         documents::{DocumentCounter, DocumentKind, DocumentStyle},
         elements::{
             SectionLevel,
-            paragraphs::{ParagraphFormatting, ParagraphKind},
+            paragraphs::{ParagraphFormatting, ParagraphKind, ParagraphStepKind},
             problems::{AnswerKind, ChoiceBlockStyle, CognitiveDimension, FillInSolOption},
             variables::VariableData,
         },
     },
-    terms::{ArgumentMode, Term, TermContainer, VarOrSym, Variable},
+    terms::{ArgumentMode, TermContainer, VarOrSym, Variable},
     utils::Permutation,
 };
 use ftml_uris::{
@@ -36,7 +36,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 125;
+pub const NUM_KEYS: u8 = 129;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -612,22 +612,6 @@ do_keys! {
             do_paragraph(ext, attrs, keys, node, ParagraphKind::Example)
         },
 
-    /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Proof`]
-    /// for the given [Symbol]s using the given styles.
-    Proof = "proof"
-        {+(Id,Inline,Fors,Styles,ProofHide) &(ProofBody)}
-        := (ext,attrs,keys,node) => {
-            do_paragraph(ext, attrs, keys, node, ParagraphKind::Proof)
-        },
-
-    /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::SubProof`]
-    /// for the given [Symbol]s using the given styles.
-    SubProof = "subproof"
-        {+(Id,Inline,Fors,Styles,ProofHide) &(ProofBody)}
-        := (ext,attrs,keys,node) => {
-            do_paragraph(ext, attrs, keys, node, ParagraphKind::SubProof)
-        },
-
     /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Paragraph`]
     /// for the given [`Symbol`]s using the given styles.
     Paragraph = "paragraph"
@@ -639,7 +623,8 @@ do_keys! {
             formatting:ParagraphFormatting,
             styles:Box<[Id]>,
             uri:DocumentElementUri,
-            fors:Vec<(SymbolUri,Option<Term>)>
+            fors:Vec<SymbolUri>,
+            varname:Option<DocumentElementUri>
         },
 
     /// This [`LogicalParagraph`] is *inline*; i.e. not a separate paragraph
@@ -653,9 +638,43 @@ do_keys! {
         {="[SymbolUri]*" -(Definition, Paragraph, Assertion, Example, Proof, SubProof)}
         := noop,
 
-    ProofHide = "proofhide"
-        {-(Proof,SubProof) }
-        := noop,
+    /// <div class="ftml-wip">TODO</div>
+    Premise = "premise"
+        { <=(Assertion) }
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- Premise + Premise)
+        } => Premise,
+
+    /// <div class="ftml-wip">TODO</div>
+    Conclusion = "conclusion"
+        {="[Option]<[SymbolUri]>" <=(Assertion) }
+        := (ext,attrs,_keys,node) => {
+            let uri = opt!(attrs.get_symbol_uri(FtmlKey::Definiens));
+            ret!(ext,node <- Conclusion(uri) + Conclusion)
+        } => Conclusion(ass:Option<SymbolUri>),
+
+    /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Proof`]
+    /// for the given [Symbol]s using the given styles.
+    Proof = "proof"
+        {
+            +(Id,Inline,Fors,Styles,ProofHide)
+            &(ProofBody,ProofStep,ProofAssumption,ProofConclusion,ProofTerm,ProofMethod,ProofEqStep)
+        }
+        := (ext,attrs,keys,node) => {
+            do_paragraph(ext, attrs, keys, node, ParagraphKind::Proof)
+        },
+
+    /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::SubProof`]
+    /// for the given [Symbol]s using the given styles.
+    SubProof = "subproof"
+        {
+            +(Id,Inline,Fors,Styles,ProofHide,StepName)
+            &(ProofBody,ProofStep,ProofAssumption,ProofConclusion,ProofTerm,ProofMethod,ProofEqStep)
+        }
+        := (ext,attrs,keys,node) => {
+            do_paragraph(ext, attrs, keys, node, ParagraphKind::SubProof)
+        },
+
 
     /// Demarcates the collapsible part of a structured proof
     ProofBody = "proofbody"
@@ -664,33 +683,72 @@ do_keys! {
             ret!(ext,node <- ProofBody)
         } => ProofBody,
 
+    ProofStep = "spfstep"
+        { <=(Proof,SubProof)}
+        := (ext,attrs,keys,node) => {
+            do_proofstep(ext, attrs, keys, node, ParagraphStepKind::ProofStep)
+        } => ProofStep{
+            var:Option<DocumentElementUri>,
+            kind:ParagraphStepKind
+        },
+
+    ProofAssumption = "spfassumption"
+        { <=(Proof,SubProof)}
+        := (ext,attrs,keys,node) => {
+            do_proofstep(ext, attrs, keys, node, ParagraphStepKind::Assumption)
+        },
+
+    ProofConclusion = "spfconclusion"
+        { <=(Proof,SubProof)}
+        := (ext,attrs,keys,node) => {
+            do_proofstep(ext, attrs, keys, node, ParagraphStepKind::Conclusion)
+        },
+
+    ProofTerm = "proofterm"
+        { <=(Proof,SubProof)}
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- ProofTerm + ProofTerm)
+        } => ProofTerm,
+
     ProofMethod = "proofmethod"
+        { <=(Proof,SubProof)}
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- ProofMethod + ProofMethod)
+        } => ProofMethod,
+
+    ProofJustification = "spfjust"
+        { <=(Proof,SubProof)}
+        := (ext,_attrs,_keys,node) => {
+            if !ext.iterate_narrative().any(|e| matches!(e,OpenNarrativeElement::Paragraph { kind:ParagraphKind::Proof|ParagraphKind::SubProof,.. })) {
+                return Err(FtmlExtractionError::NotIn(FtmlKey::ProofJustification, "a proof"))
+            }
+            ret!(ext,node <- ProofJustification + ProofJustification)
+        } => ProofJustification,
+
+    ProofArgument = "spfarg"
+        { <=(Proof,SubProof)}
+        := (ext,attrs,_keys,node) => {
+            if !ext.iterate_narrative().any(|e| matches!(e,OpenNarrativeElement::Paragraph { kind:ParagraphKind::Proof|ParagraphKind::SubProof,.. })) {
+                return Err(FtmlExtractionError::NotIn(FtmlKey::ProofArgument, "a proof"))
+            }
+            let num = attrs.get(FtmlKey::ProofArgument).map_or(Ok(None),|s| if s.as_ref().is_empty() {Ok(None)} else { s.as_ref().parse::<NonZeroU8>().map(Some) }).map_err(|_|(FtmlKey::ProofArgument,()))?;
+            ret!(ext,node <- ProofArgument(num) + ProofArgument)
+        } => ProofArgument(num: Option<NonZeroU8>),
+
+    ProofEqStep = "spfeqstep"
         := todo,
 
     ProofSketch = "proofsketch"
         := todo,
 
-    ProofTerm = "proofterm"
-        := todo,
-
-
-    ProofAssumption = "spfassumption"
-        := todo,
-
-    ProofStep = "spfstep"
-        := todo,
-
     ProofStepName = "stepname"
-        := todo,
+        { = "[UriName]" - (SubProof,ProofStep,ProofAssumption,ProofConclusion) }
+        := noop,
 
-    ProofEqStep = "spfeqstep"
-        := todo,
+    ProofHide = "proofhide"
+        {-(Proof,SubProof) }
+        := noop,
 
-    ProofPremise = "premise"
-        := todo,
-
-    ProofConclusion = "spfconclusion"
-        := todo,
 
     // ------------------------------------------------------------------------------------
 
@@ -987,6 +1045,11 @@ do_keys! {
                         drop(iter);
                         return ret!(ext,node <- ProblemTitle + ProblemTitle);
                     }
+                    OpenNarrativeElement::Module { .. }
+                    | OpenNarrativeElement::MathStructure { .. }
+                    | OpenNarrativeElement::Morphism { .. }
+                    | OpenNarrativeElement::ProofStep{kind:ParagraphStepKind::SubProof,..}
+                    | OpenNarrativeElement::Invisible => (),
                     OpenNarrativeElement::SkipSection { .. }
                     | OpenNarrativeElement::Notation { .. }
                     | OpenNarrativeElement::NotationComp { .. }
@@ -1004,13 +1067,12 @@ do_keys! {
                     | OpenNarrativeElement::ProblemChoiceVerdict
                     | OpenNarrativeElement::ProblemChoiceFeedback
                     | OpenNarrativeElement::FillinSolCase(_)
+                    | OpenNarrativeElement::FoldExpr(_)
+                    | OpenNarrativeElement::FoldExprShort
+                    | OpenNarrativeElement::ProofStep{..}
                     | OpenNarrativeElement::NotationArg(_) => {
                         break;
                     }
-                    OpenNarrativeElement::Module { .. }
-                    | OpenNarrativeElement::MathStructure { .. }
-                    | OpenNarrativeElement::Morphism { .. }
-                    | OpenNarrativeElement::Invisible => (),
                 }
             }
             Err(FtmlExtractionError::NotIn(
@@ -1340,11 +1402,26 @@ do_keys! {
             ret!(ext,node <- Definiens(uri) + Definiens)
             } => Definiens(def:Option<SymbolUri>),
 
-    /// <div class="ftml-wip">TODO</div>
-    Conclusion = "conclusion"
-        := todo,
-
     // ---------------------------------------------------------------------------------
+
+    /// Makes a subexpression hidable behind a (short) abbreviation/comment.
+    /// By default, shows the abbreviation, and on-click puts it in a comment below.
+    /// If value is "show", expanded immediately.
+    FoldExpr = "fold-expression"
+        {
+            = "[`Option`]`<\"show\">`"
+            &(FoldExprAbbrev)
+        }
+        := (ext,attrs,_keys,node) => {
+            let show = attrs.get(FtmlKey::FoldExpr).is_some_and(|s| s.as_ref().trim() == "show");
+            ret!(ext,node <- FoldExpr(show) + FoldExpr)
+        } => FoldExpr(show:bool),
+
+    FoldExprAbbrev = "fold-short"
+        { -(FoldExpr) }
+        := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- FoldExprShort + FoldExprShort)
+        } => FoldExprShort,
 
     /// A [Term] of the given kind with the given head, being presented using the given
     /// [NotationId](FtmlKey::NotationId):
@@ -1408,7 +1485,9 @@ do_keys! {
             let notation = opt!(attrs.get_typed(FtmlKey::NotationId, str::parse));
 
             let has_uri = |ext: &mut E| {
-                if ext.iterate_narrative().any(|e| matches!(e,OpenNarrativeElement::Invisible)) {
+                if ext.iterate_narrative().any(|e| matches!(e,
+                    OpenNarrativeElement::Invisible
+                )) {
                     return Ok(true);
                 }
                 Ok(!ext.in_notation()
@@ -1420,6 +1499,13 @@ do_keys! {
                             | OpenDomainElement::Morphism { .. }
                             | OpenDomainElement::SymbolDeclaration { .. }
                             | OpenDomainElement::Definiens { .. }
+                            | OpenDomainElement::Premise { .. }
+                            | OpenDomainElement::Conclusion { .. }
+                            | OpenDomainElement::ProofTerm { .. }
+                            | OpenDomainElement::ProofMethod { .. }
+                            | OpenDomainElement::ProofJustification { .. }
+                            | OpenDomainElement::ProofArgument { .. }
+                            | OpenDomainElement::FoldExprShort
                         ) => false,
                         Some(OpenDomainElement::Argument { .. }
                             | OpenDomainElement::HeadTerm { .. }
@@ -1434,6 +1520,10 @@ do_keys! {
                             | OpenDomainElement::ReturnType { .. }
                             | OpenDomainElement::Assign { .. }
                             | OpenDomainElement::ArgTypes(_)
+                            //| OpenDomainElement::ProofTerm
+                            //| OpenDomainElement::ProofJustification
+                            //| OpenDomainElement::ProofArgument
+                            //| OpenDomainElement::ProofMethod
                         ) => {
                             true
                         }
@@ -1786,10 +1876,17 @@ do_keys! {
                     | OpenDomainElement::Type { .. }
                     | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. }
+                    | OpenDomainElement::Premise { .. }
+                    | OpenDomainElement::Conclusion { .. }
+                    | OpenDomainElement::ProofTerm { .. }
+                    | OpenDomainElement::ProofMethod { .. }
+                    | OpenDomainElement::ProofJustification { .. }
+                    | OpenDomainElement::ProofArgument { .. }
                     | OpenDomainElement::Assign { .. }
                     | OpenDomainElement::InferenceRule { .. }
                     | OpenDomainElement::Comp
                     | OpenDomainElement::DefComp
+                    | OpenDomainElement::FoldExprShort
                 ) => {
                     return Err(FtmlExtractionError::NotIn(FtmlKey::DefComp, "a term"));
                 }
@@ -1948,6 +2045,30 @@ fn do_comp<E: FtmlExtractor>(
     ret!(ext,node <- Comp + Comp)
 }
 
+fn do_proofstep<E: FtmlExtractor>(
+    ext: &mut E,
+    attrs: &mut E::Attributes<'_>,
+    keys: &mut KeyList,
+    node: &E::Node,
+    kind: ParagraphStepKind,
+) -> Result<
+    (E::Return, Option<crate::extraction::CloseFtmlElement>),
+    crate::extraction::FtmlExtractionError,
+> {
+    let var = attrs.get(FtmlKey::ProofStepName).map_or(Ok(None), |idl| {
+        match idl.as_ref().parse::<UriName>() {
+            Ok(name) => Ok(Some(ext.get_narrative_uri().owned() & name)),
+            Err(e) => Err((FtmlKey::ProofStepName, e)),
+        }
+    })?;
+
+    del!(keys - ProofStepName);
+    ret!(ext,node <- ProofStep{
+        kind,
+        var
+    } + ProofStep)
+}
+
 fn do_paragraph<E: FtmlExtractor>(
     ext: &mut E,
     attrs: &mut E::Attributes<'_>,
@@ -1960,15 +2081,15 @@ fn do_paragraph<E: FtmlExtractor>(
 > {
     let uri = attrs.get_elem_uri_from_id(ext, Cow::Borrowed(kind.as_str()))?;
     let inline = attrs.get_bool(FtmlKey::Inline);
-    let mut fors: Vec<(SymbolUri, Option<Term>)> = Vec::new();
+    let mut fors: Vec<SymbolUri> = Vec::new();
     if let Some(f) = attrs.get(FtmlKey::Fors) {
         for f in f.as_ref().split(',') {
             let uri = f
                 .trim()
                 .parse()
                 .map_err(|_| FtmlExtractionError::InvalidValue(FtmlKey::Fors))?;
-            if !fors.iter().any(|(u, _)| *u == uri) {
-                fors.push((uri, None));
+            if !fors.contains(&uri) {
+                fors.push(uri);
             }
         }
     }
@@ -1981,26 +2102,33 @@ fn do_paragraph<E: FtmlExtractor>(
     )
     .unwrap_or_default();
 
-    let formatting = if inline {
-        ParagraphFormatting::Inline
+    let (formatting, varname) = if inline {
+        (ParagraphFormatting::Inline, None)
     } else if matches!(kind, ParagraphKind::Proof | ParagraphKind::SubProof) {
         let hide = attrs.get_bool(FtmlKey::ProofHide);
+        let vn = attrs.get(FtmlKey::ProofStepName).map_or(Ok(None), |idl| {
+            match idl.as_ref().parse::<UriName>() {
+                Ok(name) => Ok(Some(ext.get_narrative_uri().owned() & name)),
+                Err(e) => Err((FtmlKey::ProofStepName, e)),
+            }
+        })?;
         if hide {
-            ParagraphFormatting::Collapsed
+            (ParagraphFormatting::Collapsed, vn)
         } else {
-            ParagraphFormatting::Block
+            (ParagraphFormatting::Block, vn)
         }
     } else {
-        ParagraphFormatting::Block
+        (ParagraphFormatting::Block, None)
     };
 
-    del!(keys - Id, Inline, Fors, Styles, ProofHide);
+    del!(keys - Id, Inline, Fors, Styles, ProofHide, ProofStepName);
     ret!(ext,node <- Paragraph{
         kind,
         formatting,
         styles:styles.into_boxed_slice(),
         uri,
-        fors
+        fors,
+        varname
     } + Paragraph)
 }
 

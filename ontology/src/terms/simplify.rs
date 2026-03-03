@@ -22,23 +22,57 @@ macro_rules! destruct {
 
 impl Term {
     #[must_use]
+    pub fn is_marker(&self) -> bool {
+        if let Self::Opaque(o) = self
+            && o.terms.is_empty()
+        {
+            let [AnyOpaque::Text(txt)] = &*o.node.children else {
+                return false;
+            };
+            &**txt == "proven"
+        } else {
+            false
+        }
+    }
+
+    #[must_use]
     #[allow(clippy::too_many_lines)]
     pub fn simplify(self) -> Self {
         // for opaques:
-        const IGNORE_ATTRS: [&str; 8] = [
+        static IGNORE_ATTRS: [&str; 17] = [
             "data-ftml-arg",
             "data-ftml-argmode",
             "data-ftml-type",
             "data-ftml-definiens",
             "data-ftml-invisible",
             "data-ftml-headterm",
+            "data-ftml-premise",
+            "data-ftml-conclusion",
+            "data-ftml-spfassumption",
+            "data-ftml-spfconclusion",
+            "data-ftml-proofterm",
+            "data-ftml-proofmethod",
+            "data-ftml-spfjust",
+            "data-ftml-spfarg",
+            "data-rustex-sourceref",
             "style",
             "class",
         ];
         match self {
             // Opaques
             Self::Opaque(o)
-                if (o.node.tag.as_ref() == "mrow"
+                if o.node
+                    .attributes
+                    .iter()
+                    .any(|(k, _)| k.as_ref() == "data-ftml-fold-expression")
+                    && o.terms.len() == 1 =>
+            {
+                destruct!([tm] = o.terms);
+                tm
+            }
+            Self::Opaque(o)
+                if (o.node.tag.as_ref() == "math"
+                    || o.node.tag.as_ref() == "mrow"
                     || o.node.tag.as_ref().eq_ignore_ascii_case("span")
                     || o.node.tag.as_ref().eq_ignore_ascii_case("div"))
                     && o.terms.len() == 1
@@ -71,7 +105,8 @@ impl Term {
                 maybe_var(o)
             }
             Self::Opaque(o)
-                if (o.node.tag.as_ref() == "mrow"
+                if (o.node.tag.as_ref() == "math"
+                    || o.node.tag.as_ref() == "mrow"
                     || o.node.tag.as_ref().eq_ignore_ascii_case("span")
                     || o.node.tag.as_ref().eq_ignore_ascii_case("div"))
                     && matches!(*o.node.children, [AnyOpaque::Node { .. }])

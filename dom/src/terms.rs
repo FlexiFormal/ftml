@@ -31,7 +31,7 @@ pub struct ClosedApp {
     pub head: VarOrSym,
     //owner: Owner,
     pub arguments: Vec<Either<ClonableView, Vec<ClonableView>>>,
-    term_write: WriteSignal<Option<Term>>,
+    //term_write: WriteSignal<Option<Term>>,
     term: ReadSignal<Option<Term>>,
 }
 
@@ -116,7 +116,7 @@ impl ReactiveApplication {
                         })
                         .collect(),
                     term: *term,
-                    term_write: *term_write,
+                    //term_write: *term_write,
                 });
             }
             Self::Closed(_) => {
