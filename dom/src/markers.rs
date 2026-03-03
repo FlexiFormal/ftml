@@ -17,11 +17,13 @@ use ftml_ontology::{
 };
 use ftml_parser::extraction::{ArgumentPosition, FtmlExtractor, OpenFtmlElement, nodes::FtmlNode};
 use ftml_uris::{DocumentElementUri, DocumentUri, Id, IsNarrativeUri, ModuleUri, SymbolUri};
-use leptos::prelude::{AnyView, CustomAttribute, IntoAny, Memo, provide_context, use_context};
+use leptos::prelude::{AnyView, CustomAttribute, IntoAny, provide_context, use_context};
 use leptos_posthoc::OriginalNode;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Marker {
+    FoldExpr(bool),
+    FoldExprShort,
     Module(ModuleUri, Option<ModuleUri>),
     ImportModule(ModuleUri),
     UseModule(ModuleUri),
@@ -134,6 +136,11 @@ impl Marker {
             {
                 Self::apply::<Views>(markers, invisible, is_math, orig)
             }
+            Self::FoldExpr(show) => Views::fold_expr(show, move || {
+                Self::apply::<Views>(markers, invisible, is_math, orig)
+            })
+            .into_any(),
+            Self::FoldExprShort => Views::fold_expr_short(orig).into_any(),
             Self::Module(m, o) => {
                 ModuleContext::barrier();
                 ContentModuleContext::make_new(Some(m));
@@ -161,6 +168,14 @@ impl Marker {
                     Self::apply::<Views>(markers, invisible, is_math, orig)
                 })
                 .into_any()
+            }
+            Self::SectionTitle => {
+                let cls = DocumentStructure::insert_section_title(|| {
+                    FtmlDomElement::new((*orig).clone())
+                        .inner_string()
+                        .into_owned()
+                });
+                Views::section_title(cls, orig).into_any()
             }
             Self::SkipSection => {
                 DocumentState::skip_section();
@@ -263,14 +278,6 @@ impl Marker {
                     Self::apply::<Views>(markers, invisible, is_math, orig)
                 })
                 .into_any()
-            }
-            Self::SectionTitle => {
-                let cls = DocumentStructure::insert_section_title(|| {
-                    FtmlDomElement::new((*orig).clone())
-                        .inner_string()
-                        .into_owned()
-                });
-                Views::section_title(cls, orig).into_any()
             }
             Self::ParagraphTitle => Views::paragraph_title(orig).into_any(),
             Self::SlideTitle => Views::slide_title(orig).into_any(),
@@ -448,12 +455,13 @@ impl Marker {
                 formatting,
                 styles,
                 fors,
+                varname,
             } => Some(Self::Paragraph {
                 uri: uri.clone(),
                 kind: *kind,
                 formatting: *formatting,
                 styles: styles.clone(),
-                fors: fors.iter().map(|(u, _)| u.clone()).collect(),
+                fors: fors.clone(),
             }),
             OpenFtmlElement::Slide(uri) => Some(Self::Slide(uri.clone())),
             OpenFtmlElement::Argument(pos) => Some(Self::Argument(*pos)),
@@ -478,6 +486,8 @@ impl Marker {
             }
             OpenFtmlElement::ImportModule(uri) => Some(Self::ImportModule(uri.clone())),
             OpenFtmlElement::UseModule(uri) => Some(Self::UseModule(uri.clone())),
+            OpenFtmlElement::FoldExpr(show) => Some(Self::FoldExpr(*show)),
+            OpenFtmlElement::FoldExprShort => Some(Self::FoldExprShort),
             OpenFtmlElement::Counter(_)
             | OpenFtmlElement::Invisible
             | OpenFtmlElement::MathStructure { .. }
@@ -489,6 +499,8 @@ impl Marker {
             | OpenFtmlElement::Objective { .. }
             | OpenFtmlElement::ReturnType
             | OpenFtmlElement::Definiens(_)
+            | OpenFtmlElement::Premise
+            | OpenFtmlElement::Conclusion(_)
             | OpenFtmlElement::Notation { .. }
             | OpenFtmlElement::SymbolDeclaration { .. }
             | OpenFtmlElement::NotationComp
@@ -507,6 +519,11 @@ impl Marker {
             | OpenFtmlElement::ProblemChoiceFeedback
             | OpenFtmlElement::ArgTypes
             | OpenFtmlElement::HeadTerm
+            | OpenFtmlElement::ProofStep { .. }
+            | OpenFtmlElement::ProofTerm
+            | OpenFtmlElement::ProofMethod
+            | OpenFtmlElement::ProofArgument(_)
+            | OpenFtmlElement::ProofJustification
             | OpenFtmlElement::Rule(_) => None,
         }
     }

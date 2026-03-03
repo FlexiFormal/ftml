@@ -11,7 +11,7 @@ use ftml_ontology::{
         elements::{
             DocumentElement,
             notations::{NotationComponent, NotationNode},
-            paragraphs::{ParagraphFormatting, ParagraphKind},
+            paragraphs::{ParagraphFormatting, ParagraphKind, ParagraphStep, ParagraphStepKind},
             problems::{
                 AnswerClass, AnswerKind, Choice, ChoiceBlockStyle, CognitiveDimension,
                 FillInSolOption, GradingNote, SolutionData,
@@ -21,9 +21,10 @@ use ftml_ontology::{
         },
     },
     terms::{
-        Argument, ArgumentMode, BoundArgument, ComponentVar, MaybeSequence, Term, VarOrSym,
-        Variable,
+        Argument, ArgumentMode, BoundArgument, ComponentVar, MaybeSequence, Term, TermContainer,
+        VarOrSym, Variable,
     },
+    utils::SourceRange,
 };
 use ftml_uris::{
     DocumentElementUri, DocumentUri, Id, Language, ModuleUri, SimpleUriName, SymbolUri, UriName,
@@ -83,10 +84,20 @@ pub enum CloseFtmlElement {
     ArgTypes,
     FillinSolCase,
     Rule,
+    FoldExpr,
+    FoldExprShort,
+    Premise,
+    Conclusion,
+    ProofStep,
+    ProofTerm,
+    ProofMethod,
+    ProofJustification,
+    ProofArgument,
 }
 
 #[derive(Debug, Clone)]
 pub enum OpenDomainElement<N: FtmlNode> {
+    FoldExprShort,
     Module {
         uri: ModuleUri,
         meta: Option<ModuleUri>,
@@ -168,6 +179,32 @@ pub enum OpenDomainElement<N: FtmlNode> {
         node: N,
         uri: Option<SymbolUri>,
     },
+    Premise {
+        terms: Vec<(Term, crate::NodePath)>,
+        node: N,
+    },
+    Conclusion {
+        terms: Vec<(Term, crate::NodePath)>,
+        node: N,
+        uri: Option<SymbolUri>,
+    },
+    ProofTerm {
+        terms: Vec<(Term, crate::NodePath)>,
+        node: N,
+    },
+    ProofMethod {
+        terms: Vec<(Term, crate::NodePath)>,
+        node: N,
+    },
+    ProofJustification {
+        terms: Vec<(Term, crate::NodePath)>,
+        node: N,
+    },
+    ProofArgument {
+        index: Option<NonZeroU8>,
+        terms: Vec<(Term, crate::NodePath)>,
+        node: N,
+    },
     Comp,
     DefComp,
     Assign {
@@ -179,6 +216,16 @@ pub enum OpenDomainElement<N: FtmlNode> {
 
 #[derive(Debug, Clone)]
 pub enum OpenNarrativeElement<N: FtmlNode> {
+    FoldExpr(bool),
+    FoldExprShort,
+    ProofStep {
+        var_name: Option<DocumentElementUri>,
+        kind: ParagraphStepKind,
+        method: Option<(Term, SourceRange)>,
+        justification: Option<(Term, SourceRange)>,
+        arguments: Vec<Option<(Term, SourceRange)>>,
+        yields: Option<(Term, SourceRange)>,
+    },
     Module {
         uri: ModuleUri,
         children: Vec<DocumentElement>,
@@ -223,11 +270,14 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
     Paragraph {
         uri: DocumentElementUri,
         kind: ParagraphKind,
-        fors: Vec<(SymbolUri, Option<Term>)>,
+        premises: Vec<Term>,
+        binds_variables: Vec<DocumentElementUri>,
+        fors: Vec<(SymbolUri, Option<TermContainer>)>,
         formatting: ParagraphFormatting,
         styles: Box<[Id]>,
         children: Vec<DocumentElement>,
         title: Option<Box<str>>,
+        steps: Vec<ParagraphStep>,
     },
     Problem {
         uri: DocumentElementUri,
@@ -356,6 +406,24 @@ impl OpenArgument {
         use either::Either::Right;
         match self {
             Self::Simple(a) => Some(Argument::Simple(a)),
+            Self::Sequence(Right(mut v))
+                if matches!(
+                    &*v,
+                    [Some(Term::Var {
+                        variable: Variable::Ref {
+                            is_sequence: Some(true),
+                            ..
+                        },
+                        ..
+                    })]
+                ) =>
+            {
+                let Some(Some(v)) = v.pop() else {
+                    // SAFETY: we just pattern matched
+                    unsafe { unreachable_unchecked() }
+                };
+                Some(Argument::Sequence(MaybeSequence::One(v)))
+            }
             Self::Sequence(Right(v)) if v.iter().all(Option::is_some) => {
                 Some(Argument::Sequence(MaybeSequence::Seq(
                     v.into_iter()
@@ -437,7 +505,15 @@ impl OpenBoundArgument {
             })),
             Self::Simple { term, .. } => Some(BoundArgument::Simple(term)),
             Self::Sequence {
-                terms: Left(Term::Var { variable: v, .. }),
+                terms:
+                    Left(Term::Var {
+                        variable:
+                            v @ Variable::Ref {
+                                is_sequence: Some(true),
+                                ..
+                            },
+                        ..
+                    }),
                 should_be_var: true,
             } => Some(BoundArgument::BoundSeq(MaybeSequence::One(ComponentVar {
                 var: v,
@@ -677,6 +753,54 @@ impl OpenFtmlElement {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn split<N: FtmlNode>(self, node: &N) -> AnyOpen<N> {
         match self {
+            Self::FoldExpr(show) => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::FoldExpr(show)),
+            },
+            Self::FoldExprShort => AnyOpen::Open {
+                domain: Some(OpenDomainElement::FoldExprShort),
+                narrative: Some(OpenNarrativeElement::FoldExprShort),
+            },
+            Self::ProofTerm => AnyOpen::Open {
+                domain: Some(OpenDomainElement::ProofTerm {
+                    terms: Vec::new(),
+                    node: node.clone(),
+                }),
+                narrative: None,
+            },
+            Self::ProofMethod => AnyOpen::Open {
+                domain: Some(OpenDomainElement::ProofMethod {
+                    terms: Vec::new(),
+                    node: node.clone(),
+                }),
+                narrative: None,
+            },
+            Self::ProofJustification => AnyOpen::Open {
+                domain: Some(OpenDomainElement::ProofJustification {
+                    terms: Vec::new(),
+                    node: node.clone(),
+                }),
+                narrative: None,
+            },
+            Self::ProofStep { var, kind } => AnyOpen::Open {
+                domain: None,
+                narrative: Some(OpenNarrativeElement::ProofStep {
+                    var_name: var,
+                    kind,
+                    method: None,
+                    justification: None,
+                    arguments: Vec::new(),
+                    yields: None,
+                }),
+            },
+            Self::ProofArgument(index) => AnyOpen::Open {
+                domain: Some(OpenDomainElement::ProofArgument {
+                    terms: Vec::new(),
+                    node: node.clone(),
+                    index,
+                }),
+                narrative: None,
+            },
             Self::DocumentUri(uri) => AnyOpen::Meta(MetaDatum::DocumentUri(uri)),
             Self::Module {
                 uri,
@@ -868,6 +992,21 @@ impl OpenFtmlElement {
                 }),
                 narrative: None,
             },
+            Self::Premise => AnyOpen::Open {
+                domain: Some(OpenDomainElement::Premise {
+                    terms: Vec::new(),
+                    node: node.clone(),
+                }),
+                narrative: None,
+            },
+            Self::Conclusion(uri) => AnyOpen::Open {
+                domain: Some(OpenDomainElement::Conclusion {
+                    terms: Vec::new(),
+                    node: node.clone(),
+                    uri,
+                }),
+                narrative: None,
+            },
             Self::Notation {
                 id,
                 uri,
@@ -892,15 +1031,19 @@ impl OpenFtmlElement {
                 formatting,
                 styles,
                 fors,
+                varname,
             } => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::Paragraph {
                     uri,
                     kind,
-                    fors,
+                    premises: Vec::new(),
+                    binds_variables: varname.map_or(Vec::new(), |v| vec![v]),
+                    fors: fors.into_iter().map(|u| (u, None)).collect(),
                     formatting,
                     styles,
                     title: None,
+                    steps: Vec::new(),
                     children: Vec::new(),
                 }),
             },

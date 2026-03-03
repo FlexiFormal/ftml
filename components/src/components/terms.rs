@@ -4,7 +4,7 @@ use crate::{
     SendBackend,
     components::content::FtmlViewable,
     config::{FtmlConfig, HighlightStyle},
-    utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible, wait_and_then},
+    utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
 };
 use ftml_backend::{BackendCheckResult, BackendError, FtmlBackend, GlobalBackend};
 use ftml_dom::{
@@ -25,16 +25,64 @@ use ftml_ontology::{
 use ftml_uris::{
     DocumentElementUri, Id, IsNarrativeUri, LeafUri, NarrativeUri, SymbolUri, Uri, UriWithArchive,
 };
-use leptos::{
-    prelude::*,
-    tachys::{reactive_graph::OwnedView, renderer::dom::Element},
-};
+use leptos::{prelude::*, tachys::renderer::dom::Element};
+use leptos_posthoc::OriginalNode;
+use send_wrapper::SendWrapper;
 use std::hint::unreachable_unchecked;
 use wasm_bindgen::JsCast;
 
 #[derive(Copy, Clone)]
 struct InTerm {
     hovered: RwSignal<bool>,
+}
+
+#[derive(Default, Clone)]
+struct FoldExpr(Option<SendWrapper<OriginalNode>>);
+pub fn fold_expr<V: IntoView>(
+    show: bool,
+    then: impl FnOnce() -> V + Send + 'static,
+) -> impl IntoView {
+    let show = RwSignal::new(show);
+    let short = RwSignal::new(FoldExpr(None));
+    provide_context(short);
+    let fullstyle = Signal::derive(move || {
+        if show.get() {
+            None
+        } else {
+            Some("display:none;")
+        }
+    });
+    let otherstyle = Signal::derive(move || {
+        if show.get() {
+            Some("display:none;")
+        } else {
+            None
+        }
+    });
+    view! {
+        <munder displaystyle="true">
+            <munder displaystyle="true">
+                <msup>
+                    <mrow>
+                        {then().attr("style", fullstyle)}
+                        {move || if show.get() {None} else {Some(view!{
+                            <mi>...</mi>
+                        })}}
+                    </mrow>
+                    <mi style="color:blue;cursor:pointer;" on:click=move|_| {show.update(|b| *b = !*b)}>"🛈"</mi>
+                </msup>
+                <mo stretchy="true" style=otherstyle>"⏟"</mo>
+            </munder>
+            {move || short.get().0.map(|n| n.take().attr("style",otherstyle))}
+        </munder>
+    }
+}
+
+pub fn fold_expr_short<B: SendBackend>(then: OriginalNode) -> impl IntoView {
+    let _ = crate::Views::<B>::cont(then.clone(), true);
+    if let Some(sig) = use_context::<RwSignal<FoldExpr>>() {
+        sig.set(FoldExpr(Some(SendWrapper::new(then))));
+    }
 }
 
 #[allow(clippy::needless_pass_by_value)]

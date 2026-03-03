@@ -15,7 +15,6 @@ use ftml_dom::{
     terms::ReactiveApplication,
     utils::local_cache::SendBackend,
 };
-use ftml_ontology::{narrative::elements::SectionLevel, terms::Term};
 use ftml_uris::{DocumentElementUri, Id};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
@@ -46,6 +45,19 @@ impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
     #[inline]
     fn section_title(class: &'static str, then: OriginalNode) -> impl IntoView {
         sections::section_title(class, then)
+    }
+
+    #[inline]
+    fn fold_expr<V: IntoView>(
+        show: bool,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        terms::fold_expr(show, then)
+    }
+
+    #[inline]
+    fn fold_expr_short(then: OriginalNode) -> impl IntoView {
+        terms::fold_expr_short::<B>(then)
     }
 
     #[inline]

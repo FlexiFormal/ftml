@@ -27,7 +27,7 @@ use ftml_ontology::{
             notations::{
                 NotationComponent, NotationNode, NotationReference, VariableNotationReference,
             },
-            paragraphs::{ParagraphFormatting, ParagraphKind},
+            paragraphs::{ParagraphFormatting, ParagraphKind, ParagraphStep, ParagraphStepKind},
             problems::{
                 AnswerClass, AnswerKind, Choice, ChoiceBlock, ChoiceBlockStyle, FillInSol,
                 FillInSolOption, GradingNote, ProblemData, SolutionData, Solutions,
@@ -42,7 +42,7 @@ use ftml_uris::{
     DocumentElementUri, DocumentUri, DomainUriRef, Id, IsDomainUri, Language, LeafUri, ModuleUri,
     SymbolUri,
 };
-use std::{borrow::Cow, hint::unreachable_unchecked, mem::MaybeUninit};
+use std::{borrow::Cow, hint::unreachable_unchecked, mem::MaybeUninit, num::NonZeroU8};
 
 #[derive(Debug)]
 pub struct IdCounter {
@@ -382,7 +382,25 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 if let Some(dom) = domain {
                     self.domain.push(dom);
                 }
-                if let Some(narr) = narrative {
+                if let Some(mut narr) = narrative {
+                    if let OpenNarrativeElement::Paragraph {
+                        kind: ParagraphKind::SubProof,
+                        binds_variables,
+                        ..
+                    } = &mut narr
+                    {
+                        let var = binds_variables.pop();
+                        self.narrative.push(narr);
+                        self.narrative.push(OpenNarrativeElement::ProofStep {
+                            var_name: var,
+                            kind: ParagraphStepKind::SubProof,
+                            method: None,
+                            justification: None,
+                            arguments: Vec::new(),
+                            yields: None,
+                        });
+                        return Ok(());
+                    }
                     self.narrative.push(narr);
                 }
             }
@@ -398,6 +416,73 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     pub fn close(&mut self, elem: CloseFtmlElement, node: &N) -> super::Result<()> {
         tracing::trace!("Closing: {elem:?} in {:?}", self.domain);
         match elem {
+            CloseFtmlElement::FoldExpr => match self.narrative.pop() {
+                Some(OpenNarrativeElement::FoldExpr(_)) => Ok(()),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::FoldExpr)),
+            },
+            CloseFtmlElement::FoldExprShort => {
+                match self.narrative.pop() {
+                    Some(OpenNarrativeElement::FoldExprShort) => (),
+                    _ => {
+                        return Err(FtmlExtractionError::UnexpectedEndOf(
+                            FtmlKey::FoldExprAbbrev,
+                        ));
+                    }
+                }
+                match self.domain.pop() {
+                    Some(OpenDomainElement::FoldExprShort) => Ok(()),
+                    _ => Err(FtmlExtractionError::UnexpectedEndOf(
+                        FtmlKey::FoldExprAbbrev,
+                    )),
+                }
+            }
+            CloseFtmlElement::ProofStep => match self.narrative.pop() {
+                Some(OpenNarrativeElement::ProofStep {
+                    var_name,
+                    method,
+                    justification,
+                    arguments,
+                    yields,
+                    kind,
+                }) => {
+                    self.close_proof_step(var_name, method, justification, arguments, yields, kind)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofStep)),
+            },
+            CloseFtmlElement::ProofTerm => match self.domain.pop() {
+                Some(OpenDomainElement::ProofTerm { terms, node: n }) => {
+                    //debug_assert_eq!(node,n);
+                    self.close_proof_term(terms, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofTerm)),
+            },
+            CloseFtmlElement::ProofMethod => match self.domain.pop() {
+                Some(OpenDomainElement::ProofMethod { terms, node: n }) => {
+                    //debug_assert_eq!(node,n);
+                    self.close_proof_method(terms, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofMethod)),
+            },
+            CloseFtmlElement::ProofJustification => match self.domain.pop() {
+                Some(OpenDomainElement::ProofJustification { terms, node: n }) => {
+                    //debug_assert_eq!(node,n);
+                    self.close_proof_just(terms, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(
+                    FtmlKey::ProofJustification,
+                )),
+            },
+            CloseFtmlElement::ProofArgument => match self.domain.pop() {
+                Some(OpenDomainElement::ProofArgument {
+                    terms,
+                    index,
+                    node: n,
+                }) => {
+                    //debug_assert_eq!(node,n);
+                    self.close_proof_argument(terms, index, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofArgument)),
+            },
             CloseFtmlElement::Module => match self.domain.pop() {
                 Some(OpenDomainElement::Module {
                     uri,
@@ -469,23 +554,44 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Section)),
             },
             CloseFtmlElement::Paragraph => match self.narrative.pop() {
+                Some(OpenNarrativeElement::ProofStep {
+                    var_name,
+                    kind: ParagraphStepKind::SubProof,
+                    method,
+                    justification,
+                    arguments,
+                    yields,
+                }) => self.close_subproof_step(
+                    var_name,
+                    method,
+                    justification,
+                    arguments,
+                    yields,
+                    node.range(),
+                ),
                 Some(OpenNarrativeElement::Paragraph {
                     uri,
                     kind,
                     formatting,
                     styles,
                     children,
+                    premises,
+                    binds_variables,
                     fors,
+                    steps,
                     title,
                 }) => {
                     self.close_paragraph(
                         uri,
                         kind,
                         fors,
+                        premises,
+                        binds_variables,
                         formatting,
                         styles,
                         children,
                         title,
+                        steps,
                         node.range(),
                     );
                     Ok(())
@@ -677,6 +783,24 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     self.close_definiens(terms, uri, node)
                 }
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens)),
+            },
+            CloseFtmlElement::Premise => match self.domain.pop() {
+                Some(OpenDomainElement::Premise { terms, node: n }) => {
+                    //debug_assert_eq!(node,n);
+                    self.close_premise(terms, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Premise)),
+            },
+            CloseFtmlElement::Conclusion => match self.domain.pop() {
+                Some(OpenDomainElement::Conclusion {
+                    terms,
+                    node: n,
+                    uri,
+                }) => {
+                    //debug_assert_eq!(node,n);
+                    self.close_conclusion(terms, uri, node)
+                }
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Conclusion)),
             },
             CloseFtmlElement::Problem => match self.narrative.pop() {
                 Some(OpenNarrativeElement::Problem {
@@ -1014,6 +1138,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::NotationArg(_) => (),
             }
         }
@@ -1537,11 +1664,14 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         &mut self,
         uri: DocumentElementUri,
         kind: ParagraphKind,
-        fors: Vec<(SymbolUri, Option<Term>)>,
+        fors: Vec<(SymbolUri, Option<TermContainer>)>,
+        premises: Vec<Term>,
+        binds_variables: Vec<DocumentElementUri>,
         formatting: ParagraphFormatting,
         styles: Box<[Id]>,
         children: Vec<DocumentElement>,
         title: Option<Box<str>>,
+        steps: Vec<ParagraphStep>,
         range: DocumentRange,
     ) {
         let p = LogicalParagraph {
@@ -1552,7 +1682,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             range,
             styles,
             children: children.into_boxed_slice(),
+            binds_variables: binds_variables.into_boxed_slice(),
+            premises: premises.into_boxed_slice(),
             fors: fors.into_boxed_slice(),
+            steps: steps.into_boxed_slice(),
             source: self.current_source_range,
         };
         if self
@@ -1802,6 +1935,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
+                | OpenNarrativeElement::FoldExpr(_)
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1847,6 +1983,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1872,6 +2011,14 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 OpenNarrativeElement::Paragraph { title, .. } => {
                     return Err(FtmlExtractionError::DuplicateValue(FtmlKey::Title));
                 }
+                OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::Morphism { .. }
+                | OpenNarrativeElement::Invisible
+                | OpenNarrativeElement::ProofStep {
+                    kind: ParagraphStepKind::SubProof,
+                    ..
+                } => (),
                 OpenNarrativeElement::SkipSection { .. }
                 | OpenNarrativeElement::Problem { .. }
                 | OpenNarrativeElement::Solution(..)
@@ -1892,13 +2039,12 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
-                OpenNarrativeElement::Module { .. }
-                | OpenNarrativeElement::MathStructure { .. }
-                | OpenNarrativeElement::Morphism { .. }
-                | OpenNarrativeElement::Invisible => (),
             }
         }
         Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title))
@@ -1937,6 +2083,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::NotationArg(_) => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title));
                 }
@@ -1993,6 +2142,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::Premise { .. }
+                | OpenDomainElement::Conclusion { .. }
                 | OpenDomainElement::Module { .. }
                 | OpenDomainElement::MathStructure { .. }
                 | OpenDomainElement::Morphism { .. }
@@ -2002,15 +2153,19 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::OML { .. }
                 | OpenDomainElement::Comp
                 | OpenDomainElement::DefComp
+                | OpenDomainElement::FoldExprShort
+                | OpenDomainElement::ProofTerm { .. }
+                | OpenDomainElement::ProofMethod { .. }
+                | OpenDomainElement::ProofJustification { .. }
+                | OpenDomainElement::ProofArgument { .. }
                 | OpenDomainElement::VariableReference { .. } => {
                     Ok(Err(std::ops::ControlFlow::Break(())))
                 }
             }
         }
         let mut term = MaybeUninit::new(node.as_term(terms)?.simplify());
-        let mut des = self.domain.iter_mut();
         let mut cont = 0u8;
-        while let Some(next) = des.next() {
+        for next in self.domain.iter_mut() {
             // SAFETY: term is initialized initially
             match merge(next, position, unsafe { term.assume_init_read() }, cont)? {
                 Ok(()) => return Ok(()),
@@ -2075,6 +2230,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::Premise { .. }
+                | OpenDomainElement::Conclusion { .. }
                 | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
@@ -2087,6 +2244,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::Comp
                 | OpenDomainElement::DefComp
+                | OpenDomainElement::FoldExprShort
+                | OpenDomainElement::ProofTerm { .. }
+                | OpenDomainElement::ProofMethod { .. }
+                | OpenDomainElement::ProofJustification { .. }
+                | OpenDomainElement::ProofArgument { .. }
                 | OpenDomainElement::VariableReference { .. },
             ) => (),
         }
@@ -2096,7 +2258,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     data.tp = TermContainer::new(term, self.current_source_range.into_option());
                     return Ok(());
                 }
-                OpenNarrativeElement::Invisible => (),
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::FoldExpr(_) => (),
                 OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::Paragraph { .. }
                 | OpenNarrativeElement::Problem { .. }
@@ -2121,6 +2283,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
@@ -2150,6 +2314,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Type { .. }
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::Premise { .. }
+                | OpenDomainElement::Conclusion { .. }
                 | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
@@ -2163,6 +2329,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::Comp
                 | OpenDomainElement::DefComp
                 | OpenDomainElement::ArgTypes(_)
+                | OpenDomainElement::FoldExprShort
+                | OpenDomainElement::ProofTerm { .. }
+                | OpenDomainElement::ProofMethod { .. }
+                | OpenDomainElement::ProofJustification { .. }
+                | OpenDomainElement::ProofArgument { .. }
                 | OpenDomainElement::VariableReference { .. },
             ) => (),
         }
@@ -2172,7 +2343,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     data.return_type = Some(term);
                     return Ok(());
                 }
-                OpenNarrativeElement::Invisible => (),
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::FoldExpr(_) => (),
                 OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::Problem { .. }
                 | OpenNarrativeElement::Solution(..)
@@ -2197,12 +2368,135 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type));
                 }
             }
         }
         Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Type))
+    }
+
+    fn close_subproof_step(
+        &mut self,
+        var_name: Option<DocumentElementUri>,
+        method: Option<(Term, SourceRange)>,
+        justification: Option<(Term, SourceRange)>,
+        arguments: Vec<Option<(Term, SourceRange)>>,
+        yields: Option<(Term, SourceRange)>,
+        range: DocumentRange,
+    ) -> super::Result<()> {
+        let Some(OpenNarrativeElement::Paragraph {
+            uri,
+            kind: ParagraphKind::SubProof,
+            formatting,
+            styles,
+            children,
+            premises,
+            binds_variables,
+            fors,
+            steps,
+            title,
+        }) = self.narrative.pop()
+        else {
+            return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::SubProof));
+        };
+        let step = ParagraphStep::Subproof {
+            uri: uri.clone(),
+            var_name,
+            method,
+            justification,
+            arguments: arguments.into_boxed_slice(),
+            yields,
+            steps: steps.into_boxed_slice(),
+        };
+        for e in self.narrative.iter_mut() {
+            if let OpenNarrativeElement::Paragraph {
+                kind: ParagraphKind::Proof | ParagraphKind::SubProof,
+                steps,
+                ..
+            } = e
+            {
+                steps.push(step);
+                return Ok(());
+            }
+        }
+        if self
+            .narrative
+            .iter()
+            .any(|e| matches!(e, OpenNarrativeElement::Solution(_)))
+        {
+            tracing::info!("Skipping paragraph in solutions block");
+            return Ok(());
+        }
+        let p = LogicalParagraph {
+            kind: ParagraphKind::SubProof,
+            uri,
+            formatting,
+            title,
+            range,
+            styles,
+            children: children.into_boxed_slice(),
+            binds_variables: binds_variables.into_boxed_slice(),
+            premises: premises.into_boxed_slice(),
+            fors: fors.into_boxed_slice(),
+            steps: Box::new([]),
+            source: self.current_source_range,
+        };
+        tracing::info!("Adding subproof {p:#?}");
+        self.push_elem(DocumentElement::Paragraph(p));
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofStep))
+    }
+
+    fn close_proof_step(
+        &mut self,
+        var_name: Option<DocumentElementUri>,
+        method: Option<(Term, SourceRange)>,
+        justification: Option<(Term, SourceRange)>,
+        arguments: Vec<Option<(Term, SourceRange)>>,
+        yields: Option<(Term, SourceRange)>,
+        kind: ParagraphStepKind,
+    ) -> super::Result<()> {
+        let step = match kind {
+            ParagraphStepKind::Assumption => ParagraphStep::ProofAssumption {
+                var_name,
+                method,
+                justification,
+                arguments: arguments.into_boxed_slice(),
+                yields,
+            },
+            ParagraphStepKind::Conclusion => ParagraphStep::ProofConclusion {
+                var_name,
+                method,
+                justification,
+                arguments: arguments.into_boxed_slice(),
+                yields,
+            },
+            ParagraphStepKind::ProofStep => ParagraphStep::ProofStep {
+                var_name,
+                method,
+                justification,
+                arguments: arguments.into_boxed_slice(),
+                yields,
+            },
+            ParagraphStepKind::EquationStep => return Ok(()), // TODO
+            ParagraphStepKind::SubProof => {
+                return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::SubProof));
+            }
+        };
+        for e in self.narrative.iter_mut() {
+            if let OpenNarrativeElement::Paragraph {
+                kind: ParagraphKind::Proof | ParagraphKind::SubProof,
+                steps,
+                ..
+            } = e
+            {
+                steps.push(step);
+                return Ok(());
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofStep))
     }
 
     #[allow(clippy::too_many_lines)]
@@ -2235,6 +2529,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::Premise { .. }
+                | OpenDomainElement::Conclusion { .. }
                 | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
                 | OpenDomainElement::OMBIND { .. }
@@ -2247,6 +2543,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::Comp
                 | OpenDomainElement::DefComp
+                | OpenDomainElement::FoldExprShort
+                | OpenDomainElement::ProofTerm { .. }
+                | OpenDomainElement::ProofMethod { .. }
+                | OpenDomainElement::ProofJustification { .. }
+                | OpenDomainElement::ProofArgument { .. }
                 | OpenDomainElement::VariableReference { .. },
             ) => (),
         }
@@ -2257,6 +2558,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     data.df = TermContainer::new(term, self.current_source_range.into_option());
                     return Ok(());
                 }
+                OpenNarrativeElement::Paragraph {
+                    kind: ParagraphKind::Proof | ParagraphKind::SubProof,
+                    ..
+                } if term.is_marker() => return Ok(()),
                 OpenNarrativeElement::Paragraph {
                     kind, styles, fors, ..
                 } if kind.is_definition_like(styles) => {
@@ -2270,9 +2575,18 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                             );
                         }
                         if let Some((a, b)) = fors.iter_mut().find(|(k, v)| *k == of) {
-                            *b = Some(term);
+                            *b = Some(TermContainer::new(
+                                term,
+                                self.current_source_range.into_option(),
+                            ));
                         } else {
-                            fors.push((of, Some(term)));
+                            fors.push((
+                                of,
+                                Some(TermContainer::new(
+                                    term,
+                                    self.current_source_range.into_option(),
+                                )),
+                            ));
                         }
                     } else if let Some((k, v)) = fors.first_mut() {
                         if let Some(data) = Self::find_symbol(&mut self.domain, k)
@@ -2283,13 +2597,18 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                                 self.current_source_range.into_option(),
                             );
                         }
-                        *v = Some(term);
+                        *v = Some(TermContainer::new(
+                            term,
+                            self.current_source_range.into_option(),
+                        ));
                     } else {
                         return Err(FtmlExtractionError::DuplicateValue(FtmlKey::Definiens));
                     }
                     return Ok(());
                 }
-                OpenNarrativeElement::Invisible => (),
+                OpenNarrativeElement::Invisible
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::ProofStep { .. } => (),
                 OpenNarrativeElement::Section { .. }
                 | OpenNarrativeElement::VariableDeclaration { .. }
                 | OpenNarrativeElement::Paragraph { .. }
@@ -2314,12 +2633,368 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
                 | OpenNarrativeElement::Morphism { .. } => {
                     return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens));
                 }
             }
         }
         Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Definiens))
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn close_premise(
+        &mut self,
+        terms: Vec<(Term, crate::NodePath)>,
+        node: &N,
+    ) -> super::Result<()> {
+        let term = node.as_term(terms)?.simplify();
+
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::VariableDeclaration { uri, data } if data.df.is_none() => {
+                    data.df = TermContainer::new(term, self.current_source_range.into_option());
+                    return Ok(());
+                }
+                OpenNarrativeElement::Paragraph {
+                    kind: ParagraphKind::Assertion,
+                    premises,
+                    ..
+                } => {
+                    premises.push(term);
+                    return Ok(());
+                }
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::FoldExpr(_) => (),
+                OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Problem { .. }
+                | OpenNarrativeElement::Solution(..)
+                | OpenNarrativeElement::Slide { .. }
+                | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Premise));
+                }
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Premise))
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn close_conclusion(
+        &mut self,
+        terms: Vec<(Term, crate::NodePath)>,
+        of: Option<SymbolUri>,
+        node: &N,
+    ) -> super::Result<()> {
+        let term = node.as_term(terms)?.simplify();
+
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::VariableDeclaration { uri, data } if data.df.is_none() => {
+                    data.df = TermContainer::new(term, self.current_source_range.into_option());
+                    return Ok(());
+                }
+                OpenNarrativeElement::Paragraph {
+                    kind: ParagraphKind::Assertion,
+                    fors,
+                    ..
+                } => {
+                    if let Some(of) = of {
+                        if let Some((a, b)) = fors.iter_mut().find(|(k, v)| *k == of) {
+                            *b = Some(TermContainer::new(
+                                term,
+                                self.current_source_range.into_option(),
+                            ));
+                        } else {
+                            fors.push((
+                                of,
+                                Some(TermContainer::new(
+                                    term,
+                                    self.current_source_range.into_option(),
+                                )),
+                            ));
+                        }
+                    } else if let Some((k, v)) = fors.first_mut() {
+                        *v = Some(TermContainer::new(
+                            term,
+                            self.current_source_range.into_option(),
+                        ));
+                    } else {
+                        return Err(FtmlExtractionError::DuplicateValue(FtmlKey::Conclusion));
+                    }
+                    return Ok(());
+                }
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::FoldExpr(_) => (),
+                OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Problem { .. }
+                | OpenNarrativeElement::Solution(..)
+                | OpenNarrativeElement::Slide { .. }
+                | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Conclusion));
+                }
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Conclusion))
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn close_proof_term(
+        &mut self,
+        terms: Vec<(Term, crate::NodePath)>,
+        node: &N,
+    ) -> super::Result<()> {
+        let term = node.as_term(terms)?.simplify();
+
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::ProofStep { yields, .. } if yields.is_none() => {
+                    *yields = Some((term, self.current_source_range));
+                    return Ok(());
+                }
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::FoldExpr(_) => (),
+                OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Problem { .. }
+                | OpenNarrativeElement::Solution(..)
+                | OpenNarrativeElement::Slide { .. }
+                | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofTerm));
+                }
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofTerm))
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn close_proof_method(
+        &mut self,
+        terms: Vec<(Term, crate::NodePath)>,
+        node: &N,
+    ) -> super::Result<()> {
+        let term = node.as_term(terms)?.simplify();
+
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::ProofStep { method, .. } if method.is_none() => {
+                    *method = Some((term, self.current_source_range));
+                    return Ok(());
+                }
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::FoldExpr(_) => (),
+                OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Problem { .. }
+                | OpenNarrativeElement::Solution(..)
+                | OpenNarrativeElement::Slide { .. }
+                | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofMethod));
+                }
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofMethod))
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn close_proof_just(
+        &mut self,
+        terms: Vec<(Term, crate::NodePath)>,
+        node: &N,
+    ) -> super::Result<()> {
+        let term = node.as_term(terms)?.simplify();
+
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::ProofStep { justification, .. }
+                    if justification.is_none() =>
+                {
+                    *justification = Some((term, self.current_source_range));
+                    return Ok(());
+                }
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::FoldExpr(_) => (),
+                OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Problem { .. }
+                | OpenNarrativeElement::Solution(..)
+                | OpenNarrativeElement::Slide { .. }
+                | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(
+                        FtmlKey::ProofJustification,
+                    ));
+                }
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(
+            FtmlKey::ProofJustification,
+        ))
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn close_proof_argument(
+        &mut self,
+        terms: Vec<(Term, crate::NodePath)>,
+        index: Option<NonZeroU8>,
+        node: &N,
+    ) -> super::Result<()> {
+        let term = node.as_term(terms)?.simplify();
+
+        for n in self.narrative.iter_mut() {
+            match n {
+                OpenNarrativeElement::ProofStep { arguments, .. }
+                    if index.is_none_or(|v| {
+                        arguments
+                            .get(v.get() as usize - 1)
+                            .is_none_or(Option::is_none)
+                    }) =>
+                {
+                    if let Some(idx) = index {
+                        let idx = (idx.get() - 1) as usize;
+                        while arguments.len() <= idx {
+                            arguments.push(None);
+                        }
+                        *arguments.get_mut(idx).expect("impossible") =
+                            Some((term, self.current_source_range));
+                    } else {
+                        arguments.push(Some((term, self.current_source_range)));
+                    }
+                    return Ok(());
+                }
+                OpenNarrativeElement::Invisible | OpenNarrativeElement::FoldExpr(_) => (),
+                OpenNarrativeElement::Section { .. }
+                | OpenNarrativeElement::VariableDeclaration { .. }
+                | OpenNarrativeElement::Paragraph { .. }
+                | OpenNarrativeElement::Problem { .. }
+                | OpenNarrativeElement::Solution(..)
+                | OpenNarrativeElement::Slide { .. }
+                | OpenNarrativeElement::SkipSection { .. }
+                | OpenNarrativeElement::Notation { .. }
+                | OpenNarrativeElement::NotationComp { .. }
+                | OpenNarrativeElement::ArgSep { .. }
+                | OpenNarrativeElement::NotationArg(_)
+                | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::Module { .. }
+                | OpenNarrativeElement::MathStructure { .. }
+                | OpenNarrativeElement::FillinSol { .. }
+                | OpenNarrativeElement::ProblemHint
+                | OpenNarrativeElement::ProblemExNote
+                | OpenNarrativeElement::ProblemGradingNote(_)
+                | OpenNarrativeElement::AnswerClass { .. }
+                | OpenNarrativeElement::ChoiceBlock { .. }
+                | OpenNarrativeElement::ProblemChoice { .. }
+                | OpenNarrativeElement::ProblemChoiceVerdict
+                | OpenNarrativeElement::ProblemChoiceFeedback
+                | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
+                | OpenNarrativeElement::Morphism { .. } => {
+                    return Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofArgument));
+                }
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofArgument))
     }
 
     fn find_symbol<'a>(
@@ -2350,6 +3025,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ComplexTerm { .. }
                 | OpenDomainElement::DefComp
                 | OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::Premise { .. }
+                | OpenDomainElement::Conclusion { .. }
                 | OpenDomainElement::HeadTerm { .. }
                 | OpenDomainElement::InferenceRule { .. }
                 | OpenDomainElement::OMA { .. }
@@ -2359,6 +3036,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::VariableReference { .. }
+                | OpenDomainElement::FoldExprShort
+                | OpenDomainElement::ProofTerm { .. }
+                | OpenDomainElement::ProofMethod { .. }
+                | OpenDomainElement::ProofJustification { .. }
+                | OpenDomainElement::ProofArgument { .. }
                 | OpenDomainElement::Type { .. } => (),
             }
         }
@@ -2462,6 +3144,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::SymbolDeclaration { .. }
                 | OpenDomainElement::SymbolReference { .. }
                 | OpenDomainElement::ArgTypes(_)
+                | OpenDomainElement::FoldExprShort
                 | OpenDomainElement::VariableReference { .. },
             )
             | None => (),
@@ -2480,6 +3163,36 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     node: ancestor,
                 }
                 | OpenDomainElement::Definiens {
+                    terms,
+                    node: ancestor,
+                    ..
+                }
+                | OpenDomainElement::Premise {
+                    terms,
+                    node: ancestor,
+                    ..
+                }
+                | OpenDomainElement::Conclusion {
+                    terms,
+                    node: ancestor,
+                    ..
+                }
+                | OpenDomainElement::ProofTerm {
+                    terms,
+                    node: ancestor,
+                    ..
+                }
+                | OpenDomainElement::ProofMethod {
+                    terms,
+                    node: ancestor,
+                    ..
+                }
+                | OpenDomainElement::ProofJustification {
+                    terms,
+                    node: ancestor,
+                    ..
+                }
+                | OpenDomainElement::ProofArgument {
                     terms,
                     node: ancestor,
                     ..

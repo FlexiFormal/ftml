@@ -12,44 +12,6 @@ use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 use send_wrapper::SendWrapper;
-/*
-pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> impl IntoView {
-    inject_css("ftml-sections", include_str!("sections.css"));
-    let SectionInfo {
-        id,
-        style,
-        class,
-        lvl,
-        uri,
-    } = info;
-    tracing::debug!("section {id} at level {lvl:?}");
-
-    view! {
-        <div id=id style=style class=class>
-          {
-            if let LogicalLevel::Section(lvl) = lvl {
-                tracing::trace!("Section at level {lvl}");
-            }
-            FtmlConfig::wrap_section(&uri,children)
-          }
-        </div>
-    }
-}
-
-pub fn section_title(
-    lvl: SectionLevel,
-    class: &'static str,
-    children: OriginalNode,
-) -> impl IntoView {
-    tracing::debug!("section title at level {lvl:?}");
-    view! {
-      {children.attr("class",class)}
-      {
-          FtmlConfig::insert_section_title(lvl)
-      }
-    }
-}
- */
 
 #[derive(Default, Clone)]
 struct SectionTitle(Option<(&'static str, SendWrapper<OriginalNode>)>);
@@ -94,22 +56,11 @@ pub fn section<V: IntoView>(info: SectionInfo, children: impl FnOnce() -> V) -> 
     );
     let title = move || {
         title.get().0.map(|(class, title)| {
-            /*
-            let pos_ref = NodeRef::new();
-            let marker_ref = NodeRef::new();
-            let _ = Effect::new(move || {
-                if let Some(pos) = pos_ref.get()
-                    && let Some(marker) = marker_ref.get()
-                {
-                    position_marker(&pos, &marker);
-                }
-            });
-            */
             view! {
-                <div /*node_ref=pos_ref*/ style="display:contents;">
+                <div style="display:contents;">
                     {title.take().attr("class",class)}
                 </div>
-                <div /*node_ref=marker_ref*/ on:click=move |_| visible.set(!visible.get_untracked())
+                <div on:click=move |_| visible.set(!visible.get_untracked())
                     style="width:0;height:0;left:-15px;top:-15px;position:relative;"
                 >
                     {collapse_marker(visible,false)}

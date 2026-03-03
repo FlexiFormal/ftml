@@ -68,6 +68,18 @@ pub trait FtmlViews: 'static {
         super::global_setup(then)
     }
 
+    #[inline]
+    #[allow(unused_variables)]
+    fn fold_expr<V: IntoView>(
+        show: bool,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+    fn fold_expr_short(then: OriginalNode) -> impl IntoView {
+        Self::cont(then, true)
+    }
+
     fn section<V: IntoView>(
         info: SectionInfo,
         then: impl FnOnce() -> V + Send + 'static,
@@ -278,6 +290,18 @@ pub trait TermTrackedViews: 'static {
         super::global_setup(then)
     }
 
+    #[inline]
+    #[allow(unused_variables)]
+    fn fold_expr<V: IntoView>(
+        show: bool,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        then()
+    }
+    fn fold_expr_short(then: OriginalNode) -> impl IntoView {
+        Self::cont(then, true)
+    }
+
     fn section<V: IntoView>(
         info: SectionInfo,
         then: impl FnOnce() -> V + Send + 'static,
@@ -444,6 +468,17 @@ impl<T: TermTrackedViews + ?Sized> FtmlViews for T {
     #[inline]
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
         <T as TermTrackedViews>::top(then)
+    }
+
+    #[inline]
+    fn fold_expr<V: IntoView>(
+        show: bool,
+        then: impl FnOnce() -> V + Send + 'static,
+    ) -> impl IntoView {
+        <T as TermTrackedViews>::fold_expr(show, then)
+    }
+    fn fold_expr_short(then: OriginalNode) -> impl IntoView {
+        <T as TermTrackedViews>::fold_expr_short(then)
     }
 
     #[inline]

@@ -1,6 +1,7 @@
 mod arguments;
 mod bank;
 pub mod eq;
+pub mod free;
 mod macros;
 #[cfg(feature = "openmath")]
 pub mod om;
@@ -213,11 +214,30 @@ impl From<Option<Term>> for MutableTerm {
     }
 }
 
+impl std::hash::Hash for MutableTerm {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        ((&raw const *self.0) as usize).hash(state);
+    }
+}
+impl PartialEq for MutableTerm {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::addr_eq(&raw const *self.0, &raw const *other.0)
+    }
+}
+impl Eq for MutableTerm {}
+
 #[cfg(feature = "deepsize")]
 impl deepsize::DeepSizeOf for TermContainer {
     fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
         self.parsed.deep_size_of_children(context)
             + self.checked.0.lock().deep_size_of_children(context)
+    }
+}
+
+#[cfg(feature = "deepsize")]
+impl deepsize::DeepSizeOf for MutableTerm {
+    fn deep_size_of_children(&self, context: &mut deepsize::Context) -> usize {
+        self.0.lock().deep_size_of_children(context)
     }
 }
 

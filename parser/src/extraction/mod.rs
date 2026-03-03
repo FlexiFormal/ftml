@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use either::Either::{Left, Right};
 use ftml_ontology::{
-    narrative::elements::{DocumentElement, DocumentTerm, LogicalParagraph, VariableDeclaration},
+    narrative::elements::{DocumentElement, LogicalParagraph, VariableDeclaration},
     terms::{Term, Variable},
     utils::SourceRange,
 };
@@ -74,7 +74,13 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenDomainElement::ReturnType { .. }
                 | OpenDomainElement::ArgTypes(_)
                 | OpenDomainElement::InferenceRule { .. }
-                | OpenDomainElement::Assign { .. } => {
+                | OpenDomainElement::FoldExprShort
+                | OpenDomainElement::Assign { .. }
+                //| OpenDomainElement::ProofArgument
+                //| OpenDomainElement::ProofTerm
+                //| OpenDomainElement::ProofMethod
+                //| OpenDomainElement::ProofJustification
+                => {
                     return Err(FtmlExtractionError::NotIn(
                         in_elem,
                         "a module (or inside a declaration)",
@@ -82,6 +88,12 @@ pub trait FtmlExtractor: 'static + Sized {
                 }
 
                 OpenDomainElement::Definiens { .. }
+                | OpenDomainElement::Premise { .. }
+                | OpenDomainElement::Conclusion { .. }
+                | OpenDomainElement::ProofTerm { .. }
+                | OpenDomainElement::ProofMethod { .. }
+                | OpenDomainElement::ProofJustification { .. }
+                | OpenDomainElement::ProofArgument { .. }
                 | OpenDomainElement::Comp
                 | OpenDomainElement::DefComp => (),
             }
@@ -121,6 +133,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::Definiendum(_) => None,
                 OpenNarrativeElement::Section { uri, .. }
                 | OpenNarrativeElement::Notation { uri, .. }
@@ -163,6 +178,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::SkipSection { .. } => return false,
             }
         }
@@ -179,6 +197,11 @@ pub trait FtmlExtractor: 'static + Sized {
                     | OpenDomainElement::Morphism { .. }
                     | OpenDomainElement::Assign { .. }
                     | OpenDomainElement::ArgTypes(_)
+                    | OpenDomainElement::FoldExprShort
+                    //| OpenDomainElement::ProofArgument
+                    //| OpenDomainElement::ProofTerm
+                    //| OpenDomainElement::ProofMethod
+                    //| OpenDomainElement::ProofJustification
                     | OpenDomainElement::SymbolDeclaration { .. },
                 ) => false,
                 Some(
@@ -193,7 +216,13 @@ pub trait FtmlExtractor: 'static + Sized {
                     | OpenDomainElement::Type { .. }
                     | OpenDomainElement::ReturnType { .. }
                     | OpenDomainElement::Definiens { .. }
+                    | OpenDomainElement::Premise { .. }
+                    | OpenDomainElement::Conclusion { .. }
                     | OpenDomainElement::InferenceRule { .. }
+                    | OpenDomainElement::ProofTerm { .. }
+                    | OpenDomainElement::ProofMethod { .. }
+                    | OpenDomainElement::ProofJustification { .. }
+                    | OpenDomainElement::ProofArgument { .. }
                     | OpenDomainElement::Comp
                     | OpenDomainElement::DefComp,
                 ) => true,
@@ -242,6 +271,9 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenNarrativeElement::ProblemChoiceVerdict
                 | OpenNarrativeElement::ProblemChoiceFeedback
                 | OpenNarrativeElement::FillinSolCase(_)
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. }
                 | OpenNarrativeElement::ArgSep { .. } => continue, // Narrative::Notation(_) => continue,
             };
             for c in ch.iter().rev() {
@@ -280,7 +312,11 @@ pub trait FtmlExtractor: 'static + Sized {
     fn last_paragraph(&self) -> Option<&LogicalParagraph> {
         for e in self.iterate_narrative() {
             match e {
-                OpenNarrativeElement::Invisible | OpenNarrativeElement::Definiendum(_) => (),
+                OpenNarrativeElement::Invisible
+                | OpenNarrativeElement::Definiendum(_)
+                | OpenNarrativeElement::FoldExpr(_)
+                | OpenNarrativeElement::FoldExprShort
+                | OpenNarrativeElement::ProofStep { .. } => (),
                 OpenNarrativeElement::Module { children, .. }
                 | OpenNarrativeElement::MathStructure { children, .. }
                 | OpenNarrativeElement::Morphism { children, .. }
@@ -316,74 +352,7 @@ pub trait FtmlExtractor: 'static + Sized {
         }
     }
 
-    fn last_term(&self) -> Option<&Term>; /* {
-    for e in self.iterate_narrative() {
-    match e {
-    OpenNarrativeElement::Invisible => (),
-    OpenNarrativeElement::Module { children, .. }
-    | OpenNarrativeElement::MathStructure { children, .. }
-    | OpenNarrativeElement::Morphism { children, .. }
-    | OpenNarrativeElement::Section { children, .. }
-    | OpenNarrativeElement::Paragraph { children, .. }
-    | OpenNarrativeElement::Slide { children, .. }
-    | OpenNarrativeElement::Problem { children, .. }
-    | OpenNarrativeElement::SkipSection { children } => match children.last() {
-    Some(DocumentElement::Term(term)) => {
-    return Some(term.parsed());
-    }
-    _ => break,
-    },
-    OpenNarrativeElement::Notation { .. }
-    | OpenNarrativeElement::NotationComp { .. }
-    | OpenNarrativeElement::ArgSep { .. }
-    | OpenNarrativeElement::VariableDeclaration { .. }
-    | OpenNarrativeElement::Definiendum(_)
-    | OpenNarrativeElement::Solution(_)
-    | OpenNarrativeElement::FillinSol { .. }
-    | OpenNarrativeElement::ProblemHint
-    | OpenNarrativeElement::ProblemExNote
-    | OpenNarrativeElement::ProblemGradingNote(_)
-    | OpenNarrativeElement::AnswerClass { .. }
-    | OpenNarrativeElement::ChoiceBlock { .. }
-    | OpenNarrativeElement::ProblemChoice { .. }
-    | OpenNarrativeElement::ProblemChoiceVerdict
-    | OpenNarrativeElement::ProblemChoiceFeedback
-    | OpenNarrativeElement::FillinSolCase(_)
-    | OpenNarrativeElement::NotationArg(_) => break,
-    }
-    }
-    if let Some(d) = self.iterate_domain().next().and_then(|d| match d {
-    OpenDomainElement::Argument { terms, .. }
-    | OpenDomainElement::HeadTerm { terms, .. }
-    | OpenDomainElement::Type { terms, .. }
-    | OpenDomainElement::ReturnType { terms, .. }
-    | OpenDomainElement::Definiens { terms, .. } => terms.last().map(|(t, _)| t),
-    OpenDomainElement::ArgTypes(terms)
-    | OpenDomainElement::InferenceRule {
-    parameters: terms, ..
-    } => terms.last(),
-    OpenDomainElement::Module { .. }
-    | OpenDomainElement::MathStructure { .. }
-    | OpenDomainElement::Assign { .. }
-    | OpenDomainElement::Morphism { .. }
-    | OpenDomainElement::OMA { .. }
-    | OpenDomainElement::OMBIND { .. }
-    | OpenDomainElement::OML { .. }
-    | OpenDomainElement::ComplexTerm { .. }
-    | OpenDomainElement::SymbolDeclaration { .. }
-    | OpenDomainElement::SymbolReference { .. }
-    | OpenDomainElement::Comp
-    | OpenDomainElement::DefComp
-    | OpenDomainElement::VariableReference { .. } => None,
-    }) {
-    return Some(d);
-    }
-    if let Some(DocumentElement::Term(term)) = self.iterate_dones().next_back() {
-    Some(term.parsed())
-    } else {
-    None
-    }
-    } */
+    fn last_term(&self) -> Option<&Term>;
 
     fn term_at(&self, pos: ArgumentPosition) -> Option<&Term> {
         self.iterate_domain().next().and_then(|e| match e {
@@ -428,6 +397,12 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::ArgTypes(_)
             | OpenDomainElement::ReturnType { .. }
             | OpenDomainElement::Definiens { .. }
+            | OpenDomainElement::Premise { .. }
+            | OpenDomainElement::Conclusion { .. }
+            | OpenDomainElement::ProofTerm { .. }
+            | OpenDomainElement::ProofMethod { .. }
+            | OpenDomainElement::ProofJustification { .. }
+            | OpenDomainElement::ProofArgument { .. }
             | OpenDomainElement::Module { .. }
             | OpenDomainElement::MathStructure { .. }
             | OpenDomainElement::Morphism { .. }
@@ -439,7 +414,13 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::DefComp
             | OpenDomainElement::Assign { .. }
             | OpenDomainElement::InferenceRule { .. }
-            | OpenDomainElement::VariableReference { .. } => None,
+            | OpenDomainElement::VariableReference { .. }
+            | OpenDomainElement::FoldExprShort
+            //| OpenDomainElement::ProofArgument
+            //| OpenDomainElement::ProofTerm
+            //| OpenDomainElement::ProofMethod
+            //| OpenDomainElement::ProofJustification
+            => None,
         })
     }
 }

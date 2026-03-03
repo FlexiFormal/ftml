@@ -3,7 +3,7 @@ use crate::{
         DocumentRange, Narrative,
         elements::{DocumentElement, DocumentElementRef, IsDocumentElement},
     },
-    terms::Term,
+    terms::{Term, TermContainer},
     utils::SourceRange,
 };
 use ftml_uris::{DocumentElementUri, Id, SymbolUri};
@@ -29,9 +29,15 @@ pub struct LogicalParagraph {
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub styles: Box<[Id]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub premises: Box<[Term]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub binds_variables: Box<[DocumentElementUri]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub children: Box<[DocumentElement]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
-    pub fors: Box<[(SymbolUri, Option<Term>)]>,
+    pub fors: Box<[(SymbolUri, Option<TermContainer>)]>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub steps: Box<[ParagraphStep]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub source: SourceRange,
 }
@@ -252,6 +258,93 @@ impl std::str::FromStr for ParagraphKind {
             _ => Err(InvalidParagraphKind),
         }
     }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
+pub enum ParagraphStep {
+    ProofAssumption {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        var_name: Option<DocumentElementUri>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        method: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        justification: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        arguments: Box<[Option<(Term, SourceRange)>]>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        yields: Option<(Term, SourceRange)>,
+    },
+    ProofStep {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        var_name: Option<DocumentElementUri>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        method: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        justification: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        arguments: Box<[Option<(Term, SourceRange)>]>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        yields: Option<(Term, SourceRange)>,
+    },
+    ProofConclusion {
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        var_name: Option<DocumentElementUri>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        method: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        justification: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        arguments: Box<[Option<(Term, SourceRange)>]>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        yields: Option<(Term, SourceRange)>,
+    },
+    Subproof {
+        uri: DocumentElementUri,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        var_name: Option<DocumentElementUri>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        method: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        justification: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        arguments: Box<[Option<(Term, SourceRange)>]>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        yields: Option<(Term, SourceRange)>,
+        #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        steps: Box<[Self]>,
+    },
+    EquationStep,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "serde-lite",
+    derive(serde_lite::Serialize, serde_lite::Deserialize)
+)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+#[repr(u8)]
+pub enum ParagraphStepKind {
+    Assumption = 0,
+    ProofStep = 1,
+    Conclusion = 2,
+    EquationStep = 3,
+    SubProof = 4,
 }
 
 #[cfg(feature = "deepsize")]
