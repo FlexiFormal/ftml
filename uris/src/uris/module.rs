@@ -305,7 +305,7 @@ impl ModuleUri {
 
         // SAFETY: by construction, segments are non-empty (=> first() is Some()), and have no illegal
         // characters (=> parse() return Ok()). Since !is_top(), name contains at least one '/'.
-        let (last, name) = unsafe {
+        let (modname, symname) = unsafe {
             let (first, rest) = self.name().as_ref().split_once('/').unwrap_unchecked();
             (
                 first.parse().unwrap_unchecked(),
@@ -316,9 +316,9 @@ impl ModuleUri {
         Some(SymbolUri {
             module: Self {
                 path: self.path,
-                name,
+                name: modname,
             },
-            name: last,
+            name: symname,
         })
     }
 
