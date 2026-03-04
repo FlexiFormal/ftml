@@ -280,11 +280,11 @@ impl ModuleUri {
 
     /// Converts this module URI into a symbol URI by treating the first segment
     /// of the module name as the top-level module name, and all remaining segments as the symbol name.
-    ///  => into_top_symbol().module().is_top()
+    ///  => `into_top_symbol().module().is_top()`
     ///
     /// Returns `None` if *and only if* the module name has only one segment (is top-level).
     ///
-    /// Useful to e.g. retrieve this ModuleLike from the top-level Module.
+    /// Useful to e.g. retrieve this `ModuleLike` from the top-level Module.
     ///
     /// # Examples
     ///

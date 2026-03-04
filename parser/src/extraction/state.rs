@@ -2421,16 +2421,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             } = e
             {
                 steps.push(step);
-                return Ok(());
+                break;
             }
-        }
-        if self
-            .narrative
-            .iter()
-            .any(|e| matches!(e, OpenNarrativeElement::Solution(_)))
-        {
-            tracing::info!("Skipping paragraph in solutions block");
-            return Ok(());
         }
         let p = LogicalParagraph {
             kind: ParagraphKind::SubProof,
@@ -2448,7 +2440,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         };
         tracing::info!("Adding subproof {p:#?}");
         self.push_elem(DocumentElement::Paragraph(p));
-        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::ProofStep))
+        Ok(())
     }
 
     fn close_proof_step(
