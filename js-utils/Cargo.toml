@@ -14,7 +14,8 @@ workspace = true
 serde = ["dep:serde","dep:serde-wasm-bindgen"]
 ## Can use serde-lite to convert between rs/js
 serde-lite = ["dep:serde-lite","dep:serde_json"]
-
+## use wasm-split
+wasm-split = ["dep:wasm_split_helpers","dep:leptos","dep:paste"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -50,3 +51,6 @@ serde-lite = { workspace = true,optional=true }
 thiserror = {workspace = true}
 tracing = {workspace = true}
 send_wrapper = {workspace=true}
+wasm_split_helpers = {workspace=true,optional=true}
+leptos = {workspace=true,optional=true}
+paste = {workspace=true,optional=true}

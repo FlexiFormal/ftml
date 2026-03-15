@@ -242,23 +242,28 @@ fn content_drawer<B: SendBackend, Cont: ViewContinuations>() -> AnyView {
                 </DrawerHeaderTitle>
             </DrawerHeader>
             <DrawerBody>
-                {move || if open.get() { let uri= uri.clone(); Some(LocalCache::with_or_toast::<B,_,_>(
-                    move |b| b.get_document(uri), move |d| {
-                        if let Some(t) = &d.title {
-                            title.set(t.to_string());
-                        }
-                        //let doc = d.clone();
-                        view!{
-                            //<span on:click=move |_| leptos::logging::log!("{doc:#?}")>"Print JSON"</span>
-                            {d.as_view::<B>()}
-                            {Cont::document_drawer(&d)}
-                        }.into_any()
-                    },
-                    || "error".into_any()
-                ))} else { None }
+                {move || if open.get() {
+                    let uri= uri.clone(); Some(LocalCache::with_or_toast::<B,_,_>(
+                        move |b| b.get_document(uri), move |d| {
+                            if let Some(t) = &d.title {
+                                title.set(t.to_string());
+                            }
+                            //let doc = d.clone();
+                            view!{
+                                //<span on:click=move |_| leptos::logging::log!("{doc:#?}")>"Print JSON"</span>
+                                {d.as_view::<B>()}
+                                {Cont::document_drawer(&d)}
+                            }.into_any()
+                        },
+                        || "error".into_any()
+                    ))
+                } else {
+                    None
+                }
             }</DrawerBody>
         </OverlayDrawer>
-    }.into_any()
+    }
+    .into_any()
 }
 
 fn pdf<B: SendBackend>() -> impl IntoView {

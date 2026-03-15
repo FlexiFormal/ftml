@@ -7,6 +7,7 @@
 #![cfg_attr(doc,doc = document_features::document_features!())]
 
 pub mod conversion;
+pub mod split;
 
 use wasm_bindgen::JsValue;
 

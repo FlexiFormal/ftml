@@ -21,7 +21,7 @@ use ftml_ontology::{
     utils::Css,
 };
 use ftml_uris::{
-    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri, UriKind,
+    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
 };
 use std::{hint::unreachable_unchecked, marker::PhantomData};
 
@@ -47,6 +47,311 @@ pub struct LocalCache {
     pub(crate) solutions: Map<DocumentElementUri, Solutions>,
 }
 impl LocalCache {
+    pub fn get_fragment<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: ftml_uris::Uri,
+        context: Option<NarrativeUri>,
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<B::Error>>>
+    + Send
+    + 'static {
+        if let Uri::DocumentElement(uri) = &uri
+            && let Some(s) = self.paragraphs.get(uri)
+        {
+            either::Either::Left(std::future::ready(Ok((s.clone(), Box::new([]) as _, true))))
+        } else {
+            either::Either::Right(backend.get_fragment(uri, context))
+        }
+    }
+
+    pub fn get_definition<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: SymbolUri,
+        context: Option<NarrativeUri>,
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<B::Error>>>
+    + Send
+    + 'static {
+        if let Some(v) = self.fors.get(&uri)
+            && let Some((uri, _)) = v
+                .iter()
+                .find(|(_, k)| matches!(k, ParagraphOrProblemKind::Definition))
+            && let Some(s) = self.paragraphs.get(uri)
+        {
+            return either::Either::Left(std::future::ready(Ok((
+                s.clone(),
+                Box::new([]) as _,
+                true,
+            ))));
+        }
+        either::Either::Right(backend.get_fragment(uri.into(), context))
+    }
+
+    pub fn get_module<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: ModuleUri,
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<B::Error>>> + Send + 'static {
+        use futures_util::TryFutureExt;
+        if uri.is_top() {
+            if let Some(m) = self.modules.get(&uri) {
+                return either::Left(either::Left(std::future::ready(Ok(ModuleLike::Module(
+                    m.clone(),
+                )))));
+            }
+            either::Left(either::Right(backend.get_module(uri)))
+        } else {
+            let uriclone = uri.clone();
+            let Some(SymbolUri { name, module }) = uri.into_symbol() else {
+                // SAFETY: uri is not a top-level module uri, so it is compatible with a symbol URI
+                unsafe { unreachable_unchecked() }
+            };
+            let fut = self.modules.get(&module).map_or_else(
+                || {
+                    either::Right(backend.get_module(module).map_ok(|m| {
+                        let ModuleLike::Module(m) = m else {
+                            // SAFETY: A top-level module uri can only resolve to a top-level module
+                            unsafe { unreachable_unchecked() }
+                        };
+                        m
+                    }))
+                },
+                |m| either::Left(std::future::ready(Ok(m.clone()))),
+            );
+            either::Right(fut.and_then(move |m| {
+                std::future::ready(
+                    m.as_module_like(&name)
+                        .ok_or_else(move || BackendError::NotFound(uriclone.into())),
+                )
+            }))
+        }
+    }
+
+    pub fn get_document<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: DocumentUri,
+    ) -> impl Future<Output = Result<Document, BackendError<B::Error>>> + Send + 'static {
+        if let Some(m) = self.documents.get(&uri) {
+            return either::Either::Left(std::future::ready(Ok(m.clone())));
+        }
+        either::Either::Right(backend.get_document(uri))
+    }
+
+    pub fn get_document_term<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: DocumentElementUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<DocumentTerm, SharedDocumentElement<DocumentTerm>>,
+            BackendError<B::Error>,
+        >,
+    > + Send
+    + 'static {
+        if let Some(m) = self.documents.get(&uri.document) {
+            let r = m.get_as::<DocumentTerm>(&uri.name).map_or_else(
+                move || Err(BackendError::NotFound(uri.into())),
+                |d| Ok(either::Either::Right(d)),
+            );
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(backend.get_document_term(uri))
+    }
+
+    pub fn get_symbol<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<Either<Symbol, SharedDeclaration<Symbol>>, BackendError<B::Error>>,
+    > + Send
+    + 'static {
+        let uri = uri.simple_module();
+        if let Some(m) = self.modules.get(&uri.module) {
+            let r = m.get_as::<Symbol>(&uri.name).map_or_else(
+                move || Err(BackendError::NotFound(uri.into())),
+                |d| Ok(either::Either::Right(d)),
+            );
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(backend.get_symbol(uri))
+    }
+
+    pub fn get_morphism<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<Either<Morphism, SharedDeclaration<Morphism>>, BackendError<B::Error>>,
+    > + Send
+    + 'static {
+        let uri = uri.simple_module();
+        if let Some(m) = self.modules.get(&uri.module) {
+            let r = m.get_as::<Morphism>(&uri.name).map_or_else(
+                move || Err(BackendError::NotFound(uri.into())),
+                |d| Ok(either::Either::Right(d)),
+            );
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(backend.get_morphism(uri))
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn get_structure<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: SymbolUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
+            BackendError<B::Error>,
+        >,
+    > + Send
+    + 'static {
+        let uri = uri.simple_module();
+        if let Some(m) = self.modules.get(&uri.module) {
+            let r = m.get_as::<MathStructure>(&uri.name).map_or_else(
+                || {
+                    m.get_as::<StructureExtension>(&uri.name).map_or_else(
+                        move || Err(BackendError::NotFound(uri.into())),
+                        |d| Ok(either::Either::Right(d)),
+                    )
+                },
+                |d| Ok(either::Either::Left(d)),
+            );
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(backend.get_structure(uri))
+    }
+
+    pub fn get_variable<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: DocumentElementUri,
+    ) -> impl Future<
+        Output = Result<
+            Either<VariableDeclaration, SharedDocumentElement<VariableDeclaration>>,
+            BackendError<B::Error>,
+        >,
+    > + Send
+    + 'static {
+        if let Some(m) = self.documents.get(&uri.document) {
+            let r = m.get_as::<VariableDeclaration>(&uri.name).map_or_else(
+                move || Err(BackendError::NotFound(uri.into())),
+                |d| Ok(either::Either::Right(d)),
+            );
+            return either::Either::Left(std::future::ready(r));
+        }
+        either::Either::Right(backend.get_variable(uri))
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn get_document_html<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: DocumentUri,
+        context: Option<NarrativeUri>,
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<B::Error>>>
+    + Send
+    + 'static {
+        self.dochtmls.get(&uri).map_or_else(
+            || either::Either::Right(backend.get_document_html(uri, context)),
+            |s| either::Either::Left(std::future::ready(Ok((s.clone(), Box::new([]) as _, true)))),
+        )
+    }
+
+    pub fn get_solutions<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: DocumentElementUri,
+    ) -> impl Future<Output = Result<Solutions, BackendError<B::Error>>> + Send + 'static {
+        self.solutions.get(&uri).map_or_else(
+            || either::Either::Right(backend.get_solutions(uri)),
+            |s| either::Either::Left(std::future::ready(Ok(s.clone()))),
+        )
+    }
+
+    pub fn get_notations<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: LeafUri,
+    ) -> impl Future<
+        Output = GlobalLocal<Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
+    > + Send
+    + 'static {
+        let local = self.notations.get(&uri).as_deref().cloned();
+        let fut = backend.get_notations(uri);
+        async move {
+            let global = fut.await;
+            GlobalLocal {
+                local,
+                global: Some(global),
+            }
+        }
+    }
+
+    pub fn get_paragraphs<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        uri: SymbolUri,
+        problems: bool,
+    ) -> impl Future<
+        Output = GlobalLocal<
+            Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
+            BackendError<B::Error>,
+        >,
+    > + Send
+    + 'static {
+        let local = self.fors.get(&uri).as_deref().cloned();
+        let fut = backend.get_logical_paragraphs(uri, problems);
+        async move {
+            let global = fut.await;
+            GlobalLocal {
+                local,
+                global: Some(global),
+            }
+        }
+    }
+
+    pub fn get_notation<B: FtmlBackend<Error: Send>>(
+        &self,
+        backend: &B,
+        symbol: Option<LeafUri>,
+        uri: DocumentElementUri,
+    ) -> impl Future<Output = Result<Notation, BackendError<B::Error>>> + Send + 'static {
+        use either::Either::{Left, Right};
+        let uriclone = uri.clone();
+        let local = symbol.as_ref().map_or_else(
+            || {
+                self.notations.iter().find_map(|e| {
+                    e.value()
+                        .iter()
+                        .find_map(|(u, n)| if *u == uri { Some(n.clone()) } else { None })
+                })
+            },
+            |symbol| {
+                self.notations.get(symbol).and_then(|v| {
+                    v.iter()
+                        .find_map(|(u, n)| if *u == uri { Some(n.clone()) } else { None })
+                })
+            },
+        );
+        local.map_or_else(
+            || {
+                symbol.map_or_else(
+                    move || {
+                        Left(std::future::ready(Err(BackendError::NotFound(
+                            uriclone.into(),
+                        ))))
+                    },
+                    |symbol| Right(backend.get_notation(symbol, uri)),
+                )
+            },
+            |n| Left(std::future::ready(Ok(n))),
+        )
+    }
+
     pub fn resource<B: SendBackend, R, Fut>(
         f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
     ) -> leptos::prelude::RwSignal<

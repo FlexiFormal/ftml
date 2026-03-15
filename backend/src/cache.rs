@@ -115,8 +115,10 @@ where
         global_context: &[ModuleUri],
         term: &ftml_ontology::terms::Term,
         in_path: &ftml_ontology::terms::termpaths::TermPath,
-    ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>> + Send + use<B>
-    {
+    ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>>
+    + Send
+    + use<B>
+    + 'static {
         self.inner
             .check_term(global_context, term, in_path)
             .map_err(|e| BackendError::ToDo(e.to_string()))
@@ -136,7 +138,8 @@ where
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + 'static
+    {
         self.fragment_cache
             .get((uri, context), |(uri, context)| {
                 self.inner.get_fragment(uri, context)
@@ -152,7 +155,8 @@ where
             ftml_ontology::narrative::elements::problems::Solutions,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > + Send
+    + 'static {
         // TODO returns wrong error type
         let fut = self.inner.get_solutions(uri);
         async move { fut.await.map_err(|e| BackendError::ToDo(e.to_string())) }
@@ -162,8 +166,9 @@ where
         &self,
         uri: DocumentUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
-    {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>>
+    + Send
+    + 'static {
         self.doc_html_cache
             .get((uri, context), |(uri, context)| {
                 self.inner.get_document_html(uri, context)
@@ -176,7 +181,8 @@ where
         uri: DocumentUri,
     ) -> impl Future<
         Output = Result<(Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<Self::Error>>,
-    > + Send {
+    > + Send
+    + 'static {
         self.toc_cache
             .get(uri, |uri| self.inner.get_toc(uri))
             .map_err(Into::into)
@@ -185,7 +191,7 @@ where
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> {
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> + 'static {
         if uri.is_top() {
             either::Either::Left(
                 self.modules_cache
@@ -232,7 +238,7 @@ where
     fn get_document(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> {
+    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + 'static {
         self.documents_cache
             .get(uri, |uri| self.inner.get_document(uri))
             .map_err(Into::into)
@@ -242,7 +248,7 @@ where
         &self,
         uri: LeafUri,
     ) -> impl Future<Output = Result<Vec<(DocumentElementUri, Notation)>, BackendError<Self::Error>>>
-    {
+    + 'static {
         self.notations_cache
             .get(uri, |uri| self.inner.get_notations(uri))
             .map_err(Into::into)
@@ -257,7 +263,7 @@ where
             Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
             BackendError<Self::Error>,
         >,
-    > {
+    > + 'static {
         self.paragraphs_cache
             .get(uri, move |uri| {
                 self.inner.get_logical_paragraphs(uri, problems)
@@ -268,7 +274,7 @@ where
         &self,
         symbol: LeafUri,
         uri: DocumentElementUri,
-    ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> {
+    ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> + 'static {
         let uriclone = uri.clone();
         self.notations_cache
             .with(
@@ -302,15 +308,15 @@ where
 }
 impl<K, V, E> Cache<K, V, E>
 where
-    K: std::hash::Hash + Clone + Eq,
-    V: Clone + Send + Sync,
-    E: std::fmt::Debug + std::fmt::Display + Clone + Send + Sync,
+    K: std::hash::Hash + Clone + Eq + 'static,
+    V: Clone + Send + Sync + 'static,
+    E: std::fmt::Debug + std::fmt::Display + Clone + Send + Sync + 'static,
 {
-    fn get<Fut: Future<Output = Result<V, E>>>(
+    fn get<Fut: Future<Output = Result<V, E>> + 'static, F: FnOnce(K) -> Fut>(
         &self,
         k: K,
-        f: impl FnOnce(K) -> Fut,
-    ) -> impl Future<Output = Result<V, CacheError<E>>> {
+        f: F,
+    ) -> impl Future<Output = Result<V, CacheError<E>>> + use<K, V, E, Fut, F> + 'static {
         use either::Either::{Left, Right};
         match self.map.entry(k.clone()) {
             Entry::Occupied(lock) => {
@@ -331,12 +337,12 @@ where
         }
     }
 
-    fn with<Fut: Future<Output = Result<V, E>>, R: Send>(
+    fn with<Fut: Future<Output = Result<V, E>> + 'static, R: Send + 'static>(
         &self,
         k: K,
         f: impl FnOnce(K) -> Fut,
-        then: impl FnOnce(&V) -> R + Send,
-    ) -> impl Future<Output = Result<R, CacheError<E>>> {
+        then: impl FnOnce(&V) -> R + Send + 'static,
+    ) -> impl Future<Output = Result<R, CacheError<E>>> + 'static {
         use either::Either::{Left, Right};
 
         match self.map.entry(k.clone()) {

@@ -160,3 +160,5 @@ proc-macro2 = "1"
 quote = "1"
 syn = "2"
 proc-macro-crate = "3"
+
+wasm_split_helpers="0.2"

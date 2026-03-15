@@ -42,7 +42,7 @@ macro_rules! commata {
 }
 
 pub trait TermExt: Sized {
-    fn into_view<Views: FtmlViews, Be: SendBackend>(self, in_term: bool) -> impl IntoView {
+    fn into_view<Views: FtmlViews, Be: SendBackend>(self, in_term: bool) -> AnyView {
         self.into_view_with_precedence::<Views, Be>(in_term, i64::MAX)
     }
 
@@ -50,7 +50,7 @@ pub trait TermExt: Sized {
         self,
         in_term: bool,
         precedence: i64,
-    ) -> impl IntoView;
+    ) -> AnyView;
 
     fn into_view_safe<Views: FtmlViews, Be: SendBackend>(self) -> impl IntoView {
         owned(move || {
@@ -76,16 +76,16 @@ fn no_notation<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(
     name: &str,
     uri: &LeafUri,
     arguments: &A,
-) -> impl IntoView + use<Views,Be,A> {
-    fn do_view<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(arguments:&A,index:u8) -> impl IntoView + use<Views,Be,A> {
+) -> AnyView {
+    fn do_view<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(arguments:&A,index:u8) -> AnyView {
         if arguments.is_sequence(index) {
-            leptos::either::Either::Right(view! {
+            view! {
                 {maybe_comp!(mo().child('('))}
                 {arguments.render_arg::<Views,Be>(index,ftml_ontology::terms::ArgumentMode::Sequence,i64::MAX)}
                 {maybe_comp!(mo().child(')'))}
-            })
+            }.into_any()
         } else {
-            leptos::either::Either::Left(arguments.render_arg::<Views,Be>(index, ftml_ontology::terms::ArgumentMode::Simple,i64::MAX))
+            arguments.render_arg::<Views,Be>(index, ftml_ontology::terms::ArgumentMode::Simple,i64::MAX)
         }
     }
     let kind = match uri {
@@ -93,17 +93,17 @@ fn no_notation<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(
         LeafUri::Symbol(_) => "OMID",
     };
     if arguments.is_empty() {
-        return leptos::either::Either::Left(
+        return
             mtext()
                 .style("color:red")
                 .child(name.to_string())
                 .attr(FtmlKey::Head.attr_name(), uri.to_string())
                 .attr(FtmlKey::Term.attr_name(), kind)
-                .attr(FtmlKey::Comp.attr_name(), ""),
-        );
+                .attr(FtmlKey::Comp.attr_name(), "").into_any()
+        ;
     }
     //let mut args = arguments.into_iter();
-    leptos::either::Either::Right(view! {<mrow>
+    view! {<mrow>
         {mtext().style("color:red").child(name.to_string())
             .attr(FtmlKey::Head.attr_name(), uri.to_string())
             .attr(FtmlKey::Term.attr_name(), kind)
@@ -122,7 +122,7 @@ fn no_notation<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(
         }).collect_view()}
         */
         {maybe_comp!(mo().child(')'))}
-    </mrow>})
+    </mrow>}.into_any()
 }
 
 impl TermExt for Term {
@@ -130,15 +130,14 @@ impl TermExt for Term {
         self,
         in_term: bool,
         precedence: i64,
-    ) -> impl IntoView + use<Views, Be> {
-        use leptos::either::EitherOf8::{A, B, C, D, E, F, G, H};
+    ) -> AnyView {
         tracing::trace!("Presenting {self:?}");
         //owned(move || {
         match self {
             Self::Symbol {
                 uri,
                 presentation: None,
-            } => A(sym::<Views, Be>(uri, None, in_term, precedence)),
+            } => sym::<Views, Be>(uri, None, in_term, precedence),
             Self::Var {
                 variable:
                     Variable::Ref {
@@ -146,31 +145,31 @@ impl TermExt for Term {
                         is_sequence,
                     },
                 presentation: None,
-            } => B(var_ref::<Views, Be>(
+            } => var_ref::<Views, Be>(
                 declaration,
                 is_sequence,
                 None,
                 in_term,
                 precedence,
-            )),
+            ),
             Self::Var {
                 variable: Variable::Name { name, notated },
                 ..
-            } => C(var_name::<Views>(name, notated, None, in_term)),
+            } => var_name::<Views>(name, notated, None, in_term),
             Self::Application(app) => {
-                D(app.into_view_with_precedence::<Views, Be>(in_term, precedence))
+                app.into_view_with_precedence::<Views, Be>(in_term, precedence)
             }
-            Self::Bound(b) => E(b.into_view_with_precedence::<Views, Be>(in_term, precedence)),
+            Self::Bound(b) => b.into_view_with_precedence::<Views, Be>(in_term, precedence),
             Self::Opaque(o) => {
                 let mut terms = o
                     .terms
                     .iter()
                     .map(|t| {
                         let t = t.clone();
-                        Some(move || t.into_view::<Views, Be>(true).into_any())
+                        Some(move || t.into_view::<Views, Be>(true))
                     })
                     .collect::<Vec<_>>();
-                F(do_opaque(&o.node, &mut terms))
+                do_opaque(&o.node, &mut terms)
             }
             Self::Field(f) if f.presentation.is_some() => {
                 // SAFETY: presentation.is_some();
@@ -180,28 +179,28 @@ impl TermExt for Term {
                     ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
                 match pres {
                     VarOrSym::Sym(uri) => {
-                        A(sym::<Views, Be>(uri, Some(record), in_term, precedence))
+                        sym::<Views, Be>(uri, Some(record), in_term, precedence)
                     }
                     VarOrSym::Var(Variable::Ref {
                         declaration,
                         is_sequence,
-                    }) => B(var_ref::<Views, Be>(
+                    }) => var_ref::<Views, Be>(
                         declaration,
                         is_sequence,
                         Some(record),
                         in_term,
                         precedence,
-                    )),
+                    ),
                     VarOrSym::Var(Variable::Name { name, notated }) => {
-                        C(var_name::<Views>(name, notated, Some(record), in_term))
+                        var_name::<Views>(name, notated, Some(record), in_term)
                     }
                 }
             }
-            Self::Number(n) => G(mn().child(match n {
+            Self::Number(n) => mn().child(match n {
                 Numeric::Int(i) => i.to_string(),
                 Numeric::Float(f) => f.to_string(),
-            })),
-            t => H(mtext().child(format!("{t:?}"))),
+            }).into_any(),
+            t => mtext().child(format!("{t:?}")).into_any(),
         }
         //})
 
@@ -214,9 +213,8 @@ impl TermExt for ApplicationTerm {
         self,
         in_term: bool,
         precedence: i64,
-    ) -> impl IntoView + use<Views, Be> {
+    ) -> AnyView {
         use leptos::either::EitherOf3::{A as A3, B as B3, C as C3};
-        use leptos::either::EitherOf4::{A, B, C, D};
         match &self.head {
             Term::Symbol { .. }
             | Term::Var {
@@ -225,7 +223,7 @@ impl TermExt for ApplicationTerm {
             } if self.presentation.is_none() => {
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(self.head.clone()) };
-                A(application::<Views, Be>(vos, leaf, None, self, precedence))
+                application::<Views, Be>(vos, leaf, None, self, precedence)
             }
             _ if self.presentation.is_some() => {
                 let head = match &self.head {
@@ -240,16 +238,16 @@ impl TermExt for ApplicationTerm {
                     VarOrSym::Sym(s) => s.clone().into(),
                     VarOrSym::Var(Variable::Ref { declaration, .. }) => declaration.clone().into(),
                     VarOrSym::Var(Variable::Name { .. }) => {
-                        return B("TODO: unresolved variable");
+                        return "TODO: unresolved variable".into_any();
                     }
                 };
-                A(application::<Views, Be>(
+                application::<Views, Be>(
                     pres.clone(),
                     uri,
                     Some(head),
                     self,
                     precedence,
-                ))
+                )
             }
             Term::Field(f) if f.presentation.is_none() && f.record_type.is_some() => {
                 // let arguments = do_args::<Views, Be>(arguments);
@@ -265,7 +263,7 @@ impl TermExt for ApplicationTerm {
                     ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
                 // TODO I think this clone can be avoided
                 //let arguments = app.arguments.clone();
-                C(FutureExt::into_view(
+                FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
                             WithLocalCache::<Be>::default().get_structure(uri)
@@ -282,11 +280,11 @@ impl TermExt for ApplicationTerm {
                             precedence,
                         )),
                     },
-                ))
+                ).into_any()
             }
             _ => {
                 use leptos::either::Either::{Left, Right};
-                let head = self.head.clone().into_view::<Views, Be>(true).into_any();
+                let head = self.head.clone().into_view::<Views, Be>(true);
                 let args = commata!(self.arguments.iter().map(|a| match a {
                     Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
                         Left(t.clone().into_view::<Views, Be>(true))
@@ -300,13 +298,12 @@ impl TermExt for ApplicationTerm {
                             {mo().child(']')}
                         }
                     }),
-                }))
-                .into_any(); // avoid recursive types
-                D(leptos::tachys::mathml::mrow()
+                })); // avoid recursive types
+                leptos::tachys::mathml::mrow()
                     .child(head)
                     .child(mo().child('('))
                     .child(args)
-                    .child(mo().child(')')))
+                    .child(mo().child(')')).into_any()
             }
         }
     }
@@ -317,7 +314,7 @@ impl TermExt for BindingTerm {
         self,
         in_term: bool,
         precedence: i64,
-    ) -> impl IntoView {
+    ) -> AnyView {
         use leptos::either::EitherOf3::{A as A3, B as B3, C as C3};
         use leptos::either::EitherOf4::{A, B, C, D};
         match &self.head {
@@ -328,9 +325,9 @@ impl TermExt for BindingTerm {
             } if self.presentation.is_none() => {
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(self.head.clone()) };
-                A(bound::<Views, Be>(
+                bound::<Views, Be>(
                     vos, leaf, /*b.body.clone(),*/ None, self, precedence,
-                ))
+                )
             }
             _ if self.presentation.is_some() => {
                 // SAFETY: presentation.is_some();
@@ -345,16 +342,16 @@ impl TermExt for BindingTerm {
                     VarOrSym::Sym(s) => s.clone().into(),
                     VarOrSym::Var(Variable::Ref { declaration, .. }) => declaration.clone().into(),
                     VarOrSym::Var(Variable::Name { .. }) => {
-                        return C("TODO: unresolved variable");
+                        return "TODO: unresolved variable".into_any();
                     }
                 };
-                A(bound::<Views, Be>(
+                bound::<Views, Be>(
                     pres,
                     uri,
                     /*b.body.clone(),*/ Some(head),
                     self,
                     precedence,
-                ))
+                )
             }
             Term::Field(f) if f.presentation.is_none() && f.record_type.is_some() => {
                 // let arguments = do_args::<Views, Be>(arguments);
@@ -370,7 +367,7 @@ impl TermExt for BindingTerm {
                     ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
                 // TODO I think this clone can be avoided
                 //let arguments = app.arguments.clone();
-                B(FutureExt::into_view(
+                FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
                             WithLocalCache::<Be>::default().get_structure(uri)
@@ -387,11 +384,11 @@ impl TermExt for BindingTerm {
                             precedence,
                         )),
                     },
-                ))
+                ).into_any()
             }
             _ => {
                 //use leptos::either::EitherOf4::{A, B, C, D};
-                let head = self.head.clone().into_view::<Views, Be>(true).into_any();
+                let head = self.head.clone().into_view::<Views, Be>(true);
                 let args = commata!(self.arguments.iter().map(|a| match a {
                     BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
                         A(t.clone().into_view::<Views, Be>(true))
@@ -416,13 +413,12 @@ impl TermExt for BindingTerm {
                             {mo().child(']')}
                         }
                     }),
-                }))
-                .into_any();
-                D(leptos::tachys::mathml::mrow()
+                }));
+                leptos::tachys::mathml::mrow()
                     .child(head)
                     .child(mo().child('('))
                     .child(args)
-                    .child(mo().child(')')))
+                    .child(mo().child(')')).into_any()
             }
         }
     }
@@ -434,7 +430,7 @@ fn application<Views: FtmlViews, Be: SendBackend>(
     real_term: Option<ClonableView>,
     app: ApplicationTerm,
     precedence: i64,
-) -> impl IntoView {
+) -> AnyView {
     let arguments = app.arguments.clone(); //do_args::<Views, Be>(&app.arguments);
     DocumentState::with_head(head.clone(), move || {
         if with_context::<CurrentUri, _>(|_| ()).is_some() {
@@ -462,7 +458,7 @@ fn application<Views: FtmlViews, Be: SendBackend>(
             )
             .into_view::<Views>()
         }
-    })
+    }).into_any()
 }
 
 fn bound<Views: FtmlViews, Be: SendBackend>(
@@ -472,7 +468,7 @@ fn bound<Views: FtmlViews, Be: SendBackend>(
     real_term: Option<ClonableView>,
     app: BindingTerm,
     precedence: i64,
-) -> impl IntoView {
+) -> AnyView {
     let arguments = app.arguments.clone();//do_bound_args::<Views, Be>(&app.arguments);
     /*arguments.push(Either::Left(ClonableView::new(true, move || {
         body.clone().into_view::<Views, Be>(true)
@@ -503,7 +499,7 @@ fn bound<Views: FtmlViews, Be: SendBackend>(
             )
             .into_view::<Views>()
         }
-    })
+    }).into_any()
 }
 
 fn sym<Views: FtmlViews, Be: SendBackend>(
@@ -511,7 +507,7 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
     this: Option<ClonableView>,
     in_term: bool,
     precedence: i64,
-) -> impl IntoView {
+) -> AnyView {
     use leptos::either::EitherOf3::{A, B, C};
     DocumentState::with_head(VarOrSym::Sym(uri.clone()), move || {
         if with_context::<CurrentUri, _>(|_| ()).is_some() {
@@ -530,7 +526,7 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
                                     precedence,
                                     prec,
                                     Views::comp(ClonableView::new(true, move || {
-                                        super::view_node(&n)
+                                        super::view_node(&n,false)
                                     })),
                                 ))
                             } else {
@@ -551,7 +547,7 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
                 if let Some(n) = t {
                     if let Some(n) = n.op {
                         A(Views::comp(ClonableView::new(true, move || {
-                            super::view_node(&n)
+                            super::view_node(&n,false)
                         })))
                     } else {
                         B(n.as_view::<Views,Be>(&VarOrSym::Sym(uri), this.as_ref(),precedence))
@@ -564,7 +560,7 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
             })
             .into_any()
         }
-    })
+    }).into_any()
 }
 
 fn var_ref<Views: FtmlViews, Be: SendBackend>(
@@ -573,7 +569,7 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
     this: Option<ClonableView>,
     in_term: bool,
     precedence: i64,
-) -> impl IntoView {
+) -> AnyView {
     use leptos::either::EitherOf3::{A, B, C};
     DocumentState::with_head(
         VarOrSym::Var(Variable::Ref {
@@ -600,7 +596,7 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
                                         precedence,
                                         prec,
                                         Views::comp(ClonableView::new(true, move || {
-                                            super::view_node(&n)
+                                            super::view_node(&n,false)
                                         })),
                                     ))
                                 } else {
@@ -626,7 +622,7 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
                 with_notations::<Be, _, _>(uri.clone().into(), move |t| {
                     if let Some(n) = t {
                         if let Some(n) = n.op {
-                            A(super::view_node(&n))
+                            A(super::view_node(&n,false))
                         } else {
                             B(n.as_view::<Views,Be>(
                                 &VarOrSym::Var(Variable::Ref {
@@ -646,7 +642,7 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
                 .into_any()
             }
         },
-    )
+    ).into_any()
 }
 
 fn var_name<Views: FtmlViews>(
@@ -654,7 +650,7 @@ fn var_name<Views: FtmlViews>(
     notated: Option<Id>,
     this: Option<ClonableView>,
     in_term: bool,
-) -> impl IntoView {
+) -> AnyView {
     use leptos::either::Either::{Left, Right};
     let not = notated
         .as_ref()
@@ -686,7 +682,7 @@ fn var_name<Views: FtmlViews>(
                 Right(outer)
             }
         },
-    )
+    ).into_any()
 }
 
 fn do_application_inner<Views: FtmlViews, Be: SendBackend,A:ArgumentRender>(
@@ -740,7 +736,7 @@ fn do_args<Views: FtmlViews, Be: SendBackend>(
 fn do_opaque<F: FnOnce() -> AnyView>(
     node: &OpaqueNode,
     terms: &mut Vec<Option<F>>,
-) -> impl IntoView + use<F> {
+) -> AnyView {
     use leptos::either::EitherOf4::{A, B, C, D};
     let make_red = !node
         .children
@@ -767,9 +763,9 @@ fn do_opaque<F: FnOnce() -> AnyView>(
             i.attr(k.as_ref().to_string(), v.to_string())
         });
     if make_red {
-        r.attr("style", "color:red").into_view()
+        r.attr("style", "color:red").into_any()
     } else {
-        r.into_view()
+        r.into_any()
     }
 }
 
@@ -820,14 +816,13 @@ fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
 }
  */
 
-pub fn do_cv<Views: FtmlViews, Be: SendBackend>(cv: ComponentVar,precedence:i64) -> impl IntoView {
+pub fn do_cv<Views: FtmlViews, Be: SendBackend>(cv: ComponentVar,precedence:i64) -> AnyView {
     use leptos::either::Either::{Left, Right};
-    use leptos::either::EitherOf3::{A, B, C};
     match cv.var {
         Variable::Ref {
             declaration,
             is_sequence,
-        } => A(with_notations::<Be, _, _>(
+        } => with_notations::<Be, _, _>(
             declaration.clone().into(),
             move |t| {
                 let r = if let Some(n) = t {
@@ -862,11 +857,11 @@ pub fn do_cv<Views: FtmlViews, Be: SendBackend>(cv: ComponentVar,precedence:i64)
                 });
                 Right(view! {<mrow>{r}{tp}{df}</mrow>})
             },
-        )),
+        ),
         Variable::Name { name, notated } => {
             let r = var_name::<Views>(name, notated, None, true); //mtext().child("TODO: unresolved variable"); //.into_any();
             if cv.tp.is_none() && cv.df.is_none() {
-                return B(r);
+                return r;
             }
             let tp = cv.tp.map(|t| {
                 view! {
@@ -878,7 +873,7 @@ pub fn do_cv<Views: FtmlViews, Be: SendBackend>(cv: ComponentVar,precedence:i64)
                     <mo>":="</mo>{t.into_view::<Views, Be>(true)}
                 }
             });
-            C(view! {<mrow>{r}{tp}{df}</mrow>})
+            view! {<mrow>{r}{tp}{df}</mrow>}.into_any()
         }
     }
 }
@@ -890,7 +885,7 @@ fn with_notations<
 >(
     uri: LeafUri,
     then: F,
-) -> impl IntoView + use<Be, V, F> {
+) -> AnyView {
     use crate::utils::FutureExt;
     let uricl = uri.clone();
     FutureExt::into_view(
@@ -902,7 +897,7 @@ fn with_notations<
             });
             then(not)
         },
-    )
+    ).into_any()
 }
 
 #[allow(clippy::cast_possible_truncation)]

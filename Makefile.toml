@@ -35,3 +35,8 @@ script = '''
 cd viewer
 cargo make dev
 '''
+
+[tasks.install-wasm-split]
+workspace = false
+command = "cargo"
+args=["install","--locked","wasm_split_cli_support","--features=build-binary"]

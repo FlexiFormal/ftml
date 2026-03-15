@@ -172,7 +172,12 @@ where
 impl<Url, E, Re: Redirects> super::FtmlBackend for RemoteBackend<E, Url, Re>
 where
     Url: std::fmt::Display,
-    E: std::fmt::Display + std::fmt::Debug + From<RequestError> + std::str::FromStr + Send,
+    E: std::fmt::Display
+        + std::fmt::Debug
+        + From<RequestError>
+        + std::str::FromStr
+        + Send
+        + 'static,
     E::Err: Into<BackendError<E>>,
 {
     type Error = E;
@@ -184,7 +189,8 @@ where
         in_path: &ftml_ontology::terms::termpaths::TermPath,
     ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>>
     + Send
-    + use<Url, E, Re> {
+    + use<Url, E, Re>
+    + 'static {
         fn body(
             global_context: &[ModuleUri],
             term: &ftml_ontology::terms::Term,
@@ -226,7 +232,9 @@ where
         &self,
         uri: ftml_uris::Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<E>>> {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<E>>>
+    + use<Url, E, Re>
+    + 'static {
         let url = if let Uri::Document(d) = &uri {
             self.redirects.for_fragment(d).map_or_else(
                 || Self::make_url(&self.fragment_url, &uri, context.as_ref()),
@@ -243,8 +251,9 @@ where
         &self,
         uri: DocumentUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
-    {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>>
+    + Send
+    + 'static {
         let url = self.redirects.for_document_html(&uri).map_or_else(
             || Self::make_url(&self.document_html_url, &uri.into(), context.as_ref()),
             |r| r.to_string(),
@@ -265,7 +274,8 @@ where
             ),
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > + Send
+    + 'static {
         let url = Self::make_url(&self.toc_url, &uri.into(), None);
         call(url)
     }
@@ -279,7 +289,8 @@ where
             ftml_ontology::narrative::elements::problems::Solutions,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > + Send
+    + 'static {
         let url = Self::make_url(&self.solutions_url, &uri.into(), None);
         call(url)
     }
@@ -290,7 +301,7 @@ where
         uri: ModuleUri,
     ) -> impl Future<
         Output = Result<ftml_ontology::domain::modules::ModuleLike, BackendError<Self::Error>>,
-    > {
+    > + 'static {
         let url = self.redirects.for_modules(&uri).map_or_else(
             || Self::make_url(&self.modules_url, &uri.into(), None),
             |r| r.to_string(),
@@ -304,7 +315,7 @@ where
         uri: DocumentUri,
     ) -> impl Future<
         Output = Result<ftml_ontology::narrative::documents::Document, BackendError<Self::Error>>,
-    > {
+    > + 'static {
         let url = self.redirects.for_documents(&uri).map_or_else(
             || Self::make_url(&self.documents_url, &uri.into(), None),
             |r| r.to_string(),
@@ -324,7 +335,7 @@ where
             )>,
             BackendError<Self::Error>,
         >,
-    > {
+    > + 'static {
         let url = self.redirects.for_notations(&uri).map_or_else(
             || Self::make_url(&self.notations_url, &uri.into(), None),
             |r| r.to_string(),
@@ -342,7 +353,7 @@ where
             Vec<(ftml_uris::DocumentElementUri, crate::ParagraphOrProblemKind)>,
             BackendError<Self::Error>,
         >,
-    > {
+    > + 'static {
         let url = self.redirects.for_paragraphs(&uri, problems).map_or_else(
             || Self::make_url(&self.paragraphs_url, &uri.into(), None),
             |r| r.to_string(),
@@ -426,7 +437,8 @@ mod server_fn {
         ) -> impl Future<
             Output = Result<crate::BackendCheckResult, BackendError<ServerFnErrorErr>>,
         > + Send
-        + use<Url, Re> {
+        + use<Url, Re>
+        + 'static {
             fn body(
                 global_context: &[ModuleUri],
                 term: &ftml_ontology::terms::Term,
@@ -455,7 +467,7 @@ mod server_fn {
 
         ftml_uris::compfun! {!!
             #[allow(clippy::similar_names)]
-            fn get_fragment(&self,uri:Uri,context:Option<NarrativeUri>) -> impl Future<Output=Result<(Uri, Box<[Css]>,Box<str>), BackendError<ServerFnErrorErr>>> {
+            fn get_fragment(&self,uri:Uri,context:Option<NarrativeUri>) -> impl Future<Output=Result<(Uri, Box<[Css]>,Box<str>), BackendError<ServerFnErrorErr>>>+ use<Url,Re> + 'static {
                 fn make_url<D: std::fmt::Display>(
                     base: D,
                     uri: &UriComponentTuple,
@@ -495,7 +507,8 @@ mod server_fn {
                 ftml_ontology::narrative::elements::problems::Solutions,
                 BackendError<ServerFnErrorErr>,
             >,
-        > + Send {
+        > + Send
+        + 'static {
             let url = format!("{}/content/solution?uri={}", &self.url, uri.url_encoded());
             async move {
                 let s = super::call::<String, SFnE>(url)
@@ -522,7 +535,7 @@ mod server_fn {
             l: Option<ftml_uris::Language>,
         ) -> impl Future<
             Output = Result<(DocumentUri, Box<[Css]>, Box<str>), BackendError<ServerFnErrorErr>>,
-        > {
+        > + 'static {
             use std::fmt::Write;
             if let Some(uri) = &uri
                 && let Some(url) = self.redirects.for_document_html(uri)
@@ -580,7 +593,8 @@ mod server_fn {
                 ),
                 BackendError<server_fn::error::ServerFnErrorErr>,
             >,
-        > + Send {
+        > + Send
+        + 'static {
             use std::fmt::Write;
             if let Some(uri) = &uri
                 && let Some(url) = self.redirects.for_document_html(uri)
@@ -631,7 +645,7 @@ mod server_fn {
                 ftml_ontology::domain::modules::ModuleLike,
                 BackendError<server_fn::error::ServerFnErrorErr>,
             >,
-        > {
+        > + 'static {
             use std::fmt::Write;
             if let Some(uri) = &uri
                 && let Some(url) = self.redirects.for_modules(uri)
@@ -678,7 +692,7 @@ mod server_fn {
                 ftml_ontology::narrative::documents::Document,
                 BackendError<server_fn::error::ServerFnErrorErr>,
             >,
-        > {
+        > + 'static {
             use std::fmt::Write;
             if let Some(uri) = &uri
                 && let Some(url) = self.redirects.for_documents(uri)
@@ -721,7 +735,7 @@ mod server_fn {
             fn get_notations(&self,uri:Uri) -> impl Future<Output=Result<Vec<(
                 ftml_uris::DocumentElementUri,
                 ftml_ontology::narrative::elements::Notation,
-            )>, BackendError<ServerFnErrorErr>>> {
+            )>, BackendError<ServerFnErrorErr>>> + 'static {
                 fn leaf(base:impl std::fmt::Display,re:&impl Redirects,uri:&LeafUri) -> String {
                     re.for_notations(uri).map_or_else(
                         || format!(
@@ -761,7 +775,7 @@ mod server_fn {
                     Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
                     BackendError<server_fn::error::ServerFnErrorErr>,
                 >,
-            > {
+            > + 'static {
                 let url = uri.uri.as_ref().map_or_else(
                     || format!(
                         "{}/content/los{}&problems={problems}",

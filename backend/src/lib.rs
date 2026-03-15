@@ -19,6 +19,7 @@ use either::Either;
 #[cfg(any(feature = "wasm", feature = "reqwest"))]
 pub use remote::*;
 
+pub mod dynbackend;
 pub mod errors;
 pub use errors::*;
 
@@ -47,6 +48,8 @@ use ftml_uris::{
     DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
 };
 use futures_util::{FutureExt, TryFutureExt};
+
+use crate::dynbackend::DynBackend;
 
 pub const DEFAULT_SERVER_URL: &str = "https://mathhub.info";
 
@@ -119,6 +122,10 @@ pub trait GlobalBackend: 'static {
     type Error: std::fmt::Display + std::fmt::Debug;
     type Backend: FtmlBackend<Error = Self::Error>;
     fn get() -> &'static Self::Backend;
+    #[must_use]
+    fn as_dyn() -> &'static dyn DynBackend {
+        Self::get() as _
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -133,7 +140,7 @@ pub struct BackendCheckResult {
 }
 
 pub trait FtmlBackend {
-    type Error: std::fmt::Display + std::fmt::Debug;
+    type Error: std::fmt::Display + std::fmt::Debug + 'static;
 
     #[cfg(feature = "cached")]
     #[inline]
@@ -153,13 +160,18 @@ pub trait FtmlBackend {
         global_context: &[ModuleUri],
         term: &Term,
         in_path: &TermPath,
-    ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>> + Send + use<Self>;
+    ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>>
+    + Send
+    + use<Self>
+    + 'static;
 
     fn get_fragment(
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>>
+    + Send
+    + 'static;
 
     fn get_logical_paragraphs(
         &self,
@@ -170,31 +182,34 @@ pub trait FtmlBackend {
             Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
             BackendError<Self::Error>,
         >,
-    > + Send;
+    > + Send
+    + 'static;
 
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> + Send + 'static;
 
     fn get_document(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send + 'static;
 
     fn get_toc(
         &self,
         uri: DocumentUri,
     ) -> impl Future<
         Output = Result<(Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<Self::Error>>,
-    > + Send;
+    > + Send
+    + 'static;
 
     fn get_symbol(
         &self,
         uri: SymbolUri,
     ) -> impl Future<
         Output = Result<Either<Symbol, SharedDeclaration<Symbol>>, BackendError<Self::Error>>,
-    > + Send {
+    > + Send
+    + 'static {
         let uriclone = uri.clone();
         let uri = uri.simple_module();
         let name = uri.name;
@@ -212,7 +227,8 @@ pub trait FtmlBackend {
         uri: SymbolUri,
     ) -> impl Future<
         Output = Result<Either<Morphism, SharedDeclaration<Morphism>>, BackendError<Self::Error>>,
-    > + Send {
+    > + Send
+    + 'static {
         let uriclone = uri.clone();
         let uri = uri.simple_module();
         let name = uri.name;
@@ -234,7 +250,8 @@ pub trait FtmlBackend {
             Either<SharedDeclaration<MathStructure>, SharedDeclaration<StructureExtension>>,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > + Send
+    + 'static {
         let uriclone = uri.clone();
         let uri = uri.simple_module();
         let name = uri.name;
@@ -260,7 +277,8 @@ pub trait FtmlBackend {
             Either<VariableDeclaration, SharedDocumentElement<VariableDeclaration>>,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > + Send
+    + 'static {
         let uriclone = uri.clone();
         let name = uri.name;
         self.get_document(uri.document).map(move |r| {
@@ -280,7 +298,8 @@ pub trait FtmlBackend {
             Either<DocumentTerm, SharedDocumentElement<DocumentTerm>>,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > + Send
+    + 'static {
         let uriclone = uri.clone();
         let name = uri.name;
         self.get_document(uri.document).map(move |r| {
@@ -293,38 +312,44 @@ pub trait FtmlBackend {
     }
 
     #[inline]
-    #[allow(async_fn_in_trait)]
-    async fn get_definition(
+    fn get_definition(
         &self,
         uri: SymbolUri,
         context: Option<NarrativeUri>,
-    ) -> Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>> {
-        let (a, b, _) = self.get_fragment(uri.into(), context).await?;
-        Ok((a, b))
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>), BackendError<Self::Error>>> + Send + 'static
+    {
+        let frag = self.get_fragment(uri.into(), context);
+        async move {
+            let (a, b, _) = frag.await?;
+            Ok((a, b))
+        }
     }
 
     fn get_document_html(
         &self,
         uri: DocumentUri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>>
+    + Send
+    + 'static;
 
     fn get_solutions(
         &self,
         uri: DocumentElementUri,
-    ) -> impl Future<Output = Result<Solutions, BackendError<Self::Error>>> + Send;
+    ) -> impl Future<Output = Result<Solutions, BackendError<Self::Error>>> + Send + 'static;
 
     fn get_notations(
         &self,
         uri: LeafUri,
     ) -> impl Future<Output = Result<Vec<(DocumentElementUri, Notation)>, BackendError<Self::Error>>>
-    + Send;
+    + Send
+    + 'static;
 
     fn get_notation(
         &self,
         symbol: LeafUri,
         uri: DocumentElementUri,
-    ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> + Send + 'static {
         let uriclone = uri.clone();
         self.get_notations(symbol).map_ok_or_else(Err, move |r| {
             r.into_iter()
@@ -360,7 +385,9 @@ pub trait FlamsBackend {
             (Uri, Box<[Css]>, Box<str>),
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
-    > + Send;
+    > + use<Self>
+    + Send
+    + 'static;
 
     /// `/content/document`
     #[allow(clippy::too_many_arguments)]
@@ -377,7 +404,8 @@ pub trait FlamsBackend {
             (DocumentUri, Box<[Css]>, Box<str>),
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
-    > + Send;
+    > + Send
+    + 'static;
 
     fn get_toc(
         &self,
@@ -392,7 +420,8 @@ pub trait FlamsBackend {
             (Box<[Css]>, SectionLevel, Box<[TocElem]>),
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
-    > + Send;
+    > + Send
+    + 'static;
 
     /// `/domain/module`
     #[allow(clippy::too_many_arguments)]
@@ -402,7 +431,9 @@ pub trait FlamsBackend {
         a: Option<ftml_uris::ArchiveId>,
         p: Option<String>,
         m: Option<String>,
-    ) -> impl Future<Output = Result<ModuleLike, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<server_fn::error::ServerFnErrorErr>>>
+    + Send
+    + 'static;
 
     /// `/domain/document`
     #[allow(clippy::too_many_arguments)]
@@ -414,7 +445,9 @@ pub trait FlamsBackend {
         p: Option<String>,
         d: Option<String>,
         l: Option<ftml_uris::Language>,
-    ) -> impl Future<Output = Result<Document, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
+    ) -> impl Future<Output = Result<Document, BackendError<server_fn::error::ServerFnErrorErr>>>
+    + Send
+    + 'static;
 
     /// `/content/notations`
     #[allow(clippy::too_many_arguments)]
@@ -434,13 +467,16 @@ pub trait FlamsBackend {
             Vec<(DocumentElementUri, Notation)>,
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
-    > + Send;
+    > + Send
+    + 'static;
 
     /// `/content/solution`
     fn get_solutions(
         &self,
         uri: DocumentElementUri,
-    ) -> impl Future<Output = Result<Solutions, BackendError<server_fn::error::ServerFnErrorErr>>> + Send;
+    ) -> impl Future<Output = Result<Solutions, BackendError<server_fn::error::ServerFnErrorErr>>>
+    + Send
+    + 'static;
 
     /// `/content/los`
     #[allow(clippy::too_many_arguments)]
@@ -457,7 +493,8 @@ pub trait FlamsBackend {
             Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
             BackendError<server_fn::error::ServerFnErrorErr>,
         >,
-    > + Send;
+    > + Send
+    + 'static;
 
     fn check_term(
         &self,
@@ -467,7 +504,8 @@ pub trait FlamsBackend {
     ) -> impl Future<
         Output = Result<BackendCheckResult, BackendError<server_fn::error::ServerFnErrorErr>>,
     > + Send
-    + use<Self>;
+    + use<Self>
+    + 'static;
 }
 
 #[cfg(feature = "server_fn")]
@@ -491,8 +529,10 @@ where
         global_context: &[ModuleUri],
         term: &Term,
         in_path: &TermPath,
-    ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>> + Send + use<FB>
-    {
+    ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>>
+    + Send
+    + use<FB>
+    + 'static {
         <Self as FlamsBackend>::check_term(&self, global_context, term, in_path)
     }
 
@@ -500,8 +540,10 @@ where
         &self,
         uri: Uri,
         context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
-    {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>>
+    + use<FB>
+    + Send
+    + 'static {
         let stripped = self.stripped();
         <Self as FlamsBackend>::get_fragment(
             self,
@@ -523,7 +565,7 @@ where
     fn get_module(
         &self,
         uri: ModuleUri,
-    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<ModuleLike, BackendError<Self::Error>>> + Send + 'static {
         <Self as FlamsBackend>::get_module(self, Some(uri), None, None, None)
     }
 
@@ -531,7 +573,7 @@ where
     fn get_document(
         &self,
         uri: DocumentUri,
-    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<Document, BackendError<Self::Error>>> + Send + 'static {
         <Self as FlamsBackend>::get_document(self, Some(uri), None, None, None, None, None)
     }
 
@@ -541,7 +583,8 @@ where
         uri: DocumentUri,
     ) -> impl Future<
         Output = Result<(Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<Self::Error>>,
-    > + Send {
+    > + Send
+    + 'static {
         <Self as FlamsBackend>::get_toc(self, Some(uri), None, None, None, None, None)
     }
 
@@ -550,8 +593,9 @@ where
         &self,
         uri: DocumentUri,
         _context: Option<NarrativeUri>,
-    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>> + Send
-    {
+    ) -> impl Future<Output = Result<(Box<str>, Box<[Css]>, bool), BackendError<Self::Error>>>
+    + Send
+    + 'static {
         let stripped = self.stripped();
         let fut = <Self as FlamsBackend>::get_document_html(
             self,
@@ -571,7 +615,7 @@ where
     fn get_solutions(
         &self,
         uri: DocumentElementUri,
-    ) -> impl Future<Output = Result<Solutions, BackendError<Self::Error>>> + Send {
+    ) -> impl Future<Output = Result<Solutions, BackendError<Self::Error>>> + Send + 'static {
         <Self as FlamsBackend>::get_solutions(self, uri)
     }
 
@@ -580,7 +624,8 @@ where
         &self,
         uri: LeafUri,
     ) -> impl Future<Output = Result<Vec<(DocumentElementUri, Notation)>, BackendError<Self::Error>>>
-    + Send {
+    + Send
+    + 'static {
         <Self as FlamsBackend>::get_notations(
             self,
             Some(uri.into()),
@@ -605,7 +650,8 @@ where
             Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
             BackendError<Self::Error>,
         >,
-    > + Send {
+    > + Send
+    + 'static {
         <Self as FlamsBackend>::get_logical_paragraphs(
             self,
             Some(uri),
