@@ -195,12 +195,13 @@ pub trait FtmlBackend {
     ) -> impl Future<
         Output = Result<Either<Symbol, SharedDeclaration<Symbol>>, BackendError<Self::Error>>,
     > + Send {
+        let uriclone = uri.clone();
         let uri = uri.simple_module();
         let name = uri.name;
         self.get_module(uri.module).map(move |r| {
             let m = r?;
             m.get_as(&name).map_or_else(
-                || Err(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                move || Err(BackendError::NotFound(uriclone.into())),
                 |d| Ok(Either::Right(d)),
             )
         })
@@ -212,12 +213,13 @@ pub trait FtmlBackend {
     ) -> impl Future<
         Output = Result<Either<Morphism, SharedDeclaration<Morphism>>, BackendError<Self::Error>>,
     > + Send {
+        let uriclone = uri.clone();
         let uri = uri.simple_module();
         let name = uri.name;
         self.get_module(uri.module).map(move |r| {
             let m = r?;
             m.get_as(&name).map_or_else(
-                || Err(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                move || Err(BackendError::NotFound(uriclone.into())),
                 |d| Ok(Either::Right(d)),
             )
         })
@@ -233,6 +235,7 @@ pub trait FtmlBackend {
             BackendError<Self::Error>,
         >,
     > + Send {
+        let uriclone = uri.clone();
         let uri = uri.simple_module();
         let name = uri.name;
         self.get_module(uri.module).map(move |r| {
@@ -240,7 +243,7 @@ pub trait FtmlBackend {
             m.get_as(&name).map_or_else(
                 || {
                     m.get_as(&name).map_or_else(
-                        || Err(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                        move || Err(BackendError::NotFound(uriclone.into())),
                         |d| Ok(Either::Right(d)),
                     )
                 },
@@ -258,11 +261,12 @@ pub trait FtmlBackend {
             BackendError<Self::Error>,
         >,
     > + Send {
+        let uriclone = uri.clone();
         let name = uri.name;
         self.get_document(uri.document).map(move |r| {
             let m = r?;
             m.get_as(&name).map_or_else(
-                || Err(BackendError::NotFound(ftml_uris::UriKind::DocumentElement)),
+                || Err(BackendError::NotFound(uriclone.into())),
                 |d| Ok(Either::Right(d)),
             )
         })
@@ -277,11 +281,12 @@ pub trait FtmlBackend {
             BackendError<Self::Error>,
         >,
     > + Send {
+        let uriclone = uri.clone();
         let name = uri.name;
         self.get_document(uri.document).map(move |r| {
             let m = r?;
             m.get_as(&name).map_or_else(
-                || Err(BackendError::NotFound(ftml_uris::UriKind::DocumentElement)),
+                move || Err(BackendError::NotFound(uriclone.into())),
                 |d| Ok(Either::Right(d)),
             )
         })
@@ -320,11 +325,12 @@ pub trait FtmlBackend {
         symbol: LeafUri,
         uri: DocumentElementUri,
     ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> + Send {
+        let uriclone = uri.clone();
         self.get_notations(symbol).map_ok_or_else(Err, move |r| {
             r.into_iter()
                 .find(|(u, _)| *u == uri)
                 .map(|(_, n)| n)
-                .ok_or(BackendError::NotFound(ftml_uris::UriKind::DocumentElement))
+                .ok_or_else(move || BackendError::NotFound(uriclone.into()))
         })
     }
 }

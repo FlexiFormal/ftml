@@ -128,7 +128,7 @@ body {
     }
 }
 .ftml-subproof-title {
-    display: inline-flex;
+    display: inline-block;
 }
 
 .ftml-paragraph {

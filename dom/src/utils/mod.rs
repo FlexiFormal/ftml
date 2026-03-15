@@ -95,13 +95,19 @@ impl<T: Send + Sync + Clone + 'static + std::fmt::Debug> ContextChain<T> {
 
 pub trait FutureExt {
     type T;
-    fn into_view(self, f: impl FnOnce(Self::T) -> AnyView + Clone + Send + 'static) -> AnyView;
+    fn into_view<V: IntoView + Send + 'static>(
+        self,
+        f: impl FnOnce(Self::T) -> V + Clone + Send + 'static,
+    ) -> impl IntoView;
 }
 impl<T, Fut: std::future::Future<Output = T>, F: Fn() -> Fut + Clone + Send + 'static> FutureExt
     for F
 {
     type T = T;
-    fn into_view(self, f: impl FnOnce(T) -> AnyView + Clone + Send + 'static) -> AnyView {
+    fn into_view<V: IntoView + Send + 'static>(
+        self,
+        f: impl FnOnce(T) -> V + Clone + Send + 'static,
+    ) -> impl IntoView {
         use leptos::prelude::{Suspense, view};
         view!(<Suspense fallback = || "…">{move || {
             let s = self.clone();
@@ -109,7 +115,6 @@ impl<T, Fut: std::future::Future<Output = T>, F: Fn() -> Fut + Clone + Send + 's
             let fut = send_wrapper::SendWrapper::new(async move {let ret = s().await;f(ret)});
             Suspend::new(fut)
         }}</Suspense>)
-        .into_any()
     }
 }
 

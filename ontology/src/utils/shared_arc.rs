@@ -59,7 +59,7 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
         get: impl Fn(&Arced) -> Result<&Inner, Err>,
     ) -> Result<Self, Err> {
         let elem = get(arc(&outer))?;
-        let elem = elem as *const Inner;
+        let elem = std::ptr::from_ref(elem);
         Ok(Self { outer, elem })
     }
 
@@ -77,7 +77,7 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
         Outer: Clone,
     {
         let elem = get(arc(outer))?;
-        let elem = elem as *const Inner;
+        let elem = std::ptr::from_ref(elem);
         Ok(Self {
             outer: outer.clone(),
             elem,
@@ -94,7 +94,7 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
         get: impl FnOnce(&Inner) -> Result<&NewInner, Err>,
     ) -> Result<SharedArc<Outer, NewInner>, (Self, Err)> {
         let elem = match get(&*self) {
-            Ok(e) => e as *const NewInner,
+            Ok(e) => std::ptr::from_ref(e),
             Err(e) => return Err((self, e)),
         };
         Ok(SharedArc {

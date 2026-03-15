@@ -389,7 +389,7 @@ mod serde_impl {
     pub struct DataBuffer(Vec<u8>);
     impl DataBuffer {
         /// ### Errors
-        pub fn push<T: bincode::Encode>(
+        pub fn push<T: bincode::Encode + std::fmt::Debug>(
             &mut self,
             t: &T,
         ) -> Result<DataRef<T>, bincode::error::EncodeError> {

@@ -3,7 +3,7 @@ use crate::terms::IsTerm;
 use crate::terms::arguments::ComponentVar;
 use crate::terms::opaque::OpaqueNode;
 use crate::terms::{VarOrSym, arguments::MaybeSequence};
-use crate::utils::{Float, RefTree, TreeIter};
+use crate::utils::{Float64, RefTree, TreeIter};
 use ftml_uris::{SymbolUri, UriName};
 use std::fmt::Write;
 use std::str::FromStr;
@@ -78,14 +78,38 @@ pub enum Term {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Numeric {
     Int(i64),
-    Float(Float),
+    Float(Float64),
+}
+impl Numeric {
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn as_int(self) -> Option<i64> {
+        match self {
+            Self::Int(i) => Some(i),
+            Self::Float(f) => {
+                if f.abs().fract() < f64::EPSILON {
+                    Some(f.round() as i64)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn as_float(self) -> f64 {
+        match self {
+            Self::Float(f) => *f,
+            Self::Int(i) => i as f64,
+        }
+    }
 }
 impl FromStr for Numeric {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.parse().map_or_else(
             |_| {
-                s.parse::<f32>()
+                s.parse::<f64>()
                     .map_or(Err(()), |f| Ok(Self::Float(f.into())))
             },
             |i| Ok(Self::Int(i)),

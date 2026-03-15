@@ -1,9 +1,15 @@
 mod terms;
 
 use crate::ClonableView;
-use crate::document::CurrentUri;
+use crate::FtmlViews;
+use crate::document::{CurrentUri, WithHead};
 use crate::terms::{ReactiveApplication, ReactiveTerm, TopTerm};
-use crate::{DocumentState, FtmlViews};
+use crate::utils::local_cache::SendBackend;
+use crate::utils::owned;
+use ftml_ontology::terms::Argument;
+use ftml_ontology::terms::BoundArgument;
+use ftml_ontology::terms::ComponentVar;
+use ftml_ontology::terms::MaybeSequence;
 use ftml_ontology::terms::{Term, VarOrSym};
 use ftml_ontology::{
     narrative::elements::{
@@ -22,68 +28,477 @@ use leptos::{either::Either, prelude::*};
 use std::num::NonZeroU8;
 pub use terms::*;
 
-pub trait NotationExt {
-    fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(
-        &self,
-        term: Option<Term>,
-        head: &VarOrSym,
-        this: Option<&ClonableView>,
-        args: &R,
-    ) -> AnyView;
-    fn with_arguments_safe<Views: FtmlViews, R: ArgumentRender + ?Sized>(
-        &self,
-        term: Option<Term>,
-        head: &VarOrSym,
-        this: Option<&ClonableView>,
-        args: &R,
-    ) -> AnyView {
-        DocumentState::with_head(head.clone(), move || {
-            provide_context(None::<TopTerm>);
-            provide_context(None::<ReactiveTerm>);
-            self.with_arguments::<Views, R>(term, head, this, args)
-                .into_any()
+pub fn with_precedences(down: i64, up: i64, view: impl IntoView) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
+    if up > down {
+        Left(view! {
+            <mo lspace="0" rspace="0" stretchy="true" attr:data-ftml-comp="">"("</mo>
+            {view}
+            <mo lspace="0" rspace="0" stretchy="true" attr:data-ftml-comp="">")"</mo>
         })
-    }
-    fn as_view<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView;
-    fn as_view_safe<Views: FtmlViews>(
-        &self,
-        head: &VarOrSym,
-        this: Option<&ClonableView>,
-    ) -> AnyView {
-        DocumentState::with_head(head.clone(), move || {
-            self.as_view::<Views>(head, this).into_any()
-        })
-    }
-    fn as_op<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView;
-    fn as_op_safe<Views: FtmlViews>(
-        &self,
-        head: &VarOrSym,
-        this: Option<&ClonableView>,
-    ) -> AnyView {
-        DocumentState::with_head(head.clone(), move || {
-            self.as_op::<Views>(head, this).into_any()
-        })
+    } else {
+        Right(view)
     }
 }
 
-pub trait ArgumentRender {
+pub trait NotationExt {
+    fn with_arguments<Views: FtmlViews, Be: SendBackend, R: ArgumentRender>(
+        &self,
+        term: Option<Term>,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+        args: &R,
+        precedence: i64,
+    ) -> impl IntoView + use<Self, Views, Be, R> + 'static;
+
+    fn with_arguments_safe<Views: FtmlViews, Be: SendBackend, R: ArgumentRender>(
+        &self,
+        term: Option<Term>,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+        args: &R,
+    ) -> impl IntoView + use<Self, Views, Be, R> {
+        owned(move || {
+            provide_context(WithHead(Some(head.clone())));
+            provide_context(None::<TopTerm>);
+            provide_context(None::<ReactiveTerm>);
+            self.with_arguments::<Views, Be, R>(term, head, this, args, i64::MAX)
+        })
+    }
+
+    fn as_view<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+        precedence: i64,
+    ) -> impl IntoView + use<Self, Views, Be>;
+
+    fn as_view_safe<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+    ) -> impl IntoView + use<Self, Views, Be> {
+        owned(move || {
+            provide_context(WithHead(Some(head.clone())));
+            self.as_view::<Views, Be>(head, this, i64::MAX)
+        })
+        //DocumentState::with_head(head.clone(), move || self.as_view::<Views>(head, this))
+    }
+    fn as_op<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+        precedence: i64,
+    ) -> impl IntoView + use<Self, Views, Be>;
+
+    fn as_op_safe<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+    ) -> impl IntoView + use<Self, Views, Be> {
+        owned(move || {
+            provide_context(WithHead(Some(head.clone())));
+            self.as_op::<Views, Be>(head, this, i64::MAX)
+        })
+        //DocumentState::with_head(head.clone(), move || self.as_op::<Views>(head, this))
+    }
+}
+
+pub trait ArgumentRender: Clone + Send + Sync + 'static {
     #[inline]
     fn is_empty(&self) -> bool {
         self.num_args() > 0
     }
     fn num_args(&self) -> usize;
-    fn render_arg<Views: FtmlViews>(&self, index: u8, mode: ArgumentMode) -> AnyView;
-    fn render_arg_at<Views: FtmlViews>(
+    fn is_sequence(&self, index: u8) -> bool;
+    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        index: u8,
+        mode: ArgumentMode,
+        argument_prec: i64,
+    ) -> impl IntoView + use<Self, Views, Be>;
+    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
         &self,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,
-    ) -> AnyView;
+    ) -> impl IntoView + use<Self, Views, Be>;
     fn length_at(&self, index: u8) -> usize;
 }
 
-fn error() -> AnyView {
-    mtext().style("color:red").child("ERROR").into_any()
+fn error() -> impl IntoView {
+    mtext().style("color:red").child("ERROR")
+}
+
+fn render_arg<Views: FtmlViews, Be: SendBackend>(
+    term: &Term,
+    index: u8,
+    seq_index: Option<usize>,
+    mode: ArgumentMode,
+    argument_prec: i64,
+) -> impl IntoView + use<Views, Be> {
+    use_context::<Option<ReactiveTerm>>().flatten().map_or_else(
+        || {
+            leptos::either::Either::Right(
+                term.clone()
+                    .into_view_with_precedence::<Views, Be>(true, argument_prec),
+            )
+        },
+        |r| {
+            let position = seq_index.map_or_else(
+                || {
+                    // SAFETY: +1 > 0
+                    unsafe { ArgumentPosition::Simple(NonZeroU8::new_unchecked(index + 1), mode) }
+                },
+                |i| unsafe {
+                    ArgumentPosition::Sequence {
+                        argument_number: NonZeroU8::new_unchecked(index + 1),
+                        #[allow(clippy::cast_possible_truncation)]
+                        sequence_index: NonZeroU8::new_unchecked((i + 1) as u8),
+                        mode,
+                    }
+                },
+            );
+            let t = term.clone();
+            leptos::either::Either::Left(r.add_argument::<Views>(
+                position,
+                ClonableView::new(true, move || {
+                    t.clone()
+                        .into_view_with_precedence::<Views, Be>(true, argument_prec)
+                }),
+            ))
+        },
+    )
+}
+
+fn render_cv<Views: FtmlViews, Be: SendBackend>(
+    cv: &ComponentVar,
+    index: u8,
+    seq_index: Option<usize>,
+    mode: ArgumentMode,
+    argument_prec: i64,
+) -> impl IntoView + use<Views, Be> {
+    use_context::<Option<ReactiveTerm>>().flatten().map_or_else(
+        || leptos::either::Either::Right(terms::do_cv::<Views, Be>(cv.clone(), argument_prec)),
+        |r| {
+            let position = seq_index.map_or_else(
+                || {
+                    // SAFETY: +1 > 0
+                    unsafe { ArgumentPosition::Simple(NonZeroU8::new_unchecked(index + 1), mode) }
+                },
+                |i| unsafe {
+                    ArgumentPosition::Sequence {
+                        argument_number: NonZeroU8::new_unchecked(index + 1),
+                        #[allow(clippy::cast_possible_truncation)]
+                        sequence_index: NonZeroU8::new_unchecked((i + 1) as u8),
+                        mode,
+                    }
+                },
+            );
+            let t = cv.clone();
+            leptos::either::Either::Left(r.add_argument::<Views>(
+                position,
+                ClonableView::new(true, move || {
+                    terms::do_cv::<Views, Be>(t.clone(), argument_prec)
+                }),
+            ))
+        },
+    )
+}
+
+impl ArgumentRender for Box<[Argument]> {
+    #[inline]
+    fn is_empty(&self) -> bool {
+        (**self).is_empty()
+    }
+    #[inline]
+    fn num_args(&self) -> usize {
+        self.len()
+    }
+    fn is_sequence(&self, index: u8) -> bool {
+        matches!(self.get(index as usize), Some(Argument::Sequence(_)))
+    }
+    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        index: u8,
+        mode: ArgumentMode,
+        argument_prec: i64,
+    ) -> impl IntoView + use<Views, Be> {
+        use leptos::either::Either::{Left, Right};
+        use leptos::either::EitherOf5::{A, B, C, D, E};
+        tracing::trace!("rendering arg {index}@{mode:?} of {}", self.len());
+        match self.get(index as usize) {
+            Some(Argument::Simple(v) | Argument::Sequence(MaybeSequence::One(v))) => {
+                A(render_arg::<Views, Be>(v, index, None, mode, argument_prec))
+            }
+            Some(Argument::Sequence(MaybeSequence::Seq(v))) => {
+                let len = v.len();
+                if len == 0 {
+                    return E(());
+                }
+                // SAFETY: len > 0
+                let first = || {
+                    render_arg::<Views, Be>(
+                        unsafe { v.first().unwrap_unchecked() },
+                        index,
+                        Some(0),
+                        mode,
+                        argument_prec,
+                    )
+                };
+                if len == 1 {
+                    return B(first());
+                }
+                C(view! {
+                    <mrow>
+                        {first()}
+                    {
+                        v.iter().enumerate().skip(1).map(|(i,v)| view!{
+                            {
+
+                                if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                                    Left(Views::comp(ClonableView::new(true,|| leptos::math::mo().child(","))))
+                                } else {
+                                    Right(leptos::math::mo().child(","))
+                                }
+                            }
+                            {render_arg::<Views,Be>(v,index, Some(i), mode,argument_prec)}
+                        }).collect_view()
+                    }
+                    </mrow>
+                })
+            }
+            _ => D(error()),
+        }
+    }
+    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        index: u8,
+        seq_index: usize,
+        mode: ArgumentMode,
+    ) -> impl IntoView + use<Views, Be> {
+        use leptos::either::Either::{Left, Right};
+        tracing::trace!(
+            "rendering arg sequence@{mode:?} {index}/{seq_index} of {}",
+            self.len()
+        );
+        match self.get(index as usize) {
+            Some(Argument::Sequence(MaybeSequence::Seq(v))) => v.get(seq_index).map_or_else(
+                || Right(error()),
+                |v| {
+                    Left(render_arg::<Views, Be>(
+                        v,
+                        index,
+                        Some(seq_index),
+                        mode,
+                        i64::MAX,
+                    ))
+                },
+            ),
+            Some(Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)))
+                if seq_index == 0 =>
+            {
+                Left(render_arg::<Views, Be>(
+                    t,
+                    index,
+                    Some(seq_index),
+                    mode,
+                    i64::MAX,
+                ))
+            }
+            _ => Right(error()),
+        }
+    }
+    fn length_at(&self, index: u8) -> usize {
+        self.get(index as usize).map_or(0, |l| {
+            if let Argument::Sequence(MaybeSequence::Seq(v)) = l {
+                v.len()
+            } else {
+                1
+            }
+        })
+    }
+}
+
+impl ArgumentRender for Box<[BoundArgument]> {
+    #[inline]
+    fn is_empty(&self) -> bool {
+        (&**self).is_empty()
+    }
+    #[inline]
+    fn num_args(&self) -> usize {
+        self.len()
+    }
+    fn is_sequence(&self, index: u8) -> bool {
+        matches!(
+            self.get(index as usize),
+            Some(BoundArgument::Sequence(_) | BoundArgument::BoundSeq(_))
+        )
+    }
+    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        index: u8,
+        mode: ArgumentMode,
+        argument_precedence: i64,
+    ) -> impl IntoView + use<Views, Be> {
+        use leptos::either::Either::{Left, Right};
+        use leptos::either::EitherOf6::{A, B, C, D, E, F};
+        tracing::trace!("rendering arg {index}@{mode:?} of {}", self.len());
+        match self.get(index as usize) {
+            Some(BoundArgument::Simple(v) | BoundArgument::Sequence(MaybeSequence::One(v))) => A(
+                render_arg::<Views, Be>(v, index, None, mode, argument_precedence),
+            ),
+            Some(BoundArgument::Sequence(MaybeSequence::Seq(v))) => {
+                let len = v.len();
+                if len == 0 {
+                    return E(());
+                }
+                // SAFETY: len > 0
+                let first = || {
+                    render_arg::<Views, Be>(
+                        unsafe { v.first().unwrap_unchecked() },
+                        index,
+                        Some(0),
+                        mode,
+                        argument_precedence,
+                    )
+                };
+                if len == 1 {
+                    return A(first());
+                }
+                C(view! {
+                    <mrow>
+                        {first()}
+                    {
+                        v.iter().enumerate().skip(1).map(|(i,v)| view!{
+                            {
+
+                                if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                                    Left(Views::comp(ClonableView::new(true,|| leptos::math::mo().child(","))))
+                                } else {
+                                    Right(leptos::math::mo().child(","))
+                                }
+                            }
+                            {render_arg::<Views,Be>(v,index, Some(i), mode,argument_precedence)}
+                        }).collect_view()
+                    }
+                    </mrow>
+                })
+            }
+            Some(BoundArgument::Bound(cv) | BoundArgument::BoundSeq(MaybeSequence::One(cv))) => B(
+                render_cv::<Views, Be>(cv, index, None, mode, argument_precedence),
+            ),
+            Some(BoundArgument::BoundSeq(MaybeSequence::Seq(v))) => {
+                let len = v.len();
+                if len == 0 {
+                    return E(());
+                }
+                // SAFETY: len > 0
+                let first = || {
+                    render_cv::<Views, Be>(
+                        unsafe { v.first().unwrap_unchecked() },
+                        index,
+                        Some(0),
+                        mode,
+                        i64::MAX,
+                    )
+                };
+                if len == 1 {
+                    return B(first());
+                }
+                F(view! {
+                    <mrow>
+                        {first()}
+                    {
+                        v.iter().enumerate().skip(1).map(|(i,v)| view!{
+                            {
+
+                                if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                                    Left(Views::comp(ClonableView::new(true,|| leptos::math::mo().child(","))))
+                                } else {
+                                    Right(leptos::math::mo().child(","))
+                                }
+                            }
+                            {render_cv::<Views,Be>(v,index, Some(i), mode,i64::MAX)}
+                        }).collect_view()
+                    }
+                    </mrow>
+                })
+            }
+            _ => D(error()),
+        }
+    }
+    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        index: u8,
+        seq_index: usize,
+        mode: ArgumentMode,
+    ) -> impl IntoView + use<Views, Be> {
+        use leptos::either::EitherOf3::{A, B, C};
+        tracing::trace!(
+            "rendering arg sequence@{mode:?} {index}/{seq_index} of {}",
+            self.len()
+        );
+        match self.get(index as usize) {
+            Some(BoundArgument::Sequence(MaybeSequence::Seq(v))) => v.get(seq_index).map_or_else(
+                || C(error()),
+                |v| {
+                    A(render_arg::<Views, Be>(
+                        v,
+                        index,
+                        Some(seq_index),
+                        mode,
+                        i64::MAX,
+                    ))
+                },
+            ),
+            Some(BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)))
+                if seq_index == 0 =>
+            {
+                A(render_arg::<Views, Be>(
+                    t,
+                    index,
+                    Some(seq_index),
+                    mode,
+                    i64::MAX,
+                ))
+            }
+            Some(BoundArgument::BoundSeq(MaybeSequence::Seq(v))) => v.get(seq_index).map_or_else(
+                || C(error()),
+                |cv| {
+                    B(render_cv::<Views, Be>(
+                        cv,
+                        index,
+                        Some(seq_index),
+                        mode,
+                        i64::MAX,
+                    ))
+                },
+            ),
+            Some(BoundArgument::Bound(cv) | BoundArgument::BoundSeq(MaybeSequence::One(cv)))
+                if seq_index == 0 =>
+            {
+                B(render_cv::<Views, Be>(
+                    cv,
+                    index,
+                    Some(seq_index),
+                    mode,
+                    i64::MAX,
+                ))
+            }
+
+            _ => C(error()),
+        }
+    }
+    fn length_at(&self, index: u8) -> usize {
+        self.get(index as usize).map_or(0, |l| {
+            if let BoundArgument::Sequence(MaybeSequence::Seq(v)) = l {
+                v.len()
+            } else {
+                1
+            }
+        })
+    }
 }
 
 impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
@@ -95,15 +510,24 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
     fn num_args(&self) -> usize {
         self.len()
     }
-    fn render_arg<Views: FtmlViews>(&self, index: u8, mode: ArgumentMode) -> AnyView {
+    fn is_sequence(&self, index: u8) -> bool {
+        matches!(self.get(index as usize), Some(Either::Right(_)))
+    }
+    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        index: u8,
+        mode: ArgumentMode,
+        _: i64,
+    ) -> impl IntoView + use<Views, Be> {
         use leptos::either::Either::{Left, Right};
+        use leptos::either::EitherOf5::{A, B, C, D, E};
         tracing::trace!("rendering arg {index}@{mode:?} of {}", self.len());
         match self.get(index as usize) {
-            Some(Either::Left(v)) => do_arg::<Views>(v.clone(), index, None, mode),
+            Some(Either::Left(v)) => A(do_arg::<Views>(v.clone(), index, None, mode)),
             Some(Either::Right(v)) => {
                 let len = v.len();
                 if len == 0 {
-                    return ().into_any();
+                    return E(());
                 }
                 // SAFETY: len > 0
                 let first = || {
@@ -115,9 +539,9 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
                     )
                 };
                 if len == 1 {
-                    return first();
+                    return B(first());
                 }
-                view! {
+                C(view! {
                     <mrow>
                         {first()}
                     {
@@ -134,30 +558,31 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
                         }).collect_view()
                     }
                     </mrow>
-                }
-                .into_any()
+                })
             }
-            _ => error(),
+            _ => D(error()),
         }
     }
-    fn render_arg_at<Views: FtmlViews>(
+    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
         &self,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,
-    ) -> AnyView {
+    ) -> impl IntoView + use<Views, Be> {
+        use leptos::either::Either::{Left, Right};
         tracing::trace!(
             "rendering arg sequence@{mode:?} {index}/{seq_index} of {}",
             self.len()
         );
         match self.get(index as usize) {
-            Some(Either::Right(v)) => v.get(seq_index).map_or_else(error, |v| {
-                do_arg::<Views>(v.clone(), index, Some(seq_index), mode)
-            }),
+            Some(Either::Right(v)) => v.get(seq_index).map_or_else(
+                || Right(error()),
+                |v| Left(do_arg::<Views>(v.clone(), index, Some(seq_index), mode)),
+            ),
             Some(Either::Left(t)) if seq_index == 0 => {
-                do_arg::<Views>(t.clone(), index, Some(seq_index), mode)
+                Left(do_arg::<Views>(t.clone(), index, Some(seq_index), mode))
             }
-            _ => error(),
+            _ => Right(error()),
         }
     }
     fn length_at(&self, index: u8) -> usize {
@@ -171,7 +596,7 @@ fn do_arg<Views: FtmlViews>(
     index: u8,
     seq_index: Option<usize>,
     mode: ArgumentMode,
-) -> AnyView {
+) -> impl IntoView {
     if let Some(r) = use_context::<Option<ReactiveTerm>>().flatten() {
         let position = seq_index.map_or_else(
             || {
@@ -187,116 +612,170 @@ fn do_arg<Views: FtmlViews>(
                 }
             },
         );
-        r.add_argument::<Views>(position, v).into_any()
+        leptos::either::Either::Left(r.add_argument::<Views>(position, v))
     } else {
-        v.into_view::<Views>()
+        leptos::either::Either::Right(v.into_view::<Views>())
     }
 }
 
 impl NotationExt for Notation {
-    fn with_arguments<Views: FtmlViews, R: ArgumentRender + ?Sized>(
+    fn with_arguments<Views: FtmlViews, Be: SendBackend, R: ArgumentRender>(
         &self,
         term: Option<Term>,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         args: &R,
-    ) -> AnyView {
+        precedence: i64,
+    ) -> impl IntoView + use<Views, Be, R> {
         if args.is_empty() {
-            return self.as_op::<Views>(head, this);
+            return leptos::either::Either::Left(self.as_op::<Views, Be>(head, this, precedence));
         }
         /*owned(move ||*/
         {
             let h = head.to_string();
             //provide_context(WithHead(Some(head.clone())));
-            let r = view_component_with_args::<Views>(&self.component, args, this)
+            let r = with_precedences(
+                precedence,
+                self.precedence,
+                view_component_with_args::<Views, Be, _>(
+                    &self.component,
+                    args,
+                    this,
+                    self.precedence,
+                    &self.argprecs,
+                )
                 .attr(FtmlKey::Term.attr_name(), "OMBIND")
-                .attr(FtmlKey::Head.attr_name(), h);
+                .attr(FtmlKey::Head.attr_name(), h),
+            );
             ReactiveApplication::close(term);
-            r.into_any()
+            leptos::either::Either::Right(r)
         } //)
     }
 
-    fn as_op<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView {
-        use leptos::either::Either::Left;
-        attr(
-            attr(
-                self.op.as_ref().map_or_else(
-                    || view_component_with_args::<Views>(&self.component, &DummyRender, this),
-                    |op| {
-                        let op = op.clone();
-                        if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                            Left(
-                                Views::comp(ClonableView::new(true, move || {
-                                    attr(view_node(&op), "data-ftml-comp", "")
-                                }))
-                                .into_any(),
+    fn as_op<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+        precedence: i64,
+    ) -> impl IntoView + use<Views, Be> {
+        use leptos::either::EitherOf3::{A, B, C};
+        self.op
+            .as_ref()
+            .map_or_else(
+                || {
+                    A(with_precedences(
+                        precedence,
+                        self.precedence,
+                        view_component_with_args::<Views, Be, _>(
+                            &self.component,
+                            &DummyRender,
+                            this,
+                            self.precedence,
+                            &self.argprecs,
+                        ),
+                    ))
+                },
+                |op| {
+                    let op = op.clone();
+                    let prec = self.precedence;
+                    if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                        B(Views::comp(ClonableView::new(true, move || {
+                            with_precedences(
+                                precedence,
+                                prec,
+                                view_node(&op).attr("data-ftml-comp", ""),
                             )
-                        } else {
-                            attr(view_node(&op), "data-ftml-comp", "")
-                        }
-                    },
-                ),
-                FtmlKey::Term.attr_name(),
-                "OMID",
-            ),
-            FtmlKey::Head.attr_name(),
-            head.to_string(),
-        )
-        .into_any()
+                        })))
+                    } else {
+                        C(with_precedences(
+                            precedence,
+                            self.precedence,
+                            view_node(&op).attr("data-ftml-comp", ""),
+                        ))
+                    }
+                },
+            )
+            .attr(FtmlKey::Term.attr_name(), "OMID")
+            .attr(FtmlKey::Head.attr_name(), head.to_string())
     }
 
-    fn as_view<Views: FtmlViews>(&self, head: &VarOrSym, this: Option<&ClonableView>) -> AnyView {
-        //owned(move || {
+    fn as_view<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        head: &VarOrSym,
+        this: Option<&ClonableView>,
+        precedence: i64,
+    ) -> impl IntoView + use<Views, Be> {
         let h = head.to_string();
-        //provide_context(WithHead(Some(head.clone())));
-        attr(
-            attr(
-                view_component_with_args::<Views>(&self.component, &DummyRender, this),
-                FtmlKey::Term.attr_name(),
-                "OMID",
-            ),
-            FtmlKey::Head.attr_name(),
-            h,
+        with_precedences(
+            precedence,
+            self.precedence,
+            view_component_with_args::<Views, Be, _>(
+                &self.component,
+                &DummyRender,
+                this,
+                self.precedence,
+                &self.argprecs,
+            )
+            .attr(FtmlKey::Term.attr_name(), "OMID")
+            .attr(FtmlKey::Head.attr_name(), h),
         )
-        .into_any()
-        //})
     }
 }
 
-pub(crate) fn attr(
-    e: leptos::either::Either<AnyView, AnyViewWithAttrs>,
-    k: impl CustomAttributeKey,
-    v: impl AttributeValue,
-) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
-    use leptos::either::Either::{Left, Right};
-    Right(match e {
-        Left(a) => a.attr(k, v),
-        Right(a) => a.attr(k, v),
-    })
+pub enum AnyMaybeAttr {
+    Any(AnyView),
+    Attr(AnyViewWithAttrs),
+}
+impl AnyMaybeAttr {
+    fn attr<K: CustomAttributeKey, V: AttributeValue>(self, k: K, v: V) -> Self {
+        Self::Attr(match self {
+            Self::Any(a) => a.attr(k, v),
+            Self::Attr(a) => a.attr(k, v),
+        })
+    }
+    fn into_view(self) -> impl IntoView {
+        match self {
+            Self::Any(a) => leptos::either::Either::Left(a),
+            Self::Attr(a) => leptos::either::Either::Right(a),
+        }
+    }
 }
 
-pub(crate) fn view_component_with_args<Views: FtmlViews>(
+pub(crate) fn view_component_with_args<Views: FtmlViews, Be: SendBackend, A: ArgumentRender>(
     comp: &NotationComponent,
-    args: &(impl ArgumentRender + ?Sized),
+    args: &A,
     this: Option<&ClonableView>,
-) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
-    use leptos::either::Either::Left;
+    prec: i64,
+    argument_precs: &[i64],
+) -> impl IntoView + use<Views, A, Be> {
+    use leptos::either::EitherOf8::{A, B, C, D, E, F, G, H};
     match comp {
-        NotationComponent::Text(s) => Left(s.to_string().into_any()),
+        NotationComponent::Text(s) => B(s.to_string()),
         NotationComponent::Node {
             tag,
             attributes,
             children,
-        } => attributes.iter().fold(
-            Left(html_from_tag(
-                tag.as_ref(),
-                children
-                    .iter()
-                    .map(|c| view_component_with_args::<Views>(c, args, this))
-                    .collect_view(),
-            )),
-            |n, (k, v)| attr(n, k.to_string(), v.to_string()),
-        ),
+        } => A(attributes
+            .iter()
+            .fold(
+                AnyMaybeAttr::Any(html_from_tag(
+                    tag.as_ref(),
+                    children
+                        .iter()
+                        .map(|c| {
+                            view_component_with_args::<Views, Be, _>(
+                                c,
+                                args,
+                                this,
+                                prec,
+                                argument_precs,
+                            )
+                        })
+                        .collect_view(),
+                )),
+                |n, (k, v)| n.attr(k.to_string(), v.to_string()),
+            )
+            .into_view()),
         NotationComponent::MainComp(n) if this.is_some() => {
             // SAFETY: defined
             let this = unsafe { this.unwrap_unchecked().clone() };
@@ -308,50 +787,49 @@ pub(crate) fn view_component_with_args<Views: FtmlViews>(
             } else {
                 leptos::either::Either::Right(view_node(&n).attr("data-ftml-comp", ""))
             };
-            Left(view!(<msub>{inner}{this.into_view::<Views>()}</msub>).into_any())
+            C(view!(<msub>{inner}{this.into_view::<Views>()}</msub>))
         }
         NotationComponent::Comp(n) | NotationComponent::MainComp(n) => {
             let n = n.clone();
             if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                Left(
-                    Views::comp(ClonableView::new(true, move || {
-                        view_node(&n).attr("data-ftml-comp", "")
-                    }))
-                    .into_any(),
-                )
+                H(Views::comp(ClonableView::new(true, move || {
+                    view_node(&n).attr("data-ftml-comp", "")
+                })))
             } else {
-                Left(view_node(&n).attr("data-ftml-comp", "").into_any())
+                D(view_node(&n).attr("data-ftml-comp", ""))
             }
         }
         NotationComponent::Argument { index, mode } => {
-            Left(args.render_arg::<Views>(*index, *mode))
+            let prec = argument_precs.get(*index as usize).copied().unwrap_or(prec);
+            E(args.render_arg::<Views, Be>(*index, *mode, prec))
         }
         NotationComponent::ArgSep { index, mode, sep } => {
             let len = args.length_at(*index);
             if len == 0 {
-                return Left(().into_any());
+                return F(());
             }
             if len == 1 {
-                return Left(args.render_arg::<Views>(*index, *mode));
+                let prec = argument_precs.get(*index as usize).copied().unwrap_or(prec);
+                return E(args.render_arg::<Views, Be>(*index, *mode, prec));
             }
 
-            Left(view! {
+            G(view! {
                 <mrow>
-                    {args.render_arg_at::<Views>(*index, 0, *mode)}
+                    {args.render_arg_at::<Views,Be>(*index, 0, *mode)}
                 {
                     (1..len).map(|i| view!{
-                        {sep.iter().map(|s| view_component_with_args::<Views>(s,args,this)).collect_view()}
-                        {args.render_arg_at::<Views>(*index, i, *mode)}
+                        {sep.iter().map(|s| view_component_with_args::<Views,Be,_>(s,args,this,prec,argument_precs)).collect_view().into_any()}
+                        {args.render_arg_at::<Views,Be>(*index, i, *mode)}
                     }).collect_view()
                 }
                 </mrow>
-            }
-            .into_any())
+            })
         }
         NotationComponent::ArgMap { .. } => todo!(),
     }
 }
 
+#[derive(Copy, Clone)]
 struct DummyRender;
 impl ArgumentRender for DummyRender {
     #[inline]
@@ -362,58 +840,67 @@ impl ArgumentRender for DummyRender {
     fn num_args(&self) -> usize {
         0
     }
-    fn render_arg<Views: FtmlViews>(&self, index: u8, mode: ArgumentMode) -> AnyView {
-        view!(<msub><mi>{mode.as_char()}</mi><mn>{index + 1}</mn></msub>).into_any()
+    fn is_sequence(&self, _: u8) -> bool {
+        true
+    }
+    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+        &self,
+        index: u8,
+        mode: ArgumentMode,
+        _: i64,
+    ) -> impl IntoView + use<Views, Be> {
+        view!(<msub><mi>{mode.as_char()}</mi><mn>{index + 1}</mn></msub>)
     }
     #[inline]
     fn length_at(&self, _index: u8) -> usize {
         3
     }
-    fn render_arg_at<Views: FtmlViews>(
+    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
         &self,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,
-    ) -> AnyView {
+    ) -> impl IntoView + use<Views, Be> {
+        use leptos::either::EitherOf3::{A, B, C};
         match seq_index {
-            0 => {
-                view!(<msubsup><mi>{mode.as_char()}</mi><mn>{index + 1}</mn><mn>{1}</mn></msubsup>)
-                    .into_any()
-            }
-            1 => view!(<mo>"…"</mo>).into_any(),
-            _ => view!(<msubsup>
+            0 => A(
+                view!(<msubsup><mi>{mode.as_char()}</mi><mn>{index + 1}</mn><mn>{1}</mn></msubsup>),
+            ),
+            1 => B(view!(<mo>"…"</mo>)),
+            _ => C(view!(<msubsup>
                  <mi>{mode.as_char()}</mi>
                  <mn>{index + 1}</mn>
                  <msub>
                      <mn>"ℓ"</mn>
                      <mn>{index + 1}</mn>
                  </msub>
-             </msubsup>)
-            .into_any(),
+             </msubsup>)),
         }
     }
 }
 
-pub(crate) fn view_node(n: &NotationNode) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
-    use leptos::either::Either::Left;
+pub(crate) fn view_node(n: &NotationNode) -> impl IntoView + use<> {
     let NotationNode {
         tag,
         attributes,
         children,
     } = n;
-    attributes.iter().fold(
-        Left(html_from_tag(
-            tag.as_ref(),
-            children.iter().map(node_or_text).collect_view(),
-        )),
-        |n, (k, v)| attr(n, k.to_string(), v.to_string()),
-    )
+    attributes
+        .iter()
+        .fold(
+            AnyMaybeAttr::Any(html_from_tag(
+                tag.as_ref(),
+                children.iter().map(node_or_text).collect_view(),
+            )),
+            |n, (k, v)| n.attr(k.to_string(), v.to_string()),
+        )
+        .into_view()
 }
 
-fn node_or_text(n: &NodeOrText) -> leptos::either::Either<AnyView, AnyViewWithAttrs> {
+fn node_or_text(n: &NodeOrText) -> impl IntoView {
     match n {
-        NodeOrText::Node(n) => view_node(n),
-        NodeOrText::Text(t) => leptos::either::Either::Left(t.to_string().into_any()),
+        NodeOrText::Node(n) => leptos::either::Either::Left(view_node(n)),
+        NodeOrText::Text(t) => leptos::either::Either::Right(t.to_string()),
     }
 }
 
@@ -466,44 +953,3 @@ pub(crate) fn html_from_tag(id: &str, children: impl IntoView) -> AnyView {
         }*/
     }
 }
-/*
-pub enum AnyV {
-    Any(AnyView),
-    Attr(AnyViewWithAttrs),
-}
-impl AnyV {
-    fn into_view(self) -> impl IntoView {
-        match self {
-            Self::Any(a) => leptos::either::Either::Left(a),
-            Self::Attr(a) => leptos::either::Either::Right(a),
-        }
-    }
-}
-impl AddAnyAttr for AnyV {
-    type Output<SomeNewAttr: leptos::attr::Attribute> = Self;
-    fn add_any_attr<NewAttr: leptos::attr::Attribute>(self, attr: NewAttr) -> Self::Output<NewAttr>
-    where
-        Self::Output<NewAttr>: RenderHtml,
-    {
-        Self::Attr(match self {
-            Self::Any(a) => a.add_any_attr(attr),
-            Self::Attr(a) => a.add_any_attr(attr),
-        })
-    }
-}
-impl From<AnyView> for AnyV {
-    #[inline]
-    fn from(value: AnyView) -> Self {
-        Self::Any(value)
-    }
-}
-impl RenderHtml for AnyV {
-    type AsyncOutput =
-    type State = leptos::either::Either<<AnyView as RenderHtml>::AsyncOutput,<AnyViewWithAttrs as RenderHtml>::AsyncOutput>;
-    type Owned =
-    type State = leptos::either::Either<<AnyView as RenderHtml>::Owned,<AnyViewWithAttrs as RenderHtml>::Owned>;
-}
-impl Render for AnyV {
-    type State = leptos::either::Either<<AnyView as Render>::State,<AnyViewWithAttrs as Render>::State>;
-}
-*/

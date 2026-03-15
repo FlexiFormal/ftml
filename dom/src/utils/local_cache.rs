@@ -194,6 +194,7 @@ impl<B: SendBackend> WithLocalCache<B> {
             }
             either::Left(either::Right(B::get().get_module(uri)))
         } else {
+            let uriclone = uri.clone();
             let Some(SymbolUri { name, module }) = uri.into_symbol() else {
                 // SAFETY: uri is not a top-level module uri, so it is compatible with a symbol URI
                 unsafe { unreachable_unchecked() }
@@ -213,7 +214,7 @@ impl<B: SendBackend> WithLocalCache<B> {
             either::Right(fut.and_then(move |m| {
                 std::future::ready(
                     m.as_module_like(&name)
-                        .ok_or(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                        .ok_or_else(move || BackendError::NotFound(uriclone.into())),
                 )
             }))
         }
@@ -251,11 +252,10 @@ impl<B: SendBackend> WithLocalCache<B> {
     > + Send
     + use<B> {
         if let Some(m) = LOCAL_CACHE.documents.get(&uri.document) {
-            let r = m
-                .get_as::<DocumentTerm>(&uri.name)
-                .map_or(Err(BackendError::NotFound(UriKind::DocumentElement)), |d| {
-                    Ok(either::Either::Right(d))
-                });
+            let r = m.get_as::<DocumentTerm>(&uri.name).map_or_else(
+                move || Err(BackendError::NotFound(uri.into())),
+                |d| Ok(either::Either::Right(d)),
+            );
             return either::Either::Left(std::future::ready(r));
         }
         either::Either::Right(B::get().get_document_term(uri))
@@ -270,11 +270,10 @@ impl<B: SendBackend> WithLocalCache<B> {
     + use<B> {
         let uri = uri.simple_module();
         if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
-            let r = m
-                .get_as::<Symbol>(&uri.name)
-                .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
-                    Ok(either::Either::Right(d))
-                });
+            let r = m.get_as::<Symbol>(&uri.name).map_or_else(
+                move || Err(BackendError::NotFound(uri.into())),
+                |d| Ok(either::Either::Right(d)),
+            );
             return either::Either::Left(std::future::ready(r));
         }
         either::Either::Right(B::get().get_symbol(uri))
@@ -289,11 +288,10 @@ impl<B: SendBackend> WithLocalCache<B> {
     + use<B> {
         let uri = uri.simple_module();
         if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
-            let r = m
-                .get_as::<Morphism>(&uri.name)
-                .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
-                    Ok(either::Either::Right(d))
-                });
+            let r = m.get_as::<Morphism>(&uri.name).map_or_else(
+                move || Err(BackendError::NotFound(uri.into())),
+                |d| Ok(either::Either::Right(d)),
+            );
             return either::Either::Left(std::future::ready(r));
         }
         either::Either::Right(B::get().get_morphism(uri))
@@ -314,10 +312,10 @@ impl<B: SendBackend> WithLocalCache<B> {
         if let Some(m) = LOCAL_CACHE.modules.get(&uri.module) {
             let r = m.get_as::<MathStructure>(&uri.name).map_or_else(
                 || {
-                    m.get_as::<StructureExtension>(&uri.name)
-                        .map_or(Err(BackendError::NotFound(UriKind::Symbol)), |d| {
-                            Ok(either::Either::Right(d))
-                        })
+                    m.get_as::<StructureExtension>(&uri.name).map_or_else(
+                        move || Err(BackendError::NotFound(uri.into())),
+                        |d| Ok(either::Either::Right(d)),
+                    )
                 },
                 |d| Ok(either::Either::Left(d)),
             );
@@ -337,11 +335,10 @@ impl<B: SendBackend> WithLocalCache<B> {
     > + Send
     + use<B> {
         if let Some(m) = LOCAL_CACHE.documents.get(&uri.document) {
-            let r = m
-                .get_as::<VariableDeclaration>(&uri.name)
-                .map_or(Err(BackendError::NotFound(UriKind::DocumentElement)), |d| {
-                    Ok(either::Either::Right(d))
-                });
+            let r = m.get_as::<VariableDeclaration>(&uri.name).map_or_else(
+                move || Err(BackendError::NotFound(uri.into())),
+                |d| Ok(either::Either::Right(d)),
+            );
             return either::Either::Left(std::future::ready(r));
         }
         either::Either::Right(B::get().get_variable(uri))
@@ -415,6 +412,7 @@ impl<B: SendBackend> WithLocalCache<B> {
         uri: DocumentElementUri,
     ) -> impl Future<Output = Result<Notation, BackendError<B::Error>>> + Send + use<B> {
         use either::Either::{Left, Right};
+        let uriclone = uri.clone();
         let local = symbol.as_ref().map_or_else(
             || {
                 LOCAL_CACHE.notations.iter().find_map(|e| {
@@ -433,9 +431,9 @@ impl<B: SendBackend> WithLocalCache<B> {
         local.map_or_else(
             || {
                 symbol.map_or_else(
-                    || {
+                    move || {
                         Left(std::future::ready(Err(BackendError::NotFound(
-                            ftml_uris::UriKind::DocumentElement,
+                            uriclone.into(),
                         ))))
                     },
                     |symbol| Right(B::get().get_notation(symbol, uri)),

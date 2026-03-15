@@ -86,7 +86,7 @@ pub fn title<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
                     style="display:flex;flex-direction:row;"
                 >
                     {collapse_marker(data.visible,false)}
-                    {crate::Views::<Be>::cont(then, true).attr("class", "ftml-subproof-title")}
+                    {crate::Views::<Be>::cont(then, true).attr("class", "ftml-subproof-title").attr("style","")}
                 </div>
             })
         } else {
@@ -95,7 +95,7 @@ pub fn title<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
                     style="display:contents;"
                 >
                     {collapse_marker(data.visible,true)}
-                    {crate::Views::<Be>::cont(then, true).attr("class", "ftml-proof-title")}
+                    {crate::Views::<Be>::cont(then, true).attr("class", "ftml-proof-title").attr("style","")}
                 </div>
             })
         }

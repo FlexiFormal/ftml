@@ -18,6 +18,7 @@ use ftml_dom::{
     toc::{TocSource, TocStyle},
     utils::local_cache::SendBackend,
 };
+use ftml_ontology::narrative::documents::Document;
 use ftml_uris::{DocumentUri, NarrativeUri};
 use leptos::{
     IntoView,
@@ -37,8 +38,16 @@ pub enum SidebarPosition {
 #[derive(Copy, Clone)]
 struct InFtmlTop;
 
-pub struct Views<B: SendBackend>(PhantomData<B>);
-impl<B: SendBackend> Views<B> {
+pub trait ViewContinuations: 'static {
+    fn document_drawer(doc: &Document) -> impl IntoView;
+}
+pub struct NoContinuations;
+impl ViewContinuations for NoContinuations {
+    fn document_drawer(doc: &Document) -> impl IntoView {}
+}
+
+pub struct Views<B: SendBackend, Cont: ViewContinuations = NoContinuations>(PhantomData<(B, Cont)>);
+impl<B: SendBackend, Cont: ViewContinuations> Views<B, Cont> {
     pub fn top_safe<V: IntoView + 'static>(
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
@@ -92,7 +101,7 @@ impl<B: SendBackend> Views<B> {
                         //FtmlConfig::with_toc_source(|toc| !matches!(toc, TocSource::None)).is_some_and(|b| b)
                     );
                 if do_sidebar {
-                    components::sidebar::do_sidebar::<B>(
+                    components::sidebar::do_sidebar::<B, Cont>(
                         show_content,
                         pdf_link,
                         choose_highlight_style,

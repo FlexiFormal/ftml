@@ -4,19 +4,100 @@ use ftml_uris::{Id, metatheory};
 
 use crate::terms::{
     Argument, Term, Variable,
-    opaque::AnyOpaque,
+    opaque::{AnyOpaque, OpaqueNode},
     term::{OpaqueTerm, RecordFieldTerm},
 };
 
+// for opaques:
+static IGNORE_ATTRS: [&str; 22] = [
+    "data-ftml-arg",
+    "data-ftml-argmode",
+    "data-ftml-type",
+    "data-ftml-definiens",
+    "data-ftml-invisible",
+    "data-ftml-headterm",
+    "data-ftml-premise",
+    "data-ftml-conclusion",
+    "data-ftml-spfassumption",
+    "data-ftml-spfconclusion",
+    "data-ftml-proofterm",
+    "data-ftml-proofmethod",
+    "data-ftml-spfjust",
+    "data-ftml-spfarg",
+    "data-rustex-sourceref",
+    "data-rustex-font",
+    "data-rustex-glyph",
+    "style",
+    "class",
+    "lspace",
+    "rspace",
+    "stretchy",
+];
+
 macro_rules! destruct {
     ([$($p:pat),*] = $e:expr ) => {
+        let [$($p),*] = &*$e else {
+            // SAFETY: pattern match above
+            unsafe { unreachable_unchecked() }
+        };
+        /*
         let mut iter = $e.iter();
         $(
         let Some($p) = iter.next().cloned() else {
             // SAFETY: pattern match above
             unsafe { unreachable_unchecked() }
         };
-        )*
+        )* */
+    }
+}
+
+impl OpaqueNode {
+    fn is_paren(&self, parens: &[&str]) -> bool {
+        if ["mi", "mo"].contains(&self.tag.as_ref())
+            && self
+                .attributes
+                .iter()
+                .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref()))
+        {
+            if let [AnyOpaque::Text(s)] = &*self.children {
+                return parens.contains(&&**s);
+            }
+        } else if self.tag.as_ref() == "mrow"
+            && self
+                .attributes
+                .iter()
+                .all(|(k, _)| k.as_ref() == "data-ftml-comp" || IGNORE_ATTRS.contains(&k.as_ref()))
+            && let [c] = &*self.children
+        {
+            return match c {
+                AnyOpaque::Node(n) => n.is_paren(parens),
+                _ => false,
+            };
+        }
+        false
+    }
+    fn is_open_paren(&self) -> bool {
+        self.is_paren(&["(", "[", "{"])
+    }
+    fn is_close_paren(&self) -> bool {
+        self.is_paren(&[")", "]", "}"])
+    }
+}
+
+impl AnyOpaque {
+    fn is_open_paren(&self) -> bool {
+        if let Self::Node(on) = self {
+            on.is_open_paren()
+        } else {
+            false
+        }
+    }
+    fn is_close_paren(&self) -> bool {
+        if let Self::Node(on) = self {
+            on.is_close_paren()
+        } else {
+            false
+        }
     }
 }
 
@@ -38,26 +119,6 @@ impl Term {
     #[must_use]
     #[allow(clippy::too_many_lines)]
     pub fn simplify(self) -> Self {
-        // for opaques:
-        static IGNORE_ATTRS: [&str; 17] = [
-            "data-ftml-arg",
-            "data-ftml-argmode",
-            "data-ftml-type",
-            "data-ftml-definiens",
-            "data-ftml-invisible",
-            "data-ftml-headterm",
-            "data-ftml-premise",
-            "data-ftml-conclusion",
-            "data-ftml-spfassumption",
-            "data-ftml-spfconclusion",
-            "data-ftml-proofterm",
-            "data-ftml-proofmethod",
-            "data-ftml-spfjust",
-            "data-ftml-spfarg",
-            "data-rustex-sourceref",
-            "style",
-            "class",
-        ];
         match self {
             // Opaques
             Self::Opaque(o)
@@ -68,7 +129,7 @@ impl Term {
                     && o.terms.len() == 1 =>
             {
                 destruct!([tm] = o.terms);
-                tm
+                tm.clone()
             }
             Self::Opaque(o)
                 if (o.node.tag.as_ref() == "math"
@@ -83,7 +144,21 @@ impl Term {
                         .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
             {
                 destruct!([tm] = o.terms);
-                tm
+                tm.clone()
+            }
+            // parentheses
+            Self::Opaque(o)
+                if (o.node.tag.as_ref() == "math" || o.node.tag.as_ref() == "mrow")
+                    && o.terms.len() == 1
+                    && matches!(&*o.node.children,[open,AnyOpaque::Term(0),close]
+                        if open.is_open_paren() && close.is_close_paren())
+                    && o.node
+                        .attributes
+                        .iter()
+                        .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
+            {
+                destruct!([tm] = o.terms);
+                tm.clone()
             }
             // Numbers
             Self::Opaque(o)
@@ -116,14 +191,14 @@ impl Term {
                         .all(|(k, _)| IGNORE_ATTRS.contains(&k.as_ref())) =>
             {
                 destruct!([AnyOpaque::Node(node)] = o.node.children);
-                Self::Opaque(OpaqueTerm::new(node, o.terms.clone())).simplify()
+                Self::Opaque(OpaqueTerm::new(node.clone(), o.terms.clone())).simplify()
             }
             Self::Opaque(o)
                 if o.node.tag.as_ref() == "math"
                     && matches!(*o.node.children, [AnyOpaque::Node { .. }]) =>
             {
                 destruct!([AnyOpaque::Node(node)] = o.node.children);
-                Self::Opaque(OpaqueTerm::new(node, o.terms.clone())).simplify()
+                Self::Opaque(OpaqueTerm::new(node.clone(), o.terms.clone())).simplify()
             }
 
             // structure field projections:
@@ -162,9 +237,9 @@ impl Term {
                     _ => (record, None),
                 };
                 Self::Field(RecordFieldTerm::new(
-                    record,
-                    key,
-                    record_type,
+                    record.clone(),
+                    key.clone(),
+                    record_type.cloned(),
                     app.presentation.clone(),
                 ))
             }
@@ -175,7 +250,7 @@ impl Term {
                     && matches!(&*app.arguments, [Argument::Simple(Self::Symbol { .. })]) =>
             {
                 destruct!([Argument::Simple(head)] = app.arguments);
-                head
+                head.clone()
             }
 
             // default

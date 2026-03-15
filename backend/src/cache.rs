@@ -202,6 +202,7 @@ where
                     .map_err(Into::into),
             )
         } else {
+            let uriclone = uri.clone();
             let Some(SymbolUri { name, module }) = uri.into_symbol() else {
                 // SAFETY: uri is not a top-level module uri, so it is compatible with a symbol URI
                 unsafe { unreachable_unchecked() }
@@ -221,7 +222,7 @@ where
                     .and_then(move |m| {
                         std::future::ready(
                             m.as_module_like(&name)
-                                .ok_or(BackendError::NotFound(ftml_uris::UriKind::Symbol)),
+                                .ok_or(BackendError::NotFound(uriclone.into())),
                         )
                     }),
             )
@@ -268,15 +269,20 @@ where
         symbol: LeafUri,
         uri: DocumentElementUri,
     ) -> impl Future<Output = Result<Notation, BackendError<Self::Error>>> {
+        let uriclone = uri.clone();
         self.notations_cache
             .with(
                 symbol,
                 |v| self.inner.get_notations(v),
-                move |v| v.iter().find(|(u, _)| *u == uri).map(|(_, n)| n.clone()),
+                move |v| {
+                    v.iter()
+                        .find(|(u, _)| *u == uriclone)
+                        .map(|(_, n)| n.clone())
+                },
             )
             .map_ok_or_else(
                 |e| Err(e.into()),
-                |v| v.ok_or(BackendError::NotFound(ftml_uris::UriKind::DocumentElement)),
+                move |v| v.ok_or(BackendError::NotFound(uri.into())),
             )
     }
 }

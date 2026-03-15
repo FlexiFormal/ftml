@@ -103,12 +103,14 @@ impl DocumentState {
         use_context::<WithHead>().and_then(|w| w.0)
     }
 
-    pub fn with_head<F: FnOnce() -> AnyView>(head: VarOrSym, then: F) -> AnyView {
+    pub fn with_head<V: IntoView, F: FnOnce() -> V>(
+        head: VarOrSym,
+        then: F,
+    ) -> impl IntoView + use<V, F> {
         owned(|| {
             provide_context(WithHead(Some(head)));
             then()
         })
-        .into_any()
     }
 
     /// ### Panics

@@ -109,6 +109,44 @@ impl SymbolUri {
     /// assert_eq!(as_module.to_string(),"http://example.com?a=archive&p=path&m=some&s=module/symbol/name");
     /// ````
     #[must_use]
+    pub fn as_simple_module(&self) -> std::borrow::Cow<'_, Self> {
+        if self.module.is_top() {
+            return std::borrow::Cow::Borrowed(self);
+        }
+        // SAFETY: first segment is valid name
+        let first = unsafe { self.module.name.first().parse().unwrap_unchecked() };
+        let mut reststr =
+            String::with_capacity(self.module.name.steps().skip(1).map(|s| s.len() + 1).sum());
+        for s in self.module.name.steps().skip(1) {
+            reststr.push_str(s);
+            reststr.push('/');
+        }
+        reststr.push_str(self.name.as_ref());
+        let module = ModuleUri {
+            name: first,
+            path: self.module.path.clone(),
+        };
+        std::borrow::Cow::Owned(Self {
+            module,
+            // SAFETY: all segments are valid
+            name: unsafe { reststr.parse().unwrap_unchecked() },
+        })
+    }
+
+    /// Transforms this uri to have a simple module name, by prefixing all
+    /// later name segments to the symbol name;
+    /// e.g. transforms `&m=a/b&s=c/d` into `&m=a&s=b/c/d`:
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let symbol_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some/module&s=symbol/name").unwrap();
+    /// let as_module = symbol_uri.simple_module();
+    /// assert_eq!(as_module.to_string(),"http://example.com?a=archive&p=path&m=some&s=module/symbol/name");
+    /// ````
+    #[must_use]
     pub fn simple_module(mut self) -> Self {
         if self.module.is_top() {
             return self;

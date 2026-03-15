@@ -5,7 +5,7 @@ pub enum BackendError<E: std::fmt::Debug> {
     #[error("invalid uri components: {0}")]
     InvalidUriComponent(#[from] ftml_uris::components::ComponentError),
     #[error("{0} not found")]
-    NotFound(ftml_uris::UriKind),
+    NotFound(ftml_uris::Uri),
     #[error("no html for document")]
     HtmlNotFound,
     #[error("element does not have a fragment")]

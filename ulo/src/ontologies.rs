@@ -1,3 +1,5 @@
+#![allow(clippy::too_long_first_doc_paragraph)]
+
 pub mod rdf {
     pub use oxrdf::vocab::rdf::*;
 }
@@ -211,6 +213,7 @@ dict! {
 
     /** OWL distinguishes between two main categories of properties that an ontology builder
      * may want to define:
+     *
      * - Object properties link individuals to individuals.
      * - Datatype properties link individuals to data values.
      *
@@ -220,6 +223,7 @@ dict! {
 
     /** OWL distinguishes between two main categories of properties that an ontology builder
      * may want to define:
+     *
      * - Object properties link individuals to individuals.
      * - Datatype properties link individuals to data values.
      *
@@ -228,6 +232,7 @@ dict! {
     DatatypeProperty <: ::dc::relation, ::rdf::PROPERTY;
 
     /// Classes provide an abstraction mechanism for grouping resources with similar characteristics.
+    ///
     /// Like RDF classes, every OWL class is associated with a set of individuals, called the class
     /// extension. The individuals in the class extension are called the instances of the class.
     /// A class has an intensional meaning (the underlying concept) which is related but not equal to
@@ -235,6 +240,7 @@ dict! {
     /// different classes.
     Class;
     /// `owl:disjointWith` is a built-in OWL property with a class description as domain and range.
+    ///
     /// Each `owl:disjointWith` statement asserts that the class extensions of the two class
     /// descriptions involved have no individuals in common. Like axioms with `rdfs:subClassOf`,
     /// declaring two classes to be disjoint is a partial definition: it imposes a necessary but not
@@ -243,7 +249,9 @@ dict! {
 
     //disjointUnionOf;
 
-    /// An `owl:complementOf` property links a class to precisely one class description. An
+    /// An `owl:complementOf` property links a class to precisely one class description.
+    ///
+    /// An
     /// `owl:complementOf` statement describes a class for which the class extension contains exactly
     /// those individuals that do not belong to the class extension of the class description that is
     /// the object of the statement. `owl:complementOf` is analogous to logical negation: the class
@@ -253,13 +261,17 @@ dict! {
 
     #[allow(clippy::doc_markdown)]
     /// Syntactically, `owl:inverseOf` is a built-in OWL property with `owl:ObjectProperty` as its
-    /// domain and range. An axiom of the form $P_1$ `owl:inverseOf` $P_2$ asserts that for every
+    /// domain and range.
+    ///
+    /// An axiom of the form $P_1$ `owl:inverseOf` $P_2$ asserts that for every
     /// pair $(x,y)$ in the property extension of $P_1$, there is a pair $(y,x)$ in the property
     /// extension of $P_2$, and vice versa. Thus, `owl:inverseOf` is a symmetric property.
     inverseOf :SymmetricProperty << ObjectProperty;
 
     /// A symmetric property is a property for which holds that if the pair $(x,y)$ is an instance of
-    /// $P$, then the pair $(y,x)$ is also an instance of $P$. Syntactically, a property is defined
+    /// $P$, then the pair $(y,x)$ is also an instance of $P$.
+    ///
+    /// Syntactically, a property is defined
     /// as symmetric by making it an instance of the built-in OWL class `owl:SymmetricProperty`,
     /// a subclass of `owl:ObjectProperty`.
     SymmetricProperty :Class <: ObjectProperty;
@@ -277,12 +289,15 @@ dict! {
 
     #[allow(clippy::doc_markdown)]
     /// A functional property is a property that can have only one (unique) value $y$ for each
-    /// instance $x$, i.e. there cannot be two distinct values $y_1$ and $y_2$ such that the pairs
+    /// instance $x$,
+    ///
+    /// i.e. there cannot be two distinct values $y_1$ and $y_2$ such that the pairs
     /// $(x,y_1)$ and $(x,y_2)$ are both instances of this property. Both object properties and
     /// datatype properties can be declared as "functional". For this purpose, OWL defines the
     /// built-in class `owl:FunctionalProperty` as a special subclass of the RDF class `rdf:Property`.
     FunctionalProperty :Class <: ::rdf::PROPERTY;
     /// Two OWL class identifiers are predefined, namely the classes `owl:Thing` and `owl:Nothing`.
+    ///
     /// The class extension of `owl:Thing` is the set of all individuals.
     /// Consequently, every OWL class is a subclass of `owl:Thing`.
     Thing : Class;

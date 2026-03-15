@@ -312,14 +312,14 @@ fn do_table<Be: SendBackend, E>(
         not: &Notation,
     ) -> AnyView {
         let functional = arity.num() > 0;
-        let notation = not.as_view_safe::<crate::Views<Be>>(head, None);
+        let notation = not.as_view_safe::<crate::Views<Be>, Be>(head, None);
         let op = if functional {
-            let op = not.as_op_safe::<crate::Views<Be>>(head, None);
+            let op = not.as_op_safe::<crate::Views<Be>, Be>(head, None);
             Some(view! {<TableCell class="ftml-notation-cell">{op}</TableCell>})
         } else {
             None
         };
-        let notation2 = not.as_view_safe::<crate::Views<Be>>(head, None);
+        let notation2 = not.as_view_safe::<crate::Views<Be>, Be>(head, None);
         view! {<TableCell class="ftml-notation-cell">
             <Popover>
                 <PopoverTrigger slot><span>{notation}</span></PopoverTrigger>

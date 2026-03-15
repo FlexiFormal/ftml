@@ -55,6 +55,7 @@ uri! {
     ANONYMOUS_RECORD = "anonymous record",
     FIELD_PROJECTION = "record field",
     MATH_STRUCTURE = "mathematical structure",
+    LET_IN = "let in",
 
     // -------------------------------------
 

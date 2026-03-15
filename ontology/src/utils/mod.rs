@@ -132,6 +132,63 @@ impl serde_lite::Deserialize for Float {
     }
 }
 
+/// Wrapper for [`OrderedFloat`] for serialization reasons
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
+)]
+#[cfg_attr(
+    feature = "typescript",
+    tsify(into_wasm_abi, from_wasm_abi, type = "number")
+)]
+pub struct Float64(#[cfg_attr(feature = "serde", bincode(with_serde))] OrderedFloat<f64>);
+impl Deref for Float64 {
+    type Target = f64;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for Float64 {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl From<f64> for Float64 {
+    #[inline]
+    fn from(value: f64) -> Self {
+        Self(OrderedFloat(value))
+    }
+}
+impl From<Float64> for f64 {
+    #[inline]
+    fn from(value: Float64) -> Self {
+        value.0.into()
+    }
+}
+
+#[cfg(feature = "serde-lite")]
+impl serde_lite::Serialize for Float64 {
+    #[inline]
+    fn serialize(&self) -> Result<serde_lite::Intermediate, serde_lite::Error> {
+        self.0.deref().serialize()
+    }
+}
+
+#[cfg(feature = "serde-lite")]
+impl serde_lite::Deserialize for Float64 {
+    #[inline]
+    fn deserialize(val: &serde_lite::Intermediate) -> Result<Self, serde_lite::Error>
+    where
+        Self: Sized,
+    {
+        Ok(Self(OrderedFloat(f64::deserialize(val)?)))
+    }
+}
+
 /// Wrapper for [`SmallVec`] for serialization reasons
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

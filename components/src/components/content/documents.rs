@@ -297,7 +297,10 @@ fn view_notation<Be: ftml_dom::utils::local_cache::SendBackend>(
     let not = FtmlConfig::disable_hovers(move || {
         LocalCache::with_or_toast::<Be, _, _>(
             |e| e.get_notation(leaf, uri),
-            move |n| n.as_view_safe::<crate::Views<Be>>(&head, None),
+            move |n| {
+                n.as_view_safe::<crate::Views<Be>, Be>(&head, None)
+                    .into_any()
+            },
             || "error".into_any(),
         )
     });

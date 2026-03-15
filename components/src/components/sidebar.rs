@@ -1,4 +1,5 @@
 use crate::{
+    ViewContinuations,
     components::content::FtmlViewable,
     config::HighlightStyle,
     utils::{
@@ -18,7 +19,7 @@ use ftml_uris::DocumentUri;
 use leptos::{prelude::*, web_sys::HtmlDivElement};
 
 #[allow(clippy::fn_params_excessive_bools)]
-pub fn do_sidebar<B: SendBackend>(
+pub fn do_sidebar<B: SendBackend, Cont: ViewContinuations>(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -28,13 +29,13 @@ pub fn do_sidebar<B: SendBackend>(
     inject_css("ftml-sidebar", include_str!("./sidebar.css"));
 
     if floating {
-        floating_sidebar::<B>(show_content, pdf_link, choose_highlight_style, children)
+        floating_sidebar::<B, Cont>(show_content, pdf_link, choose_highlight_style, children)
     } else {
-        flex_sidebar::<B>(show_content, pdf_link, choose_highlight_style, children)
+        flex_sidebar::<B, Cont>(show_content, pdf_link, choose_highlight_style, children)
     }
 }
 
-fn flex_sidebar<B: SendBackend>(
+fn flex_sidebar<B: SendBackend, Cont: ViewContinuations>(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -48,7 +49,7 @@ fn flex_sidebar<B: SendBackend>(
             view! {
                 {if choose_highlight_style {Some(select_highlighting())} else {None}}
                 <Flex>
-                    {if show_content {Some(content_drawer::<B>())} else {None}}
+                    {if show_content {Some(content_drawer::<B,Cont>())} else {None}}
                     {if pdf_link {Some(pdf::<B>())} else {None}}
                 </Flex>
                 {super::toc::toc::<B>()}
@@ -81,7 +82,7 @@ fn flex_sidebar<B: SendBackend>(
     .into_any()
 }
 
-fn floating_sidebar<B: SendBackend>(
+fn floating_sidebar<B: SendBackend, Cont: ViewContinuations>(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -104,7 +105,7 @@ fn floating_sidebar<B: SendBackend>(
             view! {
                 {if choose_highlight_style {Some(select_highlighting())} else {None}}
                 <Flex>
-                    {if show_content {Some(content_drawer::<B>())} else {None}}
+                    {if show_content {Some(content_drawer::<B,Cont>())} else {None}}
                     {if pdf_link {Some(pdf::<B>())} else {None}}
                 </Flex>
                 {super::toc::toc::<B>()}
@@ -190,7 +191,7 @@ fn max_child(e: &leptos::web_sys::Element) -> Option<leptos::web_sys::Element> {
     curr
 }
 
-fn content_drawer<B: SendBackend>() -> AnyView {
+fn content_drawer<B: SendBackend, Cont: ViewContinuations>() -> AnyView {
     use thaw::{
         Button, ButtonAppearance, DrawerBody, DrawerHeader, DrawerHeaderTitle,
         DrawerHeaderTitleAction, DrawerPosition, Icon, OverlayDrawer, Popover, PopoverTrigger,
@@ -246,7 +247,12 @@ fn content_drawer<B: SendBackend>() -> AnyView {
                         if let Some(t) = &d.title {
                             title.set(t.to_string());
                         }
-                        d.as_view::<B>()
+                        //let doc = d.clone();
+                        view!{
+                            //<span on:click=move |_| leptos::logging::log!("{doc:#?}")>"Print JSON"</span>
+                            {d.as_view::<B>()}
+                            {Cont::document_drawer(&d)}
+                        }.into_any()
                     },
                     || "error".into_any()
                 ))} else { None }

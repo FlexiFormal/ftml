@@ -8,7 +8,7 @@ pub mod sidebar;
 pub mod terms;
 pub mod toc;
 
-use crate::config::FtmlConfig;
+use crate::{ViewContinuations, config::FtmlConfig};
 use ftml_dom::{
     ClonableView, TermTrackedViews,
     structure::{Inputref, SectionInfo},
@@ -19,7 +19,7 @@ use ftml_uris::{DocumentElementUri, Id};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
-impl<B: SendBackend> TermTrackedViews for crate::Views<B> {
+impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<B, Cont> {
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
         use crate::utils::theming::Themer;
         ftml_dom::global_setup(|| {

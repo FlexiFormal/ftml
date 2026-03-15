@@ -45,7 +45,7 @@ impl ReactiveTerm {
         &self,
         position: ArgumentPosition,
         children: ClonableView,
-    ) -> impl IntoView {
+    ) -> impl IntoView + use<Views> {
         children.set_state();
         let ch = children.clone();
         self.app.try_update_untracked(move |app| {
