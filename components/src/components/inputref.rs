@@ -65,8 +65,8 @@ fn do_replace<B: SendBackend>(
     let context = DocumentState::context_uri();
     let uri2 = uri.clone();
     tracing::debug!("expanding inputref {inputref}");
-    LocalCache::with::<B, _, _>(
-        |b| b.get_fragment(uri2.into(), Some(context)),
+    LocalCache::with(
+        |b| b.get_fragment(B::get(), uri2.into(), Some(context)),
         move |(html, css, b)| {
             for c in css {
                 c.inject();

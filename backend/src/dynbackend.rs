@@ -28,7 +28,7 @@ use crate::{BackendCheckResult, BackendError, FtmlBackend};
 
 pub type Fut<T> = std::pin::Pin<Box<dyn Future<Output = Result<T, BackendError<String>>> + Send>>;
 
-pub trait DynBackend {
+pub trait DynBackend: Send + Sync {
     fn document_link_url(&self, uri: &DocumentUri) -> String;
     fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String>;
 
@@ -287,7 +287,7 @@ impl FtmlBackend for dyn DynBackend {
     }
 }
 
-impl<B: FtmlBackend> DynBackend for B {
+impl<B: FtmlBackend + Send + Sync> DynBackend for B {
     #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         <Self as FtmlBackend>::document_link_url(self, uri)

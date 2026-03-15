@@ -219,8 +219,12 @@ pub(super) fn do_paragraphs<Be: SendBackend>(uri: SymbolUri) -> AnyView {
 
     let cached = move || {
         let uri = uri.clone();
-        LocalCache::with_or_toast::<Be, _, _>(
-            move |be| async move { Ok(be.get_paragraphs(uri, false).await) },
+        LocalCache::with_or_toast(
+            move |be| async move {
+                Ok::<_, ftml_backend::BackendError<Be::Error>>(
+                    be.get_paragraphs(Be::get(), uri, false).await,
+                )
+            },
             |ps| {
                 let mut definitions = Vec::new();
                 let mut examples = Vec::new();
@@ -292,8 +296,10 @@ pub(super) fn do_notations<Be: SendBackend>(uri: LeafUri, arity: ArgumentSpec) -
         LeafUri::Symbol(s) => VarOrSym::Sym(s.clone()),
     };
     inject_css("ftml-notation-table", include_str!("notations.css"));
-    LocalCache::with_or_toast::<Be, _, _>(
-        move |b| async move { Ok(b.get_notations(uri).await) },
+    LocalCache::with_or_toast(
+        move |b| async move {
+            Ok::<_, ftml_backend::BackendError<Be::Error>>(b.get_notations(Be::get(), uri).await)
+        },
         move |nots| do_table::<Be, _>(var_or_sym, arity, nots),
         || "(errored)".into_any(),
     )

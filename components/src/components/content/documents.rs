@@ -109,8 +109,8 @@ impl super::FtmlViewable for DocumentElement {
                 .into_any(),
             Self::SymbolDeclaration(s) => {
                 let s = s.clone();
-                LocalCache::with_or_toast::<Be, _, _>(
-                    |e| e.get_symbol(s),
+                LocalCache::with_or_toast(
+                    |e| e.get_symbol(Be::get(), s),
                     move |s| match s {
                         either::Either::Left(s) => super::symbols::symbol_view::<Be>(&s, true),
                         either::Either::Right(s) => super::symbols::symbol_view::<Be>(&s, true),
@@ -132,8 +132,8 @@ impl super::FtmlViewable for DocumentElement {
             } => {
                 let children = children.clone();
                 let uri = morphism.clone();
-                LocalCache::with_or_toast::<Be, _, _>(
-                    |e| e.get_morphism(uri),
+                LocalCache::with_or_toast(
+                    |e| e.get_morphism(Be::get(), uri),
                     move |s| {
                         let s = match &s {
                             either::Either::Left(s) => s,
@@ -295,8 +295,8 @@ fn view_notation<Be: ftml_dom::utils::local_cache::SendBackend>(
         VarOrSym::Var(Variable::Name { .. }) => (C("TODO"), None),
     };
     let not = FtmlConfig::disable_hovers(move || {
-        LocalCache::with_or_toast::<Be, _, _>(
-            |e| e.get_notation(leaf, uri),
+        LocalCache::with_or_toast(
+            |e| e.get_notation(Be::get(), leaf, uri),
             move |n| {
                 n.as_view_safe::<crate::Views<Be>, Be>(&head, None)
                     .into_any()
@@ -329,8 +329,8 @@ fn view_inputref<Be: ftml_dom::utils::local_cache::SendBackend>(uri: &DocumentUr
         </Header>
         <div style="padding-left:15px;">{
             let uri = uri.clone();
-            LocalCache::with_or_toast::<Be,_,_>(
-                move |b| b.get_document(uri), move |d| {
+            LocalCache::with_or_toast(
+                move |b| b.get_document(Be::get(),uri), move |d| {
                     let title = d.title.as_ref().map(ToString::to_string);
                     view!{
                         {title.map(|s|

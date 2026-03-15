@@ -123,7 +123,10 @@ pub trait GlobalBackend: 'static {
     type Backend: FtmlBackend<Error = Self::Error>;
     fn get() -> &'static Self::Backend;
     #[must_use]
-    fn as_dyn() -> &'static dyn DynBackend {
+    fn as_dyn() -> &'static dyn DynBackend
+    where
+        Self::Backend: Send + Sync,
+    {
         Self::get() as _
     }
 }

@@ -59,8 +59,8 @@ pub fn with_notation<B: SendBackend>(
 ) -> AnyView {
     use leptos::either::Either::{Left, Right};
     let h = head.clone();
-    LocalCache::with_or_toast::<B, _, _>(
-        |c| c.get_notation(Some(h), notation),
+    LocalCache::with_or_toast(
+        |c| c.get_notation(B::get(), Some(h), notation),
         move |n| {
             match arguments {
                 None => Left(n.as_op::<crate::Views<B>, B>(&head.into(), None, i64::MAX)),
@@ -96,8 +96,11 @@ pub fn notation_selector<Be: SendBackend>(uri: LeafUri) -> impl IntoView {
         return Left(());
     }
     let leaf = uri.clone();
-    let notations =
-        LocalCache::resource::<Be, _, _>(move |b| async move { Ok(b.get_notations(leaf).await) });
+    let notations = LocalCache::resource(move |b| async move {
+        Result::<_, ftml_backend::BackendError<Be::Error>>::Ok(
+            b.get_notations(Be::get(), leaf).await,
+        )
+    });
     Right(view! {<Suspense fallback = || view!(<Spinner/>)>{move || {
         use leptos::either::EitherOf4::{A, B, C, D};
         match notations.get() {

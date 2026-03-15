@@ -352,7 +352,7 @@ fn submit_answer<Be: SendBackend>() -> impl IntoView {
                 } else {
                     let uricl = uri.clone();
                     leptos::either::Either::Right(move || {
-                        let res = LocalCache::resource::<Be, _, _>(|c| c.get_solutions(uricl));
+                        let res = LocalCache::resource(|c| c.get_solutions(Be::get(), uricl));
                         Effect::new(move || {
                             res.with(|r| {
                                 if let Some(Ok(r)) = r {

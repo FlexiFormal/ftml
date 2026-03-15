@@ -7,7 +7,7 @@ use ftml_backend::FtmlBackend;
 use ftml_dom::{
     DocumentState,
     notations::TermExt,
-    utils::local_cache::{LocalCache, SendBackend, WithLocalCache},
+    utils::local_cache::{LocalCache, SendBackend},
 };
 use ftml_ontology::terms::{Term, VarOrSym};
 use ftml_uris::{DocumentElementUri, LeafUri};
@@ -116,75 +116,62 @@ impl ReactiveStore {
     }
 }
 
-pub trait LocalCacheExt {
-    fn with<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
+pub trait LocalCacheExt: 'static {
+    fn with<R, E, Fut>(
+        f: impl FnOnce(&'static Self) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
     ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + Send
-            + 'static;
+        E: std::fmt::Debug + Send + Sync + 'static,
+        Fut: Future<Output = Result<R, ftml_backend::BackendError<E>>> + Send + 'static;
 
-    fn with_or_err<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
+    fn with_or_err<R, E, Fut>(
+        f: impl FnOnce(&'static Self) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
-        error: impl FnOnce(ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>) -> AnyView
-        + Clone
-        + Send
-        + 'static,
+        error: impl FnOnce(ftml_backend::BackendError<E>) -> AnyView + Clone + Send + 'static,
     ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + Send
-            + 'static;
+        E: std::fmt::Debug + Send + Sync + 'static,
+        Fut: Future<Output = Result<R, ftml_backend::BackendError<E>>> + 'static + Send;
 
-    fn with_or_toast<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
+    fn with_or_toast<R, E, Fut>(
+        f: impl FnOnce(&'static Self) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
         error: impl FnOnce() -> AnyView + Send + Clone + 'static,
     ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + Send
-            + 'static;
+        E: std::fmt::Debug + Send + Sync + 'static,
+        Fut: Future<Output = Result<R, ftml_backend::BackendError<E>>> + Send + 'static;
 }
 
 impl LocalCacheExt for LocalCache {
-    fn with<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
+    fn with<R, E, Fut>(
+        f: impl FnOnce(&'static Self) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
     ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + Send
-            + 'static,
+        E: std::fmt::Debug + Send + Sync + 'static,
+        Fut: Future<Output = Result<R, ftml_backend::BackendError<E>>> + Send + 'static,
     {
-        Self::with_or_err::<B, _, _>(f, view, |e| {
-            tracing::error!("{e}");
+        Self::with_or_err(f, view, |e| {
+            tracing::error!("{e:?}");
             ().into_any()
         })
     }
 
-    fn with_or_toast<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
+    fn with_or_toast<R, E, Fut>(
+        f: impl FnOnce(&'static Self) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
         error: impl FnOnce() -> AnyView + Send + Clone + 'static,
     ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + Send
-            + 'static,
+        E: std::fmt::Debug + Send + Sync + 'static,
+        Fut: Future<Output = Result<R, ftml_backend::BackendError<E>>> + Send + 'static,
     {
         use leptos::prelude::*;
         use thaw::{
@@ -192,8 +179,8 @@ impl LocalCacheExt for LocalCache {
             ToasterInjection,
         };
         let toaster = ToasterInjection::expect_context();
-        Self::with_or_err::<B, _, _>(f, view, move |e| {
-            tracing::error!("{e}");
+        Self::with_or_err(f, view, move |e| {
+            tracing::error!("{e:?}");
             toaster.dispatch_toast(
                 move || {
                     view! {
@@ -208,23 +195,17 @@ impl LocalCacheExt for LocalCache {
         })
     }
 
-    fn with_or_err<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
+    fn with_or_err<R, E, Fut>(
+        f: impl FnOnce(&'static Self) -> Fut + Send + Sync + 'static + Clone,
         view: impl FnOnce(R) -> AnyView + Clone + Send + 'static,
-        error: impl FnOnce(ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>) -> AnyView
-        + Clone
-        + Send
-        + 'static,
+        error: impl FnOnce(ftml_backend::BackendError<E>) -> AnyView + Clone + Send + 'static,
     ) -> AnyView
     where
         R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            >
-            + 'static
-            + Send,
+        E: std::fmt::Debug + Send + Sync + 'static,
+        Fut: Future<Output = Result<R, ftml_backend::BackendError<E>>> + 'static + Send,
     {
-        wait_and_then(move || f(WithLocalCache::default()), view, error)
+        wait_and_then(move || f(Self::get()), view, error)
     }
 }
 

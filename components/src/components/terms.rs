@@ -457,7 +457,7 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
     let header = view!({title}{tm}" ("{uri.name().to_string()}")");
     view! {<div class="ftml-symbol-popup">
         <Text>{header}</Text>
-        {LocalCache::with::<B,_,_>(|b| b.get_variable(uri),|v| {
+        {LocalCache::with(|b| b.get_variable(B::get(),uri),|v| {
             let v = match &v {
                 either::Either::Left(v) => v,
                 either::Either::Right(v) => &**v
@@ -491,8 +491,8 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
 pub fn symbol_popover<B: SendBackend>(uri: SymbolUri) -> AnyView {
     inject_css("ftml-symbol-popup", include_str!("popup.css"));
     let context = DocumentState::context_uri();
-    LocalCache::with::<B, _, _>(
-        |b| b.get_definition(uri, Some(context)),
+    LocalCache::with(
+        |b| b.get_definition(B::get(), uri, Some(context)),
         |(html, css, _)| {
             for c in css {
                 c.inject();
@@ -565,8 +565,8 @@ pub(crate) fn do_onclick<Be: SendBackend>(
         }
         VarOrSym::Var(Variable::Ref { declaration, .. }) => {
             let uri = declaration.clone();
-            return LocalCache::with_or_toast::<Be, _, _>(
-                move |c| c.get_variable(uri),
+            return LocalCache::with_or_toast(
+                move |c| c.get_variable(Be::get(), uri),
                 |v| match v {
                     either::Either::Left(v) => v.as_view::<Be>(),
                     either::Either::Right(v) => v.as_view::<Be>(),
@@ -580,8 +580,8 @@ pub(crate) fn do_onclick<Be: SendBackend>(
     let uri_string = s.to_string();
     let uri = s.clone();
     let paras =
-        LocalCache::resource::<Be, _, _>(
-            move |b| async move { Ok(b.get_paragraphs(s, false).await) },
+        LocalCache::resource(
+            move |b| async move { Ok(b.get_paragraphs(Be::get(), s, false).await) },
         );
     let selected = RwSignal::new(None);
     let selector = paras_selector::<Be>(paras.read_only(), selected);
@@ -622,8 +622,8 @@ fn formals<Be: SendBackend>(
             {
                 let sym = symbol.clone();
                 let bol = symbol.clone();
-                LocalCache::with_or_toast::<Be,_,_>(
-                    move |r| r.get_symbol(sym),
+                LocalCache::with_or_toast(
+                    move |r| r.get_symbol(Be::get(),sym),
                     |s| match s {
                         ::either::Left(s) => super::content::symbols::symbol_view::<Be>(&s,false),
                         ::either::Right(s) => super::content::symbols::symbol_view::<Be>(&s,false)
@@ -632,8 +632,8 @@ fn formals<Be: SendBackend>(
             )}
             {move || { uri.with(|u| u.clone().map(|u|  {
                let uri = u.clone();
-               view!("In term: "{LocalCache::with_or_toast::<Be,_,_>(
-                   |r| r.get_document_term(u),
+               view!("In term: "{LocalCache::with_or_toast(
+                   |r| r.get_document_term(Be::get(),u),
                    |t|  {
                        tracing::warn!("Rendering term {t:?}");
                        ftml_dom::utils::math(|| ReactiveStore::render_term::<Be>(
@@ -733,13 +733,13 @@ fn para_window<Be: SendBackend>(selected: RwSignal<Option<String>>) -> impl Into
                 || Right(view!(<Spinner/>)),
                 |u| {
                     let uri = u.clone();
-                    Left(LocalCache::with_or_toast::<Be, _, _>(
-                        |c| c.get_fragment(Uri::DocumentElement(u), None),
+                    Left(LocalCache::with_or_toast(
+                        |c| c.get_fragment(Be::get(), Uri::DocumentElement(u), None),
                         |(html, css, stripped)| {
                             for c in css {
                                 c.inject();
                             }
-                            crate::Views::<Be>::render_fragment::<Be>(
+                            crate::Views::<Be>::render_fragment(
                                 Some(uri.into()),
                                 crate::SidebarPosition::None,
                                 stripped,
@@ -849,7 +849,7 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
             //leptos::logging::log!("getting term at {uri}");
             Some((
                 uri.clone(),
-                LocalCache::resource::<Be, _, _>(|r| r.get_document_term(uri)),
+                LocalCache::resource(|r| r.get_document_term(Be::get(), uri)),
             ))
         } else {
             None

@@ -7,7 +7,7 @@ use crate::{
     terms::{ReactiveTerm, TopTerm},
     utils::{
         FutureExt,
-        local_cache::{SendBackend, WithLocalCache},
+        local_cache::{LocalCache, SendBackend},
         owned,
     },
 };
@@ -266,7 +266,7 @@ impl TermExt for ApplicationTerm {
                 FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
-                            WithLocalCache::<Be>::default().get_structure(uri)
+                            LocalCache::get().get_structure(Be::get(), uri)
                         })
                     },
                     move |r| match r {
@@ -370,7 +370,7 @@ impl TermExt for BindingTerm {
                 FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
-                            WithLocalCache::<Be>::default().get_structure(uri)
+                            LocalCache::get().get_structure(Be::get(), uri)
                         })
                     },
                     move |r| match r {
@@ -889,7 +889,7 @@ fn with_notations<
     use crate::utils::FutureExt;
     let uricl = uri.clone();
     FutureExt::into_view(
-        move || WithLocalCache::<Be>::default().get_notations(uricl.clone()),
+        move || LocalCache::get().get_notations(Be::get(), uricl.clone()),
         move |gl| {
             let not = gl.local.and_then(|v| select_notation(v, &uri)).or_else(|| {
                 gl.global

@@ -107,8 +107,8 @@ pub fn hover_paragraph<Be: SendBackend>(uri: DocumentElementUri, title: AnyView)
           <div style="margin-bottom:5px;"><thaw::Divider/></div>
           <div class="ftml-symbol-popup">
           {
-              LocalCache::with_or_err::<Be,_,_>(
-                  |b| b.get_fragment(uri.into(), None),
+              LocalCache::with_or_err(
+                  |b| b.get_fragment(Be::get(),uri.into(), None),
                   |(html,css,_)| {
                       for c in css {
                           c.inject();
@@ -151,7 +151,7 @@ impl FtmlViewable for ModuleUri {
         view! {
         <Dialog open = on_click>
             <DialogSurface>{
-                LocalCache::with_or_toast::<Be,_,_>(move |c| c.get_module(origuri),
+                LocalCache::with_or_toast(move |c| c.get_module(Be::get(),origuri),
                 |m| view!{
                     <Scrollbar style="max-height:75vh;">{m.as_view::<Be>()}</Scrollbar>
                 }.into_any(),

@@ -127,7 +127,7 @@ impl LocalCache {
         }
     }
 
-    pub fn get_document<B: FtmlBackend<Error: Send>>(
+    pub fn get_document<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: DocumentUri,
@@ -352,21 +352,18 @@ impl LocalCache {
         )
     }
 
-    pub fn resource<B: SendBackend, R, Fut>(
-        f: impl FnOnce(WithLocalCache<B>) -> Fut + Send + Sync + 'static + Clone,
-    ) -> leptos::prelude::RwSignal<
-        Option<Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>>,
-    >
+    pub fn resource<R, E, Fut>(
+        f: impl FnOnce(&'static Self) -> Fut + Send + Sync + 'static + Clone,
+    ) -> leptos::prelude::RwSignal<Option<Result<R, ftml_backend::BackendError<E>>>>
     where
         R: Send + Sync + 'static + Clone,
-        Fut: Future<
-                Output = Result<R, ftml_backend::BackendError<<B::Backend as FtmlBackend>::Error>>,
-            > + 'static,
+        E: std::fmt::Debug + Send + Sync + 'static,
+        Fut: Future<Output = Result<R, ftml_backend::BackendError<E>>> + 'static,
     {
         use leptos::prelude::*;
         let result = RwSignal::new(None);
         leptos::task::spawn_local(async move {
-            let r = f(WithLocalCache::default()).await;
+            let r = f(&LOCAL_CACHE).await;
             result.set(Some(r));
         });
         result
@@ -383,14 +380,6 @@ pub(crate) static LOCAL_CACHE: std::sync::LazyLock<LocalCache> =
         dochtmls: Map::default(),
         solutions: Map::default(),
     });
-
-pub struct WithLocalCache<B: SendBackend>(PhantomData<B>);
-impl<B: SendBackend> Default for WithLocalCache<B> {
-    #[inline]
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GlobalLocal<T, E> {
@@ -423,6 +412,10 @@ impl<T, E> GlobalLocal<Vec<T>, E> {
 }
 
 impl LocalCache {
+    #[inline]
+    pub fn get() -> &'static Self {
+        &LOCAL_CACHE
+    }
     pub fn add_module(m: Module) {
         LOCAL_CACHE.modules.insert(m);
     }
@@ -449,6 +442,15 @@ impl LocalCache {
     }
 }
 
+/*
+
+pub struct WithLocalCache<B: SendBackend>(PhantomData<B>);
+impl<B: SendBackend> Default for WithLocalCache<B> {
+    #[inline]
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
 impl<B: SendBackend> WithLocalCache<B> {
     pub fn get_fragment(
         &self,
@@ -748,6 +750,7 @@ impl<B: SendBackend> WithLocalCache<B> {
         )
     }
 }
+ */
 
 #[cfg(feature = "deepsize")]
 pub struct CacheSize {

@@ -243,8 +243,8 @@ fn content_drawer<B: SendBackend, Cont: ViewContinuations>() -> AnyView {
             </DrawerHeader>
             <DrawerBody>
                 {move || if open.get() {
-                    let uri= uri.clone(); Some(LocalCache::with_or_toast::<B,_,_>(
-                        move |b| b.get_document(uri), move |d| {
+                    let uri= uri.clone(); Some(LocalCache::with_or_toast(
+                        move |b| b.get_document(B::get(),uri), move |d| {
                             if let Some(t) = &d.title {
                                 title.set(t.to_string());
                             }
@@ -265,6 +265,32 @@ fn content_drawer<B: SendBackend, Cont: ViewContinuations>() -> AnyView {
     }
     .into_any()
 }
+
+/*
+fn drawer_inner(
+    uri: DocumentUri,
+    title: RwSignal<String>,
+    be: &dyn ftml_backend::dynbackend::DynBackend,
+) -> AnyView {
+    let uri = uri.clone();
+    LocalCache::with_or_toast(
+        move |b| b.get_document(be, uri),
+        move |d| {
+            if let Some(t) = &d.title {
+                title.set(t.to_string());
+            }
+            //let doc = d.clone();
+            view! {
+                //<span on:click=move |_| leptos::logging::log!("{doc:#?}")>"Print JSON"</span>
+                {d.as_view::<B>()}
+                {Cont::document_drawer(&d)}
+            }
+            .into_any()
+        },
+        || "error".into_any(),
+    )
+}
+ */
 
 fn pdf<B: SendBackend>() -> impl IntoView {
     use thaw::{Button, ButtonAppearance, Icon};

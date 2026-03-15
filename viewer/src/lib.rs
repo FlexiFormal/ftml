@@ -60,7 +60,7 @@ pub fn iterate_body(cfg: config::FtmlViewerConfig) {
 
         //provide_context(TocSource::Extract);
         let uri = cfg.apply().unwrap_or_else(|| DocumentUri::no_doc().clone());
-        ftml_components::Views::<backend::GlobalBackend>::setup_document::<backend::GlobalBackend>(
+        ftml_components::Views::<backend::GlobalBackend>::setup_document(
             uri,
             SidebarPosition::Find,
             false,

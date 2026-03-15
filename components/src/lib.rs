@@ -76,7 +76,7 @@ impl<B: SendBackend, Cont: ViewContinuations> Views<B, Cont> {
         }
     }
 
-    pub fn setup_document<Be: SendBackend>(
+    pub fn setup_document(
         uri: DocumentUri,
         sidebar: SidebarPosition,
         is_stripped: bool,
@@ -85,7 +85,7 @@ impl<B: SendBackend, Cont: ViewContinuations> Views<B, Cont> {
     ) -> AnyView {
         use leptos::prelude::*;
         Self::maybe_top(move || {
-            ftml_dom::setup_document::<Be, _>(uri, is_stripped, toc, move || {
+            ftml_dom::setup_document::<B, _>(uri, is_stripped, toc, move || {
                 let (v, s) = Slides::new();
                 provide_context(s);
                 let children = move || view! {{children()}{v}}.into_any();
@@ -116,7 +116,7 @@ impl<B: SendBackend, Cont: ViewContinuations> Views<B, Cont> {
         .into_any()
     }
 
-    pub fn render_fragment<Be: SendBackend>(
+    pub fn render_fragment(
         uri: Option<NarrativeUri>,
         sidebar: SidebarPosition,
         is_stripped: bool,
@@ -129,7 +129,7 @@ impl<B: SendBackend, Cont: ViewContinuations> Views<B, Cont> {
             (DocumentUri::no_doc().clone(), true)
         };
         let inner = Self::maybe_top(move || {
-            Self::setup_document::<Be>(doc, sidebar, is_stripped, toc, move || {
+            Self::setup_document(doc, sidebar, is_stripped, toc, move || {
                 if let Some(NarrativeUri::Element(uri)) = uri {
                     DocumentState::force_uri(uri);
                 }

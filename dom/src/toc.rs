@@ -1,3 +1,4 @@
+use ftml_backend::FtmlBackend;
 use ftml_ontology::{
     narrative::{
         documents::{DocumentCounter, DocumentStyle, TocElem},
@@ -16,7 +17,7 @@ use crate::{
     },
     document::CurrentUri,
     structure::{CurrentId, DocumentStructure},
-    utils::local_cache::{SendBackend, WithLocalCache},
+    utils::local_cache::SendBackend,
 };
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
@@ -672,9 +673,8 @@ impl TocStateGet {
         let _ = Effect::new(move || {
             csr.set(true);
         });
-        let fut = send_wrapper::SendWrapper::new(std::cell::Cell::new(Some(
-            WithLocalCache::<Be>::default().get_toc(uri),
-        )));
+        let fut =
+            send_wrapper::SendWrapper::new(std::cell::Cell::new(Some(Be::get().get_toc(uri))));
         Effect::new(move || {
             if csr.get()
                 && let Some(fut) = std::cell::Cell::take(&fut)
