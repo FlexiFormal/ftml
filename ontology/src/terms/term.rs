@@ -65,7 +65,7 @@ pub enum Term {
     Number(Numeric),
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)
@@ -79,6 +79,18 @@ pub enum Term {
 pub enum Numeric {
     Int(i64),
     Float(Float64),
+}
+impl Eq for Numeric {}
+impl PartialEq for Numeric {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_float() == other.as_float()
+    }
+}
+impl std::hash::Hash for Numeric {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let f: Float64 = self.as_float().into();
+        f.hash(state);
+    }
 }
 impl Numeric {
     #[must_use]
@@ -492,7 +504,7 @@ impl Term {
     #[inline]
     #[must_use]
     pub fn debug_short(&self) -> impl std::fmt::Debug {
-        Short(self)
+        super::debug::Short(self)
     }
 
     #[must_use]
@@ -559,267 +571,6 @@ impl crate::utils::RefTree for Term {
                 SubtermIter::One(t)
             }
             Self::Opaque(o) => SubtermIter::Slice(o.terms.iter()),
-        }
-    }
-}
-
-#[allow(clippy::too_many_lines)]
-fn fmt<const LONG: bool>(e: &Term, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match e {
-        Term::Symbol { uri, .. } if LONG => write!(f, "{uri}"),
-        Term::Symbol { uri, .. } => write!(f, "\"{}\"", uri.name()),
-        Term::Var {
-            variable: Variable::Name {
-                notated: Some(n), ..
-            },
-            ..
-        } => write!(f, "V({n})"),
-        Term::Var {
-            variable: Variable::Name { name, .. },
-            ..
-        } => write!(f, "V({name})"),
-        Term::Number(n) => std::fmt::Debug::fmt(n, f),
-        Term::Var {
-            variable: Variable::Ref { declaration, .. },
-            ..
-        } if LONG => write!(f, "V({declaration})"),
-        Term::Var {
-            variable: Variable::Ref { declaration, .. },
-            ..
-        } => write!(f, "V({})", declaration.name()),
-        Term::Field(field) if field.record_type.is_none() => {
-            fmt::<LONG>(&field.record, f)?;
-            f.write_char('.')?;
-            std::fmt::Debug::fmt(&field.key, f)
-        }
-        Term::Field(field) => f
-            .debug_struct("Field")
-            .field("name", &field.key)
-            .field("record", &field.record)
-            .field("type", &field.record_type)
-            .finish(),
-        Term::Label {
-            name,
-            df: None,
-            tp: None,
-        } => write!(f, "Label({name})"),
-        Term::Label {
-            name,
-            df: Some(df),
-            tp: Some(tp),
-        } if LONG => f
-            .debug_struct("Label")
-            .field("", name)
-            .field(":", tp)
-            .field(":=", df)
-            .finish(),
-        Term::Label {
-            name,
-            df: Some(df),
-            tp: Some(tp),
-        } => f
-            .debug_struct("Label")
-            .field("", name)
-            .field(":", &tp.debug_short())
-            .field(":=", &df.debug_short())
-            .finish(),
-        Term::Label {
-            name, tp: Some(tp), ..
-        } if LONG => f
-            .debug_struct("Label")
-            .field("", name)
-            .field(":", tp)
-            .finish(),
-        Term::Label {
-            name, tp: Some(tp), ..
-        } => f
-            .debug_struct("Label")
-            .field("", name)
-            .field(":", &tp.debug_short())
-            .finish(),
-        Term::Label {
-            name, df: Some(df), ..
-        } if LONG => f
-            .debug_struct("Label")
-            .field("", name)
-            .field(":=", df)
-            .finish(),
-        Term::Label {
-            name, df: Some(df), ..
-        } => f
-            .debug_struct("Label")
-            .field("", name)
-            .field(":=", &df.debug_short())
-            .finish(),
-        Term::Application(a) if LONG => f
-            .debug_struct("OMA")
-            .field("head", &a.head)
-            .field("arguments", &a.arguments)
-            .finish(),
-        Term::Application(a) => {
-            write!(f, "{:?}", a.head.debug_short())?;
-            let mut tup = f.debug_list();
-            for a in &a.arguments {
-                tup.entry(&ShortArg(a));
-            }
-            tup.finish()
-        }
-        Term::Bound(b) if LONG => f
-            .debug_struct("OMBIND")
-            .field("head", &b.head)
-            .field("arguments", &b.arguments)
-            //.field("body", &b.body)
-            .finish(),
-        Term::Bound(b) => {
-            write!(f, "{:?}", b.head.debug_short())?;
-            let mut tup = f.debug_list();
-            for a in &b.arguments {
-                tup.entry(&ShortBoundArg(a));
-            }
-            tup.finish()
-        }
-        Term::Opaque(o) => {
-            write!(f, "<{}", o.node.tag)?;
-            for (k, v) in &o.node.attributes {
-                write!(f, " {k}=\"{v}\"")?;
-            }
-            f.write_str(">\n")?;
-            for t in &o.node.children {
-                writeln!(f, "{t}")?;
-            }
-            f.write_str("<terms>\n")?;
-            for t in &o.terms {
-                fmt::<LONG>(t, f)?;
-                f.write_char('\n')?;
-            }
-            write!(f, "</{}>", o.node.tag)
-        }
-    }
-}
-impl std::fmt::Debug for Term {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt::<true>(self, f)
-    }
-}
-struct Short<'e>(&'e Term);
-impl std::fmt::Debug for Short<'_> {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fmt::<false>(self.0, f)
-    }
-}
-
-struct ShortArg<'e>(&'e Argument);
-impl std::fmt::Debug for ShortArg<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            Argument::Simple(t) => t.debug_short().fmt(f),
-            Argument::Sequence(MaybeSequence::One(t)) => {
-                write!(f, "({:?})", t.debug_short())
-            }
-            Argument::Sequence(MaybeSequence::Seq(s)) => {
-                f.write_char('[')?;
-                let mut fl = f.debug_list();
-                for t in s {
-                    fl.entry(&t.debug_short());
-                }
-                fl.finish()?;
-                f.write_char(']')
-            }
-        }
-    }
-}
-
-struct ShortBoundArg<'e>(&'e BoundArgument);
-impl std::fmt::Debug for ShortBoundArg<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            BoundArgument::Simple(t) => t.debug_short().fmt(f),
-            BoundArgument::Sequence(MaybeSequence::One(t)) => {
-                write!(f, "({:?})", t.debug_short())
-            }
-            BoundArgument::Bound(ComponentVar {
-                var: Variable::Name { name, .. },
-                tp,
-                df,
-            }) => {
-                write!(f, "{{{name}")?;
-                if let Some(tp) = tp.as_ref() {
-                    write!(f, " : {:?}", tp.debug_short())?;
-                }
-                if let Some(df) = df.as_ref() {
-                    write!(f, " := {:?}", df.debug_short())?;
-                }
-                f.write_char('}')
-            }
-            BoundArgument::Bound(ComponentVar {
-                var: Variable::Ref { declaration, .. },
-                tp,
-                df,
-            }) => {
-                write!(f, "{{{}", declaration.name())?;
-                if let Some(tp) = tp.as_ref() {
-                    write!(f, " : {:?}", tp.debug_short())?;
-                }
-                if let Some(df) = df.as_ref() {
-                    write!(f, " := {:?}", df.debug_short())?;
-                }
-                f.write_char('}')
-            }
-            BoundArgument::BoundSeq(MaybeSequence::One(ComponentVar {
-                var: Variable::Name { name, .. },
-                tp,
-                df,
-            })) => {
-                write!(f, "{{[{name}")?;
-                if let Some(tp) = tp.as_ref() {
-                    write!(f, " : {:?}", tp.debug_short())?;
-                }
-                if let Some(df) = df.as_ref() {
-                    write!(f, " := {:?}", df.debug_short())?;
-                }
-                f.write_str("]}")
-            }
-            BoundArgument::BoundSeq(MaybeSequence::One(ComponentVar {
-                var: Variable::Ref { declaration, .. },
-                tp,
-                df,
-            })) => {
-                write!(f, "{{[{}", declaration.name())?;
-                if let Some(tp) = tp.as_ref() {
-                    write!(f, " : {:?}", tp.debug_short())?;
-                }
-                if let Some(df) = df.as_ref() {
-                    write!(f, " := {:?}", df.debug_short())?;
-                }
-                f.write_str("]}")
-            }
-            BoundArgument::Sequence(MaybeSequence::Seq(s)) => {
-                f.write_char('[')?;
-                let mut fl = f.debug_list();
-                for t in s {
-                    fl.entry(&t.debug_short());
-                }
-                fl.finish()?;
-                f.write_char(']')
-            }
-            BoundArgument::BoundSeq(MaybeSequence::Seq(s)) => {
-                f.write_char('{')?;
-                let mut fl = f.debug_list();
-                for v in s {
-                    match &v.var {
-                        Variable::Name { name, .. } => {
-                            fl.entry(name);
-                        }
-                        Variable::Ref { declaration, .. } => {
-                            fl.entry(declaration.name());
-                        }
-                    }
-                }
-                fl.finish()?;
-                f.write_char('}')
-            }
         }
     }
 }

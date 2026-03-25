@@ -8,6 +8,181 @@ use crate::terms::{
     RecordFieldTerm, Term, Variable,
 };
 
+impl Term {
+    pub fn modify(&self, mut f: impl FnMut(&Self) -> Option<Self>) -> Cow<'_, Self> {
+        self.modify_i(&mut f)
+    }
+    fn modify_i<'s>(&'s self, f: &mut impl FnMut(&Self) -> Option<Self>) -> Cow<'s, Self> {
+        let t = f(self).map_or(Cow::Borrowed(self), Cow::Owned);
+        match &*t {
+            Self::Var { .. } | Self::Symbol { .. } | Self::Number(_) => t,
+            Self::Application(app) => match app.modify_i(f) {
+                Cow::Owned(t) => Cow::Owned(Self::Application(t)),
+                Cow::Borrowed(_) => t,
+            },
+            Self::Bound(app) => match app.modify_i(f) {
+                Cow::Owned(t) => Cow::Owned(Self::Bound(t)),
+                Cow::Borrowed(_) => t,
+            },
+            Self::Field(fld) => match fld.record.modify_i(f) {
+                Cow::Owned(t) => Cow::Owned(Self::Field(RecordFieldTerm::new(
+                    t,
+                    fld.key.clone(),
+                    fld.record_type.clone(),
+                    fld.presentation.clone(),
+                ))),
+                Cow::Borrowed(_) => t,
+            },
+            Self::Label { name, df, tp } => {
+                let ndf = df.as_ref().map(|t| t.modify_i(f));
+                let ntp = tp.as_ref().map(|t| t.modify_i(f));
+                if ndf.as_ref().is_some_and(|t| matches!(t, Cow::Owned(_)))
+                    || ntp.as_ref().is_some_and(|t| matches!(t, Cow::Owned(_)))
+                {
+                    Cow::Owned(Self::Label {
+                        name: name.clone(),
+                        tp: ntp.map(|t| Box::new(Cow::into_owned(t))),
+                        df: ndf.map(|t| Box::new(Cow::into_owned(t))),
+                    })
+                } else {
+                    t
+                }
+            }
+            Self::Opaque(o) => {
+                let mut changed = false;
+                let nts = o
+                    .terms
+                    .iter()
+                    .map(|t| {
+                        let r = t.modify_i(f);
+                        if matches!(r, Cow::Owned(_)) {
+                            changed = true;
+                        }
+                        r
+                    })
+                    .collect::<Vec<_>>();
+                if changed {
+                    Cow::Owned(Self::Opaque(OpaqueTerm::new(
+                        o.node.clone(),
+                        nts.into_iter().map(Cow::into_owned).collect(),
+                    )))
+                } else {
+                    t
+                }
+            }
+        }
+    }
+}
+impl ApplicationTerm {
+    fn modify_i<'s>(&'s self, f: &mut impl FnMut(&Term) -> Option<Term>) -> Cow<'s, Self> {
+        let mut changed = false;
+        let head = self.head.modify_i(f);
+        macro_rules! ch {
+            ($e:expr) => {
+                match $e.modify_i(f) {
+                    Cow::Owned(t) => {
+                        changed = true;
+                        t
+                    }
+                    c => c.into_owned(),
+                }
+            };
+        }
+        let nargs = self
+            .arguments
+            .iter()
+            .map(|a| match a {
+                Argument::Simple(a) => Argument::Simple(ch!(a)),
+                Argument::Sequence(MaybeSequence::One(a)) => {
+                    Argument::Sequence(MaybeSequence::One(ch!(a)))
+                }
+                Argument::Sequence(MaybeSequence::Seq(ts)) => {
+                    Argument::Sequence(MaybeSequence::Seq(ts.iter().map(|t| ch!(t)).collect()))
+                }
+            })
+            .collect::<Vec<_>>();
+        if matches!(&head, Cow::Owned(_)) {
+            changed = true;
+        }
+        if changed {
+            Cow::Owned(Self::new(
+                head.into_owned(),
+                nargs.into_boxed_slice(),
+                self.presentation.clone(),
+            ))
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+}
+impl BindingTerm {
+    fn modify_i<'s>(&'s self, f: &mut impl FnMut(&Term) -> Option<Term>) -> Cow<'s, Self> {
+        let mut changed = false;
+        let head = self.head.modify_i(f);
+        macro_rules! ch {
+            ($e:expr) => {
+                match $e.modify_i(f) {
+                    Cow::Owned(t) => {
+                        changed = true;
+                        t
+                    }
+                    c => c.into_owned(),
+                }
+            };
+        }
+        let nargs = self
+            .arguments
+            .iter()
+            .map(|a| match a {
+                BoundArgument::Simple(a) => BoundArgument::Simple(ch!(a)),
+                BoundArgument::Sequence(MaybeSequence::One(a)) => {
+                    BoundArgument::Sequence(MaybeSequence::One(ch!(a)))
+                }
+                BoundArgument::Sequence(MaybeSequence::Seq(ts)) => {
+                    BoundArgument::Sequence(MaybeSequence::Seq(ts.iter().map(|t| ch!(t)).collect()))
+                }
+                BoundArgument::Bound(b) => BoundArgument::Bound(ch!(b)),
+                BoundArgument::BoundSeq(MaybeSequence::One(b)) => {
+                    BoundArgument::BoundSeq(MaybeSequence::One(ch!(b)))
+                }
+                BoundArgument::BoundSeq(MaybeSequence::Seq(bs)) => {
+                    BoundArgument::BoundSeq(MaybeSequence::Seq(bs.iter().map(|b| ch!(b)).collect()))
+                }
+            })
+            .collect::<Vec<_>>();
+        if matches!(&head, Cow::Owned(_)) {
+            changed = true;
+        }
+
+        if changed {
+            Cow::Owned(Self::new(
+                head.into_owned(),
+                nargs.into_boxed_slice(),
+                self.presentation.clone(),
+            ))
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+}
+impl ComponentVar {
+    fn modify_i<'s>(&'s self, f: &mut impl FnMut(&Term) -> Option<Term>) -> Cow<'s, Self> {
+        let ndf = self.df.as_ref().map(|t| t.modify_i(f));
+        let ntp = self.tp.as_ref().map(|t| t.modify_i(f));
+        if ndf.as_ref().is_some_and(|t| matches!(t, Cow::Owned(_)))
+            || ntp.as_ref().is_some_and(|t| matches!(t, Cow::Owned(_)))
+        {
+            Cow::Owned(Self {
+                var: self.var.clone(),
+                tp: ntp.map(Cow::into_owned),
+                df: ndf.map(Cow::into_owned),
+            })
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+}
+
 impl AsRef<Self> for Term {
     #[allow(clippy::inline_always)]
     #[inline(always)]
@@ -77,6 +252,10 @@ impl Term {
         substs: &mut SmallVec<(&'s str, Cow<'t, Self>), 1>,
         shadowed: &mut Vec<&'t str>,
     ) -> Option<Self> {
+        /*substs.retain(|(n, v)| !matches!(&**v,Term::Var { variable, .. } if variable.name() == *n));
+        if substs.is_empty() {
+            return None;
+        }*/
         match self {
             Self::Var { variable, .. } if !shadowed.contains(&variable.name()) => {
                 substs.iter().rev().find_map(|(n, t)| {
@@ -334,6 +513,7 @@ impl BoundArgument {
 }
 
 impl ComponentVar {
+    // (_,has_shadowed,has_renamed)
     fn subst<'s, 't: 's>(
         &'t self,
         substs: &mut SmallVec<(&'s str, Cow<'t, Term>), 1>,
@@ -448,6 +628,7 @@ fn subst_maybe_seq<'s, 't: 's>(
         MaybeSequence::One(Term::Var { variable, .. }) if !shadowed.contains(&variable.name()) => {
             substs
                 .iter()
+                .rev()
                 .find_map(|(n, t)| {
                     if *n == variable.name() {
                         Some(t.as_ref())

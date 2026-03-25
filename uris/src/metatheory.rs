@@ -33,7 +33,9 @@ uri! {
     APPLY = "apply",
     BIND = "bind",
     IMPLICIT_BIND = "implicit bind",
+    BIND_UNKNOWNS = "bind unknowns",
     PARENTHESES = "internal parentheses",
+    AUTO_PROVE = "prove automatically",
 
     PROP = "prop",
     JUDGMENT = "judgment holds",

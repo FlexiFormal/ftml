@@ -4,11 +4,9 @@ use crate::{
     document::CurrentUri,
     extractor::DomExtractor,
     toc::{FinalTocEntry, InputrefTitle, TocSource, TocStyle},
-    utils::{
-        actions::{OneShot, SetOneShotDone},
-        local_cache::SendBackend,
-    },
+    utils::actions::{OneShot, SetOneShotDone},
 };
+use ftml_backend::{SendBackend, dynbackend::DynBackend};
 use ftml_ontology::narrative::{
     documents::{DocumentCounter, DocumentStyle},
     elements::{SectionLevel, paragraphs::ParagraphKind},
@@ -136,9 +134,9 @@ pub struct DocumentStructure {
 }
 
 impl DocumentStructure {
-    pub fn set<Be: SendBackend>(source: TocSource) {
+    pub fn set(source: TocSource, backend: &'static dyn DynBackend) {
         let styles = StoredValue::new((Vec::new(), Vec::new()));
-        let toc = crate::toc::Toc::new::<Be>(source, styles);
+        let toc = crate::toc::Toc::new(source, styles, backend);
         Self::set_i(toc, styles);
     }
     pub fn set_empty() {

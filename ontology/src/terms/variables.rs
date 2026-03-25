@@ -1,9 +1,13 @@
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display, Formatter},
+};
 
 use ftml_uris::{DocumentElementUri, Id};
 
 use crate::terms::IsTerm;
 
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "serde",
@@ -41,6 +45,16 @@ impl Variable {
     pub fn name(&self) -> &str {
         self.as_ref()
     }
+    #[must_use]
+    pub fn name_id(&self) -> Cow<'_, Id> {
+        match self {
+            Self::Name { name, .. } => Cow::Borrowed(name),
+            Self::Ref { declaration, .. } => {
+                // SAFETY: UriName segments are valid Ids
+                Cow::Owned(unsafe { declaration.name().last().parse().unwrap_unchecked() })
+            }
+        }
+    }
 }
 
 impl IsTerm for Variable {
@@ -75,9 +89,6 @@ impl Display for Variable {
 impl Debug for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Name {
-                notated: Some(n), ..
-            } => Debug::fmt(n, f),
             Self::Name { name, .. } => Debug::fmt(name, f),
             Self::Ref { declaration, .. } => Debug::fmt(declaration, f),
         }

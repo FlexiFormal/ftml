@@ -8,18 +8,17 @@ pub mod sidebar;
 pub mod terms;
 pub mod toc;
 
-use crate::{ViewContinuations, config::FtmlConfig};
+use crate::config::FtmlConfig;
 use ftml_dom::{
     ClonableView, TermTrackedViews,
     structure::{Inputref, SectionInfo},
     terms::ReactiveApplication,
-    utils::local_cache::SendBackend,
 };
 use ftml_uris::{DocumentElementUri, Id};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
-impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<B, Cont> {
+impl TermTrackedViews for crate::Views {
     fn top<V: IntoView + 'static>(then: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
         use crate::utils::theming::Themer;
         ftml_dom::global_setup(|| {
@@ -57,7 +56,7 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
 
     #[inline]
     fn fold_expr_short(then: OriginalNode) -> impl IntoView {
-        terms::fold_expr_short::<B>(then)
+        terms::fold_expr_short(then)
     }
 
     #[inline]
@@ -70,12 +69,12 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
 
     #[inline]
     fn proof_body(then: OriginalNode) -> impl IntoView {
-        paragraphs::proof_body::<B>(then)
+        paragraphs::proof_body(then)
     }
 
     #[inline]
     fn paragraph_title(then: OriginalNode) -> impl IntoView {
-        paragraphs::title::<B>(then)
+        paragraphs::title(then)
     }
 
     #[inline]
@@ -90,7 +89,7 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
         minutes: Option<f32>,
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
-        problems::problem::<B, _>(
+        problems::problem(
             uri,
             styles,
             style,
@@ -105,7 +104,7 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
 
     #[inline]
     fn problem_solution() -> impl IntoView {
-        problems::solution::<B>()
+        problems::solution()
     }
 
     #[inline]
@@ -157,7 +156,7 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
 
     #[inline]
     fn inputref(info: Inputref) -> impl IntoView {
-        inputref::inputref::<B>(info)
+        inputref::inputref(info)
     }
 
     #[inline]
@@ -168,9 +167,9 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
         then: ClonableView,
     ) -> AnyView {
         if then.is_math() {
-            terms::oms::<B>(uri, in_term, then)
+            terms::oms(uri, in_term, then)
         } else {
-            terms::symbol_reference::<B>(uri, then)
+            terms::symbol_reference(uri, then)
         }
     }
     fn variable_reference(
@@ -180,20 +179,20 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
         then: ClonableView,
     ) -> AnyView {
         if then.is_math() {
-            terms::omv::<B>(var, in_term, then)
+            terms::omv(var, in_term, then)
         } else {
-            terms::variable_reference::<B>(var, then)
+            terms::variable_reference(var, then)
         }
     }
 
     #[inline]
     fn comp(then: ClonableView) -> AnyView {
-        terms::comp::<B>(then)
+        terms::comp(then)
     }
 
     #[inline]
     fn def_comp(uri: Option<ftml_uris::SymbolUri>, then: ClonableView) -> impl IntoView {
-        terms::defcomp::<B>(uri, then)
+        terms::defcomp(uri, then)
     }
 
     #[inline]
@@ -203,7 +202,7 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
         _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> AnyView {
-        terms::oma::<Self, B>(false, head, then)
+        terms::oma(false, head, then)
     }
 
     #[inline]
@@ -213,6 +212,6 @@ impl<B: SendBackend, Cont: ViewContinuations> TermTrackedViews for crate::Views<
         _uri: Option<DocumentElementUri>,
         then: ClonableView,
     ) -> AnyView {
-        terms::oma::<Self, B>(true, head, then)
+        terms::oma(true, head, then)
     }
 }

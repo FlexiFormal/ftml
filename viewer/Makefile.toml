@@ -31,6 +31,7 @@ toolchain = "nightly"
 command = "wasm-pack"
 args = [
     "build",
+    #"--verbose",
     "--target",
     "no-modules",
     "--out-name",
@@ -87,6 +88,7 @@ install_crate = "wasm-pack"
 command = "wasm-pack"
 args = [
     "build",
+    #"--verbose",
     "--target",
     "no-modules",
     "--dev",
@@ -101,5 +103,30 @@ args = [
     #"build-std=std,panic_abort,core,alloc",
     #"-Z",
     #"build-std-features=optimize_for_size", #,panic_immediate_abort",
+    "--timings",
+]
+
+[tasks.split]
+clear = true
+dependencies = ["wasm-pack-split", "patch-js", "copy"]
+
+# wasm_split_cli ftml_viewer.wasm ./wasm
+# wasm-bindgen main.wasm --out-dir ./out --target no-modules --no-demangle --keep-lld-exports
+# wasm-opt -Os path -o path
+[tasks.build-wasm-relocs]
+env = { "RUSTFLAGS" = "-Clink-args=--emit-relocs -Ctarget-cpu=mvp -Ctarget-feature=+multivalue,+mutable-globals,+reference-types,+sign-ext --cfg web_sys_unstable_apis --cfg getrandom_backend=\"wasm_js\"" }
+command = "cargo"
+toolchain = "nightly"
+args = [
+    "build",
+    #"--verbose",
+    "--release",
+    "--target",
+    "wasm32-unknown-unknown",
+    "--features=wasm-split",
+    "-Z",
+    "build-std=std,panic_abort,core,alloc",
+    "-Z",
+    "build-std-features=optimize_for_size", #,panic_immediate_abort",
     "--timings",
 ]

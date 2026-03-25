@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 #![allow(unexpected_cfgs)]
 #![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
@@ -12,11 +13,11 @@ pub mod config;
 pub mod utils;
 
 use crate::{components::paragraphs::Slides, config::FtmlConfig};
+use ftml_backend::{SendBackend, dynbackend::DynBackend};
 use ftml_dom::{
     DocumentState,
     structure::DocumentStructure,
     toc::{TocSource, TocStyle},
-    utils::local_cache::SendBackend,
 };
 use ftml_ontology::narrative::documents::Document;
 use ftml_uris::{DocumentUri, NarrativeUri};
@@ -25,7 +26,30 @@ use leptos::{
     html::{ElementChild, div},
     prelude::{AnyView, IntoAny, use_context},
 };
-use std::marker::PhantomData;
+
+static GLOBAL_BACKEND: std::sync::RwLock<Option<&'static dyn DynBackend>> =
+    std::sync::RwLock::new(None);
+static CONTINUATIONS: std::sync::RwLock<&'static dyn ViewContinuations> =
+    std::sync::RwLock::new(&NoContinuations);
+/// #### Panics
+pub fn backend() -> &'static dyn DynBackend {
+    GLOBAL_BACKEND
+        .read()
+        .expect("Backend not set")
+        .expect("Backend not set")
+}
+/// #### Panics
+pub fn set_backend<Be: SendBackend>() {
+    *GLOBAL_BACKEND.write().expect("error") = Some(Be::as_dyn());
+}
+/// #### Panics
+pub fn continuations() -> &'static dyn ViewContinuations {
+    *CONTINUATIONS.read().expect("Error")
+}
+/// #### Panics
+pub fn set_continuation(cont: &'static impl ViewContinuations) {
+    *CONTINUATIONS.write().expect("Error") = cont;
+}
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum SidebarPosition {
@@ -38,16 +62,18 @@ pub enum SidebarPosition {
 #[derive(Copy, Clone)]
 struct InFtmlTop;
 
-pub trait ViewContinuations: 'static {
-    fn document_drawer(doc: &Document) -> impl IntoView;
+pub trait ViewContinuations: Sync + 'static {
+    fn document_drawer(&self, doc: &Document) -> AnyView;
 }
 pub struct NoContinuations;
 impl ViewContinuations for NoContinuations {
-    fn document_drawer(doc: &Document) -> impl IntoView {}
+    fn document_drawer(&self, _: &Document) -> AnyView {
+        ().into_any()
+    }
 }
 
-pub struct Views<B: SendBackend, Cont: ViewContinuations = NoContinuations>(PhantomData<(B, Cont)>);
-impl<B: SendBackend, Cont: ViewContinuations> Views<B, Cont> {
+pub struct Views;
+impl Views {
     pub fn top_safe<V: IntoView + 'static>(
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
@@ -85,7 +111,7 @@ impl<B: SendBackend, Cont: ViewContinuations> Views<B, Cont> {
     ) -> AnyView {
         use leptos::prelude::*;
         Self::maybe_top(move || {
-            ftml_dom::setup_document::<B, _>(uri, is_stripped, toc, move || {
+            ftml_dom::setup_document(uri, is_stripped, toc, crate::backend(), move || {
                 let (v, s) = Slides::new();
                 provide_context(s);
                 let children = move || view! {{children()}{v}}.into_any();
@@ -101,7 +127,7 @@ impl<B: SendBackend, Cont: ViewContinuations> Views<B, Cont> {
                         //FtmlConfig::with_toc_source(|toc| !matches!(toc, TocSource::None)).is_some_and(|b| b)
                     );
                 if do_sidebar {
-                    components::sidebar::do_sidebar::<B, Cont>(
+                    components::sidebar::do_sidebar(
                         show_content,
                         pdf_link,
                         choose_highlight_style,

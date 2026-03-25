@@ -12,6 +12,8 @@ workspace = true
 [features]
 ## Generates typescript bindings
 typescript = ["tsify", "ftml-components/typescript", "ftml-components/callbacks"]
+## generate wasm split points
+wasm-split = ["ftml-js-utils/wasm-split"]
 
 [package.metadata.docs.rs]
 all-features = true

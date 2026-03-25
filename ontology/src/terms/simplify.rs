@@ -103,14 +103,27 @@ impl AnyOpaque {
 
 impl Term {
     #[must_use]
+    pub fn defined_marker() -> Self {
+        Self::Opaque(OpaqueTerm::new(
+            OpaqueNode {
+                // SAFETY: "mrow" is valid Id
+                tag: unsafe { "mrow".parse().unwrap_unchecked() },
+                attributes: Box::new([]),
+                children: Box::new([AnyOpaque::Text("defined".into())]),
+            },
+            Box::new([]),
+        ))
+    }
+    #[must_use]
     pub fn is_marker(&self) -> bool {
+        const MARKERS: [&str; 2] = ["proven", "defined"];
         if let Self::Opaque(o) = self
             && o.terms.is_empty()
         {
             let [AnyOpaque::Text(txt)] = &*o.node.children else {
                 return false;
             };
-            &**txt == "proven"
+            MARKERS.contains(&&**txt)
         } else {
             false
         }

@@ -415,6 +415,24 @@ pub enum LeafUri {
 crate::ts!(LeafUri);
 crate::debugdisplay!(LeafUri);
 impl crate::sealed::Sealed for LeafUri {}
+impl PartialEq<SymbolUri> for LeafUri {
+    fn eq(&self, other: &SymbolUri) -> bool {
+        if let Self::Symbol(uri) = self {
+            uri == other
+        } else {
+            false
+        }
+    }
+}
+impl PartialEq<DocumentElementUri> for LeafUri {
+    fn eq(&self, other: &DocumentElementUri) -> bool {
+        if let Self::Element(uri) = self {
+            uri == other
+        } else {
+            false
+        }
+    }
+}
 
 // parsing -----------------------------------------------------------------------------------
 

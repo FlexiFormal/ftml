@@ -5,7 +5,7 @@ use crate::{
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
-use ftml_dom::{notations::TermExt, utils::local_cache::SendBackend};
+use ftml_dom::notations::TermExt;
 use ftml_ontology::{
     domain::{
         HasDeclarations,
@@ -24,36 +24,36 @@ use leptos::prelude::*;
 use thaw::{Caption1, Caption1Strong, Divider};
 
 impl FtmlViewable for ModuleLike {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         match self {
-            Self::Module(m) => m.as_view::<Be>(),
-            Self::Structure(s) => s.as_view::<Be>(),
-            Self::Extension(s) => s.as_view::<Be>(),
-            Self::Nested(s) => s.as_view::<Be>(),
-            Self::Morphism(s) => s.as_view::<Be>(),
+            Self::Module(m) => m.as_view(),
+            Self::Structure(s) => s.as_view(),
+            Self::Extension(s) => s.as_view(),
+            Self::Nested(s) => s.as_view(),
+            Self::Morphism(s) => s.as_view(),
         }
     }
 }
 
 impl FtmlViewable for AnyDeclarationRef<'_> {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         match self {
             Self::Import { .. } => ().into_any(),
-            Self::Morphism(m) => m.as_view::<Be>(),
-            Self::Symbol(s) => super::symbols::symbol_view::<Be>(s, true),
-            Self::MathStructure(m) => m.as_view::<Be>(),
-            Self::Extension(e) => e.as_view::<Be>(),
-            Self::NestedModule(m) => m.as_view::<Be>(),
+            Self::Morphism(m) => m.as_view(),
+            Self::Symbol(s) => super::symbols::symbol_view(s, true),
+            Self::MathStructure(m) => m.as_view(),
+            Self::Extension(e) => e.as_view(),
+            Self::NestedModule(m) => m.as_view(),
             Self::Rule {
                 id,
                 parameters: args,
                 ..
-            } => rule::<Be>(id, args),
+            } => rule(id, args),
         }
     }
 }
 
-fn rule<Be: SendBackend>(id: &Id, args: &[Term]) -> AnyView {
+fn rule(id: &Id, args: &[Term]) -> AnyView {
     use thaw::Text;
     let id = id.to_string();
     let header = view! {
@@ -62,7 +62,7 @@ fn rule<Be: SendBackend>(id: &Id, args: &[Term]) -> AnyView {
     let fors = CommaSep(
         "for",
         args.iter()
-            .map(|t| t.clone().into_view::<crate::Views<Be>, Be>(false)),
+            .map(|t| t.clone().into_view::<crate::Views>(crate::backend(), false)),
     )
     .into_view();
     view! {
@@ -76,8 +76,8 @@ fn rule<Be: SendBackend>(id: &Id, args: &[Term]) -> AnyView {
 }
 
 impl FtmlViewable for MathStructure {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
-        let name = self.uri.as_view::<Be>();
+    fn as_view(&self) -> AnyView {
+        let name = self.uri.as_view();
         let imports = self.declarations().filter_map(|e| {
             if let AnyDeclarationRef::Import { uri, .. } = e {
                 Some(uri)
@@ -85,12 +85,9 @@ impl FtmlViewable for MathStructure {
                 None
             }
         });
-        let imports = super::uses::<Be, _>("Extends", imports);
-        let children = self
-            .declarations()
-            .map(|e| e.as_view::<Be>())
-            .collect_view();
-        let paragraphs = super::symbols::do_paragraphs::<Be>(self.uri.clone());
+        let imports = super::uses("Extends", imports);
+        let children = self.declarations().map(|e| e.as_view()).collect_view();
+        let paragraphs = super::symbols::do_paragraphs(self.uri.clone());
         let macroname = self
             .macroname
             .as_ref()
@@ -109,9 +106,9 @@ impl FtmlViewable for MathStructure {
 }
 
 impl FtmlViewable for StructureExtension {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
-        let name = self.uri.as_view::<Be>();
-        let target = self.target.as_view::<Be>();
+    fn as_view(&self) -> AnyView {
+        let name = self.uri.as_view();
+        let target = self.target.as_view();
         let imports = self.declarations().filter_map(|e| {
             if let AnyDeclarationRef::Import { uri, .. } = e {
                 Some(uri)
@@ -119,11 +116,8 @@ impl FtmlViewable for StructureExtension {
                 None
             }
         });
-        let imports = super::uses::<Be, _>("Extends", imports);
-        let children = self
-            .declarations()
-            .map(|d| d.as_view::<Be>())
-            .collect_view();
+        let imports = super::uses("Extends", imports);
+        let children = self.declarations().map(|d| d.as_view()).collect_view();
         view! {<Block show_separator=false>
             <Header slot>
                 <Caption1Strong>"Conservative Extension "{name}" for "{target}</Caption1Strong>
@@ -137,13 +131,13 @@ impl FtmlViewable for StructureExtension {
 
 impl FtmlViewable for Morphism {
     #[inline]
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
-        morphism::<Be>(self, None)
+    fn as_view(&self) -> AnyView {
+        morphism(self, None)
     }
 }
 
 impl FtmlViewable for NestedModule {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         let name = super::module_with_hover(&self.uri.clone().into_module());
         let imports = self.declarations().filter_map(|e| {
             if let AnyDeclarationRef::Import { uri, .. } = e {
@@ -152,11 +146,8 @@ impl FtmlViewable for NestedModule {
                 None
             }
         });
-        let imports = super::uses::<Be, _>("Imports", imports);
-        let children = self
-            .declarations()
-            .map(|d| d.as_view::<Be>())
-            .collect_view();
+        let imports = super::uses("Imports", imports);
+        let children = self.declarations().map(|d| d.as_view()).collect_view();
         view! {<Block show_separator=true>
             <Header slot>
                 <Caption1Strong>"Nested Module "{name}</Caption1Strong>
@@ -169,7 +160,7 @@ impl FtmlViewable for NestedModule {
 }
 
 impl FtmlViewable for Module {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         let name = super::module_with_hover(&self.uri);
         let imports = self.declarations().filter_map(|e| {
             if let AnyDeclarationRef::Import { uri, .. } = e {
@@ -178,11 +169,8 @@ impl FtmlViewable for Module {
                 None
             }
         });
-        let imports = super::uses::<Be, _>("Imports", imports);
-        let children = self
-            .declarations()
-            .map(|d| d.as_view::<Be>())
-            .collect_view();
+        let imports = super::uses("Imports", imports);
+        let children = self.declarations().map(|d| d.as_view()).collect_view();
         view! {<Block show_separator=true>
             <Header slot>
                 <Caption1Strong>"Module "{name}</Caption1Strong>
@@ -194,10 +182,10 @@ impl FtmlViewable for Module {
     }
 }
 
-pub fn morphism<Be: SendBackend>(m: &Morphism, doc_elems: Option<AnyView>) -> AnyView {
-    let domain = m.domain.as_view::<Be>();
-    let name = m.uri.as_view::<Be>();
-    let assignments = m.elements.iter().map(do_assignment::<Be>).collect_view();
+pub fn morphism(m: &Morphism, doc_elems: Option<AnyView>) -> AnyView {
+    let domain = m.domain.as_view();
+    let name = m.uri.as_view();
+    let assignments = m.elements.iter().map(do_assignment).collect_view();
     let elems = doc_elems.map(move |elems| {
         view! {
             <div style="margin:5px;"><Divider/></div>
@@ -216,16 +204,15 @@ pub fn morphism<Be: SendBackend>(m: &Morphism, doc_elems: Option<AnyView>) -> An
     .into_any()
 }
 
-fn do_assignment<Be: SendBackend>(a: &Assignment) -> AnyView {
+fn do_assignment(a: &Assignment) -> AnyView {
     let elaborated_uri = a.elaborated_uri();
-    let name = super::symbol_uri::<Be>(elaborated_uri.name().to_string(), &elaborated_uri);
+    let name = super::symbol_uri(elaborated_uri.name().to_string(), &elaborated_uri);
     let header = view!(<Caption1Strong>"Symbol "{name}</Caption1Strong>);
-    let orig = a.original.as_view::<Be>();
-    let paragraphs = super::symbols::do_paragraphs::<Be>(elaborated_uri.clone());
-    let notations =
-        super::symbols::do_notations::<Be>(elaborated_uri.into(), ArgumentSpec::default());
+    let orig = a.original.as_view();
+    let paragraphs = super::symbols::do_paragraphs(elaborated_uri.clone());
+    let notations = super::symbols::do_notations(elaborated_uri.into(), ArgumentSpec::default());
     let df = a.definiens.as_ref().map(|t| {
-        let t = t.clone().into_view::<crate::Views<Be>, Be>(false);
+        let t = t.clone().into_view::<crate::Views>(crate::backend(), false);
         view! {<Caption1>
             "Assigned to: "{ftml_dom::utils::math(|| t)}
             </Caption1>

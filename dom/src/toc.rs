@@ -1,4 +1,4 @@
-use ftml_backend::FtmlBackend;
+use ftml_backend::{FtmlBackend, SendBackend, dynbackend::DynBackend};
 use ftml_ontology::{
     narrative::{
         documents::{DocumentCounter, DocumentStyle, TocElem},
@@ -17,7 +17,6 @@ use crate::{
     },
     document::CurrentUri,
     structure::{CurrentId, DocumentStructure},
-    utils::local_cache::SendBackend,
 };
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
@@ -201,9 +200,10 @@ impl Toc {
         }
     }
 
-    pub fn new<Be: SendBackend>(
+    pub fn new(
         source: TocSource,
         styles: StoredValue<(Vec<DocumentStyle>, Vec<DocumentCounter>)>,
+        backend: &'static dyn DynBackend,
     ) -> Self {
         match source {
             TocSource::None => Self::None,
@@ -211,7 +211,7 @@ impl Toc {
                 toc: RwSignal::new(None),
             },
             TocSource::Get => {
-                let (state, in_level) = TocStateGet::new::<Be>(styles);
+                let (state, in_level) = TocStateGet::new(styles, backend);
                 Self::Get { state, in_level }
             }
             TocSource::Ready(v) => Self::Ready(TocStateReady::new(v.into_boxed_slice())),
@@ -651,8 +651,9 @@ struct TocStateGet {
     toc: StoredValue<Option<RwSignal<Option<Vec<FinalTocEntry>>>>>,
 }
 impl TocStateGet {
-    fn new<Be: SendBackend>(
+    fn new(
         styles: StoredValue<(Vec<DocumentStyle>, Vec<DocumentCounter>)>,
+        backend: &'static dyn DynBackend,
     ) -> (
         StoredValue<either::Either<Self, TocStateReady>>,
         RwSignal<Option<SectionLevel>>,
@@ -673,8 +674,7 @@ impl TocStateGet {
         let _ = Effect::new(move || {
             csr.set(true);
         });
-        let fut =
-            send_wrapper::SendWrapper::new(std::cell::Cell::new(Some(Be::get().get_toc(uri))));
+        let fut = send_wrapper::SendWrapper::new(std::cell::Cell::new(Some(backend.get_toc(uri))));
         Effect::new(move || {
             if csr.get()
                 && let Some(fut) = std::cell::Cell::take(&fut)

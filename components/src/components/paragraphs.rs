@@ -1,7 +1,4 @@
-use ftml_dom::{
-    FtmlViews,
-    utils::{css::inject_css, local_cache::SendBackend},
-};
+use ftml_dom::{FtmlViews, utils::css::inject_css};
 use ftml_ontology::narrative::elements::paragraphs::{ParagraphFormatting, ParagraphKind};
 use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
@@ -62,22 +59,22 @@ pub fn proof<V: IntoView>(
 }
 
 #[must_use]
-pub fn proof_body<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
+pub fn proof_body(then: OriginalNode) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     if let Some(data) = use_context::<ProofData>() {
         Left(fancy_collapsible(
-            move || crate::Views::<Be>::cont(then, true),
+            move || crate::Views::cont(then, true),
             data.visible,
             "",
             "",
         ))
     } else {
-        Right(crate::Views::<Be>::cont(then, true))
+        Right(crate::Views::cont(then, true))
     }
 }
 
 #[must_use]
-pub fn title<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
+pub fn title(then: OriginalNode) -> impl IntoView {
     use leptos::either::EitherOf3::{A, B, C};
     if let Some(data) = use_context::<ProofData>() {
         if data.subproof {
@@ -86,7 +83,7 @@ pub fn title<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
                     style="display:flex;flex-direction:row;"
                 >
                     {collapse_marker(data.visible,false)}
-                    {crate::Views::<Be>::cont(then, true).attr("class", "ftml-subproof-title").attr("style","")}
+                    {crate::Views::cont(then, true).attr("class", "ftml-subproof-title").attr("style","")}
                 </div>
             })
         } else {
@@ -95,12 +92,12 @@ pub fn title<Be: SendBackend>(then: OriginalNode) -> impl IntoView {
                     style="display:contents;"
                 >
                     {collapse_marker(data.visible,true)}
-                    {crate::Views::<Be>::cont(then, true).attr("class", "ftml-proof-title").attr("style","")}
+                    {crate::Views::cont(then, true).attr("class", "ftml-proof-title").attr("style","")}
                 </div>
             })
         }
     } else {
-        C(crate::Views::<Be>::cont(then, true).attr("class", "ftml-title-paragraph"))
+        C(crate::Views::cont(then, true).attr("class", "ftml-title-paragraph"))
     }
 }
 

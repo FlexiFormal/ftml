@@ -2,6 +2,7 @@ mod arguments;
 mod bank;
 pub mod eq;
 pub mod free;
+pub mod helpers;
 mod macros;
 #[cfg(feature = "openmath")]
 pub mod om;
@@ -12,6 +13,7 @@ pub mod subst;
 mod term;
 pub mod termpaths;
 //pub mod traverser;
+mod debug;
 mod variables;
 
 pub use arguments::{Argument, ArgumentMode, BoundArgument, ComponentVar, MaybeSequence};
@@ -89,6 +91,10 @@ impl TermContainer {
         self.checked.0.lock().is_some()
     }
 
+    pub fn with_checked<R>(&self, f: impl FnOnce(&Term) -> R) -> Option<R> {
+        self.checked.0.lock().as_ref().map(f)
+    }
+
     #[inline]
     #[must_use]
     pub const fn get_parsed(&self) -> Option<&Term> {
@@ -105,6 +111,7 @@ impl TermContainer {
     }
 
     #[must_use]
+    /// returns `true` if checked
     pub fn checked_or_parsed(&self) -> Option<(Term, bool)> {
         self.checked.0.lock().as_ref().map_or_else(
             || self.parsed.clone().map(|t| (t, false)),

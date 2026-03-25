@@ -38,6 +38,9 @@ pub trait FtmlExtractor: 'static + Sized {
     fn in_document(&self) -> &DocumentUri;
     fn iterate_domain(&self) -> impl Iterator<Item = &OpenDomainElement<Self::Node>>;
     fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement<Self::Node>>;
+    fn iterate_narrative_mut(
+        &mut self,
+    ) -> impl Iterator<Item = &mut OpenNarrativeElement<Self::Node>>;
     fn iterate_dones(
         &self,
     ) -> impl ExactSizeIterator<Item = &DocumentElement> + DoubleEndedIterator;
@@ -461,6 +464,12 @@ impl<E: FtmlStateExtractor> FtmlExtractor for E {
     #[inline]
     fn iterate_narrative(&self) -> impl Iterator<Item = &OpenNarrativeElement<Self::Node>> {
         self.state().narrative()
+    }
+    #[inline]
+    fn iterate_narrative_mut(
+        &mut self,
+    ) -> impl Iterator<Item = &mut OpenNarrativeElement<Self::Node>> {
+        self.state_mut().narrative.iter_mut()
     }
     fn last_term(&self) -> Option<&Term> {
         self.state().last_term.as_ref()

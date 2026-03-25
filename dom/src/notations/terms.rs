@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, isize};
+use std::{hint::unreachable_unchecked};
 
 use crate::{
     ClonableView, DocumentState, FtmlViews,
@@ -7,10 +7,11 @@ use crate::{
     terms::{ReactiveTerm, TopTerm},
     utils::{
         FutureExt,
-        local_cache::{LocalCache, SendBackend},
+        local_cache::{LocalCache},
         owned,
     },
 };
+use ftml_backend::{dynbackend::DynBackend};
 use ftml_ontology::{
     narrative::elements::Notation,
     terms::{
@@ -25,7 +26,6 @@ use ftml_uris::{
     UriWithArchive, UriWithPath,
 };
 use leptos::{
-    either::Either,
     math::{mi, mn, mo},
 };
 use leptos::{math::mtext, prelude::*};
@@ -42,21 +42,22 @@ macro_rules! commata {
 }
 
 pub trait TermExt: Sized {
-    fn into_view<Views: FtmlViews, Be: SendBackend>(self, in_term: bool) -> AnyView {
-        self.into_view_with_precedence::<Views, Be>(in_term, i64::MAX)
+    fn into_view<Views: FtmlViews>(self, backend:&'static dyn DynBackend,in_term: bool) -> AnyView {
+        self.into_view_with_precedence::<Views>(backend,in_term, i64::MAX)
     }
 
-    fn into_view_with_precedence<Views: FtmlViews, Be: SendBackend>(
+    fn into_view_with_precedence<Views: FtmlViews>(
         self,
+        backend:&'static dyn DynBackend,
         in_term: bool,
         precedence: i64,
     ) -> AnyView;
 
-    fn into_view_safe<Views: FtmlViews, Be: SendBackend>(self) -> impl IntoView {
+    fn into_view_safe<Views: FtmlViews>(self,backend:&'static dyn DynBackend) -> impl IntoView {
         owned(move || {
             provide_context(None::<TopTerm>);
             provide_context(None::<ReactiveTerm>);
-            self.into_view::<Views, Be>(false)
+            self.into_view::<Views>(backend,false)
         })
     }
 }
@@ -72,20 +73,21 @@ macro_rules! maybe_comp {
 }
 
  #[allow(clippy::cast_possible_truncation)]
-fn no_notation<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(
+fn no_notation<Views: FtmlViews,A:ArgumentRender>(
+    backend:&'static dyn DynBackend,
     name: &str,
     uri: &LeafUri,
     arguments: &A,
 ) -> AnyView {
-    fn do_view<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(arguments:&A,index:u8) -> AnyView {
+    fn do_view<Views: FtmlViews,A:ArgumentRender>(backend:&'static dyn DynBackend,arguments:&A,index:u8) -> AnyView {
         if arguments.is_sequence(index) {
             view! {
                 {maybe_comp!(mo().child('('))}
-                {arguments.render_arg::<Views,Be>(index,ftml_ontology::terms::ArgumentMode::Sequence,i64::MAX)}
+                {arguments.render_arg::<Views>(backend,index,ftml_ontology::terms::ArgumentMode::Sequence,i64::MAX)}
                 {maybe_comp!(mo().child(')'))}
             }.into_any()
         } else {
-            arguments.render_arg::<Views,Be>(index, ftml_ontology::terms::ArgumentMode::Simple,i64::MAX)
+            arguments.render_arg::<Views>(backend,index, ftml_ontology::terms::ArgumentMode::Simple,i64::MAX)
         }
     }
     let kind = match uri {
@@ -110,11 +112,11 @@ fn no_notation<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(
             .attr(FtmlKey::Comp.attr_name(), "")
         }
         {maybe_comp!(mo().child('('))}
-        {do_view::<Views,Be,_>(arguments,0)}
+        {do_view::<Views,_>(backend,arguments,0)}
         //{args.next().map(do_view::<Views>)}
         {(1..arguments.num_args()).map(|i| view!{
             {maybe_comp!(mo().child(','))}
-            {do_view::<Views,Be,_>(arguments,i as u8)}
+            {do_view::<Views,_>(backend,arguments,i as u8)}
         }).collect_view()}
         /*{args.map(|v| view!{
             {maybe_comp!(mo().child(','))}
@@ -126,8 +128,9 @@ fn no_notation<Views: FtmlViews,Be:SendBackend,A:ArgumentRender>(
 }
 
 impl TermExt for Term {
-    fn into_view_with_precedence<Views: FtmlViews, Be: SendBackend>(
+    fn into_view_with_precedence<Views: FtmlViews>(
         self,
+        backend:&'static dyn DynBackend,
         in_term: bool,
         precedence: i64,
     ) -> AnyView {
@@ -137,7 +140,7 @@ impl TermExt for Term {
             Self::Symbol {
                 uri,
                 presentation: None,
-            } => sym::<Views, Be>(uri, None, in_term, precedence),
+            } => sym::<Views>(backend,uri, None, in_term, precedence),
             Self::Var {
                 variable:
                     Variable::Ref {
@@ -145,7 +148,8 @@ impl TermExt for Term {
                         is_sequence,
                     },
                 presentation: None,
-            } => var_ref::<Views, Be>(
+            } => var_ref::<Views>(
+                backend,
                 declaration,
                 is_sequence,
                 None,
@@ -157,16 +161,16 @@ impl TermExt for Term {
                 ..
             } => var_name::<Views>(name, notated, None, in_term),
             Self::Application(app) => {
-                app.into_view_with_precedence::<Views, Be>(in_term, precedence)
+                app.into_view_with_precedence::<Views>(backend,in_term, precedence)
             }
-            Self::Bound(b) => b.into_view_with_precedence::<Views, Be>(in_term, precedence),
+            Self::Bound(b) => b.into_view_with_precedence::<Views>(backend,in_term, precedence),
             Self::Opaque(o) => {
                 let mut terms = o
                     .terms
                     .iter()
                     .map(|t| {
                         let t = t.clone();
-                        Some(move || t.into_view::<Views, Be>(true))
+                        Some(move || t.into_view::<Views>(backend,true))
                     })
                     .collect::<Vec<_>>();
                 do_opaque(&o.node, &mut terms)
@@ -176,15 +180,16 @@ impl TermExt for Term {
                 let pres = unsafe { f.presentation.clone().unwrap_unchecked() };
                 let record = f.record.clone();
                 let record =
-                    ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
+                    ClonableView::new(true, move || record.clone().into_view::<Views>(backend,true));
                 match pres {
                     VarOrSym::Sym(uri) => {
-                        sym::<Views, Be>(uri, Some(record), in_term, precedence)
+                        sym::<Views>(backend,uri, Some(record), in_term, precedence)
                     }
                     VarOrSym::Var(Variable::Ref {
                         declaration,
                         is_sequence,
-                    }) => var_ref::<Views, Be>(
+                    }) => var_ref::<Views>(
+                        backend,
                         declaration,
                         is_sequence,
                         Some(record),
@@ -209,8 +214,9 @@ impl TermExt for Term {
 }
 
 impl TermExt for ApplicationTerm {
-    fn into_view_with_precedence<Views: FtmlViews, Be: SendBackend>(
+    fn into_view_with_precedence<Views: FtmlViews>(
         self,
+        backend:&'static dyn DynBackend,
         in_term: bool,
         precedence: i64,
     ) -> AnyView {
@@ -223,7 +229,7 @@ impl TermExt for ApplicationTerm {
             } if self.presentation.is_none() => {
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(self.head.clone()) };
-                application::<Views, Be>(vos, leaf, None, self, precedence)
+                application::<Views>(backend,vos, leaf, None, self, precedence)
             }
             _ if self.presentation.is_some() => {
                 let head = match &self.head {
@@ -231,7 +237,7 @@ impl TermExt for ApplicationTerm {
                     t => t.clone(),
                 };
                 let head =
-                    ClonableView::new(true, move || head.clone().into_view::<Views, Be>(true));
+                    ClonableView::new(true, move || head.clone().into_view::<Views>(backend,true));
                 // SAFETY: app.presentation.is_some()
                 let pres = unsafe { self.presentation.as_ref().unwrap_unchecked() };
                 let uri = match pres {
@@ -241,7 +247,8 @@ impl TermExt for ApplicationTerm {
                         return "TODO: unresolved variable".into_any();
                     }
                 };
-                application::<Views, Be>(
+                application::<Views>(
+                    backend,
                     pres.clone(),
                     uri,
                     Some(head),
@@ -260,19 +267,20 @@ impl TermExt for ApplicationTerm {
                 let record = f.record.clone();
                 let key = f.key.clone();
                 let record =
-                    ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
+                    ClonableView::new(true, move || record.clone().into_view::<Views>(backend,true));
                 // TODO I think this clone can be avoided
                 //let arguments = app.arguments.clone();
                 FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
-                            LocalCache::get().get_structure(Be::get(), uri)
+                            LocalCache::get().get_structure(backend, uri)
                         })
                     },
                     move |r| match r {
                         Err(e) => A3(e.to_string()),
                         Ok(None) => B3("(Structure not found)"),
-                        Ok(Some(r)) => C3(application::<Views, Be>(
+                        Ok(Some(r)) => C3(application::<Views>(
+                            backend,
                             VarOrSym::Sym(r.uri.clone()),
                             r.uri.clone().into(),
                             Some(record),
@@ -284,14 +292,14 @@ impl TermExt for ApplicationTerm {
             }
             _ => {
                 use leptos::either::Either::{Left, Right};
-                let head = self.head.clone().into_view::<Views, Be>(true);
+                let head = self.head.clone().into_view::<Views>(backend,true);
                 let args = commata!(self.arguments.iter().map(|a| match a {
                     Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
-                        Left(t.clone().into_view::<Views, Be>(true))
+                        Left(t.clone().into_view::<Views>(backend,true))
                     }
                     Argument::Sequence(MaybeSequence::Seq(ts)) => Right({
                         let args =
-                            commata!(ts.iter().map(|t| t.clone().into_view::<Views, Be>(true)));
+                            commata!(ts.iter().map(|t| t.clone().into_view::<Views>(backend,true)));
                         view! {
                             {mo().child('[')}
                             {args}
@@ -310,8 +318,9 @@ impl TermExt for ApplicationTerm {
 }
 
 impl TermExt for BindingTerm {
-    fn into_view_with_precedence<Views: FtmlViews, Be: SendBackend>(
+    fn into_view_with_precedence<Views: FtmlViews>(
         self,
+        backend:&'static dyn DynBackend,
         in_term: bool,
         precedence: i64,
     ) -> AnyView {
@@ -325,8 +334,8 @@ impl TermExt for BindingTerm {
             } if self.presentation.is_none() => {
                 // SAFETY: pattern match above
                 let (leaf, vos) = unsafe { do_head(self.head.clone()) };
-                bound::<Views, Be>(
-                    vos, leaf, /*b.body.clone(),*/ None, self, precedence,
+                bound::<Views>(
+                    backend,vos, leaf, /*b.body.clone(),*/ None, self, precedence,
                 )
             }
             _ if self.presentation.is_some() => {
@@ -337,7 +346,7 @@ impl TermExt for BindingTerm {
                     t => t.clone(),
                 };
                 let head =
-                    ClonableView::new(true, move || head.clone().into_view::<Views, Be>(true));
+                    ClonableView::new(true, move || head.clone().into_view::<Views>(backend,true));
                 let uri = match &pres {
                     VarOrSym::Sym(s) => s.clone().into(),
                     VarOrSym::Var(Variable::Ref { declaration, .. }) => declaration.clone().into(),
@@ -345,7 +354,8 @@ impl TermExt for BindingTerm {
                         return "TODO: unresolved variable".into_any();
                     }
                 };
-                bound::<Views, Be>(
+                bound::<Views>(
+                    backend,
                     pres,
                     uri,
                     /*b.body.clone(),*/ Some(head),
@@ -364,19 +374,20 @@ impl TermExt for BindingTerm {
                 let record = f.record.clone();
                 let key = f.key.clone();
                 let record =
-                    ClonableView::new(true, move || record.clone().into_view::<Views, Be>(true));
+                    ClonableView::new(true, move || record.clone().into_view::<Views>(backend,true));
                 // TODO I think this clone can be avoided
                 //let arguments = app.arguments.clone();
                 FutureExt::into_view(
                     move || {
                         tp.clone().get_in_record_type_async(key.clone(), |uri| {
-                            LocalCache::get().get_structure(Be::get(), uri)
+                            LocalCache::get().get_structure(backend, uri)
                         })
                     },
                     move |r| match r {
                         Err(e) => A3(e.to_string()),
                         Ok(None) => B3("(Structure not found)"),
-                        Ok(Some(r)) => C3(bound::<Views, Be>(
+                        Ok(Some(r)) => C3(bound::<Views>(
+                            backend,
                             VarOrSym::Sym(r.uri.clone()),
                             r.uri.clone().into(),
                             Some(record),
@@ -388,14 +399,14 @@ impl TermExt for BindingTerm {
             }
             _ => {
                 //use leptos::either::EitherOf4::{A, B, C, D};
-                let head = self.head.clone().into_view::<Views, Be>(true);
+                let head = self.head.clone().into_view::<Views>(backend,true);
                 let args = commata!(self.arguments.iter().map(|a| match a {
                     BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
-                        A(t.clone().into_view::<Views, Be>(true))
+                        A(t.clone().into_view::<Views>(backend,true))
                     }
                     BoundArgument::Sequence(MaybeSequence::Seq(ts)) => B({
                         let args =
-                            commata!(ts.iter().map(|t| t.clone().into_view::<Views, Be>(true)));
+                            commata!(ts.iter().map(|t| t.clone().into_view::<Views>(backend,true)));
                         view! {
                             {mo().child('[')}
                             {args}
@@ -403,10 +414,10 @@ impl TermExt for BindingTerm {
                         }
                     }),
                     BoundArgument::Bound(cv) | BoundArgument::BoundSeq(MaybeSequence::One(cv)) => {
-                        C(do_cv::<Views, Be>(cv.clone(),i64::MAX))
+                        C(do_cv::<Views>(backend,cv.clone(),i64::MAX))
                     }
                     BoundArgument::BoundSeq(MaybeSequence::Seq(ts)) => D({
-                        let args = commata!(ts.iter().map(|t| do_cv::<Views, Be>(t.clone(),i64::MAX)));
+                        let args = commata!(ts.iter().map(|t| do_cv::<Views>(backend,t.clone(),i64::MAX)));
                         view! {
                             {mo().child('[')}
                             {args}
@@ -424,7 +435,8 @@ impl TermExt for BindingTerm {
     }
 }
 
-fn application<Views: FtmlViews, Be: SendBackend>(
+fn application<Views: FtmlViews>(
+    backend:&'static dyn DynBackend,
     head: VarOrSym,
     uri: LeafUri,
     real_term: Option<ClonableView>,
@@ -438,7 +450,8 @@ fn application<Views: FtmlViews, Be: SendBackend>(
                 head.clone(),
                 None,
                 None,
-                do_application_inner::<Views, Be,_>(
+                do_application_inner::<Views,_>(
+                    backend,
                     Some(Term::Application(app)),
                     uri,
                     head,
@@ -448,7 +461,8 @@ fn application<Views: FtmlViews, Be: SendBackend>(
                 ),
             )
         } else {
-            do_application_inner::<Views, Be,_>(
+            do_application_inner::<Views, _>(
+                backend,
                 Some(Term::Application(app)),
                 uri,
                 head,
@@ -461,7 +475,8 @@ fn application<Views: FtmlViews, Be: SendBackend>(
     }).into_any()
 }
 
-fn bound<Views: FtmlViews, Be: SendBackend>(
+fn bound<Views: FtmlViews>(
+    backend:&'static dyn DynBackend,
     head: VarOrSym,
     uri: LeafUri,
     //body: Term,
@@ -479,7 +494,8 @@ fn bound<Views: FtmlViews, Be: SendBackend>(
                 head.clone(),
                 None,
                 None,
-                do_application_inner::<Views, Be,_>(
+                do_application_inner::<Views, _>(
+                    backend,
                     Some(Term::Bound(app)),
                     uri,
                     head,
@@ -489,7 +505,8 @@ fn bound<Views: FtmlViews, Be: SendBackend>(
                 ),
             )
         } else {
-            do_application_inner::<Views, Be,_>(
+            do_application_inner::<Views, _>(
+                backend,
                 Some(Term::Bound(app)),
                 uri,
                 head,
@@ -502,7 +519,8 @@ fn bound<Views: FtmlViews, Be: SendBackend>(
     }).into_any()
 }
 
-fn sym<Views: FtmlViews, Be: SendBackend>(
+fn sym<Views: FtmlViews>(
+    backend:&'static dyn DynBackend,
     uri: SymbolUri,
     this: Option<ClonableView>,
     in_term: bool,
@@ -518,7 +536,7 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
                 ClonableView::new(true, move || {
                     let uri = uri.clone();
                     let this = this.clone();
-                    with_notations::<Be, _, _>(uri.clone().into(), move |t| {
+                    with_notations(backend,uri.clone().into(), move |t| {
                         if let Some(n) = t {
                             let prec = n.precedence;
                             if let Some(n) = n.op {
@@ -530,7 +548,7 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
                                     })),
                                 ))
                             } else {
-                                B(n.as_view::<Views,Be>(&VarOrSym::Sym(uri), this.as_ref(),precedence),
+                                B(n.as_view::<Views>(backend,&VarOrSym::Sym(uri), this.as_ref(),precedence),
                                 )
                             }
                         } else {
@@ -543,14 +561,14 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
                 }),
             )
         } else {
-            with_notations::<Be, _, _>(uri.clone().into(), move |t| {
+            with_notations(backend,uri.clone().into(), move |t| {
                 if let Some(n) = t {
                     if let Some(n) = n.op {
                         A(Views::comp(ClonableView::new(true, move || {
                             super::view_node(&n,false)
                         })))
                     } else {
-                        B(n.as_view::<Views,Be>(&VarOrSym::Sym(uri), this.as_ref(),precedence))
+                        B(n.as_view::<Views>(backend,&VarOrSym::Sym(uri), this.as_ref(),precedence))
                     }
                 } else {
                     C(mtext()
@@ -563,7 +581,8 @@ fn sym<Views: FtmlViews, Be: SendBackend>(
     }).into_any()
 }
 
-fn var_ref<Views: FtmlViews, Be: SendBackend>(
+fn var_ref<Views: FtmlViews>(
+    backend:&'static dyn DynBackend,
     uri: DocumentElementUri,
     is_sequence: Option<bool>,
     this: Option<ClonableView>,
@@ -588,7 +607,7 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
                     ClonableView::new(true, move || {
                         let uri = uri.clone();
                         let this = this.clone();
-                        with_notations::<Be, _, _>(uri.clone().into(), move |t| {
+                        with_notations::< _, _>(backend,uri.clone().into(), move |t| {
                             if let Some(n) = t {
                                 let prec = n.precedence;
                                 if let Some(n) = n.op {
@@ -600,7 +619,8 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
                                         })),
                                     ))
                                 } else {
-                                    B(n.as_view::<Views,Be>(
+                                    B(n.as_view::<Views>(
+                                            backend,
                                             &VarOrSym::Var(Variable::Ref {
                                                 declaration: uri,
                                                 is_sequence,
@@ -619,12 +639,13 @@ fn var_ref<Views: FtmlViews, Be: SendBackend>(
                     }),
                 )
             } else {
-                with_notations::<Be, _, _>(uri.clone().into(), move |t| {
+                with_notations::<_, _>(backend,uri.clone().into(), move |t| {
                     if let Some(n) = t {
                         if let Some(n) = n.op {
                             A(super::view_node(&n,false))
                         } else {
-                            B(n.as_view::<Views,Be>(
+                            B(n.as_view::<Views>(
+                                backend,
                                 &VarOrSym::Var(Variable::Ref {
                                     declaration: uri,
                                     is_sequence,
@@ -685,7 +706,8 @@ fn var_name<Views: FtmlViews>(
     ).into_any()
 }
 
-fn do_application_inner<Views: FtmlViews, Be: SendBackend,A:ArgumentRender>(
+fn do_application_inner<Views: FtmlViews, A:ArgumentRender>(
+    backend:&'static dyn DynBackend,
     term: Option<Term>,
     leaf: LeafUri,
     vos: VarOrSym,
@@ -700,38 +722,12 @@ fn do_application_inner<Views: FtmlViews, Be: SendBackend,A:ArgumentRender>(
         let arguments = arguments.clone();
         let this = this.clone();
         let term = term.clone();
-        with_notations::<Be, _, _>(leaf.clone(), move |t| t.map_or_else(
-            || Right(no_notation::<Views,Be,_>(leaf.name().last(), &leaf, &arguments)),
-            |n| Left(n.with_arguments::<Views, Be,_>(term, &vos, this.as_ref(), &arguments,precedence)))
+        with_notations::< _, _>(backend,leaf.clone(), move |t| t.map_or_else(
+            || Right(no_notation::<Views,_>(backend,leaf.name().last(), &leaf, &arguments)),
+            |n| Left(n.with_arguments::<Views,_>(backend,term, &vos, this.as_ref(), &arguments,precedence)))
         )
     })
 }
-
-/*
-fn do_args<Views: FtmlViews, Be: SendBackend>(
-    arguments: &[Argument],
-) -> Vec<Either<ClonableView, Vec<ClonableView>>> {
-    arguments
-        .iter()
-        .map(|a| match a {
-            Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)) => {
-                let t = t.clone();
-                Either::Left(ClonableView::new(true, move || {
-                    t.clone().into_view::<Views, Be>(true)
-                }))
-            }
-            Argument::Sequence(MaybeSequence::Seq(s)) => Either::Right(
-                s.iter()
-                    .map(|t| {
-                        let t = t.clone();
-                        ClonableView::new(true, move || t.clone().into_view::<Views, Be>(true))
-                    })
-                    .collect::<Vec<_>>(),
-            ),
-        })
-        .collect::<Vec<_>>()
-}
- */
 
 fn do_opaque<F: FnOnce() -> AnyView>(
     node: &OpaqueNode,
@@ -769,64 +765,19 @@ fn do_opaque<F: FnOnce() -> AnyView>(
     }
 }
 
-/*
-#[allow(clippy::too_many_lines)]
-fn do_bound_args<Views: FtmlViews, Be: SendBackend>(
-    arguments: &[BoundArgument],
-) -> Vec<Either<ClonableView, Vec<ClonableView>>> {
-    arguments
-        .iter()
-        .map(|a| match a {
-            BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)) => {
-                let t = t.clone();
-                Either::Left(ClonableView::new(true, move || {
-                    t.clone().into_view::<Views, Be>(true)
-                }))
-            }
-            BoundArgument::Sequence(MaybeSequence::Seq(s)) => Either::Right(
-                s.iter()
-                    .map(|t| {
-                        let t = t.clone();
-                        ClonableView::new(true, move || t.clone().into_view::<Views, Be>(true))
-                    })
-                    .collect::<Vec<_>>(),
-            ),
-            BoundArgument::Bound(cv) | BoundArgument::BoundSeq(MaybeSequence::One(cv)) => {
-                let cv = cv.clone();
-                Either::Left(ClonableView::new(true, move || {
-                    do_cv::<Views, Be>(cv.clone())
-                }))
-            }
-            BoundArgument::BoundSeq(MaybeSequence::Seq(v)) => Either::Right(
-                v.iter()
-                    .map(|cv| {
-                        let cv = cv.clone();
-                        ClonableView::new(true, move || do_cv::<Views, Be>(cv.clone()))
-                    })
-                    .collect(),
-            ),
-            t => {
-                let t = t.clone();
-                Either::Left(ClonableView::new(true, move || {
-                    mtext().child(format!("{t:?}")).into_any()
-                }))
-            }
-        })
-        .collect::<Vec<_>>()
-}
- */
-
-pub fn do_cv<Views: FtmlViews, Be: SendBackend>(cv: ComponentVar,precedence:i64) -> AnyView {
+pub fn do_cv<Views: FtmlViews>(backend:&'static dyn DynBackend,cv: ComponentVar,precedence:i64) -> AnyView {
     use leptos::either::Either::{Left, Right};
     match cv.var {
         Variable::Ref {
             declaration,
             is_sequence,
-        } => with_notations::<Be, _, _>(
+        } => with_notations::< _, _>(
+            backend,
             declaration.clone().into(),
             move |t| {
                 let r = if let Some(n) = t {
-                    Left(n.as_view::<Views, Be>(
+                    Left(n.as_view::<Views>(
+                        backend,
                         &VarOrSym::Var(Variable::Ref {
                             declaration,
                             is_sequence,
@@ -847,12 +798,12 @@ pub fn do_cv<Views: FtmlViews, Be: SendBackend>(cv: ComponentVar,precedence:i64)
                 }
                 let tp = cv.tp.map(|t| {
                     view! {
-                        <mo>":"</mo>{t.into_view::<Views, Be>(true)}
+                        <mo>":"</mo>{t.into_view::<Views>(backend,true)}
                     }
                 });
                 let df = cv.df.map(|t| {
                     view! {
-                        <mo>":="</mo>{t.into_view::<Views, Be>(true)}
+                        <mo>":="</mo>{t.into_view::<Views>(backend,true)}
                     }
                 });
                 Right(view! {<mrow>{r}{tp}{df}</mrow>})
@@ -865,12 +816,12 @@ pub fn do_cv<Views: FtmlViews, Be: SendBackend>(cv: ComponentVar,precedence:i64)
             }
             let tp = cv.tp.map(|t| {
                 view! {
-                    <mo>":"</mo>{t.into_view::<Views, Be>(true)}
+                    <mo>":"</mo>{t.into_view::<Views>(backend,true)}
                 }
             });
             let df = cv.df.map(|t| {
                 view! {
-                    <mo>":="</mo>{t.into_view::<Views, Be>(true)}
+                    <mo>":="</mo>{t.into_view::<Views>(backend,true)}
                 }
             });
             view! {<mrow>{r}{tp}{df}</mrow>}.into_any()
@@ -879,17 +830,17 @@ pub fn do_cv<Views: FtmlViews, Be: SendBackend>(cv: ComponentVar,precedence:i64)
 }
 
 fn with_notations<
-    Be: SendBackend,
     V: IntoView + Send + 'static,
     F: FnOnce(Option<Notation>) -> V + Send + Clone + 'static,
 >(
+    backend:&'static dyn DynBackend,
     uri: LeafUri,
     then: F,
 ) -> AnyView {
     use crate::utils::FutureExt;
     let uricl = uri.clone();
     FutureExt::into_view(
-        move || LocalCache::get().get_notations(Be::get(), uricl.clone()),
+        move || LocalCache::get().get_notations(backend, uricl.clone()),
         move |gl| {
             let not = gl.local.and_then(|v| select_notation(v, &uri)).or_else(|| {
                 gl.global

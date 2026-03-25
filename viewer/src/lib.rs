@@ -8,38 +8,48 @@
 
 use ftml_components::SidebarPosition;
 use ftml_dom::toc::TocSource;
-use leptos::prelude::{IntoAny, provide_context};
+use leptos::prelude::IntoAny;
 
 pub mod backend;
 pub mod config;
 
-#[cfg(not(feature = "typescript"))]
-#[wasm_bindgen::prelude::wasm_bindgen(start)]
-pub fn run() {
+pub fn init(lvl: config::LogLevel, targets: &[&'static str]) {
     use tracing_subscriber::prelude::*;
-    fn filter(lvl: config::LogLevel) -> tracing_subscriber::filter::Targets {
+    fn filter(
+        lvl: config::LogLevel,
+        targets: &[&'static str],
+    ) -> tracing_subscriber::filter::Targets {
         let lvl: tracing::Level = lvl.into();
-        tracing_subscriber::filter::Targets::new()
+        let mut ret = tracing_subscriber::filter::Targets::new()
             .with_target("ftml_dom", lvl)
             .with_target("ftml_components", lvl)
             .with_target("ftml_parser", lvl)
             .with_target("ftml_backend", lvl)
-            .with_target("ssr_example", lvl)
+            .with_target("ftml_js_utils", lvl)
+            //.with_target("ssr_example", lvl)
             .with_target(
                 "leptos_posthoc",
                 tracing_subscriber::filter::LevelFilter::ERROR,
-            )
+            );
+        for t in targets {
+            ret = ret.with_target(*t, lvl);
+        }
+        ret
     }
-
     console_error_panic_hook::set_once();
-
-    let meta = ftml_dom::DocumentMeta::get();
-    let (mut cfg, errors) = config::parse_config();
-
+    ftml_components::set_backend::<backend::GlobalBackend>();
     tracing_subscriber::registry()
         .with(tracing_wasm::WASMLayer::default())
-        .with(filter(cfg.log_level))
+        .with(filter(lvl, targets))
         .init();
+}
+
+#[cfg(not(feature = "typescript"))]
+#[wasm_bindgen::prelude::wasm_bindgen(start)]
+pub fn run() {
+    let meta = ftml_dom::DocumentMeta::get();
+    let (mut cfg, errors) = config::parse_config();
+    init(cfg.log_level, &[]);
 
     for e in errors {
         tracing::error!("{e}");
@@ -60,12 +70,12 @@ pub fn iterate_body(cfg: config::FtmlViewerConfig) {
 
         //provide_context(TocSource::Extract);
         let uri = cfg.apply().unwrap_or_else(|| DocumentUri::no_doc().clone());
-        ftml_components::Views::<backend::GlobalBackend>::setup_document(
+        ftml_components::Views::setup_document(
             uri,
             SidebarPosition::Find,
             false,
             TocSource::Extract,
-            || ftml_components::Views::<backend::GlobalBackend>::cont(orig, false).into_any(),
+            || ftml_components::Views::cont(orig, false).into_any(),
         )
     });
 }

@@ -6,11 +6,12 @@ use crate::{
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
+use ftml_backend::BackendError;
 use ftml_dom::{
     notations::{NotationExt, TermExt},
     utils::{
         css::inject_css,
-        local_cache::{GlobalLocal, LocalCache, SendBackend},
+        local_cache::{GlobalLocal, LocalCache},
     },
 };
 use ftml_ontology::{
@@ -42,7 +43,7 @@ pub fn do_macroname(name: &Id, arity: &ArgumentSpec) -> AnyView {
 
 //impl super::FtmlViewable for Symbol {
 #[must_use]
-pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
+pub fn symbol_view(s: &Symbol, show_paras: bool) -> AnyView {
     let Symbol { uri, data } = s;
     let SymbolData {
         arity,
@@ -68,11 +69,11 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
         .title(uri.to_string());
     let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
     let tp = tp.map(|t| {
-        let t = t.into_view::<crate::Views<Be>, Be>(false);
+        let t = t.into_view::<crate::Views>(crate::backend(), false);
         view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
     });
     let df = df.map(|t| {
-        let t = t.into_view::<crate::Views<Be>, Be>(false);
+        let t = t.into_view::<crate::Views>(crate::backend(), false);
         view! {<Caption1>
             "Definiens: "{ftml_dom::utils::math(|| t)}
             </Caption1>
@@ -87,9 +88,9 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
             view!{<Text tag=TextTag::Code>{s}</Text>}
         }).collect_view())}}
     };
-    let notations = do_notations::<Be>(LeafUri::Symbol(uri.clone()), arity.clone());
+    let notations = do_notations(LeafUri::Symbol(uri.clone()), arity.clone());
     let paragraphs = if show_paras {
-        Some(do_paragraphs::<Be>(uri.clone()))
+        Some(do_paragraphs(uri.clone()))
     } else {
         None
     };
@@ -104,39 +105,11 @@ pub fn symbol_view<Be: SendBackend>(s: &Symbol, show_paras: bool) -> AnyView {
         </Block>
     }
     .into_any()
-    /*
-    let uriclone = uri.clone();
-    let uriclone_b = uri.clone();
-    view! {
-        <Block show_separator>
-            <Header slot><span>
-                <b>{symbol_str}{super::symbol_name(&uri, uri.name().last_name().as_ref())}</b>
-                {macro_name.map(|name| view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>))}
-                {tp.map(|t| view! {
-                    " of type "{
-                        crate::remote::get!(present(t.clone()) = html => {
-                            view!(<FTMLStringMath html/>)
-                        })
-                    }
-                })}
-            </span></Header>
-            <HeaderLeft slot>{do_notations(URI::Content(uriclone_b.into()),arity)}</HeaderLeft>
-            <HeaderRight slot><span style="white-space:nowrap;">{df.map(|t| view! {
-                "Definiens: "{
-                    crate::remote::get!(present(t.clone()) = html => {
-                        view!(<FTMLStringMath html/>)
-                    })
-                }
-            })}</span></HeaderRight>
-            {do_los(uriclone)}
-        </Block>
-    }
-     */
 }
 //}
 
 impl super::FtmlViewable for VariableDeclaration {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         use thaw::Caption1;
         let Self { uri, data } = self;
         let VariableData {
@@ -160,11 +133,11 @@ impl super::FtmlViewable for VariableDeclaration {
             .title(uri.to_string());
         let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
         let tp = tp.map(|t| {
-            let t = t.into_view::<crate::Views<Be>, Be>(false);
+            let t = t.into_view::<crate::Views>(crate::backend(), false);
             view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
         });
         let df = df.map(|t| {
-            let t = t.into_view::<crate::Views<Be>, Be>(false);
+            let t = t.into_view::<crate::Views>(crate::backend(), false);
             view! {<Caption1>"Definiens: "{ftml_dom::utils::math(|| t)}</Caption1>}
                 .attr("style", "white-space:nowrap;")
         });
@@ -172,7 +145,7 @@ impl super::FtmlViewable for VariableDeclaration {
             <Caption1Strong>"Variable "{name}</Caption1Strong>
             {macroname}
         };
-        let notations = do_notations::<Be>(LeafUri::Element(uri.clone()), arity.clone());
+        let notations = do_notations(LeafUri::Element(uri.clone()), arity.clone());
         view! {
             <Block>
                 <Header slot>{header}</Header>
@@ -183,46 +156,18 @@ impl super::FtmlViewable for VariableDeclaration {
             </Block>
         }
         .into_any()
-        /*
-        let uriclone = uri.clone();
-        let uriclone_b = uri.clone();
-        view! {
-            <Block show_separator>
-                <Header slot><span>
-                    <b>{symbol_str}{super::symbol_name(&uri, uri.name().last_name().as_ref())}</b>
-                    {macro_name.map(|name| view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>))}
-                    {tp.map(|t| view! {
-                        " of type "{
-                            crate::remote::get!(present(t.clone()) = html => {
-                                view!(<FTMLStringMath html/>)
-                            })
-                        }
-                    })}
-                </span></Header>
-                <HeaderLeft slot>{do_notations(URI::Content(uriclone_b.into()),arity)}</HeaderLeft>
-                <HeaderRight slot><span style="white-space:nowrap;">{df.map(|t| view! {
-                    "Definiens: "{
-                        crate::remote::get!(present(t.clone()) = html => {
-                            view!(<FTMLStringMath html/>)
-                        })
-                    }
-                })}</span></HeaderRight>
-                {do_los(uriclone)}
-            </Block>
-        }
-         */
     }
 }
 
-pub(super) fn do_paragraphs<Be: SendBackend>(uri: SymbolUri) -> AnyView {
+pub(super) fn do_paragraphs(uri: SymbolUri) -> AnyView {
     use crate::utils::collapsible::LazyCollapsible;
 
     let cached = move || {
         let uri = uri.clone();
         LocalCache::with_or_toast(
             move |be| async move {
-                Ok::<_, ftml_backend::BackendError<Be::Error>>(
-                    be.get_paragraphs(Be::get(), uri, false).await,
+                Ok::<_, ftml_backend::BackendError<String>>(
+                    be.get_paragraphs(crate::backend(), uri, false).await,
                 )
             },
             |ps| {
@@ -236,56 +181,26 @@ pub(super) fn do_paragraphs<Be: SendBackend>(uri: SymbolUri) -> AnyView {
                     }
                 }
                 view! {
-                    {super::CommaSep("Definitions",definitions.into_iter().map(|e| e.as_view::<Be>())).into_view()}
+                    {super::CommaSep("Definitions",definitions.into_iter().map(|e| e.as_view())).into_view()}
                     <br/>
-                    {super::CommaSep("Examples",examples.into_iter().map(|e| e.as_view::<Be>())).into_view()}
+                    {super::CommaSep("Examples",examples.into_iter().map(|e| e.as_view())).into_view()}
                 }.into_any()
             },
             || "(errored)".into_any(),
         )
     };
     view! {
-            <LazyCollapsible>
-                <Header slot><span>"Associated Paragraphs"</span></Header>
-                <div style="padding-left:15px">
-                { cached() }
-    /*
-                {
-                    let uri = uri.clone();
-                    crate::remote::get!(get_los(uri.clone(),true) = v => {
-                        let LOs {definitions,examples,problems} = v.lo_sort();
-                        view!{
-                            <div>{if definitions.is_empty() { None } else {Some(
-                                super::comma_sep("Definitions", definitions.into_iter().map(|uri| {
-                                    let title = uri.name().last().to_string();
-                                    super::doc_elem_name(uri,None,title)
-                                }))
-                            )}}</div>
-                            <div>{if examples.is_empty() { None } else {Some(
-                                super::comma_sep("Examples", examples.into_iter().map(|uri| {
-                                    let title = uri.name().last().to_string();
-                                    super::doc_elem_name(uri,None,title)
-                                }))
-                            )}}</div>
-                            <div>{if problems.is_empty() { None } else {Some(
-                                super::comma_sep("Problems", problems.into_iter().map(|(_,uri,cd)| {
-                                    let title = uri.name().last().to_string();
-                                    view!{
-                                        {super::doc_elem_name(uri,None,title)}
-                                        " ("{cd.to_string()}")"
-                                    }
-                                }))
-                            )}}</div>
-                        }
-                    })
-                } */
-                </div>
-            </LazyCollapsible>
-        }
+        <LazyCollapsible>
+            <Header slot><span>"Associated Paragraphs"</span></Header>
+            <div style="padding-left:15px">
+            { cached() }
+            </div>
+        </LazyCollapsible>
+    }
     .into_any()
 }
 
-pub(super) fn do_notations<Be: SendBackend>(uri: LeafUri, arity: ArgumentSpec) -> AnyView {
+pub(super) fn do_notations(uri: LeafUri, arity: ArgumentSpec) -> AnyView {
     //let functional = arity.num() > 0;
     //let as_variable = matches!(uri, LeafUri::Element(_));
     let var_or_sym = match &uri {
@@ -298,34 +213,36 @@ pub(super) fn do_notations<Be: SendBackend>(uri: LeafUri, arity: ArgumentSpec) -
     inject_css("ftml-notation-table", include_str!("notations.css"));
     LocalCache::with_or_toast(
         move |b| async move {
-            Ok::<_, ftml_backend::BackendError<Be::Error>>(b.get_notations(Be::get(), uri).await)
+            Ok::<_, ftml_backend::BackendError<String>>(
+                b.get_notations(crate::backend(), uri).await,
+            )
         },
-        move |nots| do_table::<Be, _>(var_or_sym, arity, nots),
+        move |nots| do_table(var_or_sym, arity, nots),
         || "(errored)".into_any(),
     )
 }
 
-fn do_table<Be: SendBackend, E>(
+fn do_table(
     head: VarOrSym,
     arity: ArgumentSpec,
-    nots: GlobalLocal<Vec<(DocumentElementUri, Notation)>, E>,
+    nots: GlobalLocal<Vec<(DocumentElementUri, Notation)>, BackendError<String>>,
 ) -> AnyView {
     use thaw::{Popover, PopoverTrigger, Table, TableCell, TableHeader, TableHeaderCell, TableRow};
-    fn render_not<Be: SendBackend>(
+    fn render_not(
         head: &VarOrSym,
         arity: &ArgumentSpec,
         not_uri: DocumentElementUri,
         not: &Notation,
     ) -> AnyView {
         let functional = arity.num() > 0;
-        let notation = not.as_view_safe::<crate::Views<Be>, Be>(head, None);
+        let notation = not.as_view_safe::<crate::Views>(crate::backend(), head, None);
         let op = if functional {
-            let op = not.as_op_safe::<crate::Views<Be>, Be>(head, None);
+            let op = not.as_op_safe::<crate::Views>(crate::backend(), head, None);
             Some(view! {<TableCell class="ftml-notation-cell">{op}</TableCell>})
         } else {
             None
         };
-        let notation2 = not.as_view_safe::<crate::Views<Be>, Be>(head, None);
+        let notation2 = not.as_view_safe::<crate::Views>(crate::backend(), head, None);
         view! {<TableCell class="ftml-notation-cell">
             <Popover>
                 <PopoverTrigger slot><span>{notation}</span></PopoverTrigger>
@@ -338,7 +255,7 @@ fn do_table<Be: SendBackend, E>(
                         </TableRow>
                     </TableHeader>
                     <TableRow>
-                        <TableCell class="ftml-notation-cell">{not_uri.document_uri().as_view::<Be>()}</TableCell>
+                        <TableCell class="ftml-notation-cell">{not_uri.document_uri().as_view()}</TableCell>
                         {op}
                         <TableCell class="ftml-notation-cell">
                         {notation2}
@@ -351,7 +268,7 @@ fn do_table<Be: SendBackend, E>(
     FtmlConfig::disable_hovers(move || {
         let notations = nots
             .into_iter()
-            .map(|(k, v)| render_not::<Be>(&head, &arity, k, &v))
+            .map(|(k, v)| render_not(&head, &arity, k, &v))
             .collect::<Vec<_>>();
         if notations.is_empty() {
             return ().into_any();

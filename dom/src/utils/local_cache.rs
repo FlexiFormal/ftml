@@ -12,9 +12,9 @@ use ftml_ontology::{
     },
     narrative::{
         SharedDocumentElement,
-        documents::{Document, TocElem},
+        documents::Document,
         elements::{
-            DocumentTerm, Notation, ParagraphOrProblemKind, SectionLevel, VariableDeclaration,
+            DocumentTerm, Notation, ParagraphOrProblemKind, VariableDeclaration,
             problems::Solutions,
         },
     },
@@ -23,16 +23,7 @@ use ftml_ontology::{
 use ftml_uris::{
     DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
 };
-use std::{hint::unreachable_unchecked, marker::PhantomData};
-
-pub trait SendBackend:
-    GlobalBackend<Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone> + Send
-{
-}
-impl<G: GlobalBackend + Send> SendBackend for G where
-    G::Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone
-{
-}
+use std::hint::unreachable_unchecked;
 
 type Map<A, B> = dashmap::DashMap<A, B, rustc_hash::FxBuildHasher>;
 type Set<A> = dashmap::DashSet<A, rustc_hash::FxBuildHasher>;
@@ -47,7 +38,7 @@ pub struct LocalCache {
     pub(crate) solutions: Map<DocumentElementUri, Solutions>,
 }
 impl LocalCache {
-    pub fn get_fragment<B: FtmlBackend<Error: Send>>(
+    pub fn get_fragment<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: ftml_uris::Uri,
@@ -64,7 +55,7 @@ impl LocalCache {
         }
     }
 
-    pub fn get_definition<B: FtmlBackend<Error: Send>>(
+    pub fn get_definition<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: SymbolUri,
@@ -87,7 +78,7 @@ impl LocalCache {
         either::Either::Right(backend.get_fragment(uri.into(), context))
     }
 
-    pub fn get_module<B: FtmlBackend<Error: Send>>(
+    pub fn get_module<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: ModuleUri,
@@ -138,7 +129,7 @@ impl LocalCache {
         either::Either::Right(backend.get_document(uri))
     }
 
-    pub fn get_document_term<B: FtmlBackend<Error: Send>>(
+    pub fn get_document_term<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: DocumentElementUri,
@@ -159,7 +150,7 @@ impl LocalCache {
         either::Either::Right(backend.get_document_term(uri))
     }
 
-    pub fn get_symbol<B: FtmlBackend<Error: Send>>(
+    pub fn get_symbol<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: SymbolUri,
@@ -178,7 +169,7 @@ impl LocalCache {
         either::Either::Right(backend.get_symbol(uri))
     }
 
-    pub fn get_morphism<B: FtmlBackend<Error: Send>>(
+    pub fn get_morphism<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: SymbolUri,
@@ -198,7 +189,7 @@ impl LocalCache {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn get_structure<B: FtmlBackend<Error: Send>>(
+    pub fn get_structure<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: SymbolUri,
@@ -225,7 +216,7 @@ impl LocalCache {
         either::Either::Right(backend.get_structure(uri))
     }
 
-    pub fn get_variable<B: FtmlBackend<Error: Send>>(
+    pub fn get_variable<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: DocumentElementUri,
@@ -247,7 +238,7 @@ impl LocalCache {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn get_document_html<B: FtmlBackend<Error: Send>>(
+    pub fn get_document_html<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: DocumentUri,
@@ -261,7 +252,7 @@ impl LocalCache {
         )
     }
 
-    pub fn get_solutions<B: FtmlBackend<Error: Send>>(
+    pub fn get_solutions<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: DocumentElementUri,
@@ -272,7 +263,7 @@ impl LocalCache {
         )
     }
 
-    pub fn get_notations<B: FtmlBackend<Error: Send>>(
+    pub fn get_notations<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: LeafUri,
@@ -291,7 +282,7 @@ impl LocalCache {
         }
     }
 
-    pub fn get_paragraphs<B: FtmlBackend<Error: Send>>(
+    pub fn get_paragraphs<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         uri: SymbolUri,
@@ -314,7 +305,7 @@ impl LocalCache {
         }
     }
 
-    pub fn get_notation<B: FtmlBackend<Error: Send>>(
+    pub fn get_notation<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,
         symbol: Option<LeafUri>,

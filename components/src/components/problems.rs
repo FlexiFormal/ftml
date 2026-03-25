@@ -1,6 +1,6 @@
 use ftml_dom::FtmlViews;
 use ftml_dom::utils::css::inject_css;
-use ftml_dom::utils::local_cache::{LocalCache, SendBackend};
+use ftml_dom::utils::local_cache::LocalCache;
 use ftml_js_utils::JsDisplay;
 use ftml_ontology::narrative::elements::problems::{
     BlockFeedback, CheckedResult, ChoiceBlockStyle, FillinFeedback, FillinFeedbackKind,
@@ -15,7 +15,6 @@ use send_wrapper::SendWrapper;
 use smallvec::SmallVec;
 
 use crate::config::FtmlConfig;
-use crate::utils::LocalCacheExt;
 
 #[cfg(feature = "typescript")]
 #[leptos::wasm_bindgen::prelude::wasm_bindgen(typescript_custom_section)]
@@ -28,21 +27,6 @@ pub enum ProblemContinuation {
     Rs(std::sync::Arc<dyn Fn(&ProblemResponse) + Send + Sync>),
     Js(SendWrapper<leptos::web_sys::js_sys::Function>),
 }
-
-/*
-pub struct ProblemOptions {
-    pub on_response: Option<ProblemContinuation>,
-    pub states: rustc_hash::FxHashMap<DocumentElementUri, ProblemState>, //HMap<DocumentElementUri, ProblemState>,
-}
-impl std::fmt::Debug for ProblemOptions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ProblemOptions")
-            .field("on_response", &self.on_response.is_some())
-            .field("states", &self.states)
-            .finish()
-    }
-}
- */
 
 #[derive(
     Debug,
@@ -197,7 +181,7 @@ enum ActiveProblemResponse {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn problem<Be: SendBackend, V: IntoView>(
+pub fn problem<V: IntoView>(
     uri: DocumentElementUri,
     _styles: Box<[Id]>,
     style: Memo<String>,
@@ -296,7 +280,7 @@ pub fn problem<Be: SendBackend, V: IntoView>(
                 Left(r),
               Left(false) => Right(view!{
                 {r}
-                {submit_answer::<Be>()}
+                {submit_answer()}
               })
             }
           }
@@ -313,7 +297,8 @@ pub fn problem<Be: SendBackend, V: IntoView>(
     )
 }
 
-fn submit_answer<Be: SendBackend>() -> impl IntoView {
+ftml_js_utils::split! {
+fn submit_answer() -> AnyView {
     use thaw::{Button, ButtonSize};
     with_context(|current: &CurrentProblem| {
         let uri = current.uri.clone();
@@ -352,7 +337,8 @@ fn submit_answer<Be: SendBackend>() -> impl IntoView {
                 } else {
                     let uricl = uri.clone();
                     leptos::either::Either::Right(move || {
-                        let res = LocalCache::resource(|c| c.get_solutions(Be::get(), uricl));
+                        let res =
+                            LocalCache::resource(|c| c.get_solutions(crate::backend(), uricl));
                         Effect::new(move || {
                             res.with(|r| {
                                 if let Some(Ok(r)) = r {
@@ -375,7 +361,8 @@ fn submit_answer<Be: SendBackend>() -> impl IntoView {
                 None
             }
         }
-    })
+    }).into_any()
+}
 }
 
 pub fn hint<V: IntoView + 'static>(children: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
@@ -459,7 +446,7 @@ pub fn fillinsol(wd: Option<f32>) -> impl IntoView {
 }
 
 #[must_use]
-pub fn solution<Be: SendBackend>() -> impl IntoView {
+pub fn solution() -> impl IntoView {
     let Some((idx, feedback)) = with_context::<CurrentProblem, _>(|problem| {
         let idx = problem.solutions.get_untracked();
         problem.solutions.update_untracked(|i| *i += 1);
@@ -476,7 +463,7 @@ pub fn solution<Be: SendBackend>() -> impl IntoView {
                     return None;
                 };
                 Some(
-                    crate::Views::<Be>::render_ftml(f.to_string(), None)
+                    crate::Views::render_ftml(f.to_string(), None)
                         .attr("style", "background-color:lawngreen;"),
                 )
             })
@@ -761,82 +748,3 @@ fn single_choice<V: IntoView + 'static>(
         {post}
     </div>}
 }
-
-/*
-#[allow(clippy::needless_pass_by_value)]
-#[allow(unused_variables)]
-pub(super) fn solution(
-    _skip: usize,
-    _elements: FTMLElements,
-    orig: OriginalNode,
-    _id: Option<Box<str>>,
-) -> impl IntoView {
-    let Some((solutions, feedback)) =
-        with_context::<CurrentProblem, _>(|e| (e.solutions, e.feedback))
-    else {
-        tracing::error!("solution outside of problem!");
-        return None;
-    };
-    let idx = solutions.get_untracked();
-    solutions.update_untracked(|i| *i += 1);
-    #[cfg(any(feature = "csr", feature = "hydrate"))]
-    {
-        if orig.child_element_count() == 0 {
-            tracing::debug!("Solution removed!");
-        } else {
-            tracing::debug!("Solution exists!");
-        }
-        Some(move || {
-            feedback.with(|f| {
-                f.as_ref().and_then(|f| {
-                    let Some(f) = f.solutions.get(idx as usize) else {
-                        tracing::error!("No solution!");
-                        return None;
-                    };
-                    Some(view! {
-                      <div style="background-color:lawngreen;">
-                        <span inner_html=f.to_string()/>
-                      </div>
-                    })
-                })
-            })
-        })
-        // TODO
-    }
-    #[cfg(not(any(feature = "csr", feature = "hydrate")))]
-    {
-        Some(())
-    }
-}
-
-
-#[allow(clippy::needless_pass_by_value)]
-#[allow(unused_variables)]
-pub(super) fn gnote(_skip: usize, _elements: FTMLElements, orig: OriginalNode) -> impl IntoView {
-    #[cfg(any(feature = "csr", feature = "hydrate"))]
-    {
-        if orig.child_element_count() == 0 {
-            tracing::debug!("Grading note removed!");
-        } else {
-            tracing::debug!("Grading note exists!");
-        }
-        // TODO
-    }
-    #[cfg(not(any(feature = "csr", feature = "hydrate")))]
-    {
-        ()
-    }
-}
-
-/*
-  let feedback = ex.feedback;
-  move || {
-    if feedback.with(|f| f.is_some()) {}
-    else {
-
-    }
-  }
-*/
-
-
-*/

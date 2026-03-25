@@ -7,19 +7,15 @@ use crate::{
         collapsible::{collapse_marker, fancy_collapsible},
     },
 };
-use ftml_backend::FtmlBackend;
 use ftml_dom::{
     DocumentState,
-    utils::{
-        css::inject_css,
-        local_cache::{LocalCache, SendBackend},
-    },
+    utils::{css::inject_css, local_cache::LocalCache},
 };
 use ftml_uris::DocumentUri;
 use leptos::{prelude::*, web_sys::HtmlDivElement};
 
 #[allow(clippy::fn_params_excessive_bools)]
-pub fn do_sidebar<B: SendBackend, Cont: ViewContinuations>(
+pub fn do_sidebar(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -29,13 +25,13 @@ pub fn do_sidebar<B: SendBackend, Cont: ViewContinuations>(
     inject_css("ftml-sidebar", include_str!("./sidebar.css"));
 
     if floating {
-        floating_sidebar::<B, Cont>(show_content, pdf_link, choose_highlight_style, children)
+        floating_sidebar(show_content, pdf_link, choose_highlight_style, children)
     } else {
-        flex_sidebar::<B, Cont>(show_content, pdf_link, choose_highlight_style, children)
+        flex_sidebar(show_content, pdf_link, choose_highlight_style, children)
     }
 }
 
-fn flex_sidebar<B: SendBackend, Cont: ViewContinuations>(
+fn flex_sidebar(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -49,10 +45,10 @@ fn flex_sidebar<B: SendBackend, Cont: ViewContinuations>(
             view! {
                 {if choose_highlight_style {Some(select_highlighting())} else {None}}
                 <Flex>
-                    {if show_content {Some(content_drawer::<B,Cont>())} else {None}}
-                    {if pdf_link {Some(pdf::<B>())} else {None}}
+                    {if show_content {Some(content_drawer())} else {None}}
+                    {if pdf_link {Some(pdf())} else {None}}
                 </Flex>
-                {super::toc::toc::<B>()}
+                {super::toc::toc()}
             }
         },
         visible,
@@ -82,7 +78,7 @@ fn flex_sidebar<B: SendBackend, Cont: ViewContinuations>(
     .into_any()
 }
 
-fn floating_sidebar<B: SendBackend, Cont: ViewContinuations>(
+fn floating_sidebar(
     show_content: bool,
     pdf_link: bool,
     choose_highlight_style: bool,
@@ -105,10 +101,10 @@ fn floating_sidebar<B: SendBackend, Cont: ViewContinuations>(
             view! {
                 {if choose_highlight_style {Some(select_highlighting())} else {None}}
                 <Flex>
-                    {if show_content {Some(content_drawer::<B,Cont>())} else {None}}
-                    {if pdf_link {Some(pdf::<B>())} else {None}}
+                    {if show_content {Some(content_drawer())} else {None}}
+                    {if pdf_link {Some(pdf())} else {None}}
                 </Flex>
-                {super::toc::toc::<B>()}
+                {super::toc::toc()}
             }
         },
         visible,
@@ -191,7 +187,7 @@ fn max_child(e: &leptos::web_sys::Element) -> Option<leptos::web_sys::Element> {
     curr
 }
 
-fn content_drawer<B: SendBackend, Cont: ViewContinuations>() -> AnyView {
+fn content_drawer() -> AnyView {
     use thaw::{
         Button, ButtonAppearance, DrawerBody, DrawerHeader, DrawerHeaderTitle,
         DrawerHeaderTitleAction, DrawerPosition, Icon, OverlayDrawer, Popover, PopoverTrigger,
@@ -243,20 +239,20 @@ fn content_drawer<B: SendBackend, Cont: ViewContinuations>() -> AnyView {
             </DrawerHeader>
             <DrawerBody>
                 {move || if open.get() {
-                    let uri= uri.clone(); Some(LocalCache::with_or_toast(
-                        move |b| b.get_document(B::get(),uri), move |d| {
+                    let uri= uri.clone(); Some(drawer_inner(uri,title)/*LocalCache::with_or_toast(
+                        move |b| b.get_document(crate::backend(),uri), move |d| {
                             if let Some(t) = &d.title {
                                 title.set(t.to_string());
                             }
                             //let doc = d.clone();
                             view!{
                                 //<span on:click=move |_| leptos::logging::log!("{doc:#?}")>"Print JSON"</span>
-                                {d.as_view::<B>()}
-                                {Cont::document_drawer(&d)}
+                                {d.as_view()}
+                                {crate::continuations().document_drawer(&d)}
                             }.into_any()
                         },
                         || "error".into_any()
-                    ))
+                    )*/)
                 } else {
                     None
                 }
@@ -266,40 +262,35 @@ fn content_drawer<B: SendBackend, Cont: ViewContinuations>() -> AnyView {
     .into_any()
 }
 
-/*
-fn drawer_inner(
-    uri: DocumentUri,
-    title: RwSignal<String>,
-    be: &dyn ftml_backend::dynbackend::DynBackend,
-) -> AnyView {
-    let uri = uri.clone();
-    LocalCache::with_or_toast(
-        move |b| b.get_document(be, uri),
-        move |d| {
-            if let Some(t) = &d.title {
-                title.set(t.to_string());
-            }
-            //let doc = d.clone();
-            view! {
-                //<span on:click=move |_| leptos::logging::log!("{doc:#?}")>"Print JSON"</span>
-                {d.as_view::<B>()}
-                {Cont::document_drawer(&d)}
-            }
-            .into_any()
-        },
-        || "error".into_any(),
-    )
+ftml_js_utils::split! {
+    fn drawer_inner(uri: DocumentUri, title: RwSignal<String>) -> AnyView {
+        LocalCache::with_or_toast(
+            move |b| b.get_document(crate::backend(), uri),
+            move |d| {
+                if let Some(t) = &d.title {
+                    title.set(t.to_string());
+                }
+                //let doc = d.clone();
+                view! {
+                    //<span on:click=move |_| leptos::logging::log!("{doc:#?}")>"Print JSON"</span>
+                    {d.as_view()}
+                    {crate::continuations().document_drawer(&d)}
+                }
+                .into_any()
+            },
+            || "error".into_any(),
+        )
+    }
 }
- */
 
-fn pdf<B: SendBackend>() -> impl IntoView {
+fn pdf() -> impl IntoView {
     use thaw::{Button, ButtonAppearance, Icon};
 
     let uri = DocumentState::document_uri();
     if uri == *DocumentUri::no_doc() {
         return None;
     }
-    B::get().resource_link_url(&uri, "pdf").map(|url| {
+    crate::backend().resource_link_url(&uri, "pdf").map(|url| {
         view! {
             <a target="_blank" href=url ><Button
                 attr:title="Download PDF"

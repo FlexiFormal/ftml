@@ -50,14 +50,22 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
     /// ### Errors
     fn collect_attributes(&self) -> Result<Vec<(Id, Box<str>)>, String> {
         self.iter_attributes()
-            .map(|e| {
-                e.map_or_else::<Result<_, String>, _, _>(Err, |(k, v)| {
+            .filter_map(|e| {
+                static IGNORES: [&str; 3] = [
+                    "data-rustex-sourceref",
+                    "data-rustex-font",
+                    "data-rustex-glyph",
+                ];
+                if e.as_ref().is_ok_and(|(k, _)| IGNORES.contains(&&**k)) {
+                    return None;
+                }
+                Some(e.map_or_else::<Result<_, String>, _, _>(Err, |(k, v)| {
                     let k = k
                         .parse::<Id>()
                         .map_err(|e| format!("invalid attribute: {e}"))?;
                     let v = v.into_boxed_str();
                     Ok((k, v))
-                })
+                }))
             })
             .collect::<Result<Vec<_>, String>>()
     }

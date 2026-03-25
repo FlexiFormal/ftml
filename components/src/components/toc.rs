@@ -1,13 +1,8 @@
+use ftml_backend::SendBackend;
 use ftml_dom::{
-    FtmlViews,
-    structure::DocumentStructure,
-    toc::FinalTocEntry,
-    utils::{css::inject_css, local_cache::SendBackend},
+    FtmlViews, structure::DocumentStructure, toc::FinalTocEntry, utils::css::inject_css,
 };
-use ftml_ontology::{
-    narrative::{documents::TocElem, elements::SectionLevel},
-    utils::{TreeIter, time::Timestamp},
-};
+use ftml_ontology::utils::{TreeIter, time::Timestamp};
 use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
 
@@ -82,8 +77,9 @@ impl Gottos {
     }
 }
 
+ftml_js_utils::split! {
 #[must_use]
-pub fn toc<Be: SendBackend>() -> impl IntoView {
+pub fn toc() -> AnyView {
     use thaw::Spinner;
     wrap_toc(move |data| {
         //move || {
@@ -91,7 +87,7 @@ pub fn toc<Be: SendBackend>() -> impl IntoView {
         let gottos = StoredValue::new(Gottos::default()); //new(use_context().unwrap_or_default(), &[]));
         let data = StoredValue::new(data);
         let ctx: TocProgresses = use_context().unwrap_or_default();
-        DocumentStructure::render_toc::<crate::Views<Be>, _, _, _>(
+        DocumentStructure::render_toc::<crate::Views, _, _, _>(
             move |s, u, l, c| do_toc(gottos, data, s, u, l, c),
             move |es| {
                 gottos.update_value(|g| *g = Gottos::new(ctx.clone(), es));
@@ -105,7 +101,8 @@ pub fn toc<Be: SendBackend>() -> impl IntoView {
             do_toc::<Be>(toc, &mut gottos, data, SectionLevel::Part)
         })*/
         //}
-    })
+    }).into_any()
+}
 }
 
 fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl IntoView {

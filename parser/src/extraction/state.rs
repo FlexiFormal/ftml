@@ -113,7 +113,7 @@ impl<T> StackVec<T> {
             |l| Left(std::iter::once(l).chain(self.rest.iter().rev())),
         )
     }
-    fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
+    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
         use either::Either::{Left, Right};
         if let Some(l) = &mut self.last {
             Left(std::iter::once(l).chain(self.rest.iter_mut().rev()))
@@ -2564,10 +2564,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                             && data.df.is_none()
                         {
                             data.df = TermContainer::new(
-                                term.clone(),
+                                Term::defined_marker(),
                                 self.current_source_range.into_option(),
                             );
                         }
+
                         if let Some((a, b)) = fors.iter_mut().find(|(k, v)| *k == of) {
                             *b = Some(TermContainer::new(
                                 term,
@@ -2587,10 +2588,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                             && data.df.is_none()
                         {
                             data.df = TermContainer::new(
-                                term.clone(),
+                                Term::defined_marker(),
                                 self.current_source_range.into_option(),
                             );
                         }
+
                         *v = Some(TermContainer::new(
                             term,
                             self.current_source_range.into_option(),

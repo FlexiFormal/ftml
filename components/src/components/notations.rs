@@ -3,14 +3,15 @@ use ftml_dom::{
     ClonableView,
     notations::NotationExt,
     terms::ReactiveApplication,
-    utils::local_cache::{GlobalLocal, LocalCache, SendBackend},
+    utils::local_cache::{GlobalLocal, LocalCache},
 };
 use ftml_ontology::{narrative::elements::Notation, terms::Term};
 use ftml_uris::{DocumentElementUri, LeafUri};
 use leptos::prelude::*;
 
+ftml_js_utils::split! {
 #[must_use]
-pub fn has_notation<B: SendBackend>(
+pub fn has_notation(
     uri: LeafUri,
     children: ClonableView,
     arguments: Option<ReadSignal<ReactiveApplication>>,
@@ -22,7 +23,7 @@ pub fn has_notation<B: SendBackend>(
 
     (move || {
         notation.get().map_or_else(
-            || Left(children.clone().into_view::<crate::Views<B>>()),
+            || Left(children.clone().into_view::<crate::Views>()),
             |notation| {
                 if finished.try_get().is_some_and(|b| b) {
                     tracing::trace!(
@@ -33,7 +34,7 @@ pub fn has_notation<B: SendBackend>(
                     );
                     let term = arguments
                         .and_then(|s| s.with_untracked(ReactiveApplication::term).get_untracked());
-                    Right(with_notation::<B>(
+                    Right(with_notation(
                         term,
                         uri.clone(),
                         notation,
@@ -41,16 +42,17 @@ pub fn has_notation<B: SendBackend>(
                         children.clone(),
                     ))
                 } else {
-                    Left(children.clone().into_view::<crate::Views<B>>())
+                    Left(children.clone().into_view::<crate::Views>())
                 }
             },
         )
     })
     .into_any()
 }
+}
 
 #[must_use]
-pub fn with_notation<B: SendBackend>(
+fn with_notation(
     term: Option<Term>,
     head: LeafUri,
     notation: DocumentElementUri,
@@ -60,10 +62,12 @@ pub fn with_notation<B: SendBackend>(
     use leptos::either::Either::{Left, Right};
     let h = head.clone();
     LocalCache::with_or_toast(
-        |c| c.get_notation(B::get(), Some(h), notation),
+        |c| c.get_notation(crate::backend(), Some(h), notation),
         move |n| {
             match arguments {
-                None => Left(n.as_op::<crate::Views<B>, B>(&head.into(), None, i64::MAX)),
+                None => {
+                    Left(n.as_op::<crate::Views>(crate::backend(), &head.into(), None, i64::MAX))
+                }
                 Some(s) => {
                     let args = s.with(|s| {
                         if let ReactiveApplication::Closed(c) = s {
@@ -72,7 +76,8 @@ pub fn with_notation<B: SendBackend>(
                             Vec::new()
                         }
                     });
-                    Right(n.with_arguments::<crate::Views<B>, B, _>(
+                    Right(n.with_arguments::<crate::Views, _>(
+                        crate::backend(),
                         term,
                         &head.into(),
                         None,
@@ -84,11 +89,11 @@ pub fn with_notation<B: SendBackend>(
             .attr("style", "border: 1px dotted red;")
             .into_any()
         },
-        move || children.into_view::<crate::Views<B>>(),
+        move || children.into_view::<crate::Views>(),
     )
 }
 
-pub fn notation_selector<Be: SendBackend>(uri: LeafUri) -> impl IntoView {
+pub fn notation_selector(uri: LeafUri) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     use thaw::Spinner;
     if !FtmlConfig::allow_notation_changes() {
@@ -97,8 +102,8 @@ pub fn notation_selector<Be: SendBackend>(uri: LeafUri) -> impl IntoView {
     }
     let leaf = uri.clone();
     let notations = LocalCache::resource(move |b| async move {
-        Result::<_, ftml_backend::BackendError<Be::Error>>::Ok(
-            b.get_notations(Be::get(), leaf).await,
+        Result::<_, ftml_backend::BackendError<String>>::Ok(
+            b.get_notations(crate::backend(), leaf).await,
         )
     });
     Right(view! {<Suspense fallback = || view!(<Spinner/>)>{move || {
@@ -113,17 +118,17 @@ pub fn notation_selector<Be: SendBackend>(uri: LeafUri) -> impl IntoView {
             {
                 A(())
             }
-            Some(Ok(v)) => B(do_notation_selector::<Be,_>(&uri, v)),
+            Some(Ok(v)) => B(do_notation_selector(&uri, v)),
             Some(Err(e)) => C(format!("error: {e}")),
             None => D(view!(<Spinner/>)),
         }
     }}</Suspense>})
 }
 
-fn do_notation_selector<Be: SendBackend, E: std::fmt::Display>(
+fn do_notation_selector(
     uri: &LeafUri,
-    notations: GlobalLocal<Vec<(DocumentElementUri, Notation)>, E>,
-) -> impl IntoView + use<E, Be> {
+    notations: GlobalLocal<Vec<(DocumentElementUri, Notation)>, ftml_backend::BackendError<String>>,
+) -> impl IntoView + use<> {
     use ftml_dom::notations::NotationExt;
     use leptos::prelude::*;
     use thaw::{Combobox, ComboboxOption};
@@ -175,7 +180,7 @@ fn do_notation_selector<Be: SendBackend, E: std::fmt::Display>(
                 {all.into_iter().map(|(not_uri,not)| {
                     let head = head.clone();
                     let notation = FtmlConfig::disable_hovers(move ||
-                        not.as_view_safe::<crate::Views<Be>,Be>(&head.into(),None).into_any()
+                        not.as_view_safe::<crate::Views>(crate::backend(),&head.into(),None).into_any()
                     );
                     view!(<ComboboxOption text="" value=not_uri.to_string()>
                         {ftml_dom::utils::math(|| notation)}

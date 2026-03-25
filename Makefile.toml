@@ -36,6 +36,14 @@ cd viewer
 cargo make dev
 '''
 
+[tasks.split]
+workspace = false
+dependencies = ["install-wasm-split"]
+script = '''
+cd viewer
+cargo make split
+'''
+
 [tasks.install-wasm-split]
 workspace = false
 command = "cargo"

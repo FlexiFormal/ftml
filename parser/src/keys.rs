@@ -591,7 +591,7 @@ do_keys! {
     /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Definition`]
     /// for the given [Symbol]s using the given styles.
     Definition = "definition"
-        { +(Id,Inline,Fors,Styles) &(Title,Definiens, Definiendum) }
+        { +(Id,Inline,Fors,Styles) &(Title,Definiens, Definiendum, Bind) }
         := (ext,attrs,keys,node) => {
             do_paragraph(ext, attrs, keys, node, ParagraphKind::Definition)
         },
@@ -599,7 +599,7 @@ do_keys! {
     /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Assertion`] (Theorems, Lemmata,
     /// Axioms, etc.) for the given [Symbol]s using the given styles.
     Assertion = "assertion"
-        { +(Id,Inline,Fors,Styles) &(Title) }
+        { +(Id,Inline,Fors,Styles) &(Title,Bind) }
         := (ext,attrs,keys,node) => {
             do_paragraph(ext, attrs, keys, node, ParagraphKind::Assertion)
         },
@@ -607,7 +607,7 @@ do_keys! {
     /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Example`] (this includes counterexamples)
     /// for the given [Symbol]s using the given styles.
     Example = "example"
-        {+(Id,Inline,Fors,Styles) &(Title) }
+        {+(Id,Inline,Fors,Styles) &(Title,Bind) }
         := (ext,attrs,keys,node) => {
             do_paragraph(ext, attrs, keys, node, ParagraphKind::Example)
         },
@@ -1347,12 +1347,34 @@ do_keys! {
 
     /// <div class="advanced">
     ///
-    /// <div class="ftml-wip">TODO</div>
+    /// Marks a variable to be bound in the current paragraph.
     ///
     /// </div>
     Bind = "bind"
-        {="[bool]" -(Vardef,Varseq)}
-        := noop,
+        {="[bool]" -(Vardef,Varseq,Definition,Assertion,Example)}
+        := (ext,attrs,_keys,node) => {
+            let vn = attrs.get_typed(FtmlKey::Bind,Id::from_str)?;
+            let Variable::Ref { declaration:uri, .. } = ext.resolve_variable_name(vn) else {
+                return Err(FtmlExtractionError::InvalidValue(FtmlKey::Bind));
+            };
+            let mut success = false;
+
+            for n in ext.iterate_narrative_mut() {
+                if let OpenNarrativeElement::Paragraph { binds_variables, .. } = n {
+                    binds_variables.push(uri);
+                    success = true;
+                    break
+                }
+            }
+            if success {
+                Ok((
+                    ext.add_element(crate::extraction::OpenFtmlElement::None, node)?,
+                    None,
+                ))
+            } else {
+                Err(FtmlExtractionError::NotIn(FtmlKey::Bind, "a paragraph"))
+            }
+        },
 
     // -------------------------------------------------------------------------------
 
@@ -1989,6 +2011,17 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
         Bind
     );
     let source = ext.current_source();
+    if bind {
+        for n in ext.iterate_narrative_mut() {
+            if let OpenNarrativeElement::Paragraph {
+                binds_variables, ..
+            } = n
+            {
+                binds_variables.push(uri.clone());
+                break;
+            }
+        }
+    }
     ret!(ext,node <- VariableDeclaration {
         uri,
         data: Box::new(VariableData {

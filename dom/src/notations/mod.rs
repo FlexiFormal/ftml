@@ -4,8 +4,8 @@ use crate::ClonableView;
 use crate::FtmlViews;
 use crate::document::{CurrentUri, WithHead};
 use crate::terms::{ReactiveApplication, ReactiveTerm, TopTerm};
-use crate::utils::local_cache::SendBackend;
 use crate::utils::owned;
+use ftml_backend::dynbackend::DynBackend;
 use ftml_ontology::terms::Argument;
 use ftml_ontology::terms::BoundArgument;
 use ftml_ontology::terms::ComponentVar;
@@ -42,8 +42,9 @@ pub fn with_precedences(down: i64, up: i64, view: AnyView) -> AnyView {
 }
 
 pub trait NotationExt {
-    fn with_arguments<Views: FtmlViews, Be: SendBackend, R: ArgumentRender>(
+    fn with_arguments<Views: FtmlViews, R: ArgumentRender>(
         &self,
+        backend: &'static dyn DynBackend,
         term: Option<Term>,
         head: &VarOrSym,
         this: Option<&ClonableView>,
@@ -51,54 +52,59 @@ pub trait NotationExt {
         precedence: i64,
     ) -> AnyView;
 
-    fn with_arguments_safe<Views: FtmlViews, Be: SendBackend, R: ArgumentRender>(
+    fn with_arguments_safe<Views: FtmlViews, R: ArgumentRender>(
         &self,
+        backend: &'static dyn DynBackend,
         term: Option<Term>,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         args: &R,
-    ) -> impl IntoView + use<Self, Views, Be, R> {
+    ) -> impl IntoView + use<Self, Views, R> {
         owned(move || {
             provide_context(WithHead(Some(head.clone())));
             provide_context(None::<TopTerm>);
             provide_context(None::<ReactiveTerm>);
-            self.with_arguments::<Views, Be, R>(term, head, this, args, i64::MAX)
+            self.with_arguments::<Views, R>(backend, term, head, this, args, i64::MAX)
         })
     }
 
-    fn as_view<Views: FtmlViews, Be: SendBackend>(
+    fn as_view<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         precedence: i64,
     ) -> AnyView;
 
-    fn as_view_safe<Views: FtmlViews, Be: SendBackend>(
+    fn as_view_safe<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         head: &VarOrSym,
         this: Option<&ClonableView>,
-    ) -> impl IntoView + use<Self, Views, Be> {
+    ) -> impl IntoView + use<Self, Views> {
         owned(move || {
             provide_context(WithHead(Some(head.clone())));
-            self.as_view::<Views, Be>(head, this, i64::MAX)
+            self.as_view::<Views>(backend, head, this, i64::MAX)
         })
         //DocumentState::with_head(head.clone(), move || self.as_view::<Views>(head, this))
     }
-    fn as_op<Views: FtmlViews, Be: SendBackend>(
+    fn as_op<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         precedence: i64,
     ) -> AnyView;
 
-    fn as_op_safe<Views: FtmlViews, Be: SendBackend>(
+    fn as_op_safe<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         head: &VarOrSym,
         this: Option<&ClonableView>,
-    ) -> impl IntoView + use<Self, Views, Be> {
+    ) -> impl IntoView + use<Self, Views> {
         owned(move || {
             provide_context(WithHead(Some(head.clone())));
-            self.as_op::<Views, Be>(head, this, i64::MAX)
+            self.as_op::<Views>(backend, head, this, i64::MAX)
         })
         //DocumentState::with_head(head.clone(), move || self.as_op::<Views>(head, this))
     }
@@ -111,14 +117,16 @@ pub trait ArgumentRender: Clone + Send + Sync + 'static {
     }
     fn num_args(&self) -> usize;
     fn is_sequence(&self, index: u8) -> bool;
-    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         mode: ArgumentMode,
         argument_prec: i64,
     ) -> AnyView;
-    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg_at<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,
@@ -130,7 +138,8 @@ fn error() -> impl IntoView {
     mtext().style("color:red").child("ERROR")
 }
 
-fn render_arg<Views: FtmlViews, Be: SendBackend>(
+fn render_arg<Views: FtmlViews>(
+    backend: &'static dyn DynBackend,
     term: &Term,
     index: u8,
     seq_index: Option<usize>,
@@ -140,7 +149,7 @@ fn render_arg<Views: FtmlViews, Be: SendBackend>(
     use_context::<Option<ReactiveTerm>>().flatten().map_or_else(
         || {
             term.clone()
-                .into_view_with_precedence::<Views, Be>(true, argument_prec)
+                .into_view_with_precedence::<Views>(backend, true, argument_prec)
         },
         |r| {
             let position = seq_index.map_or_else(
@@ -162,14 +171,15 @@ fn render_arg<Views: FtmlViews, Be: SendBackend>(
                 position,
                 ClonableView::new(true, move || {
                     t.clone()
-                        .into_view_with_precedence::<Views, Be>(true, argument_prec)
+                        .into_view_with_precedence::<Views>(backend, true, argument_prec)
                 }),
             )
         },
     )
 }
 
-fn render_cv<Views: FtmlViews, Be: SendBackend>(
+fn render_cv<Views: FtmlViews>(
+    backend: &'static dyn DynBackend,
     cv: &ComponentVar,
     index: u8,
     seq_index: Option<usize>,
@@ -177,7 +187,7 @@ fn render_cv<Views: FtmlViews, Be: SendBackend>(
     argument_prec: i64,
 ) -> AnyView {
     use_context::<Option<ReactiveTerm>>().flatten().map_or_else(
-        || terms::do_cv::<Views, Be>(cv.clone(), argument_prec),
+        || terms::do_cv::<Views>(backend, cv.clone(), argument_prec),
         |r| {
             let position = seq_index.map_or_else(
                 || {
@@ -197,7 +207,7 @@ fn render_cv<Views: FtmlViews, Be: SendBackend>(
             r.add_argument::<Views>(
                 position,
                 ClonableView::new(true, move || {
-                    terms::do_cv::<Views, Be>(t.clone(), argument_prec)
+                    terms::do_cv::<Views>(backend, t.clone(), argument_prec)
                 }),
             )
         },
@@ -216,8 +226,9 @@ impl ArgumentRender for Box<[Argument]> {
     fn is_sequence(&self, index: u8) -> bool {
         matches!(self.get(index as usize), Some(Argument::Sequence(_)))
     }
-    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         mode: ArgumentMode,
         argument_prec: i64,
@@ -226,7 +237,7 @@ impl ArgumentRender for Box<[Argument]> {
         tracing::trace!("rendering arg {index}@{mode:?} of {}", self.len());
         match self.get(index as usize) {
             Some(Argument::Simple(v) | Argument::Sequence(MaybeSequence::One(v))) => {
-                render_arg::<Views, Be>(v, index, None, mode, argument_prec)
+                render_arg::<Views>(backend, v, index, None, mode, argument_prec)
             }
             Some(Argument::Sequence(MaybeSequence::Seq(v))) => {
                 let len = v.len();
@@ -235,7 +246,8 @@ impl ArgumentRender for Box<[Argument]> {
                 }
                 // SAFETY: len > 0
                 let first = || {
-                    render_arg::<Views, Be>(
+                    render_arg::<Views>(
+                        backend,
                         unsafe { v.first().unwrap_unchecked() },
                         index,
                         Some(0),
@@ -259,7 +271,7 @@ impl ArgumentRender for Box<[Argument]> {
                                     Right(leptos::math::mo().child(","))
                                 }
                             }
-                            {render_arg::<Views,Be>(v,index, Some(i), mode,argument_prec)}
+                            {render_arg::<Views>(backend,v,index, Some(i), mode,argument_prec)}
                         }).collect_view()
                     }
                     </mrow>
@@ -268,8 +280,9 @@ impl ArgumentRender for Box<[Argument]> {
             _ => error().into_any(),
         }
     }
-    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg_at<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,
@@ -281,12 +294,12 @@ impl ArgumentRender for Box<[Argument]> {
         match self.get(index as usize) {
             Some(Argument::Sequence(MaybeSequence::Seq(v))) => v.get(seq_index).map_or_else(
                 || error().into_any(),
-                |v| render_arg::<Views, Be>(v, index, Some(seq_index), mode, i64::MAX),
+                |v| render_arg::<Views>(backend, v, index, Some(seq_index), mode, i64::MAX),
             ),
             Some(Argument::Simple(t) | Argument::Sequence(MaybeSequence::One(t)))
                 if seq_index == 0 =>
             {
-                render_arg::<Views, Be>(t, index, Some(seq_index), mode, i64::MAX)
+                render_arg::<Views>(backend, t, index, Some(seq_index), mode, i64::MAX)
             }
             _ => error().into_any(),
         }
@@ -317,8 +330,9 @@ impl ArgumentRender for Box<[BoundArgument]> {
             Some(BoundArgument::Sequence(_) | BoundArgument::BoundSeq(_))
         )
     }
-    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         mode: ArgumentMode,
         argument_precedence: i64,
@@ -327,7 +341,7 @@ impl ArgumentRender for Box<[BoundArgument]> {
         tracing::trace!("rendering arg {index}@{mode:?} of {}", self.len());
         match self.get(index as usize) {
             Some(BoundArgument::Simple(v) | BoundArgument::Sequence(MaybeSequence::One(v))) => {
-                render_arg::<Views, Be>(v, index, None, mode, argument_precedence)
+                render_arg::<Views>(backend, v, index, None, mode, argument_precedence)
             }
 
             Some(BoundArgument::Sequence(MaybeSequence::Seq(v))) => {
@@ -337,7 +351,8 @@ impl ArgumentRender for Box<[BoundArgument]> {
                 }
                 // SAFETY: len > 0
                 let first = || {
-                    render_arg::<Views, Be>(
+                    render_arg::<Views>(
+                        backend,
                         unsafe { v.first().unwrap_unchecked() },
                         index,
                         Some(0),
@@ -361,14 +376,14 @@ impl ArgumentRender for Box<[BoundArgument]> {
                                     Right(leptos::math::mo().child(","))
                                 }
                             }
-                            {render_arg::<Views,Be>(v,index, Some(i), mode,argument_precedence)}
+                            {render_arg::<Views>(backend,v,index, Some(i), mode,argument_precedence)}
                         }).collect_view()
                     }
                     </mrow>
                 }.into_any()
             }
             Some(BoundArgument::Bound(cv) | BoundArgument::BoundSeq(MaybeSequence::One(cv))) => {
-                render_cv::<Views, Be>(cv, index, None, mode, argument_precedence)
+                render_cv::<Views>(backend, cv, index, None, mode, argument_precedence)
             }
 
             Some(BoundArgument::BoundSeq(MaybeSequence::Seq(v))) => {
@@ -378,7 +393,8 @@ impl ArgumentRender for Box<[BoundArgument]> {
                 }
                 // SAFETY: len > 0
                 let first = || {
-                    render_cv::<Views, Be>(
+                    render_cv::<Views>(
+                        backend,
                         unsafe { v.first().unwrap_unchecked() },
                         index,
                         Some(0),
@@ -402,7 +418,7 @@ impl ArgumentRender for Box<[BoundArgument]> {
                                     Right(leptos::math::mo().child(","))
                                 }
                             }
-                            {render_cv::<Views,Be>(v,index, Some(i), mode,i64::MAX)}
+                            {render_cv::<Views>(backend,v,index, Some(i), mode,i64::MAX)}
                         }).collect_view()
                     }
                     </mrow>
@@ -411,8 +427,9 @@ impl ArgumentRender for Box<[BoundArgument]> {
             _ => error().into_any(),
         }
     }
-    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg_at<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,
@@ -424,21 +441,21 @@ impl ArgumentRender for Box<[BoundArgument]> {
         match self.get(index as usize) {
             Some(BoundArgument::Sequence(MaybeSequence::Seq(v))) => v.get(seq_index).map_or_else(
                 || error().into_any(),
-                |v| render_arg::<Views, Be>(v, index, Some(seq_index), mode, i64::MAX),
+                |v| render_arg::<Views>(backend, v, index, Some(seq_index), mode, i64::MAX),
             ),
             Some(BoundArgument::Simple(t) | BoundArgument::Sequence(MaybeSequence::One(t)))
                 if seq_index == 0 =>
             {
-                render_arg::<Views, Be>(t, index, Some(seq_index), mode, i64::MAX)
+                render_arg::<Views>(backend, t, index, Some(seq_index), mode, i64::MAX)
             }
             Some(BoundArgument::BoundSeq(MaybeSequence::Seq(v))) => v.get(seq_index).map_or_else(
                 || error().into_any(),
-                |cv| render_cv::<Views, Be>(cv, index, Some(seq_index), mode, i64::MAX),
+                |cv| render_cv::<Views>(backend, cv, index, Some(seq_index), mode, i64::MAX),
             ),
             Some(BoundArgument::Bound(cv) | BoundArgument::BoundSeq(MaybeSequence::One(cv)))
                 if seq_index == 0 =>
             {
-                render_cv::<Views, Be>(cv, index, Some(seq_index), mode, i64::MAX)
+                render_cv::<Views>(backend, cv, index, Some(seq_index), mode, i64::MAX)
             }
 
             _ => error().into_any(),
@@ -467,8 +484,9 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
     fn is_sequence(&self, index: u8) -> bool {
         matches!(self.get(index as usize), Some(Either::Right(_)))
     }
-    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         mode: ArgumentMode,
         _: i64,
@@ -516,8 +534,9 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
             _ => error().into_any(),
         }
     }
-    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg_at<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,
@@ -571,8 +590,9 @@ fn do_arg<Views: FtmlViews>(
 }
 
 impl NotationExt for Notation {
-    fn with_arguments<Views: FtmlViews, Be: SendBackend, R: ArgumentRender>(
+    fn with_arguments<Views: FtmlViews, R: ArgumentRender>(
         &self,
+        backend: &'static dyn DynBackend,
         term: Option<Term>,
         head: &VarOrSym,
         this: Option<&ClonableView>,
@@ -580,7 +600,7 @@ impl NotationExt for Notation {
         precedence: i64,
     ) -> AnyView {
         if args.is_empty() {
-            return self.as_op::<Views, Be>(head, this, precedence);
+            return self.as_op::<Views>(backend, head, this, precedence);
         }
         /*owned(move ||*/
         {
@@ -589,7 +609,8 @@ impl NotationExt for Notation {
             let r = with_precedences(
                 precedence,
                 self.precedence,
-                view_component_with_args::<Views, Be, _>(
+                view_component_with_args::<Views, _>(
+                    backend,
                     &self.component,
                     args,
                     this,
@@ -605,8 +626,9 @@ impl NotationExt for Notation {
         } //)
     }
 
-    fn as_op<Views: FtmlViews, Be: SendBackend>(
+    fn as_op<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         precedence: i64,
@@ -618,7 +640,8 @@ impl NotationExt for Notation {
                     with_precedences(
                         precedence,
                         self.precedence,
-                        view_component_with_args::<Views, Be, _>(
+                        view_component_with_args::<Views, _>(
+                            backend,
                             &self.component,
                             &DummyRender,
                             this,
@@ -644,8 +667,9 @@ impl NotationExt for Notation {
             .into_any()
     }
 
-    fn as_view<Views: FtmlViews, Be: SendBackend>(
+    fn as_view<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         head: &VarOrSym,
         this: Option<&ClonableView>,
         precedence: i64,
@@ -654,7 +678,8 @@ impl NotationExt for Notation {
         with_precedences(
             precedence,
             self.precedence,
-            view_component_with_args::<Views, Be, _>(
+            view_component_with_args::<Views, _>(
+                backend,
                 &self.component,
                 &DummyRender,
                 this,
@@ -699,7 +724,8 @@ impl AnyMaybeAttr {
     }
 }
 
-pub(crate) fn view_component_with_args<Views: FtmlViews, Be: SendBackend, A: ArgumentRender>(
+pub(crate) fn view_component_with_args<Views: FtmlViews, A: ArgumentRender>(
+    backend: &'static dyn DynBackend,
     comp: &NotationComponent,
     args: &A,
     this: Option<&ClonableView>,
@@ -720,7 +746,8 @@ pub(crate) fn view_component_with_args<Views: FtmlViews, Be: SendBackend, A: Arg
                     children
                         .iter()
                         .map(|c| {
-                            view_component_with_args::<Views, Be, _>(
+                            view_component_with_args::<Views, _>(
+                                backend,
                                 c,
                                 args,
                                 this,
@@ -756,7 +783,7 @@ pub(crate) fn view_component_with_args<Views: FtmlViews, Be: SendBackend, A: Arg
         }
         NotationComponent::Argument { index, mode } => {
             let prec = argument_precs.get(*index as usize).copied().unwrap_or(prec);
-            args.render_arg::<Views, Be>(*index, *mode, prec)
+            args.render_arg::<Views>(backend, *index, *mode, prec)
         }
         NotationComponent::ArgSep { index, mode, sep } => {
             let len = args.length_at(*index);
@@ -765,16 +792,16 @@ pub(crate) fn view_component_with_args<Views: FtmlViews, Be: SendBackend, A: Arg
             }
             if len == 1 {
                 let prec = argument_precs.get(*index as usize).copied().unwrap_or(prec);
-                return args.render_arg::<Views, Be>(*index, *mode, prec);
+                return args.render_arg::<Views>(backend, *index, *mode, prec);
             }
 
             view! {
                 <mrow>
-                    {args.render_arg_at::<Views,Be>(*index, 0, *mode)}
+                    {args.render_arg_at::<Views>(backend,*index, 0, *mode)}
                 {
                     (1..len).map(|i| view!{
-                        {sep.iter().map(|s| view_component_with_args::<Views,Be,_>(s,args,this,prec,argument_precs)).collect_view()}
-                        {args.render_arg_at::<Views,Be>(*index, i, *mode)}
+                        {sep.iter().map(|s| view_component_with_args::<Views,_>(backend,s,args,this,prec,argument_precs)).collect_view()}
+                        {args.render_arg_at::<Views>(backend,*index, i, *mode)}
                     }).collect_view()
                 }
                 </mrow>
@@ -798,8 +825,9 @@ impl ArgumentRender for DummyRender {
     fn is_sequence(&self, _: u8) -> bool {
         true
     }
-    fn render_arg<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         mode: ArgumentMode,
         _: i64,
@@ -810,8 +838,9 @@ impl ArgumentRender for DummyRender {
     fn length_at(&self, _index: u8) -> usize {
         3
     }
-    fn render_arg_at<Views: FtmlViews, Be: SendBackend>(
+    fn render_arg_at<Views: FtmlViews>(
         &self,
+        backend: &'static dyn DynBackend,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,

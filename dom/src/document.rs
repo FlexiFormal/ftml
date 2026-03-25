@@ -5,16 +5,11 @@ use crate::{
     markers::ParagraphInfo,
     structure::{DocumentStructure, Inputref, SectionInfo},
     toc::TocSource,
-    utils::{ContextChain, ModuleContext, local_cache::SendBackend, owned},
+    utils::{ContextChain, ModuleContext, owned},
 };
+use ftml_backend::{SendBackend, dynbackend::DynBackend};
 use ftml_ontology::{
-    narrative::{
-        documents::TocElem,
-        elements::{
-            SectionLevel,
-            paragraphs::{ParagraphFormatting, ParagraphKind},
-        },
-    },
+    narrative::elements::paragraphs::{ParagraphFormatting, ParagraphKind},
     terms::VarOrSym,
 };
 use ftml_parser::extraction::ArgumentPosition;
@@ -47,13 +42,19 @@ impl DocumentMeta {
     }
 }
 
-pub fn setup_document<Be: SendBackend, Ch: IntoView + 'static>(
+pub fn setup_document<Ch: IntoView + 'static>(
     uri: DocumentUri,
     is_stripped: bool,
     toc: TocSource,
+    backend: &'static dyn DynBackend,
     children: impl FnOnce() -> Ch,
 ) -> impl IntoView {
-    fn setup<Be: SendBackend>(uri: DocumentUri, is_stripped: bool, toc: TocSource) {
+    fn setup(
+        uri: DocumentUri,
+        is_stripped: bool,
+        toc: TocSource,
+        backend: &'static dyn DynBackend,
+    ) {
         provide_context(RwSignal::new(DomExtractor::new(
             uri.clone(),
             uri.clone().into(),
@@ -62,11 +63,11 @@ pub fn setup_document<Be: SendBackend, Ch: IntoView + 'static>(
         provide_context(InDocument(uri.clone()));
         provide_context(CurrentUri(uri.clone().into()));
         provide_context(ContextUri(uri.into()));
-        DocumentStructure::set::<Be>(toc);
+        DocumentStructure::set(toc, backend);
         DocumentStructure::navigate_to_fragment();
         ModuleContext::reset();
     }
-    setup::<Be>(uri, is_stripped, toc);
+    setup(uri, is_stripped, toc, backend);
     children()
 }
 

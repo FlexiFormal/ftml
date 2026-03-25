@@ -4,12 +4,11 @@ pub mod paragraphs;
 pub mod symbols;
 
 use crate::{config::FtmlConfig, utils::LocalCacheExt};
-use ftml_backend::{FtmlBackend, GlobalBackend};
 use ftml_dom::{
     FtmlViews,
     utils::{
         css::{CssExt, inject_css},
-        local_cache::{LocalCache, SendBackend},
+        local_cache::LocalCache,
     },
 };
 use ftml_ontology::terms::{VarOrSym, Variable};
@@ -17,19 +16,19 @@ use ftml_uris::{DocumentElementUri, DocumentUri, IsDomainUri, LeafUri, ModuleUri
 use leptos::prelude::*;
 
 pub trait FtmlViewable {
-    fn as_view<Be: SendBackend>(&self) -> AnyView;
+    fn as_view(&self) -> AnyView;
 }
 impl<F: FtmlViewable> FtmlViewable for &F {
     #[allow(refining_impl_trait_reachable)]
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
-        F::as_view::<Be>(self)
+    fn as_view(&self) -> AnyView {
+        F::as_view(self)
     }
 }
 impl FtmlViewable for LeafUri {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         match self {
-            Self::Symbol(s) => s.as_view::<Be>(),
-            Self::Element(v) => variable_uri::<Be>(v.name().last().to_string(), v),
+            Self::Symbol(s) => s.as_view(),
+            Self::Element(v) => variable_uri(v.name().last().to_string(), v),
         }
     }
 }
@@ -57,15 +56,12 @@ impl<V: IntoView + 'static, I: IntoIterator<Item = V>> CommaSep<V, I> {
 
 #[inline]
 #[must_use]
-pub fn uses<'a, Be: SendBackend, I: IntoIterator<Item = &'a ModuleUri>>(
-    header: &'static str,
-    uses: I,
-) -> AnyView {
-    CommaSep(header, uses.into_iter().map(FtmlViewable::as_view::<Be>)).into_view()
+pub fn uses<'a, I: IntoIterator<Item = &'a ModuleUri>>(header: &'static str, uses: I) -> AnyView {
+    CommaSep(header, uses.into_iter().map(FtmlViewable::as_view)).into_view()
 }
 
 impl FtmlViewable for DocumentUri {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         use thaw::Text;
         let uristring = self.to_string();
         let name = self.name.to_string();
@@ -75,7 +71,7 @@ impl FtmlViewable for DocumentUri {
             <a
                 style="display:inline-block;"
                 target="_blank"
-                href={<Be as GlobalBackend>::get().document_link_url(self)}
+                href={crate::backend().document_link_url(self)}
             >
                 <thaw::Icon icon=icondata_bi::BiLinkRegular />
             </a>
@@ -86,16 +82,16 @@ impl FtmlViewable for DocumentUri {
 }
 
 impl FtmlViewable for DocumentElementUri {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         use thaw::Text;
         let name = self.name.last().to_string();
         let title = view!(<Text class="ftml-comp">{name}</Text>).into_any();
-        hover_paragraph::<Be>(self.clone(), title)
+        hover_paragraph(self.clone(), title)
     }
 }
 
 #[must_use]
-pub fn hover_paragraph<Be: SendBackend>(uri: DocumentElementUri, title: AnyView) -> AnyView {
+pub fn hover_paragraph(uri: DocumentElementUri, title: AnyView) -> AnyView {
     use thaw::{Popover, PopoverTrigger};
     let uristring = uri.to_string();
     inject_css("ftml-symbol-popup", include_str!("../popup.css"));
@@ -108,12 +104,12 @@ pub fn hover_paragraph<Be: SendBackend>(uri: DocumentElementUri, title: AnyView)
           <div class="ftml-symbol-popup">
           {
               LocalCache::with_or_err(
-                  |b| b.get_fragment(Be::get(),uri.into(), None),
+                  |b| b.get_fragment(crate::backend(),uri.into(), None),
                   |(html,css,_)| {
                       for c in css {
                           c.inject();
                       }
-                      crate::Views::<Be>::render_ftml(html.into_string(),None).into_any()
+                      crate::Views::render_ftml(html.into_string(),None).into_any()
                   },
                   |e| view!(<code>{e.to_string()}</code>).into_any()
               )
@@ -141,7 +137,7 @@ pub fn module_with_hover(uri: &ModuleUri) -> AnyView {
 }
 
 impl FtmlViewable for ModuleUri {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         use thaw::{Dialog, DialogSurface, Popover, PopoverTrigger, Scrollbar, Text};
         let name = self.module_name().to_string();
         let uri = self.to_string();
@@ -151,9 +147,9 @@ impl FtmlViewable for ModuleUri {
         view! {
         <Dialog open = on_click>
             <DialogSurface>{
-                LocalCache::with_or_toast(move |c| c.get_module(Be::get(),origuri),
+                LocalCache::with_or_toast(move |c| c.get_module(crate::backend(),origuri),
                 |m| view!{
-                    <Scrollbar style="max-height:75vh;">{m.as_view::<Be>()}</Scrollbar>
+                    <Scrollbar style="max-height:75vh;">{m.as_view()}</Scrollbar>
                 }.into_any(),
                 || view!(<Text style="color:red">"Error"</Text>).into_any()
                 )
@@ -171,12 +167,12 @@ impl FtmlViewable for ModuleUri {
 }
 
 impl FtmlViewable for SymbolUri {
-    fn as_view<Be: SendBackend>(&self) -> AnyView {
-        symbol_uri::<Be>(self.name().last().to_string(), self)
+    fn as_view(&self) -> AnyView {
+        symbol_uri(self.name().last().to_string(), self)
     }
 }
 
-pub fn symbol_uri<Be: SendBackend>(name: String, uri: &SymbolUri) -> AnyView {
+pub fn symbol_uri(name: String, uri: &SymbolUri) -> AnyView {
     use thaw::Text;
     inject_css("ftml-comp", include_str!("../comp.css"));
     if !FtmlConfig::allow_hovers() {
@@ -184,11 +180,10 @@ pub fn symbol_uri<Be: SendBackend>(name: String, uri: &SymbolUri) -> AnyView {
         return view!(<Text class="ftml-comp">{name}</Text>).into_any();
     }
     let vos = VarOrSym::Sym(uri.clone());
-    super::terms::comp_like::<Be, _>(vos, None, false, move || view!(<Text>{name}</Text>))
-        .into_any()
+    super::terms::comp_like(vos, None, false, move || view!(<Text>{name}</Text>)).into_any()
 }
 
-pub fn variable_uri<Be: SendBackend>(name: String, uri: &DocumentElementUri) -> AnyView {
+pub fn variable_uri(name: String, uri: &DocumentElementUri) -> AnyView {
     use thaw::Text;
     inject_css("ftml-comp", include_str!("../comp.css"));
     if !FtmlConfig::allow_hovers() {
@@ -199,6 +194,5 @@ pub fn variable_uri<Be: SendBackend>(name: String, uri: &DocumentElementUri) -> 
         declaration: uri.clone(),
         is_sequence: None,
     });
-    super::terms::comp_like::<Be, _>(vos, None, false, move || view!(<Text>{name}</Text>))
-        .into_any()
+    super::terms::comp_like(vos, None, false, move || view!(<Text>{name}</Text>)).into_any()
 }

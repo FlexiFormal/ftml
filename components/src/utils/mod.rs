@@ -3,12 +3,7 @@ pub mod collapsible;
 pub mod theming;
 
 use crate::components::terms::OnClickData;
-use ftml_backend::FtmlBackend;
-use ftml_dom::{
-    DocumentState,
-    notations::TermExt,
-    utils::local_cache::{LocalCache, SendBackend},
-};
+use ftml_dom::{DocumentState, notations::TermExt, utils::local_cache::LocalCache};
 use ftml_ontology::terms::{Term, VarOrSym};
 use ftml_uris::{DocumentElementUri, LeafUri};
 use leptos::{
@@ -71,10 +66,10 @@ impl ReactiveStore {
     }
 
     #[must_use]
-    pub fn render_term<Be: SendBackend>(t: Term) -> impl IntoView {
+    pub fn render_term(t: Term) -> impl IntoView {
         Self::get().with_value(|slf| {
             slf.term_owner
-                .with(move || t.into_view_safe::<crate::Views<Be>, Be>())
+                .with(move || t.into_view_safe::<crate::Views>(crate::backend()))
         })
     }
 
@@ -84,7 +79,7 @@ impl ReactiveStore {
         expect_context()
     }
     /// #### Panics
-    pub fn on_click<Be: SendBackend>(vos: &VarOrSym) -> OnClickData {
+    pub fn on_click(vos: &VarOrSym) -> OnClickData {
         use leptos::prelude::*;
         use thaw::{Dialog, DialogSurface};
         let slf = Self::get();
@@ -106,7 +101,7 @@ impl ReactiveStore {
                 view! {<Dialog open=on_clicked><DialogSurface>{
                     let r = child.with(|| {
                         provide_context(slf);
-                        crate::components::terms::do_onclick::<Be>(&vos,uri,allow_formals)
+                        crate::components::terms::do_onclick(vos,uri,allow_formals)
                     });
                     OwnedView::new_with_owner(r.into_view(), child)
                 }</DialogSurface></Dialog>}

@@ -13,18 +13,18 @@ use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
 use thaw::Caption1Strong;
 
-pub(super) fn slide<Be: ftml_dom::utils::local_cache::SendBackend>(
+pub(super) fn slide(
     uri: &DocumentElementUri,
     title: Option<&str>,
     children: &[DocumentElement],
 ) -> AnyView {
     use leptos::either::Either::{Left, Right};
-    let title = super::hover_paragraph::<Be>(
+    let title = super::hover_paragraph(
         uri.clone(),
         view!(<span style="font-style:italic;">{
             title.as_ref().map_or_else(
                 || Right(uri.name().last().to_string()),
-                |t| Left(crate::Views::<Be>::render_ftml((*t).to_string(), None)),
+                |t| Left(crate::Views::render_ftml((*t).to_string(), None)),
             )
         }</span>)
         .into_any(),
@@ -36,11 +36,8 @@ pub(super) fn slide<Be: ftml_dom::utils::local_cache::SendBackend>(
             None
         }
     });
-    let uses = super::uses::<Be, _>("Uses", uses);
-    let children = children
-        .iter()
-        .map(FtmlViewable::as_view::<Be>)
-        .collect_view();
+    let uses = super::uses("Uses", uses);
+    let children = children.iter().map(FtmlViewable::as_view).collect_view();
 
     view! {
       <Block>
@@ -55,7 +52,7 @@ pub(super) fn slide<Be: ftml_dom::utils::local_cache::SendBackend>(
 }
 
 impl FtmlViewable for Section {
-    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         use leptos::either::Either::{Left, Right};
         let Self {
             uri,
@@ -65,7 +62,7 @@ impl FtmlViewable for Section {
         } = self;
         let title = title.as_ref().map_or_else(
             || Right(uri.name().last().to_string()),
-            |t| Left(crate::Views::<Be>::render_ftml(t.to_string(), None)),
+            |t| Left(crate::Views::render_ftml(t.to_string(), None)),
         );
         let uses = children.iter().flat().filter_map(|e| {
             if let DocumentElement::UseModule { uri, .. } = e {
@@ -74,11 +71,8 @@ impl FtmlViewable for Section {
                 None
             }
         });
-        let uses = super::uses::<Be, _>("Uses", uses);
-        let children = children
-            .iter()
-            .map(FtmlViewable::as_view::<Be>)
-            .collect_view();
+        let uses = super::uses("Uses", uses);
+        let children = children.iter().map(FtmlViewable::as_view).collect_view();
 
         view! {
           <Block>
@@ -94,7 +88,7 @@ impl FtmlViewable for Section {
 }
 
 impl FtmlViewable for LogicalParagraph {
-    fn as_view<Be: ftml_dom::utils::local_cache::SendBackend>(&self) -> AnyView {
+    fn as_view(&self) -> AnyView {
         use leptos::either::Either::{Left, Right};
         let Self {
             kind,
@@ -106,12 +100,12 @@ impl FtmlViewable for LogicalParagraph {
             ..
         } = self;
         let title = title.as_ref().map_or_else(
-            || Right(uri.as_view::<Be>()),
+            || Right(uri.as_view()),
             |t| {
-                Left(super::hover_paragraph::<Be>(
+                Left(super::hover_paragraph(
                     uri.clone(),
                     view!(<span style="font-style:italic;">{
-                        crate::Views::<Be>::render_ftml(t.to_string(), None)}
+                        crate::Views::render_ftml(t.to_string(), None)}
                     </span>)
                     .into_any(),
                 ))
@@ -124,13 +118,10 @@ impl FtmlViewable for LogicalParagraph {
                 None
             }
         });
-        let uses = super::uses::<Be, _>("Uses", uses);
+        let uses = super::uses("Uses", uses);
         let definition_like = kind.is_definition_like(styles);
         let kind = kind.as_display_str();
-        let children = children
-            .iter()
-            .map(FtmlViewable::as_view::<Be>)
-            .collect_view();
+        let children = children.iter().map(FtmlViewable::as_view).collect_view();
         let fors = CommaSep(
             if definition_like {
                 "Defines"
@@ -138,10 +129,10 @@ impl FtmlViewable for LogicalParagraph {
                 "Concerns"
             },
             fors.iter().map(|(k, t)| {
-                let name = k.as_view::<Be>();
+                let name = k.as_view();
                 let t = t.clone().and_then(|t| {
                     t.presentation().map(|t| {
-                        let t = t.into_view_safe::<crate::Views<Be>, Be>();
+                        let t = t.into_view_safe::<crate::Views>(crate::backend());
                         view!(<span>" as "{ftml_dom::utils::math(|| t)}</span>)
                     })
                 });

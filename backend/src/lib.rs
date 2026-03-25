@@ -130,6 +130,19 @@ pub trait GlobalBackend: 'static {
         Self::get() as _
     }
 }
+pub trait SendBackend:
+    GlobalBackend<
+        Backend: Send + Sync,
+        Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone,
+    > + Send
+{
+}
+impl<G: GlobalBackend + Send> SendBackend for G
+where
+    G::Error: Send + Sync + serde::Serialize + serde::de::DeserializeOwned + Clone,
+    G::Backend: Send + Sync,
+{
+}
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[cfg_attr(

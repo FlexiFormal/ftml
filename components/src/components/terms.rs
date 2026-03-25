@@ -1,7 +1,6 @@
 #![allow(clippy::must_use_candidate)]
 
 use crate::{
-    SendBackend,
     components::content::FtmlViewable,
     config::{FtmlConfig, HighlightStyle},
     utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
@@ -78,30 +77,30 @@ pub fn fold_expr<V: IntoView>(
     }
 }
 
-pub fn fold_expr_short<B: SendBackend>(then: OriginalNode) -> impl IntoView {
-    let _ = crate::Views::<B>::cont(then.clone(), true);
+pub fn fold_expr_short(then: OriginalNode) -> impl IntoView {
+    let _ = crate::Views::cont(then.clone(), true);
     if let Some(sig) = use_context::<RwSignal<FoldExpr>>() {
         sig.set(FoldExpr(Some(SendWrapper::new(then))));
     }
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn symbol_reference<B: SendBackend>(uri: SymbolUri, children: ClonableView) -> AnyView {
+pub fn symbol_reference(uri: SymbolUri, children: ClonableView) -> AnyView {
     tracing::trace!("symbol reference {uri}");
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
-    children.into_view::<crate::Views<B>>()
+    children.into_view::<crate::Views>()
 }
 
-pub fn oms<B: SendBackend>(uri: SymbolUri, _in_term: bool, children: ClonableView) -> AnyView {
+pub fn oms(uri: SymbolUri, _in_term: bool, children: ClonableView) -> AnyView {
     tracing::trace!("OMS({uri})");
     provide_context(InTerm {
         hovered: RwSignal::new(false),
     });
     if FtmlConfig::allow_notation_changes() {
         let head: LeafUri = uri.into(); //.clone().into();
-        super::notations::has_notation::<B>(
+        super::notations::has_notation(
             /*Term::Symbol {
                 uri,
                 presentation: None,
@@ -109,12 +108,12 @@ pub fn oms<B: SendBackend>(uri: SymbolUri, _in_term: bool, children: ClonableVie
             head, children, None,
         )
     } else {
-        children.into_view::<crate::Views<B>>()
+        children.into_view::<crate::Views>()
     }
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn variable_reference<B: SendBackend>(var: Variable, children: ClonableView) -> AnyView {
+pub fn variable_reference(var: Variable, children: ClonableView) -> AnyView {
     tracing::trace!("variable reference {var}");
     provide_context(InTerm {
         hovered: RwSignal::new(false),
@@ -133,10 +132,10 @@ pub fn variable_reference<B: SendBackend>(var: Variable, children: ClonableView)
             tracing::trace!("No binder found");
         }
     }
-    children.into_view::<crate::Views<B>>()
+    children.into_view::<crate::Views>()
 }
 
-pub fn omv<B: SendBackend>(var: Variable, _in_term: bool, children: ClonableView) -> AnyView {
+pub fn omv(var: Variable, _in_term: bool, children: ClonableView) -> AnyView {
     tracing::trace!("OMV({var})");
     if let Some(pos) = DocumentState::arguments().next()
         && [
@@ -157,25 +156,14 @@ pub fn omv<B: SendBackend>(var: Variable, _in_term: bool, children: ClonableView
     });
     if FtmlConfig::allow_notation_changes() {
         match var {
-            Variable::Name { .. } => children.into_view::<crate::Views<B>>(),
+            Variable::Name { .. } => children.into_view::<crate::Views>(),
             Variable::Ref {
                 declaration,
                 is_sequence,
-            } => super::notations::has_notation::<B>(
-                /*Term::Var {
-                    variable: Variable::Ref {
-                        declaration: declaration.clone(),
-                        is_sequence,
-                    },
-                    presentation: None,
-                },*/
-                declaration.into(),
-                children,
-                None,
-            ),
+            } => super::notations::has_notation(declaration.into(), children, None),
         }
     } else {
-        children.into_view::<crate::Views<B>>()
+        children.into_view::<crate::Views>()
     }
 }
 
@@ -193,7 +181,7 @@ impl std::fmt::Debug for InBinder {
     }
 }
 
-pub fn oma<V: FtmlViews, B: SendBackend>(
+pub fn oma(
     is_binder: bool,
     head: ReadSignal<ReactiveApplication>,
     children: ClonableView,
@@ -209,11 +197,11 @@ pub fn oma<V: FtmlViews, B: SendBackend>(
     }
     if !FtmlConfig::allow_notation_changes() {
         tracing::trace!("No notation changes");
-        return children.into_view::<crate::Views<B>>();
+        return children.into_view::<crate::Views>();
     }
     if !children.is_math() {
         tracing::trace!("Not in math");
-        return children.into_view::<crate::Views<B>>();
+        return children.into_view::<crate::Views>();
     }
 
     let uri: Option<LeafUri> = head.with_untracked(|h| match h.head() {
@@ -226,19 +214,19 @@ pub fn oma<V: FtmlViews, B: SendBackend>(
 
     #[allow(clippy::option_if_let_else)]
     if let Some(uri) = uri {
-        let r = super::notations::has_notation::<B>(
+        let r = super::notations::has_notation(
             //t.clone(),
             uri,
             children,
             Some(head),
         );
         if allow_subterms {
-            with_subterm::<V, B>(head.with_untracked(ReactiveApplication::term), r)
+            with_subterm(head.with_untracked(ReactiveApplication::term), r)
         } else {
             r
         }
     } else {
-        children.into_view::<crate::Views<B>>()
+        children.into_view::<crate::Views>()
     }
 }
 
@@ -256,12 +244,12 @@ pub const fn comp_class(is_hovered: bool, is_var: bool, style: HighlightStyle) -
     }
 }
 
-pub fn defcomp<Be: SendBackend>(uri: Option<SymbolUri>, children: ClonableView) -> AnyView {
+pub fn defcomp(uri: Option<SymbolUri>, children: ClonableView) -> AnyView {
     use HighlightStyle as HL;
     tracing::trace!("doing defcomp");
     if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");
-        return children.into_view::<crate::Views<Be>>();
+        return children.into_view::<crate::Views>();
     }
     inject_css("ftml-comp", include_str!("comp.css"));
     let is_hovered = use_context::<InTerm>().map(|h| h.hovered);
@@ -277,39 +265,39 @@ pub fn defcomp<Be: SendBackend>(uri: Option<SymbolUri>, children: ClonableView) 
         },
     );
     if let Some(uri) = uri {
-        let on_click = ReactiveStore::on_click::<Be>(&uri.into());
+        let on_click = ReactiveStore::on_click(&uri.into());
         let allow_formals = FtmlConfig::allow_formal_info();
         let on_click = move |_| {
             on_click.click(allow_formals, None);
         };
         children
-            .into_view::<crate::Views<Be>>()
+            .into_view::<crate::Views>()
             .attr("class", move || class)
             .add_any_attr(leptos::ev::on(leptos::ev::click, Box::new(on_click)))
             .into_any()
     } else {
         children
-            .into_view::<crate::Views<Be>>()
+            .into_view::<crate::Views>()
             .attr("class", move || class)
             .into_any()
     }
 }
 
-pub fn comp<B: SendBackend>(children: ClonableView) -> AnyView {
+pub fn comp(children: ClonableView) -> AnyView {
     tracing::trace!("doing comp");
     if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");
-        return children.into_view::<crate::Views<B>>();
+        return children.into_view::<crate::Views>();
     }
     let Some(head) = DocumentState::current_term_head() else {
         tracing::warn!("no current head");
-        return children.into_view::<crate::Views<B>>();
+        return children.into_view::<crate::Views>();
     };
 
     let is_var = matches!(&head, VarOrSym::Var(_));
     let Some(is_hovered) = use_context::<InTerm>().map(|h| h.hovered) else {
         tracing::warn!("InTerm is missing!");
-        return children.into_view::<crate::Views<B>>();
+        return children.into_view::<crate::Views>();
     };
     if is_var {
         let arg = DocumentState::arguments().next();
@@ -358,12 +346,12 @@ pub fn comp<B: SendBackend>(children: ClonableView) -> AnyView {
         }
     }
 
-    comp_like::<B, _>(head, Some(is_hovered), true, move || {
-        children.into_view::<crate::Views<B>>()
+    comp_like(head, Some(is_hovered), true, move || {
+        children.into_view::<crate::Views>()
     })
 }
 
-pub fn comp_like<B: SendBackend, V: IntoView + 'static>(
+pub fn comp_like<V: IntoView + 'static>(
     head: VarOrSym,
     is_hovered: Option<RwSignal<bool>>,
     top_term: bool,
@@ -373,7 +361,7 @@ pub fn comp_like<B: SendBackend, V: IntoView + 'static>(
 
     inject_css("ftml-comp", include_str!("comp.css"));
     let is_hovered = is_hovered.unwrap_or_else(|| RwSignal::new(false));
-    let on_click = ReactiveStore::on_click::<B>(&head);
+    let on_click = ReactiveStore::on_click(&head);
     let allow_formals = FtmlConfig::allow_formal_info();
     let top_class = Memo::new(move |_| {
         if is_hovered.get() {
@@ -387,7 +375,7 @@ pub fn comp_like<B: SendBackend, V: IntoView + 'static>(
     let is_var = matches!(head, VarOrSym::Var(_));
     let class = Memo::new(move |_| comp_class(is_hovered.get(), is_var, style.get()).to_string());
     let top_term = if top_term && allow_formals {
-        crate::Views::<B>::current_top_term()
+        crate::Views::current_top_term()
     } else {
         None
     };
@@ -409,21 +397,21 @@ pub fn comp_like<B: SendBackend, V: IntoView + 'static>(
                     Box::new(on_click)
                 ))
             }</PopoverTrigger>
-            {term_popover::<B>(head)}
+            {term_popover(head)}
         </Popover>
     }
     .into_any()
 }
 
 //#[component]
-pub fn term_popover<Be: SendBackend>(head: VarOrSym) -> AnyView {
+pub fn term_popover(head: VarOrSym) -> AnyView {
     match head {
         VarOrSym::Var(Variable::Name { name, notated }) => unresolved_var_popover(name, notated),
         VarOrSym::Var(Variable::Ref {
             declaration,
             is_sequence,
-        }) => resolved_var_popover::<Be>(declaration, is_sequence.unwrap_or_default()),
-        VarOrSym::Sym(uri) => symbol_popover::<Be>(uri),
+        }) => resolved_var_popover(declaration, is_sequence.unwrap_or_default()),
+        VarOrSym::Sym(uri) => symbol_popover(uri),
     }
 }
 
@@ -437,7 +425,7 @@ pub fn unresolved_var_popover(name: Id, notated: Option<Id>) -> AnyView {
     .into_any()
 }
 
-pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence: bool) -> AnyView {
+pub fn resolved_var_popover(uri: DocumentElementUri, is_sequence: bool) -> AnyView {
     use thaw::Text;
     let title = if is_sequence {
         "Variable Sequence "
@@ -446,7 +434,7 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
     };
     let declaration = uri.clone();
     let tm = ftml_dom::utils::math(move || {
-        ReactiveStore::render_term::<B>(Term::Var {
+        ReactiveStore::render_term(Term::Var {
             presentation: None,
             variable: Variable::Ref {
                 declaration,
@@ -457,7 +445,7 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
     let header = view!({title}{tm}" ("{uri.name().to_string()}")");
     view! {<div class="ftml-symbol-popup">
         <Text>{header}</Text>
-        {LocalCache::with(|b| b.get_variable(B::get(),uri),|v| {
+        {LocalCache::with(|b| b.get_variable(crate::backend(),uri),|v| {
             let v = match &v {
                 either::Either::Left(v) => v,
                 either::Either::Right(v) => &**v
@@ -468,7 +456,7 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
                 {df.map(|df| {
                     let v = view!{"defined as "
                         {
-                            let t = df.into_view::<crate::Views<B>,B>(false);
+                            let t = df.into_view::<crate::Views>(crate::backend(),false);
                             ftml_dom::utils::math(move || t)
                         }};
                     view!{<div><Text>{v}</Text></div>}
@@ -476,7 +464,7 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
                 {tp.map(|tp| {
                     let v = view!{"of type "
                         {
-                            let t = tp.into_view::<crate::Views<B>,B>(false);
+                            let t = tp.into_view::<crate::Views>(crate::backend(),false);
                             ftml_dom::utils::math(move || t)
                         }
                     };
@@ -488,11 +476,11 @@ pub fn resolved_var_popover<B: SendBackend>(uri: DocumentElementUri, is_sequence
     .into_any()
 }
 
-pub fn symbol_popover<B: SendBackend>(uri: SymbolUri) -> AnyView {
+pub fn symbol_popover(uri: SymbolUri) -> AnyView {
     inject_css("ftml-symbol-popup", include_str!("popup.css"));
     let context = DocumentState::context_uri();
     LocalCache::with(
-        |b| b.get_definition(B::get(), uri, Some(context)),
+        |b| b.get_definition(crate::backend(), uri, Some(context)),
         |(html, css, _)| {
             for c in css {
                 c.inject();
@@ -501,7 +489,7 @@ pub fn symbol_popover<B: SendBackend>(uri: SymbolUri) -> AnyView {
               <div class="ftml-symbol-popup">
                 {
                     DocumentState::no_document(
-                        || crate::Views::<B>::render_ftml(html.into_string(),None)
+                        || crate::Views::render_ftml(html.into_string(),None)
                     )
                 }
               </div>
@@ -545,10 +533,11 @@ impl OnClickData {
     }
 }
 
-pub(crate) fn do_onclick<Be: SendBackend>(
-    vos: &VarOrSym,
+ftml_js_utils::split! {
+pub(crate) fn do_onclick(
+    vos: VarOrSym,
     top_term: ReadSignal<Option<DocumentElementUri>>,
-    allow_formals: ReadSignal<bool>,
+    allow_formals: ReadSignal<bool>
 ) -> AnyView {
     use leptos::prelude::*;
     use thaw::Divider;
@@ -564,27 +553,26 @@ pub(crate) fn do_onclick<Be: SendBackend>(
             ;
         }
         VarOrSym::Var(Variable::Ref { declaration, .. }) => {
-            let uri = declaration.clone();
+            let uri = declaration;//.clone();
             return LocalCache::with_or_toast(
-                move |c| c.get_variable(Be::get(), uri),
+                move |c| c.get_variable(crate::backend(), uri),
                 |v| match v {
-                    either::Either::Left(v) => v.as_view::<Be>(),
-                    either::Either::Right(v) => v.as_view::<Be>(),
+                    either::Either::Left(v) => v.as_view(),
+                    either::Either::Right(v) => v.as_view(),
                 },
                 || "Error".into_any(),
             );
         }
-        VarOrSym::Sym(s) => s.clone(),
+        VarOrSym::Sym(s) => s//.clone(),
     };
     let name = s.name().last().to_string();
     let uri_string = s.to_string();
     let uri = s.clone();
-    let paras =
-        LocalCache::resource(
-            move |b| async move { Ok(b.get_paragraphs(Be::get(), s, false).await) },
-        );
+    let paras = LocalCache::resource(move |b| async move {
+        Ok(b.get_paragraphs(crate::backend(), s, false).await)
+    });
     let selected = RwSignal::new(None);
-    let selector = paras_selector::<Be>(paras.read_only(), selected);
+    let selector = paras_selector(paras.read_only(), selected);
     view! {
         // paras
         <div style="display:flex;flex-direction:row;">
@@ -594,49 +582,47 @@ pub(crate) fn do_onclick<Be: SendBackend>(
         <div style="margin:5px;"><Divider/></div>
 
         // defi
-        {para_window::<Be>(selected)}
+        {para_window(selected)}
         <div style="margin:5px;"><Divider/></div>
 
         // notations
-        {super::notations::notation_selector::<Be>(uri.clone().into())}
+        {super::notations::notation_selector(uri.clone().into())}
 
         // formals
         {move || if allow_formals.get() {
-            Some(formals::<Be>(uri.clone(),top_term))
+            Some(formals(uri.clone(),top_term))
         } else {None} }
     }
     .into_any()
 }
+}
 
-fn formals<Be: SendBackend>(
-    symbol: SymbolUri,
-    uri: ReadSignal<Option<DocumentElementUri>>,
-) -> AnyView {
+fn formals(symbol: SymbolUri, uri: ReadSignal<Option<DocumentElementUri>>) -> AnyView {
     use thaw::Divider;
     view! {
         <div style="margin:5px;"><Divider/></div>
         {lazy_collapsible(Some(|| "Formal Details"), move ||view!{
             <div style="width:100%"><div style="width:fit-content;margin-left:auto;">
-                "(in module "{symbol.module.as_view::<Be>()}")"
+                "(in module "{symbol.module.as_view()}")"
             </div></div>
             {
                 let sym = symbol.clone();
                 let bol = symbol.clone();
                 LocalCache::with_or_toast(
-                    move |r| r.get_symbol(Be::get(),sym),
+                    move |r| r.get_symbol(crate::backend(),sym),
                     |s| match s {
-                        ::either::Left(s) => super::content::symbols::symbol_view::<Be>(&s,false),
-                        ::either::Right(s) => super::content::symbols::symbol_view::<Be>(&s,false)
+                        ::either::Left(s) => super::content::symbols::symbol_view(&s,false),
+                        ::either::Right(s) => super::content::symbols::symbol_view(&s,false)
                     },
                     move || view!({format!("error getting uri {bol}")}<br/>).into_any()
             )}
             {move || { uri.with(|u| u.clone().map(|u|  {
                let uri = u.clone();
                view!("In term: "{LocalCache::with_or_toast(
-                   |r| r.get_document_term(Be::get(),u),
+                   |r| r.get_document_term(crate::backend(),u),
                    |t|  {
                        tracing::warn!("Rendering term {t:?}");
-                       ftml_dom::utils::math(|| ReactiveStore::render_term::<Be>(
+                       ftml_dom::utils::math(|| ReactiveStore::render_term(
                            match t {
                                ::either::Left(t) => t.presentation(),
                                ::either::Right(t) => t.presentation(),
@@ -652,16 +638,13 @@ fn formals<Be: SendBackend>(
     .into_any()
 }
 
-type Paras<Be> = Result<
-    GlobalLocal<
-        Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
-        BackendError<<Be as GlobalBackend>::Error>,
-    >,
-    BackendError<<Be as GlobalBackend>::Error>,
+type Paras = Result<
+    GlobalLocal<Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<String>>,
+    BackendError<String>,
 >;
 
-fn paras_selector<Be: SendBackend>(
-    paras: ReadSignal<Option<Paras<Be>>>,
+fn paras_selector(
+    paras: ReadSignal<Option<Paras>>,
     selected: RwSignal<Option<String>>,
 ) -> impl IntoView {
     use leptos::either::EitherOf3::{A, B, C};
@@ -720,7 +703,7 @@ fn para_line(uri: &DocumentElementUri) -> impl IntoView + 'static {
     </div>)
 }
 
-fn para_window<Be: SendBackend>(selected: RwSignal<Option<String>>) -> impl IntoView {
+fn para_window(selected: RwSignal<Option<String>>) -> impl IntoView {
     use leptos::either::Either::{Left, Right};
     use thaw::Spinner;
     move || {
@@ -734,20 +717,17 @@ fn para_window<Be: SendBackend>(selected: RwSignal<Option<String>>) -> impl Into
                 |u| {
                     let uri = u.clone();
                     Left(LocalCache::with_or_toast(
-                        |c| c.get_fragment(Be::get(), Uri::DocumentElement(u), None),
+                        |c| c.get_fragment(crate::backend(), Uri::DocumentElement(u), None),
                         |(html, css, stripped)| {
                             for c in css {
                                 c.inject();
                             }
-                            crate::Views::<Be>::render_fragment(
+                            crate::Views::render_fragment(
                                 Some(uri.into()),
                                 crate::SidebarPosition::None,
                                 stripped,
                                 TocSource::None,
-                                || {
-                                    crate::Views::<Be>::render_ftml(html.into_string(), None)
-                                        .into_any()
-                                },
+                                || crate::Views::render_ftml(html.into_string(), None).into_any(),
                             )
                         },
                         || view!(<span style="color:red;">"error"</span>).into_any(),
@@ -757,7 +737,8 @@ fn para_window<Be: SendBackend>(selected: RwSignal<Option<String>>) -> impl Into
     }
 }
 
-fn with_subterm<V: FtmlViews, Be: SendBackend>(t: ReadSignal<Option<Term>>, v: AnyView) -> AnyView {
+ftml_js_utils::split! {
+fn with_subterm(t: ReadSignal<Option<Term>>, v: AnyView) -> AnyView {
     let Some(ti) = use_context::<thaw::ToasterInjection>() else {
         return v;
     };
@@ -776,7 +757,10 @@ fn with_subterm<V: FtmlViews, Be: SendBackend>(t: ReadSignal<Option<Term>>, v: A
                 let id = uuid::Uuid::new_v4();
                 current.set(Some(id));
                 let body = {
-                    let t = move || t.get().map(|t| t.into_view::<V, Be>(false));
+                    let t = move || {
+                        t.get()
+                            .map(|t| t.into_view::<crate::Views>(crate::backend(), false))
+                    };
                     view! {
                         <div>{ftml_dom::utils::math(move || t)}</div>
                         <div style="width:100%"><div style="margin-left:auto;"/>
@@ -812,11 +796,12 @@ fn with_subterm<V: FtmlViews, Be: SendBackend>(t: ReadSignal<Option<Term>>, v: A
             }
         });
     });
-    subterm_dialog::<V, Be>(v, t, owner, selected, dialog_open)
+    subterm_dialog(v, t, owner, selected, dialog_open)
+}
 }
 
 #[allow(clippy::too_many_lines)]
-fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
+fn subterm_dialog(
     v: AnyView,
     t: ReadSignal<Option<Term>>,
     owner: Owner,
@@ -824,13 +809,16 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
     dialog_open: RwSignal<bool>,
 ) -> AnyView {
     use thaw::{
-        Dialog, DialogBody, DialogSurface, DialogTitle, Table, TableBody, TableCell,
-        TableCellLayout, TableRow, Tooltip,
+        Dialog, DialogBody, DialogSurface, Table, TableBody, TableCell, TableCellLayout, TableRow,
+        Tooltip,
     };
 
     let nv = v.directive(move |e| selection_listener(e, &owner, selected), ());
 
-    let nt = move || t.get().map(|t| t.into_view::<V, Be>(false));
+    let nt = move || {
+        t.get()
+            .map(|t| t.into_view::<crate::Views>(crate::backend(), false))
+    };
     let ts = move || t.get().map(|t| format!("{:?}", t.debug_short()));
     let dialog = move || {
         let term = ftml_dom::utils::math(move || {
@@ -849,7 +837,7 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
             //leptos::logging::log!("getting term at {uri}");
             Some((
                 uri.clone(),
-                LocalCache::resource(|r| r.get_document_term(Be::get(), uri)),
+                LocalCache::resource(|r| r.get_document_term(crate::backend(), uri)),
             ))
         } else {
             None
@@ -867,7 +855,7 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
                             <TableRow>
                                 <TableCell><TableCellLayout>"In full term: "</TableCellLayout></TableCell>
                                 <TableCell><TableCellLayout>
-                                    {ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(t))}
+                                    {ftml_dom::utils::math(move || ReactiveStore::render_term(t))}
                                 </TableCellLayout></TableCell>
                             </TableRow>
                         }
@@ -898,18 +886,13 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
                                         };
                                         if let Some(path) = t.path_of_subterm(sub) {
                                             //leptos::logging::log!("Path: {path:?}");
-                                            let fut = Be::get().check_term(&context, t, &path);
+                                            let fut =
+                                                crate::backend().check_term(&context, t, &path);
                                             leptos::task::spawn_local(async move {
                                                 let r = fut.await;
                                                 //leptos::logging::log!("Setting signal");
                                                 sig.set(Some(r.map_err(|e| e.to_string())));
                                             });
-                                        } else {
-                                            /*leptos::logging::log!(
-                                                "{:?} is not a subterm of {:?}",
-                                                sub.debug_short(),
-                                                t.debug_short()
-                                            );*/
                                         }
                                     }
                                     Err(e) => sig.set(Some(Err(e.to_string()))),
@@ -932,7 +915,7 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
                     },
                     |r| {
                         leptos::either::Either::Right(match r {
-                            Ok(r) => leptos::either::Either::Left(check_result::<Be>(r)),
+                            Ok(r) => leptos::either::Either::Left(check_result(r)),
                             Err(e) => leptos::either::Either::Right(view! {
                                 <TableRow>
                                     <TableCell><TableCellLayout>
@@ -972,7 +955,7 @@ fn subterm_dialog<V: FtmlViews, Be: SendBackend>(
     .into_any()
 }
 
-fn check_result<Be: SendBackend>(
+fn check_result(
     BackendCheckResult {
         context,
         inferred_type,
@@ -982,7 +965,7 @@ fn check_result<Be: SendBackend>(
     use thaw::{TableCell, TableCellLayout, TableRow};
     #[allow(clippy::option_if_let_else)]
     let tp = if let Some(tp) = inferred_type {
-        let tp = ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(tp));
+        let tp = ftml_dom::utils::math(move || ReactiveStore::render_term(tp));
         leptos::either::Either::Left(view! {
             <TableRow>
                 <TableCell><TableCellLayout>"Inferred type:"</TableCellLayout></TableCell>
@@ -1001,7 +984,7 @@ fn check_result<Be: SendBackend>(
         <TableRow>
             <TableCell><TableCellLayout>"Simplified:"</TableCellLayout></TableCell>
             <TableCell><TableCellLayout>
-                {ftml_dom::utils::math(move || ReactiveStore::render_term::<Be>(simplified))}
+                {ftml_dom::utils::math(move || ReactiveStore::render_term(simplified))}
             </TableCellLayout></TableCell>
         </TableRow>
     };
@@ -1010,10 +993,8 @@ fn check_result<Be: SendBackend>(
     } else {
         let mut iter = context.into_iter();
         // SAFETY: !context.is_empty()
-        let first = cv::<Be>(unsafe { iter.next().unwrap_unchecked() });
-        let rest = iter
-            .map(|v| view! {<mo>", "</mo>{cv::<Be>(v)}})
-            .collect_view();
+        let first = cv(unsafe { iter.next().unwrap_unchecked() });
+        let rest = iter.map(|v| view! {<mo>", "</mo>{cv(v)}}).collect_view();
         let inner = ftml_dom::utils::math(move || view! {<mrow>{first}{rest}</mrow>});
         Some(view! {
             <TableRow>
@@ -1025,19 +1006,19 @@ fn check_result<Be: SendBackend>(
     view! {{simplified}{tp}{ctx}}
 }
 
-fn cv<Be: SendBackend>(v: ComponentVar) -> impl IntoView {
+fn cv(v: ComponentVar) -> impl IntoView {
     let tp = v.tp.map(|t| {
-        let t = ReactiveStore::render_term::<Be>(t);
+        let t = ReactiveStore::render_term(t);
         view! {<mo>":"</mo>{t}}
     });
     let df = v.df.map(|t| {
-        let t = ReactiveStore::render_term::<Be>(t);
+        let t = ReactiveStore::render_term(t);
         view! {<mo>":="</mo>{t}}
     });
     if tp.is_none() && df.is_none() {
         None
     } else {
-        let var = ReactiveStore::render_term::<Be>(Term::Var {
+        let var = ReactiveStore::render_term(Term::Var {
             variable: v.var,
             presentation: None,
         });
