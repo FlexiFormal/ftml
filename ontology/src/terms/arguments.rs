@@ -102,6 +102,32 @@ where
     Seq(Box<[T]>),
 }
 
+#[cfg(feature = "serde-lite")]
+impl<T> MaybeSequence<T>
+where
+    T: serde_lite::Serialize + serde_lite::Deserialize + 'static,
+{
+    pub fn len(&self) -> usize {
+        match self {
+            Self::One(_) => 1,
+            Self::Seq(s) => s.len(),
+        }
+    }
+}
+
+#[cfg(not(feature = "serde-lite"))]
+impl<T> MaybeSequence<T>
+where
+    T: 'static,
+{
+    pub fn len(&self) -> usize {
+        match self {
+            Self::One(_) => 1,
+            Self::Seq(s) => s.len(),
+        }
+    }
+}
+
 impl BoundArgument {
     #[must_use]
     pub const fn mode(&self) -> ArgumentMode {
