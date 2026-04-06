@@ -17,7 +17,7 @@ use ftml_ontology::{
     terms::{
         ApplicationTerm, Argument, BindingTerm, BoundArgument, ComponentVar, MaybeSequence,
         Numeric, Term, VarOrSym, Variable,
-        opaque::{AnyOpaque, OpaqueNode},
+        opaque::{AnyOpaque, OpaqueNode}, sequences::Sequence,
     },
 };
 use ftml_parser::FtmlKey;
@@ -127,14 +127,110 @@ fn no_notation<Views: FtmlViews,A:ArgumentRender>(
     </mrow>}.into_any()
 }
 
+fn replace(term:Term) -> Term {
+    use ftml_ontology::terms::sequences::MAP_DUMMY;
+    fn is_map_fn(term:&Term) -> Option<(&str,&Term)> {
+        if let Term::Bound(bound) = term && bound.head.is(&*ftml_uris::metatheory::BIND) {
+            if let [BoundArgument::Bound(b),BoundArgument::Simple(f)] = &*bound.arguments {
+                if b.var.name() == MAP_DUMMY.as_ref() {
+                    Some((MAP_DUMMY.as_ref(),f))
+                } else {
+                    //leptos::logging::log!("Bound variable name doesn't match");
+                    None
+                }
+            } else if let [BoundArgument::BoundSeq(MaybeSequence::Seq(seq)),BoundArgument::Simple(f)] = &*bound.arguments
+            && seq.len() == 1 {
+                let var = seq.first()?;
+                if var.var.name() == MAP_DUMMY.as_ref() {
+                    Some((MAP_DUMMY.as_ref(),f))
+                } else {
+                    //leptos::logging::log!("Bound variable name (in seq) doesn't match");
+                    None
+                }
+            } else {
+                //leptos::logging::log!("arguments don't fit");
+                None
+            }
+        } else {
+            //leptos::logging::log!("Not bind");
+            None
+        }
+    }
+    //leptos::logging::log!("Maybe replacing {:?}",term.debug_short());
+    if let Term::Application(app) = term {
+        if let Some((v,f)) = is_map_fn(&app.head) && let [Argument::Simple(a)] = &*app.arguments {
+            if a.is(&*ftml_uris::metatheory::ELLIPSES) {
+                a.clone()
+            } else {
+                (f / (v,a)).into_owned()
+            }
+        } else {
+            // other cases?
+            Term::Application(app)
+        }
+    } else {
+        term
+    }
+    /*
+    if let Term::Application(app) = term {
+        if let Term::Symbol { uri, .. } = &app.head
+            && *uri == *ftml_uris::metatheory::SEQUENCE_MAP
+            && let [a, Argument::Simple(f)] = &*app.arguments {
+
+        } else {
+            None
+        }
+    }
+    else {
+        term
+    }
+     */
+}
+
 impl TermExt for Term {
+    #[allow(clippy::too_many_lines)]
     fn into_view_with_precedence<Views: FtmlViews>(
-        self,
+        mut self,
         backend:&'static dyn DynBackend,
         in_term: bool,
         precedence: i64,
     ) -> AnyView {
+        self = replace(self);
         tracing::trace!("Presenting {self:?}");
+        if self.as_sequence().is_some_and(|v| {
+            !matches!(v,Sequence::Var(_)) &&
+            v.is_concrete_or(&mut |v| {
+                if let Variable::Ref { .. } = v {
+                    true
+                } else {
+                    false
+                }
+            })
+        }) {
+            let mut r = unsafe { super::make_sequence(&self) };
+            let len = r.len();
+            if len == 0 {
+                return ().into_any();
+            }
+            if len == 1 {
+                let t = r.pop().expect("bug");
+                return t.into_view_with_precedence::<Views>(backend, in_term, precedence);
+            }
+            let mut r = r.into_iter();
+
+            return view! {
+                <mrow>
+                    {r.next().expect("bug").into_view_with_precedence::<Views>(backend, true, 0)}
+                {
+                    r.map(|nxt| view!{
+                        <mo>","</mo>
+                        {nxt.into_view_with_precedence::<Views>(backend, true, 0)}
+                    }).collect_view()
+                }
+                </mrow>
+            }
+            .into_any()
+        }
         //owned(move || {
         match self {
             Self::Symbol {

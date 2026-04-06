@@ -2,7 +2,9 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 
 use ftml_ontology::{narrative::elements::SectionLevel, utils::Css};
-use ftml_uris::{DocumentUri, FtmlUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri};
+use ftml_uris::{
+    DocumentElementUri, DocumentUri, FtmlUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
+};
 
 use crate::BackendError;
 
@@ -185,26 +187,32 @@ where
     fn check_term(
         &self,
         global_context: &[ModuleUri],
-        term: &ftml_ontology::terms::Term,
-        in_path: &ftml_ontology::terms::termpaths::TermPath,
+        in_term: either::Either<&ftml_ontology::terms::Term, &DocumentElementUri>,
+        subterm: either::Either<
+            &ftml_ontology::terms::Term,
+            &ftml_ontology::terms::termpaths::TermPath,
+        >,
     ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>>
     + Send
     + use<Url, E, Re>
     + 'static {
         fn body(
             global_context: &[ModuleUri],
-            term: &ftml_ontology::terms::Term,
-            in_path: &ftml_ontology::terms::termpaths::TermPath,
+            in_term: either::Either<&ftml_ontology::terms::Term, &DocumentElementUri>,
+            subterm: either::Either<
+                &ftml_ontology::terms::Term,
+                &ftml_ontology::terms::termpaths::TermPath,
+            >,
         ) -> Result<String, serde_json::Error> {
             Ok(format!(
-                "{{\"global_context\":{},\"term\":{},\"in_path\":{}}}",
+                "{{\"global_context\":{},\"in_term\":{},\"subterm\":{}}}",
                 serde_json::to_string(global_context)?,
-                serde_json::to_string(term)?,
-                serde_json::to_string(in_path)?
+                serde_json::to_string(&in_term)?,
+                serde_json::to_string(&subterm)?
             ))
         }
         let url = self.check_url.to_string();
-        let body = match body(global_context, term, in_path) {
+        let body = match body(global_context, in_term, subterm) {
             Ok(body) => body,
             Err(e) => {
                 return futures_util::future::Either::Right(std::future::ready(Err(
@@ -432,8 +440,11 @@ mod server_fn {
         fn check_term(
             &self,
             global_context: &[ftml_uris::ModuleUri],
-            term: &ftml_ontology::terms::Term,
-            in_path: &ftml_ontology::terms::termpaths::TermPath,
+            in_term: either::Either<&ftml_ontology::terms::Term, &DocumentElementUri>,
+            subterm: either::Either<
+                &ftml_ontology::terms::Term,
+                &ftml_ontology::terms::termpaths::TermPath,
+            >,
         ) -> impl Future<
             Output = Result<crate::BackendCheckResult, BackendError<ServerFnErrorErr>>,
         > + Send
@@ -441,18 +452,21 @@ mod server_fn {
         + 'static {
             fn body(
                 global_context: &[ModuleUri],
-                term: &ftml_ontology::terms::Term,
-                in_path: &ftml_ontology::terms::termpaths::TermPath,
+                in_term: either::Either<&ftml_ontology::terms::Term, &DocumentElementUri>,
+                subterm: either::Either<
+                    &ftml_ontology::terms::Term,
+                    &ftml_ontology::terms::termpaths::TermPath,
+                >,
             ) -> Result<String, serde_json::Error> {
                 Ok(format!(
-                    "{{\"global_context\":{},\"term\":{},\"in_path\":{}}}",
+                    "{{\"global_context\":{},\"in_term\":{},\"subterm\":{}}}",
                     serde_json::to_string(global_context)?,
-                    serde_json::to_string(term)?,
-                    serde_json::to_string(in_path)?
+                    serde_json::to_string(&in_term)?,
+                    serde_json::to_string(&subterm)?
                 ))
             }
             let url = format!("{}/content/check_term", self.url);
-            let body = match body(global_context, term, in_path) {
+            let body = match body(global_context, in_term, subterm) {
                 Ok(body) => body,
                 Err(e) => {
                     return futures_util::future::Either::Right(std::future::ready(Err(

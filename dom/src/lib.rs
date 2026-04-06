@@ -146,76 +146,77 @@ fn close_things(
     if !invisible {
         for c in closes {
             #[allow(clippy::enum_glob_use)]
-            use CloseFtmlElement::*;
+            use CloseFtmlElement as Cl;
             match c {
-                OMA | OMBIND => {
+                Cl::OMA | Cl::OMBIND => {
                     let term = sig.with_untracked(|ext| ext.last_term().cloned());
                     ReactiveApplication::close(term);
                 }
-                Paragraph => {
+                Cl::Paragraph => {
                     if sig.with_untracked(|r| r.state.document == *DocumentUri::no_doc()) {
                         tracing::debug!("No document; paragraph ignored");
                     } else {
                         add_paragraph(sig);
                     }
                 }
-                Module
-                | SymbolDeclaration
-                | Invisible
-                | Section
-                | SectionTitle
-                | SkipSection
-                | SymbolReference
-                | VariableReference
-                | Argument
-                | Type
-                | Definiens
-                | Premise
-                | Conclusion
-                | Notation
-                | CompInNotation
-                | NotationOpComp
-                | NotationComp
-                | ArgSep
-                | MainCompInNotation
-                | NotationArg
-                | DocTitle
-                | ReturnType
-                | VariableDeclaration
-                | Comp
-                | DefComp
-                | ParagraphTitle
-                | SlideTitle
-                | Slide
-                | Definiendum
-                | MathStructure
-                | ComplexTerm
-                | HeadTerm
-                | OML
-                | Morphism
-                | Assign
-                | ProblemTitle
-                | Problem
-                | Solution
-                | FillinSol
-                | ProblemHint
-                | ProblemExNote
-                | ProblemGradingNote
-                | AnswerClass
-                | ChoiceBlock
-                | ProblemChoice
-                | ArgTypes
-                | ProblemChoiceFeedback
-                | FillinSolCase
-                | Rule
-                | ProblemChoiceVerdict
-                | FoldExpr
-                | FoldExprShort
-                | ProofStep
-                | ProofTerm
-                | ProofMethod
-                | ProofJustification
-                | ProofArgument => (),
+                Cl::Module
+                | Cl::SymbolDeclaration
+                | Cl::Invisible
+                | Cl::Section
+                | Cl::SectionTitle
+                | Cl::SkipSection
+                | Cl::SymbolReference
+                | Cl::VariableReference
+                | Cl::Argument
+                | Cl::Type
+                | Cl::Definiens
+                | Cl::Premise
+                | Cl::Conclusion
+                | Cl::Notation
+                | Cl::CompInNotation
+                | Cl::NotationOpComp
+                | Cl::NotationComp
+                | Cl::ArgSep
+                | Cl::MainCompInNotation
+                | Cl::NotationArg
+                | Cl::DocTitle
+                | Cl::ReturnType
+                | Cl::VariableDeclaration
+                | Cl::Comp
+                | Cl::DefComp
+                | Cl::ParagraphTitle
+                | Cl::SlideTitle
+                | Cl::Slide
+                | Cl::Definiendum
+                | Cl::MathStructure
+                | Cl::ComplexTerm
+                | Cl::HeadTerm
+                | Cl::OML
+                | Cl::Morphism
+                | Cl::Assign
+                | Cl::ProblemTitle
+                | Cl::Problem
+                | Cl::Solution
+                | Cl::FillinSol
+                | Cl::ProblemHint
+                | Cl::ProblemExNote
+                | Cl::ProblemGradingNote
+                | Cl::AnswerClass
+                | Cl::ChoiceBlock
+                | Cl::ProblemChoice
+                | Cl::ArgTypes
+                | Cl::ProblemChoiceFeedback
+                | Cl::FillinSolCase
+                | Cl::Rule
+                | Cl::ProblemChoiceVerdict
+                | Cl::FoldExpr
+                | Cl::FoldExprShort
+                | Cl::ProofStep
+                | Cl::ProofTerm
+                | Cl::ProofMethod
+                | Cl::ProofJustification
+                | Cl::ProofArgument
+                | Cl::SeqRange => (),
             }
         }
     }

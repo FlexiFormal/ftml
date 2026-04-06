@@ -70,7 +70,7 @@ impl IsTerm for Variable {
     fn symbols(&self) -> impl Iterator<Item = &ftml_uris::SymbolUri> {
         std::iter::empty()
     }
-    fn variables(&self) -> impl Iterator<Item = &Variable> {
+    fn variables(&self) -> impl Iterator<Item = &Self> {
         std::iter::once(self)
     }
 }
@@ -90,6 +90,10 @@ impl Debug for Variable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Name { name, .. } => Debug::fmt(name, f),
+            Self::Ref {
+                declaration,
+                is_sequence: Some(s),
+            } => f.debug_tuple("V").field(declaration).field(s).finish(),
             Self::Ref { declaration, .. } => Debug::fmt(declaration, f),
         }
     }

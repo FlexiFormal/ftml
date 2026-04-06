@@ -851,11 +851,20 @@ fn subterm_dialog(
                             ::either::Left(t) => t.presentation(),
                             ::either::Right(t) => t.presentation(),
                         };
+                        /*
+                        let ts = move || t.get().map(|t| format!("{:?}", t.debug_short())); */
                         view!{
                             <TableRow>
                                 <TableCell><TableCellLayout>"In full term: "</TableCellLayout></TableCell>
                                 <TableCell><TableCellLayout>
-                                    {ftml_dom::utils::math(move || ReactiveStore::render_term(t))}
+                                    {ftml_dom::utils::math(move || {
+                                        let ts = format!("{:?}",t.debug_short());
+                                        view! {<msup>{
+                                            ReactiveStore::render_term(t)
+                                        }<Tooltip content = ts>
+                                            <mo>"🛈"</mo>
+                                        </Tooltip></msup>}
+                                    })}
                                 </TableCellLayout></TableCell>
                             </TableRow>
                         }
@@ -884,6 +893,17 @@ fn subterm_dialog(
                                             ::either::Left(t) => t.get_parsed(),
                                             ::either::Right(t) => t.get_parsed(),
                                         };
+                                        let fut = crate::backend().check_term(
+                                            &context,
+                                            either::Left(t),
+                                            either::Left(sub),
+                                        );
+                                        leptos::task::spawn_local(async move {
+                                            let r = fut.await;
+                                            //leptos::logging::log!("Setting signal");
+                                            sig.set(Some(r.map_err(|e| e.to_string())));
+                                        });
+                                        /*
                                         if let Some(path) = t.path_of_subterm(sub) {
                                             //leptos::logging::log!("Path: {path:?}");
                                             let fut =
@@ -893,11 +913,17 @@ fn subterm_dialog(
                                                 //leptos::logging::log!("Setting signal");
                                                 sig.set(Some(r.map_err(|e| e.to_string())));
                                             });
+                                        } else {
+                                            sig.set(Some(Err(
+                                                "Failed to compute subterm path".to_string()
+                                            )));
                                         }
+                                         */
                                     }
                                     Err(e) => sig.set(Some(Err(e.to_string()))),
                                 }
                             } else {
+                                sig.set(Some(Err("no full term found".to_string())));
                                 //leptos::logging::log!("full_term is None");
                             }
                         }

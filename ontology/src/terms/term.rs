@@ -92,6 +92,15 @@ impl std::hash::Hash for Numeric {
         f.hash(state);
     }
 }
+impl std::ops::Add for Numeric {
+    type Output = Option<Self>;
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Int(i), Self::Int(j)) => Some(Self::Int(i.checked_add(j)?)),
+            (a, b) => Some(Self::Float((a.as_float() + b.as_float()).into())),
+        }
+    }
+}
 impl Numeric {
     #[must_use]
     #[allow(clippy::cast_possible_truncation)]
@@ -176,7 +185,7 @@ impl IsTerm for Term {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ApplicationTerm(pub(crate) triomphe::Arc<Application>);
@@ -243,7 +252,7 @@ impl IsTerm for Application {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, bincode::Decode, bincode::Encode)

@@ -35,7 +35,10 @@ use ftml_ontology::{
             variables::VariableData,
         },
     },
-    terms::{ApplicationTerm, ArgumentMode, BindingTerm, Term, TermContainer, VarOrSym, Variable},
+    terms::{
+        ApplicationTerm, Argument, ArgumentMode, BindingTerm, MaybeSequence, Term, TermContainer,
+        VarOrSym, Variable,
+    },
     utils::SourceRange,
 };
 use ftml_uris::{
@@ -416,6 +419,10 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
     pub fn close(&mut self, elem: CloseFtmlElement, node: &N) -> super::Result<()> {
         tracing::trace!("Closing: {elem:?} in {:?}", self.domain);
         match elem {
+            CloseFtmlElement::SeqRange => match self.domain.pop() {
+                Some(OpenDomainElement::SeqRange(tms, _)) => self.close_seq_range(tms, node),
+                _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::SeqRange)),
+            },
             CloseFtmlElement::FoldExpr => match self.narrative.pop() {
                 Some(OpenNarrativeElement::FoldExpr(_)) => Ok(()),
                 _ => Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::FoldExpr)),
@@ -2100,6 +2107,46 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::Title))
     }
 
+    fn close_seq_range(
+        &mut self,
+        mut terms: Vec<(Term, crate::NodePath)>,
+        node: &N,
+    ) -> super::Result<()> {
+        if terms.len() != 1 {
+            tracing::error!("length != 1");
+            return Err(FtmlExtractionError::InvalidValue(FtmlKey::SeqRange));
+        }
+        let Some(t) = terms.pop() else {
+            tracing::error!("terms is empty");
+            return Err(FtmlExtractionError::InvalidValue(FtmlKey::SeqRange));
+        };
+        let (Term::Application(app), _) = t else {
+            tracing::error!("term is not an application: {:?}", t.0.debug_short());
+            return Err(FtmlExtractionError::InvalidValue(FtmlKey::SeqRange));
+        };
+        if !app.head.is(&*ftml_uris::metatheory::SEQUENCE_RANGE) {
+            tracing::error!("head is not sequence range: {:?}", app.head.debug_short());
+            return Err(FtmlExtractionError::InvalidValue(FtmlKey::SeqRange));
+        }
+        let [Argument::Sequence(MaybeSequence::Seq(terms))] = &*app.arguments else {
+            return Err(FtmlExtractionError::InvalidValue(FtmlKey::SeqRange));
+        };
+        for n in self.narrative.iter_mut() {
+            if let OpenNarrativeElement::VariableDeclaration { uri, data } = n {
+                return if data.is_seq {
+                    data.sequence_range = terms.to_vec();
+                    Ok(())
+                } else {
+                    Err(FtmlExtractionError::InvalidIn(
+                        FtmlKey::SeqRange,
+                        "non-sequence variables",
+                    ))
+                };
+            }
+        }
+        Err(FtmlExtractionError::UnexpectedEndOf(FtmlKey::SeqRange))
+    }
+
     fn close_argument(
         &mut self,
         position: ArgumentPosition,
@@ -2160,9 +2207,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ProofMethod { .. }
                 | OpenDomainElement::ProofJustification { .. }
                 | OpenDomainElement::ProofArgument { .. }
-                | OpenDomainElement::VariableReference { .. } => {
-                    Ok(Err(std::ops::ControlFlow::Break(())))
-                }
+                | OpenDomainElement::VariableReference { .. }
+                | OpenDomainElement::SeqRange(_, _) => Ok(Err(std::ops::ControlFlow::Break(()))),
             }
         }
         let mut term = MaybeUninit::new(node.as_term(terms)?.simplify());
@@ -2251,7 +2297,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ProofMethod { .. }
                 | OpenDomainElement::ProofJustification { .. }
                 | OpenDomainElement::ProofArgument { .. }
-                | OpenDomainElement::VariableReference { .. },
+                | OpenDomainElement::VariableReference { .. }
+                | OpenDomainElement::SeqRange(_, _),
             ) => (),
         }
         for n in self.narrative.iter_mut() {
@@ -2336,7 +2383,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ProofMethod { .. }
                 | OpenDomainElement::ProofJustification { .. }
                 | OpenDomainElement::ProofArgument { .. }
-                | OpenDomainElement::VariableReference { .. },
+                | OpenDomainElement::VariableReference { .. }
+                | OpenDomainElement::SeqRange(_, _),
             ) => (),
         }
         for n in self.narrative.iter_mut() {
@@ -2542,7 +2590,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ProofMethod { .. }
                 | OpenDomainElement::ProofJustification { .. }
                 | OpenDomainElement::ProofArgument { .. }
-                | OpenDomainElement::VariableReference { .. },
+                | OpenDomainElement::VariableReference { .. }
+                | OpenDomainElement::SeqRange(_, _),
             ) => (),
         }
 
@@ -3037,7 +3086,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::ProofMethod { .. }
                 | OpenDomainElement::ProofJustification { .. }
                 | OpenDomainElement::ProofArgument { .. }
-                | OpenDomainElement::Type { .. } => (),
+                | OpenDomainElement::Type { .. }
+                | OpenDomainElement::SeqRange(_, _) => (),
             }
         }
         None
@@ -3196,7 +3246,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 | OpenDomainElement::HeadTerm {
                     terms,
                     node: ancestor,
-                },
+                }
+                | OpenDomainElement::SeqRange(terms, ancestor),
             ) => {
                 terms.push((term, node.path_from(ancestor)));
                 return Ok(());

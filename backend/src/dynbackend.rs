@@ -35,8 +35,8 @@ pub trait DynBackend: Send + Sync {
     fn check_term(
         &self,
         global_context: &[ModuleUri],
-        term: &Term,
-        in_path: &TermPath,
+        in_term: either::Either<&Term, &DocumentElementUri>,
+        subterm: either::Either<&Term, &TermPath>,
     ) -> Fut<BackendCheckResult>;
 
     fn get_fragment(
@@ -127,13 +127,13 @@ impl FtmlBackend for dyn DynBackend {
     fn check_term(
         &self,
         global_context: &[ModuleUri],
-        term: &Term,
-        in_path: &TermPath,
+        in_term: either::Either<&Term, &DocumentElementUri>,
+        subterm: either::Either<&Term, &TermPath>,
     ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>>
     + Send
     + use<>
     + 'static {
-        <Self as DynBackend>::check_term(self, global_context, term, in_path)
+        <Self as DynBackend>::check_term(self, global_context, in_term, subterm)
     }
     #[inline]
     fn get_fragment(
@@ -300,14 +300,14 @@ impl<B: FtmlBackend + Send + Sync> DynBackend for B {
     fn check_term(
         &self,
         global_context: &[ModuleUri],
-        term: &Term,
-        in_path: &TermPath,
+        in_term: either::Either<&Term, &DocumentElementUri>,
+        subterm: either::Either<&Term, &TermPath>,
     ) -> Fut<BackendCheckResult> {
         wrap(<Self as FtmlBackend>::check_term(
             self,
             global_context,
-            term,
-            in_path,
+            in_term,
+            subterm,
         ))
     }
     #[inline]

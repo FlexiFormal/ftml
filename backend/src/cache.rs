@@ -113,14 +113,17 @@ where
     fn check_term(
         &self,
         global_context: &[ModuleUri],
-        term: &ftml_ontology::terms::Term,
-        in_path: &ftml_ontology::terms::termpaths::TermPath,
+        in_term: either::Either<&ftml_ontology::terms::Term, &DocumentElementUri>,
+        subterm: either::Either<
+            &ftml_ontology::terms::Term,
+            &ftml_ontology::terms::termpaths::TermPath,
+        >,
     ) -> impl Future<Output = Result<crate::BackendCheckResult, BackendError<Self::Error>>>
     + Send
     + use<B>
     + 'static {
         self.inner
-            .check_term(global_context, term, in_path)
+            .check_term(global_context, in_term, subterm)
             .map_err(|e| BackendError::ToDo(e.to_string()))
     }
 

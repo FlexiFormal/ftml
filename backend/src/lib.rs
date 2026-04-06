@@ -55,8 +55,8 @@ pub const DEFAULT_SERVER_URL: &str = "https://mathhub.info";
 
 #[macro_export]
 macro_rules! new_global {
-    ($name:ident = $($rest:tt)*) => {
-        struct $name;
+    ($v:vis $name:ident = $($rest:tt)*) => {
+        $v struct $name;
         impl $crate::GlobalBackend for $name {
             type Error = <$crate::new_global!(@TYPE $($rest)*) as $crate::FtmlBackend>::Error;
             type Backend = $crate::new_global!(@TYPE $($rest)*);
@@ -91,6 +91,9 @@ macro_rules! new_global {
         ),*],true)
     };
 
+    (@TYPE RemoteFlamsLike($val:expr) [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend<&'static str,[(::ftml_uris::DocumentUri,&'static str);$num]>
+    };
     (@TYPE RemoteFlamsLike($val:expr;$tp:ty) [$($rkey:literal = $rval:literal),+;$num:literal] ) => {
         $crate::RemoteFlamsBackend<$tp,[(::ftml_uris::DocumentUri,&'static str);$num]>
     };
@@ -100,6 +103,11 @@ macro_rules! new_global {
     (@TYPE RemoteFlamsLike($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend<$tp,$crate::NoRedirects> };
     (@TYPE RemoteFlamsLike) => { $crate::RemoteFlamsBackend<&'static str,$crate::NoRedirects> };
 
+    (@NEW RemoteFlamsLike($val:expr) [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
+        $crate::RemoteFlamsBackend::new_with_redirects($val,[$(
+            (std::str::FromStr::from_str($rkey).expect("invalid DocumentUri"),$rval)
+        ),*],false)
+    };
     (@NEW RemoteFlamsLike($val:expr;$tp:ty) ) => { $crate::RemoteFlamsBackend::new($val,false) };
     (@NEW RemoteFlamsLike [$($rkey:expr => $rval:expr),+;$num:literal] ) => {
         $crate::RemoteFlamsBackend::new_with_redirects($crate::DEFAULT_SERVER_URL,[$(
@@ -174,8 +182,8 @@ pub trait FtmlBackend {
     fn check_term(
         &self,
         global_context: &[ModuleUri],
-        term: &Term,
-        in_path: &TermPath,
+        in_term: either::Either<&Term, &DocumentElementUri>,
+        subterm: either::Either<&Term, &TermPath>,
     ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>>
     + Send
     + use<Self>
@@ -515,8 +523,8 @@ pub trait FlamsBackend {
     fn check_term(
         &self,
         global_context: &[ModuleUri],
-        term: &Term,
-        in_path: &TermPath,
+        in_term: either::Either<&Term, &DocumentElementUri>,
+        subterm: either::Either<&Term, &TermPath>,
     ) -> impl Future<
         Output = Result<BackendCheckResult, BackendError<server_fn::error::ServerFnErrorErr>>,
     > + Send
@@ -543,13 +551,13 @@ where
     fn check_term(
         &self,
         global_context: &[ModuleUri],
-        term: &Term,
-        in_path: &TermPath,
+        in_term: either::Either<&Term, &DocumentElementUri>,
+        subterm: either::Either<&Term, &TermPath>,
     ) -> impl Future<Output = Result<BackendCheckResult, BackendError<Self::Error>>>
     + Send
     + use<FB>
     + 'static {
-        <Self as FlamsBackend>::check_term(&self, global_context, term, in_path)
+        <Self as FlamsBackend>::check_term(&self, global_context, in_term, subterm)
     }
 
     fn get_fragment(

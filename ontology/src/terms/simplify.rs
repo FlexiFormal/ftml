@@ -3,13 +3,14 @@ use std::hint::unreachable_unchecked;
 use ftml_uris::{Id, metatheory};
 
 use crate::terms::{
-    Argument, Term, Variable,
+    ApplicationTerm, Argument, BindingTerm, BoundArgument, MaybeSequence, Term, Variable,
     opaque::{AnyOpaque, OpaqueNode},
+    sequences::Sequence,
     term::{OpaqueTerm, RecordFieldTerm},
 };
 
 // for opaques:
-static IGNORE_ATTRS: [&str; 22] = [
+static IGNORE_ATTRS: [&str; 23] = [
     "data-ftml-arg",
     "data-ftml-argmode",
     "data-ftml-type",
@@ -24,6 +25,7 @@ static IGNORE_ATTRS: [&str; 22] = [
     "data-ftml-proofmethod",
     "data-ftml-spfjust",
     "data-ftml-spfarg",
+    "data-ftml-seqrange",
     "data-rustex-sourceref",
     "data-rustex-font",
     "data-rustex-glyph",
@@ -130,8 +132,13 @@ impl Term {
     }
 
     #[must_use]
-    #[allow(clippy::too_many_lines)]
     pub fn simplify(self) -> Self {
+        prepare_seqs(self.simplify_i())
+    }
+
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    fn simplify_i(self) -> Self {
         match self {
             // Opaques
             Self::Opaque(o)
@@ -295,6 +302,114 @@ fn maybe_var(o: OpaqueTerm) -> Term {
     Term::Var {
         variable: Variable::Name { name, notated },
         presentation: None,
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn prepare_seqs(term: Term) -> Term {
+    fn do_tms(ts: &[Term]) -> MaybeSequence<Term> {
+        if ts
+            .iter()
+            .all(|t| t.as_sequence().is_none_or(|s| s.is_concrete()))
+        {
+            MaybeSequence::Seq(
+                ts.iter()
+                    .flat_map(|t| {
+                        t.as_sequence().and_then(|s| s.to_concrete()).map_or_else(
+                            || either::Right([t.clone()].into_iter()),
+                            |v| either::Left(v.into_iter()),
+                        )
+                    })
+                    .collect(),
+            )
+        } else {
+            let mut curr = Vec::new();
+            let mut ret = Vec::new();
+            for t in ts {
+                match t.as_sequence() {
+                    None => curr.push(t.clone()),
+                    Some(Sequence::SequenceExpression(e)) => curr.extend_from_slice(e),
+                    Some(_) => {
+                        if !curr.is_empty() {
+                            ret.push(Term::into_seq(std::mem::take(&mut curr).into_iter()));
+                        }
+                        ret.push(t.clone());
+                    }
+                }
+            }
+            if !curr.is_empty() {
+                ret.push(Term::into_seq(curr.into_iter()));
+            }
+            if ret.len() == 1 {
+                // SAFETY: len == 1
+                return MaybeSequence::One(unsafe { ret.pop().unwrap_unchecked() });
+            }
+            MaybeSequence::One(Term::Application(ApplicationTerm::new(
+                ftml_uris::metatheory::SEQUENCE_CONC.clone().into(),
+                Box::new([Argument::Sequence(MaybeSequence::Seq(
+                    ret.into_boxed_slice(),
+                ))]),
+                None,
+            )))
+        }
+    }
+    fn is_seq(ts: &[Term]) -> bool {
+        ts.iter().any(Term::is_sequence)
+            && (ts.len() > 1
+                || !ts
+                    .iter()
+                    .all(|t| matches!(t.as_sequence(), Some(Sequence::Concatenation(_)))))
+    }
+    if term.is_sequence() {
+        return term;
+    }
+    match term {
+        Term::Application(app)
+            if app
+                .arguments
+                .iter()
+                .any(|a| matches!(a,Argument::Sequence(MaybeSequence::Seq(ts)) if is_seq(ts))) =>
+        {
+            Term::Application(ApplicationTerm::new(
+                app.head.clone(),
+                app.arguments
+                    .iter()
+                    .map(|a| {
+                        if let Argument::Sequence(MaybeSequence::Seq(ts)) = a
+                            && is_seq(ts)
+                        {
+                            Argument::Sequence(do_tms(ts))
+                        } else {
+                            a.clone()
+                        }
+                    })
+                    .collect(),
+                app.presentation.clone(),
+            ))
+        }
+        Term::Bound(app)
+            if app.arguments.iter().any(
+                |a| matches!(a,BoundArgument::Sequence(MaybeSequence::Seq(ts)) if is_seq(ts)),
+            ) =>
+        {
+            Term::Bound(BindingTerm::new(
+                app.head.clone(),
+                app.arguments
+                    .iter()
+                    .map(|a| {
+                        if let BoundArgument::Sequence(MaybeSequence::Seq(ts)) = a
+                            && is_seq(ts)
+                        {
+                            BoundArgument::Sequence(do_tms(ts))
+                        } else {
+                            a.clone()
+                        }
+                    })
+                    .collect(),
+                app.presentation.clone(),
+            ))
+        }
+        o => o,
     }
 }
 

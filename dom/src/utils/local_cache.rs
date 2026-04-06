@@ -216,6 +216,15 @@ impl LocalCache {
         either::Either::Right(backend.get_structure(uri))
     }
 
+    pub fn get_variable_sync(
+        uri: &DocumentElementUri,
+    ) -> Option<SharedDocumentElement<VariableDeclaration>> {
+        LOCAL_CACHE
+            .documents
+            .get(&uri.document)
+            .and_then(|m| m.get_as::<VariableDeclaration>(&uri.name))
+    }
+
     pub fn get_variable<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,

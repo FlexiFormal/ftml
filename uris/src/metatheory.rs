@@ -30,6 +30,7 @@ uri! {
 
     OBJECT = "object",
     OF_TYPE = "of type",
+    TYPE_OF = "type of",
     APPLY = "apply",
     BIND = "bind",
     IMPLICIT_BIND = "implicit bind",
@@ -37,6 +38,7 @@ uri! {
     BIND_UNKNOWNS = "bind unknowns",
     PARENTHESES = "internal parentheses",
     AUTO_PROVE = "prove automatically",
+    COMMENTED = "commented",
 
     PROP = "prop",
     JUDGMENT = "judgment holds",
@@ -48,7 +50,11 @@ uri! {
     SEQUENCE_EXPRESSION = "sequence expression",
     SEQUENCE_TYPE = "sequence type",
     SEQUENCE_MAP = "sequence map",
+    SEQUENCE_RANGE = "sequence range",
+    SEQUENCE_CONC = "sequence concatenation",
+    RANGED_SEQUENCE_TYPE = "ranged sequence type",
     FOLD_RIGHT = "fold right",
+    FOLD = "fold",
     LAST = "last",
     INIT = "init",
 

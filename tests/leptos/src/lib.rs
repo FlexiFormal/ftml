@@ -30,6 +30,7 @@ pub fn hydrate() {
         .with(tracing_wasm::WASMLayer::default())
         .with(filter)
         .init();
+    ftml_components::set_backend::<crate::app::GlobalBackend>();
 
     //tracing_wasm::set_as_global_default();
 

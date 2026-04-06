@@ -60,6 +60,8 @@ pub struct VariableData {
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub is_seq: bool,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    pub sequence_range: Vec<Term>,
+    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub source: SourceRange,
 }
 impl crate::Ftml for VariableDeclaration {

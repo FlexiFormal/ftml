@@ -98,7 +98,8 @@ pub trait FtmlExtractor: 'static + Sized {
                 | OpenDomainElement::ProofJustification { .. }
                 | OpenDomainElement::ProofArgument { .. }
                 | OpenDomainElement::Comp
-                | OpenDomainElement::DefComp => (),
+                | OpenDomainElement::DefComp
+                | OpenDomainElement::SeqRange(_,_) => (),
             }
         }
         Err(FtmlExtractionError::NotIn(
@@ -227,7 +228,8 @@ pub trait FtmlExtractor: 'static + Sized {
                     | OpenDomainElement::ProofJustification { .. }
                     | OpenDomainElement::ProofArgument { .. }
                     | OpenDomainElement::Comp
-                    | OpenDomainElement::DefComp,
+                    | OpenDomainElement::DefComp
+                    | OpenDomainElement::SeqRange(_,_)
                 ) => true,
             }
     }
@@ -419,6 +421,7 @@ pub trait FtmlExtractor: 'static + Sized {
             | OpenDomainElement::InferenceRule { .. }
             | OpenDomainElement::VariableReference { .. }
             | OpenDomainElement::FoldExprShort
+            | OpenDomainElement::SeqRange(_,_)
             //| OpenDomainElement::ProofArgument
             //| OpenDomainElement::ProofTerm
             //| OpenDomainElement::ProofMethod

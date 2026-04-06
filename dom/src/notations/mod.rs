@@ -4,12 +4,16 @@ use crate::ClonableView;
 use crate::FtmlViews;
 use crate::document::{CurrentUri, WithHead};
 use crate::terms::{ReactiveApplication, ReactiveTerm, TopTerm};
+use crate::utils::local_cache::LocalCache;
 use crate::utils::owned;
 use ftml_backend::dynbackend::DynBackend;
+use ftml_ontology::terms::ApplicationTerm;
 use ftml_ontology::terms::Argument;
 use ftml_ontology::terms::BoundArgument;
 use ftml_ontology::terms::ComponentVar;
 use ftml_ontology::terms::MaybeSequence;
+use ftml_ontology::terms::Numeric;
+use ftml_ontology::terms::Variable;
 use ftml_ontology::terms::{Term, VarOrSym};
 use ftml_ontology::{
     narrative::elements::{
@@ -124,6 +128,7 @@ pub trait ArgumentRender: Clone + Send + Sync + 'static {
         mode: ArgumentMode,
         argument_prec: i64,
     ) -> AnyView;
+
     fn render_arg_at<Views: FtmlViews>(
         &self,
         backend: &'static dyn DynBackend,
@@ -131,7 +136,102 @@ pub trait ArgumentRender: Clone + Send + Sync + 'static {
         seq_index: usize,
         mode: ArgumentMode,
     ) -> AnyView;
+    fn render_arg_with_sep<Views: FtmlViews>(
+        &self,
+        backend: &'static dyn DynBackend,
+        index: u8,
+        mode: ArgumentMode,
+        argument_prec: i64,
+        sep: impl Fn() -> AnyView,
+    ) -> AnyView {
+        render_arg_with_sep_default::<Views, _>(self, backend, index, mode, argument_prec, sep)
+    }
+
     fn length_at(&self, index: u8) -> usize;
+}
+
+fn render_arg_with_sep_default<Views: FtmlViews, Args: ArgumentRender>(
+    slf: &Args,
+    backend: &'static dyn DynBackend,
+    index: u8,
+    mode: ArgumentMode,
+    argument_prec: i64,
+    sep: impl Fn() -> AnyView,
+) -> AnyView {
+    let len = slf.length_at(index);
+    if len == 0 {
+        return ().into_any();
+    }
+    if len == 1 {
+        return slf.render_arg::<Views>(backend, index, mode, argument_prec);
+    }
+
+    view! {
+        <mrow>
+            {slf.render_arg_at::<Views>(backend,index, 0, mode)}
+        {
+            (1..len).map(|i| view!{
+                {sep()}
+                {slf.render_arg_at::<Views>(backend,index, i, mode)}
+            }).collect_view()
+        }
+        </mrow>
+    }
+    .into_any()
+}
+
+fn is_sequence(t: &Term) -> bool {
+    t.as_sequence().is_some_and(|v| {
+        v.is_concrete_or(&mut |v| {
+            if let Variable::Ref { .. } = v {
+                true
+            } else {
+                false
+            }
+        })
+    })
+}
+
+// UNSAFE: requires as_sequence().is_concrete_or(...)
+unsafe fn make_sequence(t: &Term) -> Vec<Term> {
+    t.as_sequence()
+        .expect("bug")
+        .to_concrete_or(&mut |v| {
+            if let v @ Variable::Ref { declaration, .. } = v {
+                Some(LocalCache::get_variable_sync(declaration).map_or_else(
+                    || {
+                        vec![
+                            Term::Application(ApplicationTerm::new(
+                                v.clone().into(),
+                                Box::new([Argument::Simple(Term::Number(Numeric::Int(1)))]),
+                                None,
+                            )),
+                            ftml_uris::metatheory::ELLIPSES.clone().into(),
+                            Term::Application(ApplicationTerm::new(
+                                v.clone().into(),
+                                Box::new([
+                                    // SAFETY: valid ID
+                                    Argument::Simple(
+                                        Variable::Name {
+                                            name: unsafe { "n".parse().unwrap_unchecked() },
+                                            notated: None,
+                                        }
+                                        .into(),
+                                    ),
+                                ]),
+                                None,
+                            )),
+                        ]
+                        // Argument::Simple(ftml_uris::metatheory::ELLIPSES.clone().into()),
+                        //Argument::Simple(Term::Number(Numeric::Int(1))),
+                    },
+                    |v| v.data.sequence_range.clone(),
+                ))
+            } else {
+                None
+            }
+        })
+        .expect("bug")
 }
 
 fn error() -> impl IntoView {
@@ -214,6 +314,51 @@ fn render_cv<Views: FtmlViews>(
     )
 }
 
+fn render_seq<Views: FtmlViews>(
+    backend: &'static dyn DynBackend,
+    index: u8,
+    mode: ArgumentMode,
+    argument_prec: i64,
+    v: &[Term],
+) -> AnyView {
+    let len = v.len();
+    if len == 0 {
+        return ().into_any();
+    }
+    // SAFETY: len > 0
+    let first = || {
+        render_arg::<Views>(
+            backend,
+            unsafe { v.first().unwrap_unchecked() },
+            index,
+            Some(0),
+            mode,
+            argument_prec,
+        )
+    };
+    if len == 1 {
+        return first();
+    }
+    view! {
+        <mrow>
+            {first()}
+        {
+            v.iter().enumerate().skip(1).map(|(i,v)| view!{
+                {
+                    if with_context::<CurrentUri, _>(|_| ()).is_some() {
+                        leptos::either::Either::Left(Views::comp(ClonableView::new(true,|| leptos::math::mo().child(","))))
+                    } else {
+                        leptos::either::Either::Right(leptos::math::mo().child(","))
+                    }
+                }
+                {render_arg::<Views>(backend,v,index, Some(i), mode,argument_prec)}
+            }).collect_view()
+        }
+        </mrow>
+    }
+    .into_any()
+}
+
 impl ArgumentRender for Box<[Argument]> {
     #[inline]
     fn is_empty(&self) -> bool {
@@ -226,6 +371,45 @@ impl ArgumentRender for Box<[Argument]> {
     fn is_sequence(&self, index: u8) -> bool {
         matches!(self.get(index as usize), Some(Argument::Sequence(_)))
     }
+    fn render_arg_with_sep<Views: FtmlViews>(
+        &self,
+        backend: &'static dyn DynBackend,
+        index: u8,
+        mode: ArgumentMode,
+        argument_prec: i64,
+        sep: impl Fn() -> AnyView,
+    ) -> AnyView {
+        //leptos::logging::log!("Here: {:?}", self.get(index as usize));
+        if let Some(Argument::Sequence(MaybeSequence::One(v))) = self.get(index as usize)
+            && is_sequence(v)
+        {
+            //leptos::logging::log!("Replacing {:?}", v.debug_short());
+            let r = unsafe { make_sequence(v) };
+            let len = r.len();
+            if len == 0 {
+                return ().into_any();
+            }
+            if len == 1 {
+                return render_seq::<Views>(backend, index, mode, argument_prec, &r);
+            }
+            let mut r = r.into_iter();
+
+            view! {
+                <mrow>
+                    {r.next().expect("bug").into_view_with_precedence::<Views>(backend, true, 0)}
+                {
+                    r.map(|nxt| view!{
+                        {sep()}
+                        {nxt.into_view_with_precedence::<Views>(backend, true, 0)}
+                    }).collect_view()
+                }
+                </mrow>
+            }
+            .into_any()
+        } else {
+            render_arg_with_sep_default::<Views, _>(self, backend, index, mode, argument_prec, sep)
+        }
+    }
     fn render_arg<Views: FtmlViews>(
         &self,
         backend: &'static dyn DynBackend,
@@ -233,49 +417,19 @@ impl ArgumentRender for Box<[Argument]> {
         mode: ArgumentMode,
         argument_prec: i64,
     ) -> AnyView {
-        use leptos::either::Either::{Left, Right};
         tracing::trace!("rendering arg {index}@{mode:?} of {}", self.len());
+        //leptos::logging::log!("Here2: {:?}", self.get(index as usize));
         match self.get(index as usize) {
+            Some(Argument::Sequence(MaybeSequence::One(v))) if is_sequence(v) => {
+                //leptos::logging::log!("Replacing {:?}", v.debug_short());
+                let r = unsafe { make_sequence(v) };
+                render_seq::<Views>(backend, index, mode, argument_prec, &r)
+            }
             Some(Argument::Simple(v) | Argument::Sequence(MaybeSequence::One(v))) => {
                 render_arg::<Views>(backend, v, index, None, mode, argument_prec)
             }
             Some(Argument::Sequence(MaybeSequence::Seq(v))) => {
-                let len = v.len();
-                if len == 0 {
-                    return ().into_any();
-                }
-                // SAFETY: len > 0
-                let first = || {
-                    render_arg::<Views>(
-                        backend,
-                        unsafe { v.first().unwrap_unchecked() },
-                        index,
-                        Some(0),
-                        mode,
-                        argument_prec,
-                    )
-                };
-                if len == 1 {
-                    return first();
-                }
-                view! {
-                    <mrow>
-                        {first()}
-                    {
-                        v.iter().enumerate().skip(1).map(|(i,v)| view!{
-                            {
-
-                                if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                                    Left(Views::comp(ClonableView::new(true,|| leptos::math::mo().child(","))))
-                                } else {
-                                    Right(leptos::math::mo().child(","))
-                                }
-                            }
-                            {render_arg::<Views>(backend,v,index, Some(i), mode,argument_prec)}
-                        }).collect_view()
-                    }
-                    </mrow>
-                }.into_any()
+                render_seq::<Views>(backend, index, mode, argument_prec, v)
             }
             _ => error().into_any(),
         }
@@ -330,6 +484,45 @@ impl ArgumentRender for Box<[BoundArgument]> {
             Some(BoundArgument::Sequence(_) | BoundArgument::BoundSeq(_))
         )
     }
+
+    fn render_arg_with_sep<Views: FtmlViews>(
+        &self,
+        backend: &'static dyn DynBackend,
+        index: u8,
+        mode: ArgumentMode,
+        argument_prec: i64,
+        sep: impl Fn() -> AnyView,
+    ) -> AnyView {
+        if let Some(BoundArgument::Sequence(MaybeSequence::One(v))) = self.get(index as usize)
+            && is_sequence(v)
+        {
+            let r = unsafe { make_sequence(v) };
+            let len = r.len();
+            if len == 0 {
+                return ().into_any();
+            }
+            if len == 1 {
+                return render_seq::<Views>(backend, index, mode, argument_prec, &r);
+            }
+            let mut r = r.into_iter();
+
+            view! {
+                <mrow>
+                    {r.next().expect("bug").into_view_with_precedence::<Views>(backend, true, 0)}
+                {
+                    r.map(|nxt| view!{
+                        {sep()}
+                        {nxt.into_view_with_precedence::<Views>(backend, true, 0)}
+                    }).collect_view()
+                }
+                </mrow>
+            }
+            .into_any()
+        } else {
+            render_arg_with_sep_default::<Views, _>(self, backend, index, mode, argument_prec, sep)
+        }
+    }
+    #[allow(clippy::too_many_lines)]
     fn render_arg<Views: FtmlViews>(
         &self,
         backend: &'static dyn DynBackend,
@@ -340,47 +533,16 @@ impl ArgumentRender for Box<[BoundArgument]> {
         use leptos::either::Either::{Left, Right};
         tracing::trace!("rendering arg {index}@{mode:?} of {}", self.len());
         match self.get(index as usize) {
+            Some(BoundArgument::Sequence(MaybeSequence::One(v))) if is_sequence(v) => {
+                let r = unsafe { make_sequence(v) };
+                render_seq::<Views>(backend, index, mode, argument_precedence, &r)
+            }
             Some(BoundArgument::Simple(v) | BoundArgument::Sequence(MaybeSequence::One(v))) => {
                 render_arg::<Views>(backend, v, index, None, mode, argument_precedence)
             }
 
             Some(BoundArgument::Sequence(MaybeSequence::Seq(v))) => {
-                let len = v.len();
-                if len == 0 {
-                    return ().into_any();
-                }
-                // SAFETY: len > 0
-                let first = || {
-                    render_arg::<Views>(
-                        backend,
-                        unsafe { v.first().unwrap_unchecked() },
-                        index,
-                        Some(0),
-                        mode,
-                        argument_precedence,
-                    )
-                };
-                if len == 1 {
-                    return first();
-                }
-                view! {
-                    <mrow>
-                        {first()}
-                    {
-                        v.iter().enumerate().skip(1).map(|(i,v)| view!{
-                            {
-
-                                if with_context::<CurrentUri, _>(|_| ()).is_some() {
-                                    Left(Views::comp(ClonableView::new(true,|| leptos::math::mo().child(","))))
-                                } else {
-                                    Right(leptos::math::mo().child(","))
-                                }
-                            }
-                            {render_arg::<Views>(backend,v,index, Some(i), mode,argument_precedence)}
-                        }).collect_view()
-                    }
-                    </mrow>
-                }.into_any()
+                render_seq::<Views>(backend, index, mode, argument_precedence, v)
             }
             Some(BoundArgument::Bound(cv) | BoundArgument::BoundSeq(MaybeSequence::One(cv))) => {
                 render_cv::<Views>(backend, cv, index, None, mode, argument_precedence)
@@ -785,28 +947,27 @@ pub(crate) fn view_component_with_args<Views: FtmlViews, A: ArgumentRender>(
             let prec = argument_precs.get(*index as usize).copied().unwrap_or(prec);
             args.render_arg::<Views>(backend, *index, *mode, prec)
         }
-        NotationComponent::ArgSep { index, mode, sep } => {
-            let len = args.length_at(*index);
-            if len == 0 {
-                return ().into_any();
-            }
-            if len == 1 {
-                let prec = argument_precs.get(*index as usize).copied().unwrap_or(prec);
-                return args.render_arg::<Views>(backend, *index, *mode, prec);
-            }
-
-            view! {
-                <mrow>
-                    {args.render_arg_at::<Views>(backend,*index, 0, *mode)}
-                {
-                    (1..len).map(|i| view!{
-                        {sep.iter().map(|s| view_component_with_args::<Views,_>(backend,s,args,this,prec,argument_precs)).collect_view()}
-                        {args.render_arg_at::<Views>(backend,*index, i, *mode)}
-                    }).collect_view()
-                }
-                </mrow>
-            }.into_any()
-        }
+        NotationComponent::ArgSep { index, mode, sep } => args.render_arg_with_sep::<Views>(
+            backend,
+            *index,
+            *mode,
+            argument_precs.get(*index as usize).copied().unwrap_or(prec),
+            || {
+                sep.iter()
+                    .map(|s| {
+                        view_component_with_args::<Views, _>(
+                            backend,
+                            s,
+                            args,
+                            this,
+                            prec,
+                            argument_precs,
+                        )
+                    })
+                    .collect_view()
+                    .into_any()
+            },
+        ),
         NotationComponent::ArgMap { .. } => view! {<span>"TODO: ArgMap"</span>}.into_any(),
     }
 }

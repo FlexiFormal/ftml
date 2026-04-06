@@ -33,6 +33,8 @@ pub fn App() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
 
+    provide_context(ftml_components::config::AllowSubterms(true));
+
     view! {
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
@@ -83,7 +85,7 @@ fn extract_body(s: &str) -> String {
 macro_rules! backend {
     ($num:literal:[$($name:literal),*]) => {
 
-        ftml_backend::new_global!(GlobalBackend = Cached(RemoteFlamsLike [
+        ftml_backend::new_global!(pub GlobalBackend = Cached(RemoteFlamsLike("http://localhost:3002") [
             $(
                 concat!("https://mathhub.info?a=FTML/meta&p=tests&d=",$name,"&l=en")
                 => concat!("http://localhost:3000/api/get?d=",$name,".en")
@@ -118,19 +120,20 @@ macro_rules! backend {
 }
 backend!(10: ["sections","para","symbolsmodules","paragraphs","structures","morphisms","slides","metatheory","problems","proof"]);
 
-type Views = ftml_components::Views<GlobalBackend>;
+type Views = ftml_components::Views;
 
 #[component]
 fn Ftml() -> impl IntoView {
     use ftml_dom::FtmlViews;
-    let uri: ftml_uris::DocumentUri = "https://mathhub.info?a=FTML/meta&p=tests&d=all&l=en"
-        .parse()
-        .unwrap();
-    const HTML: &str = include_str!("../public/all.en.html");
+    let uri: ftml_uris::DocumentUri =
+        "http://mathhub.info?a=Papers/26-ICMS-Semantics&p=mod&d=dump&l=en" //"https://mathhub.info?a=FTML/meta&p=tests&d=all&l=en"
+            .parse()
+            .unwrap();
+    const HTML: &str = include_str!("../public/test.en.html"); // include_str!("../public/all.en.html");
     let html = extract_body_as_div(HTML);
     tracing::info!("Here");
     //FtmlConfig::set_toc_source(TocSource::Extract);
-    Views::setup_document::<GlobalBackend>(
+    Views::setup_document(
         uri,
         SidebarPosition::Find,
         false,

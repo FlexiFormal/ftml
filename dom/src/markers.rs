@@ -524,7 +524,8 @@ impl Marker {
             | OpenFtmlElement::ProofMethod
             | OpenFtmlElement::ProofArgument(_)
             | OpenFtmlElement::ProofJustification
-            | OpenFtmlElement::Rule(_) => None,
+            | OpenFtmlElement::Rule(_)
+            | OpenFtmlElement::SeqRange => None,
         }
     }
 }

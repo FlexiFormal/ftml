@@ -358,8 +358,8 @@ impl FtmlConfig {
             provide_context(sig);
             provide_context(sig.read_only());
         }
-        if with_context::<StoredValue<ReactiveStore>, _>(|_| ()).is_none() {
-            provide_context(StoredValue::new(ReactiveStore::new()));
+        if with_context::<ReactiveStore, _>(|_| ()).is_none() {
+            provide_context(ReactiveStore::new());
         }
     }
 }
@@ -453,16 +453,14 @@ impl FtmlConfig {
     #[must_use]
     pub fn notation_preference(uri: &LeafUri) -> ReadSignal<Option<DocumentElementUri>> {
         let sig = Self::notation_preference_signal(uri);
-        with_context::<StoredValue<ReactiveStore>, _>(|s| {
-            s.with_value(|s| s.with(|| sig.read_only()))
-        })
-        .expect("Not in an ftml context")
+        with_context::<ReactiveStore, _>(|s| s.with(|| sig.read_only()))
+            .expect("Not in an ftml context")
     }
 
     pub(crate) fn notation_preference_signal(
         uri: &LeafUri,
     ) -> RwSignal<Option<DocumentElementUri>> {
-        with_context::<StoredValue<ReactiveStore>, _>(|s| {
+        with_context::<ReactiveStore, _>(|s| {
             if let Some(v) = s.with_value(|store| store.notations.get(uri).copied()) {
                 return v;
             }
@@ -477,28 +475,24 @@ impl FtmlConfig {
                     None
                 }
             };
-            let ret = s.with_value(move |store| {
-                store.with(move || {
-                    let r = RwSignal::new(value);
-                    #[cfg(any(feature = "csr", feature = "hydrate"))]
-                    {
-                        let uri = uri.clone();
-                        Effect::new(move || {
-                            r.with(|s| {
-                                use gloo_storage::Storage;
-                                if let Some(s) = s.as_ref() {
-                                    let _ = gloo_storage::LocalStorage::set(
-                                        format!("notation_{uri}"),
-                                        s,
-                                    );
-                                } else {
-                                    gloo_storage::LocalStorage::delete(format!("notation_{uri}"));
-                                }
-                            });
+            let ret = s.with(move || {
+                let r = RwSignal::new(value);
+                #[cfg(any(feature = "csr", feature = "hydrate"))]
+                {
+                    let uri = uri.clone();
+                    Effect::new(move || {
+                        r.with(|s| {
+                            use gloo_storage::Storage;
+                            if let Some(s) = s.as_ref() {
+                                let _ =
+                                    gloo_storage::LocalStorage::set(format!("notation_{uri}"), s);
+                            } else {
+                                gloo_storage::LocalStorage::delete(format!("notation_{uri}"));
+                            }
                         });
-                    }
-                    r
-                })
+                    });
+                }
+                r
             });
             s.update_value(|s| {
                 s.notations.insert(uri.clone(), ret);

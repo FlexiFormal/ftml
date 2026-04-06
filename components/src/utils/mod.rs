@@ -39,13 +39,22 @@ pub fn error_toast(msg: impl IntoView + std::fmt::Display + 'static) {
 type Map<A, B> = rustc_hash::FxHashMap<A, B>;
 
 #[derive(Clone)]
-pub struct ReactiveStore {
+pub struct ReactiveStore(std::sync::Arc<std::sync::Mutex<ReactiveStoreI>>);
+pub(crate) struct ReactiveStoreI {
     pub(crate) notations: Map<LeafUri, RwSignal<Option<DocumentElementUri>>>,
     pub(crate) on_clicks: Map<VarOrSym, OnClickData>,
     owner: Owner,
     term_owner: Owner,
 }
 impl ReactiveStore {
+    pub(crate) fn with_value<R>(&self, f: impl FnOnce(&ReactiveStoreI) -> R) -> R {
+        let lock = self.0.lock().expect("error locking");
+        f(&lock)
+    }
+    pub(crate) fn update_value<R>(&self, f: impl FnOnce(&mut ReactiveStoreI) -> R) -> R {
+        let mut lock = self.0.lock().expect("error locking");
+        f(&mut lock)
+    }
     #[inline]
     pub(crate) fn new() -> Self {
         let owner = leptos::prelude::Owner::current()
@@ -53,29 +62,35 @@ impl ReactiveStore {
             .child();
         owner.with(|| DocumentState::no_document(|| {}));
         let term_owner = owner.child();
-        Self {
+        Self(std::sync::Arc::new(std::sync::Mutex::new(ReactiveStoreI {
             notations: Map::default(),
             on_clicks: Map::default(),
             owner,
             term_owner,
-        }
+        })))
     }
     #[inline]
+    /// ### Panics
     pub fn with<R>(&self, f: impl FnOnce() -> R) -> R {
-        self.owner.with(f)
+        let lock = self.0.lock().expect("error locking");
+        let owner = lock.owner.clone();
+        drop(lock);
+        owner.with(f)
     }
 
     #[must_use]
+    /// ### Panics
     pub fn render_term(t: Term) -> impl IntoView {
-        Self::get().with_value(|slf| {
-            slf.term_owner
-                .with(move || t.into_view_safe::<crate::Views>(crate::backend()))
-        })
+        let slf = Self::get();
+        let lock = slf.0.lock().expect("error locking");
+        let owner = lock.term_owner.clone();
+        drop(lock);
+        owner.with(move || t.into_view_safe::<crate::Views>(crate::backend()))
     }
 
     #[inline]
     #[must_use]
-    pub(crate) fn get() -> StoredValue<Self> {
+    pub(crate) fn get() -> Self {
         expect_context()
     }
     /// #### Panics
@@ -84,7 +99,7 @@ impl ReactiveStore {
         use thaw::{Dialog, DialogSurface};
         let slf = Self::get();
         let (owner, (data, on_clicked, uri, allow_formals)) = {
-            let mut slf = slf.write_value();
+            let mut slf = slf.0.lock().expect("error locking");
             if let Some(d) = slf.on_clicks.get(vos) {
                 return *d;
             }

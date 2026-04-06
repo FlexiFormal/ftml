@@ -36,7 +36,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 129;
+pub const NUM_KEYS: u8 = 130;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -1274,6 +1274,14 @@ do_keys! {
             do_vardef(ext, attrs, keys, node, FtmlKey::Varseq, true)
         },
 
+    /// Determines the range of a sequence variable (e.g. `1,...,n`).
+    SeqRange = "seqrange"
+        {
+            <= (Varseq)
+        } := (ext,_attrs,_keys,node) => {
+            ret!(ext,node <- SeqRange + SeqRange)
+        } => SeqRange,
+
     /// Assigns a [`Symbol`] in the domain of a [`Morphism`] to a [`Term`]
     /// provided as a [`Definiens`](FtmlKey::Definiens) child node, with the optional
     /// refined type provided as a [`Type`](FtmlKey::Type) child.
@@ -1542,6 +1550,7 @@ do_keys! {
                             | OpenDomainElement::ReturnType { .. }
                             | OpenDomainElement::Assign { .. }
                             | OpenDomainElement::ArgTypes(_)
+                            | OpenDomainElement::SeqRange(_,_)
                             //| OpenDomainElement::ProofTerm
                             //| OpenDomainElement::ProofJustification
                             //| OpenDomainElement::ProofArgument
@@ -1909,6 +1918,7 @@ do_keys! {
                     | OpenDomainElement::Comp
                     | OpenDomainElement::DefComp
                     | OpenDomainElement::FoldExprShort
+                    | OpenDomainElement::SeqRange(_,_)
                 ) => {
                     return Err(FtmlExtractionError::NotIn(FtmlKey::DefComp, "a term"));
                 }
@@ -2036,6 +2046,7 @@ fn do_vardef<E: crate::extraction::FtmlExtractor>(
             return_type:None,
             tp: TermContainer::default(),
             df: TermContainer::default(),
+            sequence_range:Vec::new(),
             source
         }),
     } + VariableDeclaration)

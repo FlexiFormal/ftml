@@ -93,6 +93,7 @@ pub enum CloseFtmlElement {
     ProofMethod,
     ProofJustification,
     ProofArgument,
+    SeqRange,
 }
 
 #[derive(Debug, Clone)]
@@ -212,6 +213,7 @@ pub enum OpenDomainElement<N: FtmlNode> {
         refined_type: Option<Term>,
         definiens: Option<Term>,
     },
+    SeqRange(Vec<(Term, crate::NodePath)>, N),
 }
 
 #[derive(Debug, Clone)]
@@ -753,6 +755,10 @@ impl OpenFtmlElement {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn split<N: FtmlNode>(self, node: &N) -> AnyOpen<N> {
         match self {
+            Self::SeqRange => AnyOpen::Open {
+                domain: Some(OpenDomainElement::SeqRange(Vec::new(), node.clone())),
+                narrative: None,
+            },
             Self::FoldExpr(show) => AnyOpen::Open {
                 domain: None,
                 narrative: Some(OpenNarrativeElement::FoldExpr(show)),

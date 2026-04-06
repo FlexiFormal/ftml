@@ -8,6 +8,7 @@ mod macros;
 pub mod om;
 pub mod opaque;
 pub mod records;
+pub mod sequences;
 pub mod simplify;
 pub mod subst;
 mod term;
