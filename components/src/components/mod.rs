@@ -187,12 +187,12 @@ impl TermTrackedViews for crate::Views {
 
     #[inline]
     fn comp(then: ClonableView) -> AnyView {
-        terms::comp(then)
+        terms::comp::comp(then)
     }
 
     #[inline]
     fn def_comp(uri: Option<ftml_uris::SymbolUri>, then: ClonableView) -> impl IntoView {
-        terms::defcomp(uri, then)
+        terms::comp::defcomp(uri, then)
     }
 
     #[inline]

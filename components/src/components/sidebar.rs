@@ -1,5 +1,4 @@
 use crate::{
-    ViewContinuations,
     components::content::FtmlViewable,
     config::HighlightStyle,
     utils::{

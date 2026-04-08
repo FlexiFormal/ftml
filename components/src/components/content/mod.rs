@@ -94,7 +94,7 @@ impl FtmlViewable for DocumentElementUri {
 pub fn hover_paragraph(uri: DocumentElementUri, title: AnyView) -> AnyView {
     use thaw::{Popover, PopoverTrigger};
     let uristring = uri.to_string();
-    inject_css("ftml-symbol-popup", include_str!("../popup.css"));
+    inject_css("ftml-symbol-popup", include_str!("../terms/popup.css"));
 
     view! {
         <Popover>
@@ -174,18 +174,18 @@ impl FtmlViewable for SymbolUri {
 
 pub fn symbol_uri(name: String, uri: &SymbolUri) -> AnyView {
     use thaw::Text;
-    inject_css("ftml-comp", include_str!("../comp.css"));
+    inject_css("ftml-comp", include_str!("../terms/comp.css"));
     if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");
         return view!(<Text class="ftml-comp">{name}</Text>).into_any();
     }
     let vos = VarOrSym::Sym(uri.clone());
-    super::terms::comp_like(vos, None, false, move || view!(<Text>{name}</Text>)).into_any()
+    super::terms::comp::comp_like(vos, None, false, move || view!(<Text>{name}</Text>)).into_any()
 }
 
 pub fn variable_uri(name: String, uri: &DocumentElementUri) -> AnyView {
     use thaw::Text;
-    inject_css("ftml-comp", include_str!("../comp.css"));
+    inject_css("ftml-comp", include_str!("../terms/comp.css"));
     if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");
         return view!(<Text class="ftml-comp">{name}</Text>).into_any();
@@ -194,5 +194,5 @@ pub fn variable_uri(name: String, uri: &DocumentElementUri) -> AnyView {
         declaration: uri.clone(),
         is_sequence: None,
     });
-    super::terms::comp_like(vos, None, false, move || view!(<Text>{name}</Text>)).into_any()
+    super::terms::comp::comp_like(vos, None, false, move || view!(<Text>{name}</Text>)).into_any()
 }

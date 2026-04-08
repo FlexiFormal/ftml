@@ -1,7 +1,4 @@
-use ftml_backend::SendBackend;
-use ftml_dom::{
-    FtmlViews, structure::DocumentStructure, toc::FinalTocEntry, utils::css::inject_css,
-};
+use ftml_dom::{structure::DocumentStructure, toc::FinalTocEntry, utils::css::inject_css};
 use ftml_ontology::utils::{TreeIter, time::Timestamp};
 use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;

@@ -8,7 +8,7 @@ use ftml_ontology::terms::{Term, VarOrSym};
 use ftml_uris::{DocumentElementUri, LeafUri};
 use leptos::{
     IntoView,
-    prelude::{AnyView, IntoAny, Owner, RwSignal, StoredValue, WithValue, expect_context},
+    prelude::{AnyView, IntoAny, Owner, RwSignal, expect_context},
     tachys::reactive_graph::OwnedView,
 };
 
@@ -116,7 +116,7 @@ impl ReactiveStore {
                 view! {<Dialog open=on_clicked><DialogSurface>{
                     let r = child.with(|| {
                         provide_context(slf);
-                        crate::components::terms::do_onclick(vos,uri,allow_formals)
+                        crate::components::terms::popover::do_onclick(vos,uri,allow_formals)
                     });
                     OwnedView::new_with_owner(r.into_view(), child)
                 }</DialogSurface></Dialog>}
