@@ -128,7 +128,7 @@ impl std::ops::Div for Numeric {
                 let b = b.as_float();
                 if b == 0.0 {
                     return None;
-                };
+                }
                 Some(Self::Float((a.as_float() / b).into()))
             }
         }
@@ -136,9 +136,10 @@ impl std::ops::Div for Numeric {
 }
 impl std::ops::BitXor for Numeric {
     type Output = Option<Self>;
+    #[allow(clippy::cast_sign_loss)]
     fn bitxor(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Self::Int(i), Self::Int(j)) if j >= 0 && j < u32::MAX as _ => {
+            (Self::Int(i), Self::Int(j)) if j >= 0 && j < u32::MAX.into() => {
                 Some(Self::Int(i.checked_pow(j as u32)?))
             }
             (a, b) => {
