@@ -136,7 +136,7 @@ impl std::ops::Div for Numeric {
 }
 impl std::ops::BitXor for Numeric {
     type Output = Option<Self>;
-    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     fn bitxor(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Self::Int(i), Self::Int(j)) if j >= 0 && j < u32::MAX.into() => {
