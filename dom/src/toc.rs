@@ -100,7 +100,7 @@ impl InputrefTitle {
                 } else {
                     L(start.into_view(at,top))
                 }
-            }</span>}
+            }" "</span>}
         }
         let inner = move || match &self.0 {
             either::Right(s) => L(V::render_ftml(s.to_string(), None)),

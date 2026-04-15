@@ -10,7 +10,7 @@ pub(crate) struct CssIds(
 
 #[inline]
 pub fn inject_css(id: impl Into<Cow<'static, str>>, css: impl Into<Cow<'static, str>>) {
-    do_inject_css(id.into(), css.into());
+    do_inject_css(id.into(), css.into(), false);
 }
 
 fn hashstr<A: std::hash::Hash>(prefix: &str, a: &A) -> String {
@@ -33,10 +33,10 @@ fn do_css(css: Css) {
     match css {
         Css::Inline(s) => {
             let id = hashstr("id_", &s);
-            do_inject_css(id.into(), s.to_string().into());
+            do_inject_css(id.into(), s.to_string().into(), true);
         }
         Css::Class { name, css } => {
-            do_inject_css(name.to_string().into(), css.to_string().into());
+            do_inject_css(name.to_string().into(), css.to_string().into(), true);
         }
         Css::Link(s) => {
             let id = hashstr("id_", &s);
@@ -76,7 +76,7 @@ fn do_css(css: Css) {
                 _ = style.set_attribute("id", &id);
                 _ = style.set_attribute("rel", "stylesheet");
                 _ = style.set_attribute("href", &s);
-                _ = head.prepend_with_node_1(&style);
+                _ = head.append_with_node_1(&style);
             }
         }
     }
@@ -84,7 +84,7 @@ fn do_css(css: Css) {
 
 #[allow(clippy::missing_const_for_fn)]
 #[allow(clippy::needless_pass_by_value)]
-fn do_inject_css(id: Cow<'static, str>, content: Cow<'static, str>) {
+fn do_inject_css(id: Cow<'static, str>, content: Cow<'static, str>, after: bool) {
     #[cfg(feature = "ssr")]
     {
         use leptos_meta::Style;
@@ -119,6 +119,10 @@ fn do_inject_css(id: Cow<'static, str>, content: Cow<'static, str>) {
         };
         _ = style.set_attribute("id", &id);
         style.set_text_content(Some(&content));
-        _ = head.prepend_with_node_1(&style);
+        _ = if after {
+            head.append_with_node_1(&style)
+        } else {
+            head.prepend_with_node_1(&style)
+        };
     }
 }

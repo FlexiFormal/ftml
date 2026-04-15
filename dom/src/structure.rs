@@ -397,7 +397,7 @@ impl DocumentStructure {
                 && frag.starts_with('#')
             {
                 frag.remove(0);
-                tracing::warn!("Current fragment: {frag}");
+                tracing::info!("Current fragment: {frag}");
                 fragment.set(frag);
             }
             fragment_listener(fragment);
@@ -412,7 +412,7 @@ impl DocumentStructure {
             if done.get() {
                 let fragment = fragment.get();
                 if !fragment.is_empty() {
-                    tracing::warn!("Navigating to {fragment}");
+                    tracing::info!("Navigating to {fragment}");
                     Self::navigate_to(&fragment);
                 }
             }
