@@ -84,6 +84,7 @@ where
     Url: std::fmt::Display,
     E: std::fmt::Display + std::fmt::Debug + From<RequestError>,
 {
+    #[allow(clippy::too_many_arguments)]
     pub const fn new_with_redirects(
         fragment_url: Url,
         document_html_url: Url,
@@ -118,6 +119,7 @@ where
     Url: std::fmt::Display,
     E: std::fmt::Display + std::fmt::Debug + From<RequestError>,
 {
+    #[allow(clippy::too_many_arguments)]
     pub const fn new(
         fragment_url: Url,
         document_html_url: Url,
@@ -875,7 +877,7 @@ trait JsWrap {
 }
 
 #[cfg(feature = "wasm")]
-impl JsWrap for reqwasm::http::Response {
+impl JsWrap for gloo_net::http::Response {
     #[cfg(not(feature = "serde-lite"))]
     #[allow(clippy::future_not_send)]
     async fn get<
@@ -942,8 +944,9 @@ where
     E::Err: Into<BackendError<E>>,
 {
     let fut = async move {
-        let res = reqwasm::http::Request::post(&url)
+        let res = gloo_net::http::Request::post(&url)
             .body(body)
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?
             .send()
             .await
             .map_err(|e| BackendError::Connection(E::from(e.into())))?;
@@ -975,7 +978,7 @@ where
         E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
         E::Err: Into<BackendError<E>>,
     {
-        let res = reqwasm::http::Request::get(&url)
+        let res = gloo_net::http::Request::get(&url)
             .send()
             .await
             .map_err(|e| BackendError::Connection(E::from(e.into())))?;
@@ -1009,7 +1012,7 @@ where
         E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
         E::Err: Into<BackendError<E>>,
     {
-        let res = reqwasm::http::Request::get(&url)
+        let res = gloo_net::http::Request::get(&url)
             .send()
             .await
             .map_err(|e| BackendError::Connection(E::from(e.into())))?;
@@ -1037,8 +1040,9 @@ where
     E::Err: Into<BackendError<E>>,
 {
     let fut = async move {
-        let res = reqwasm::http::Request::post(&url)
+        let res = gloo_net::http::Request::post(&url)
             .body(body)
+            .map_err(|e| BackendError::Connection(E::from(e.into())))?
             .send()
             .await
             .map_err(|e| BackendError::Connection(E::from(e.into())))?;
@@ -1155,11 +1159,12 @@ where
 }
 
 #[cfg(feature = "wasm")]
-impl From<reqwasm::Error> for RequestError {
-    fn from(value: reqwasm::Error) -> Self {
+impl From<gloo_net::Error> for RequestError {
+    fn from(value: gloo_net::Error) -> Self {
         match value {
-            reqwasm::Error::JsError(j) => Self::Request(j.to_string()),
-            reqwasm::Error::SerdeError(e) => Self::Deserialization(e.to_string()),
+            gloo_net::Error::GlooError(s) => Self::Request(s),
+            gloo_net::Error::JsError(j) => Self::Request(j.to_string()),
+            gloo_net::Error::SerdeError(e) => Self::Deserialization(e.to_string()),
         }
     }
 }

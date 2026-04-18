@@ -120,7 +120,7 @@ impl<
                 if !sender.is_closed() && sender.receiver_count() > 0 {
                     #[cfg(not(target_family = "wasm"))]
                     {
-                        sender.broadcast_blocking(res.clone());
+                        let _ = sender.broadcast_blocking(res.clone());
                     }
                     #[cfg(target_family = "wasm")]
                     {

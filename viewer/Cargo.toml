@@ -10,6 +10,9 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [features]
+default = ["nightly"]
+## Use leptos nightly feature
+nightly = ["leptos/nightly","ftml-dom/nightly","ftml-components/nightly"]
 ## Generates typescript bindings
 typescript = ["tsify", "ftml-components/typescript", "ftml-components/callbacks"]
 ## generate wasm split points

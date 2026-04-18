@@ -119,7 +119,7 @@ pub trait FtmlViews: 'static {
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         view! {
-          <div class=class style=style>{then()}</div>
+          <div class=class style=move || style.get()>{then()}</div>
         }
     }
 
@@ -342,7 +342,7 @@ pub trait TermTrackedViews: 'static {
         then: impl FnOnce() -> V + Send + 'static,
     ) -> impl IntoView {
         view! {
-          <div class=class style=style>{then()}</div>
+          <div class=class style=move || style.get()>{then()}</div>
         }
     }
 

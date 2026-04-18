@@ -16,13 +16,13 @@ server_fn = ["dep:server_fn"]
 wasm = [
     "dep:wasm-bindgen",
     "ftml-ontology/wasm",
-    "dep:reqwasm",
     "dep:send_wrapper",
+    "dep:gloo-net"
 ]
 ## reqwest
 reqwest = ["dep:reqwest"]
 ## cached
-cached = ["dep:dashmap", "dep:parking_lot", "dep:kanal"]
+cached = ["dep:dashmap", "dep:async-broadcast","dep:pollster"]
 ## Generates typescript exports for `wasm-pack`
 typescript = ["wasm", "dep:tsify", "ftml-ontology/typescript"]
 ## Adds memory monitoring for cached backends
@@ -48,6 +48,9 @@ rustdoc-args = [
 rustc_version = { workspace = true }
 
 [dev-dependencies]
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time", "sync"] }
+futures = "0.3"
+
 #tracing-subscriber = { workspace = true }
 #rstest = { workspace = true }
 #criterion = { workspace = true }
@@ -72,10 +75,13 @@ reqwest = { workspace = true, optional = true, features = ["json"] }
 server_fn = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 tsify = { workspace = true, optional = true }
-reqwasm = { workspace = true, optional = true }
+#reqwasm = { workspace = true, optional = true }
+gloo-net = { workspace = true, optional = true }
 send_wrapper = { workspace = true, optional = true }
 dashmap = { workspace = true, optional = true }
-parking_lot = { workspace = true, optional = true }
-kanal = { workspace = true, optional = true }
+pollster = { workspace = true, optional = true }
+#parking_lot = { workspace = true, optional = true }
+#kanal = { workspace = true, optional = true }
 bytesize = { workspace = true, optional = true }
 deepsize = { workspace = true, optional = true }
+async-broadcast = { workspace = true,optional = true }

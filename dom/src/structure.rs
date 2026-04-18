@@ -559,25 +559,43 @@ pub mod utils {
 
     use leptos::prelude::*;
     use leptos::tachys::html::style::IntoStyle as IS;
+
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     pub struct Style(pub either::Either<String, Memo<String>>);
     macro_rules! asIs {
-        ($i:ident) => {either::Either<<String as IS>::$i,<Memo<String> as IS>::$i>}
+        ($i:ident) => {
+            either::Either<<String as IS>::$i,<Memo<String> as IS>::$i>
+        }
     }
-    macro_rules! asAs {
-        ($i:ident) => {either::Either<<Arc<str> as IS>::$i,<Memo<String> as IS>::$i>}
-    }
+
+    #[cfg(not(feature = "nightly"))]
+    pub type MStr = Memo<String>;
+    #[cfg(feature = "nightly")]
+    pub type MStr = Arc<std::sync::Mutex<dyn FnMut() -> std::string::String + Send + 'static>>;
+
     #[derive(Clone)]
     pub struct ArcStyle(either::Either<Arc<str>, Memo<String>>);
+
     impl IS for ArcStyle {
         type AsyncOutput = Self;
-        type State = asAs!(State);
+        type State = either::Either<<Arc<str> as IS>::State, <MStr as IS>::State>;
+
         type Cloneable = Self;
         type CloneableOwned = Self;
+
         fn to_html(self, style: &mut String) {
             match self.0 {
                 either::Either::Left(s) => IS::to_html(s, style),
-                either::Either::Right(s) => IS::to_html(s, style),
+                either::Either::Right(s) => {
+                    #[cfg(not(feature = "nightly"))]
+                    {
+                        IS::to_html(s, style);
+                    }
+                    #[cfg(feature = "nightly")]
+                    {
+                        IS::to_html(s.get(), style);
+                    }
+                }
             }
         }
         fn hydrate<const FROM_SERVER: bool>(
@@ -586,17 +604,46 @@ pub mod utils {
         ) -> Self::State {
             self.0.map_either(
                 |s| IS::hydrate::<FROM_SERVER>(s, el),
-                |s| IS::hydrate::<FROM_SERVER>(s, el),
+                |s| {
+                    #[cfg(not(feature = "nightly"))]
+                    {
+                        IS::hydrate::<FROM_SERVER>(s, el)
+                    }
+                    #[cfg(feature = "nightly")]
+                    {
+                        IS::hydrate::<FROM_SERVER>(move || s.get(), el)
+                    }
+                },
             )
         }
         fn build(self, el: &leptos::tachys::renderer::types::Element) -> Self::State {
-            self.0
-                .map_either(|s| IS::build(s, el), |s| IS::build(s, el))
+            self.0.map_either(
+                |s| IS::build(s, el),
+                |s| {
+                    #[cfg(not(feature = "nightly"))]
+                    {
+                        IS::build(s, el)
+                    }
+                    #[cfg(feature = "nightly")]
+                    {
+                        IS::build(move || s.get(), el)
+                    }
+                },
+            )
         }
         fn rebuild(self, state: &mut Self::State) {
             match (self.0, state) {
                 (either::Left(sl), either::Left(st)) => IS::rebuild(sl, st),
-                (either::Right(sl), either::Right(st)) => IS::rebuild(sl, st),
+                (either::Right(sl), either::Right(st)) => {
+                    #[cfg(not(feature = "nightly"))]
+                    {
+                        IS::rebuild(sl, st);
+                    }
+                    #[cfg(feature = "nightly")]
+                    {
+                        IS::rebuild(move || sl.get(), st);
+                    }
+                }
                 // SAFETY: left/right used consistently
                 _ => unsafe { unreachable_unchecked() },
             }
@@ -608,27 +655,46 @@ pub mod utils {
             self
         }
         fn dry_resolve(&mut self) {
-            self.0.as_mut().map_either(IS::dry_resolve, IS::dry_resolve);
+            self.0.as_mut().map_either(IS::dry_resolve, |s| {
+                #[cfg(not(feature = "nightly"))]
+                {
+                    IS::dry_resolve(s);
+                }
+                #[cfg(feature = "nightly")]
+                {
+                    IS::dry_resolve(&mut s.get());
+                }
+            });
         }
         async fn resolve(self) -> Self::AsyncOutput {
             self
         }
+
         fn reset(state: &mut Self::State) {
             state
                 .as_mut()
-                .map_either(<Arc<str> as IS>::reset, <Memo<String> as IS>::reset);
+                .map_either(<Arc<str> as IS>::reset, <MStr as IS>::reset);
         }
     }
 
     impl IS for Style {
         type AsyncOutput = Self;
-        type State = asIs!(State);
+        type State = either::Either<<String as IS>::State, <MStr as IS>::State>;
         type Cloneable = ArcStyle;
         type CloneableOwned = ArcStyle;
         fn to_html(self, style: &mut String) {
             match self.0 {
                 either::Either::Left(s) => IS::to_html(s, style),
-                either::Either::Right(s) => IS::to_html(s, style),
+                either::Either::Right(s) => {
+                    #[cfg(not(feature = "nightly"))]
+                    {
+                        IS::to_html(s, style);
+                    }
+                    #[cfg(feature = "nightly")]
+                    {
+                        IS::to_html(s.get(), style);
+                    }
+                }
             }
         }
         fn hydrate<const FROM_SERVER: bool>(
@@ -637,32 +703,67 @@ pub mod utils {
         ) -> Self::State {
             self.0.map_either(
                 |s| IS::hydrate::<FROM_SERVER>(s, el),
-                |s| IS::hydrate::<FROM_SERVER>(s, el),
+                |s| {
+                    #[cfg(not(feature = "nightly"))]
+                    {
+                        IS::hydrate::<FROM_SERVER>(s, el)
+                    }
+                    #[cfg(feature = "nightly")]
+                    {
+                        IS::hydrate::<FROM_SERVER>(move || s.get(), el)
+                    }
+                },
             )
         }
         fn build(self, el: &leptos::tachys::renderer::types::Element) -> Self::State {
-            self.0
-                .map_either(|s| IS::build(s, el), |s| IS::build(s, el))
+            self.0.map_either(
+                |s| IS::build(s, el),
+                |s| {
+                    #[cfg(not(feature = "nightly"))]
+                    {
+                        IS::build(s, el)
+                    }
+                    #[cfg(feature = "nightly")]
+                    {
+                        IS::build(move || s.get(), el)
+                    }
+                },
+            )
         }
         fn rebuild(self, state: &mut Self::State) {
             match (self.0, state) {
                 (either::Left(sl), either::Left(st)) => IS::rebuild(sl, st),
-                (either::Right(sl), either::Right(st)) => IS::rebuild(sl, st),
+                (either::Right(sl), either::Right(st)) => {
+                    #[cfg(not(feature = "nightly"))]
+                    {
+                        IS::rebuild(sl, st);
+                    }
+                    #[cfg(feature = "nightly")]
+                    {
+                        IS::rebuild(move || sl.get(), st);
+                    }
+                }
                 // SAFETY: left/right used consistently
                 _ => unsafe { unreachable_unchecked() },
             }
         }
         fn into_cloneable(self) -> Self::Cloneable {
-            ArcStyle(self.0.map_either(IS::into_cloneable, IS::into_cloneable))
+            ArcStyle(self.0.map_either(IS::into_cloneable, |s| s))
         }
         fn into_cloneable_owned(self) -> Self::CloneableOwned {
-            ArcStyle(
-                self.0
-                    .map_either(IS::into_cloneable_owned, IS::into_cloneable_owned),
-            )
+            ArcStyle(self.0.map_either(IS::into_cloneable_owned, |s| s))
         }
         fn dry_resolve(&mut self) {
-            self.0.as_mut().map_either(IS::dry_resolve, IS::dry_resolve);
+            self.0.as_mut().map_either(IS::dry_resolve, |s| {
+                #[cfg(not(feature = "nightly"))]
+                {
+                    IS::dry_resolve(s);
+                }
+                #[cfg(feature = "nightly")]
+                {
+                    IS::dry_resolve(&mut s.get());
+                }
+            });
         }
         async fn resolve(self) -> Self::AsyncOutput {
             self
@@ -670,7 +771,7 @@ pub mod utils {
         fn reset(state: &mut Self::State) {
             state
                 .as_mut()
-                .map_either(<String as IS>::reset, <Memo<String> as IS>::reset);
+                .map_either(<String as IS>::reset, <MStr as IS>::reset);
         }
     }
 }

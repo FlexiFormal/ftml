@@ -2,10 +2,10 @@ use ftml_uris::{DomainUriRef, ModuleUri, UriName};
 
 use crate::{
     domain::{
-        declarations::{AnyDeclarationRef, IsDeclaration, symbols::ArgumentSpec},
+        declarations::{AnyDeclarationRef, IsDeclaration},
         modules::{Module, ModuleLike},
     },
-    utils::{SharedArc, TreeIter},
+    utils::SharedArc,
 };
 
 pub mod declarations;
@@ -54,7 +54,7 @@ impl Module {
     }
 }
 
-pub trait HasDeclarations: crate::Ftml {
+pub trait HasDeclarations: crate::Ftml + Sync {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator;
@@ -77,35 +77,40 @@ pub trait HasDeclarations: crate::Ftml {
         }
     }
 
-    async fn initialize_async<E: std::fmt::Display, F>(&self, get: &mut dyn FnMut(&ModuleUri) -> F)
+    fn initialize_async<E: std::fmt::Display, F>(
+        &self,
+        get: &mut dyn FnMut(&ModuleUri) -> F,
+    ) -> impl std::future::Future<Output = ()>
     where
         F: Future<Output = Result<ModuleLike, E>>,
     {
-        for d in self.declarations() {
-            match d {
-                AnyDeclarationRef::Extension(e) => {
-                    (Box::pin(e.initialize_async(get))
-                        as std::pin::Pin<Box<dyn Future<Output = _>>>)
-                        .await;
+        async {
+            for d in self.declarations() {
+                match d {
+                    AnyDeclarationRef::Extension(e) => {
+                        (Box::pin(e.initialize_async(get))
+                            as std::pin::Pin<Box<dyn Future<Output = _>>>)
+                            .await;
+                    }
+                    AnyDeclarationRef::MathStructure(e) => {
+                        (Box::pin(e.initialize_async(get))
+                            as std::pin::Pin<Box<dyn Future<Output = _>>>)
+                            .await;
+                    }
+                    AnyDeclarationRef::Morphism(e) => {
+                        (Box::pin(e.initialize_async(get))
+                            as std::pin::Pin<Box<dyn Future<Output = _>>>)
+                            .await;
+                    }
+                    AnyDeclarationRef::NestedModule(e) => {
+                        (Box::pin(e.initialize_async(get))
+                            as std::pin::Pin<Box<dyn Future<Output = _>>>)
+                            .await;
+                    }
+                    AnyDeclarationRef::Import { .. }
+                    | AnyDeclarationRef::Symbol(_)
+                    | AnyDeclarationRef::Rule { .. } => (),
                 }
-                AnyDeclarationRef::MathStructure(e) => {
-                    (Box::pin(e.initialize_async(get))
-                        as std::pin::Pin<Box<dyn Future<Output = _>>>)
-                        .await;
-                }
-                AnyDeclarationRef::Morphism(e) => {
-                    (Box::pin(e.initialize_async(get))
-                        as std::pin::Pin<Box<dyn Future<Output = _>>>)
-                        .await;
-                }
-                AnyDeclarationRef::NestedModule(e) => {
-                    (Box::pin(e.initialize_async(get))
-                        as std::pin::Pin<Box<dyn Future<Output = _>>>)
-                        .await;
-                }
-                AnyDeclarationRef::Import { .. }
-                | AnyDeclarationRef::Symbol(_)
-                | AnyDeclarationRef::Rule { .. } => (),
             }
         }
     }

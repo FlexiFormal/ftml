@@ -1,5 +1,4 @@
 use crate::{BackendError, FtmlBackend, ParagraphOrProblemKind};
-use dashmap::Entry;
 use ftml_ontology::{
     domain::modules::{Module, ModuleLike},
     narrative::{
@@ -12,16 +11,15 @@ use ftml_uris::{
     DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
 };
 use futures_util::TryFutureExt;
-use kanal::AsyncSender;
-use parking_lot::RwLock;
-use std::{hint::unreachable_unchecked, sync::Arc};
+use std::hint::unreachable_unchecked;
 
+type AsyncCache<K, V, E> =
+    crate::utils::async_cache::AsyncCache<K, V, E, rustc_hash::FxBuildHasher>;
+/*
 #[derive(Debug, Clone, thiserror::Error, serde::Deserialize, serde::Serialize)]
 pub enum CacheError<E: std::fmt::Debug> {
-    #[error("channel sender closed")]
-    SendClosed,
-    #[error("channel receiver closed")]
-    ReceiveClosed,
+    #[error("internal cache error")]
+    Cache,
     #[error("{0}")]
     Connection(E),
 }
@@ -41,73 +39,80 @@ impl<E: std::fmt::Display + std::fmt::Debug> From<CacheError<BackendError<E>>>
                 BackendError::InvalidArgument(s) => Self::InvalidArgument(s),
                 BackendError::ToDo(s) => Self::ToDo(s),
             },
-            CacheError::ReceiveClosed => Self::Connection(CacheError::ReceiveClosed),
-            CacheError::SendClosed => Self::Connection(CacheError::SendClosed),
+            CacheError::Cache => Self::Connection(CacheError::Cache),
         }
+    }
+}
+impl<E: std::fmt::Display + std::fmt::Debug> From<crate::utils::async_cache::CacheError>
+    for CacheError<BackendError<E>>
+{
+    fn from(_: crate::utils::async_cache::CacheError) -> Self {
+        Self::Cache
+    }
+}
+ */
+impl<E: std::fmt::Display + std::fmt::Debug + From<crate::utils::async_cache::CacheError>>
+    From<crate::utils::async_cache::CacheError> for BackendError<E>
+{
+    fn from(_: crate::utils::async_cache::CacheError) -> Self {
+        Self::Connection(crate::utils::async_cache::CacheError.into())
     }
 }
 
 pub struct CachedBackend<B: FtmlBackend>
 where
-    B::Error: Clone + Send + Sync,
+    B::Error: Clone + Send + Sync + From<crate::utils::async_cache::CacheError>,
 {
     inner: B,
     #[allow(clippy::type_complexity)]
-    fragment_cache:
-        Cache<(Uri, Option<NarrativeUri>), (Box<str>, Box<[Css]>, bool), BackendError<B::Error>>,
+    fragment_cache: AsyncCache<
+        (Uri, Option<NarrativeUri>),
+        (Box<str>, Box<[Css]>, bool),
+        BackendError<B::Error>,
+    >,
     #[allow(clippy::type_complexity)]
-    doc_html_cache: Cache<
+    doc_html_cache: AsyncCache<
         (DocumentUri, Option<NarrativeUri>),
         (Box<str>, Box<[Css]>, bool),
         BackendError<B::Error>,
     >,
-    notations_cache: Cache<LeafUri, Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
-    paragraphs_cache:
-        Cache<SymbolUri, Vec<(DocumentElementUri, ParagraphOrProblemKind)>, BackendError<B::Error>>,
-    modules_cache: Cache<ModuleUri, Module, BackendError<B::Error>>,
-    documents_cache: Cache<DocumentUri, Document, BackendError<B::Error>>,
+    notations_cache:
+        AsyncCache<LeafUri, Vec<(DocumentElementUri, Notation)>, BackendError<B::Error>>,
+    paragraphs_cache: AsyncCache<
+        SymbolUri,
+        Vec<(DocumentElementUri, ParagraphOrProblemKind)>,
+        BackendError<B::Error>,
+    >,
+    modules_cache: AsyncCache<ModuleUri, Module, BackendError<B::Error>>,
+    documents_cache: AsyncCache<DocumentUri, Document, BackendError<B::Error>>,
     toc_cache:
-        Cache<DocumentUri, (Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<B::Error>>,
+        AsyncCache<DocumentUri, (Box<[Css]>, SectionLevel, Box<[TocElem]>), BackendError<B::Error>>,
 }
 
 impl<B: FtmlBackend> CachedBackend<B>
 where
-    B::Error: Clone + Send + Sync,
+    B::Error: Clone + Send + Sync + From<crate::utils::async_cache::CacheError>,
 {
     #[inline]
     pub fn new(inner: B) -> Self {
         Self {
             inner,
-            fragment_cache: Cache {
-                map: dashmap::DashMap::default(),
-            },
-            doc_html_cache: Cache {
-                map: dashmap::DashMap::default(),
-            },
-            notations_cache: Cache {
-                map: dashmap::DashMap::default(),
-            },
-            paragraphs_cache: Cache {
-                map: dashmap::DashMap::default(),
-            },
-            modules_cache: Cache {
-                map: dashmap::DashMap::default(),
-            },
-            documents_cache: Cache {
-                map: dashmap::DashMap::default(),
-            },
-            toc_cache: Cache {
-                map: dashmap::DashMap::default(),
-            },
+            fragment_cache: AsyncCache::default(),
+            doc_html_cache: AsyncCache::default(),
+            notations_cache: AsyncCache::default(),
+            paragraphs_cache: AsyncCache::default(),
+            modules_cache: AsyncCache::default(),
+            documents_cache: AsyncCache::default(),
+            toc_cache: AsyncCache::default(),
         }
     }
 }
 
 impl<B: FtmlBackend> FtmlBackend for CachedBackend<B>
 where
-    B::Error: Clone + Send + Sync + std::fmt::Debug,
+    B::Error: Clone + Send + Sync + std::fmt::Debug + From<crate::utils::async_cache::CacheError>,
 {
-    type Error = CacheError<B::Error>;
+    type Error = B::Error;
 
     #[inline]
     fn check_term(
@@ -281,7 +286,7 @@ where
         let uriclone = uri.clone();
         self.notations_cache
             .with(
-                symbol,
+                &symbol,
                 |v| self.inner.get_notations(v),
                 move |v| {
                     v.iter()
@@ -296,6 +301,7 @@ where
     }
 }
 
+/*
 #[derive(Clone)]
 enum MaybeValue<T: Clone, E: Clone> {
     Done(Result<T, E>),
@@ -460,11 +466,12 @@ impl<E: std::fmt::Debug + std::fmt::Display> From<kanal::ReceiveError> for Cache
         }
     }
 }
+ */
 
 #[cfg(feature = "deepsize")]
 impl<B: FtmlBackend> CachedBackend<B>
 where
-    B::Error: Clone + Send + Sync,
+    B::Error: Clone + Send + Sync + From<crate::utils::async_cache::CacheError>,
 {
     #[allow(clippy::significant_drop_tightening)]
     pub fn cache_size(&self) -> CacheSize {
@@ -473,10 +480,12 @@ where
         let mut notations_bytes = 0;
         for n in &self.notations_cache.map {
             notations_bytes += std::mem::size_of::<LeafUri>();
-            let value = n.value().read();
+            let Ok(value) = n.value().inner.0.lock() else {
+                continue;
+            };
             let value = &*value;
             notations_bytes += std::mem::size_of_val(value);
-            if let MaybeValue::Done(Ok(v)) = value {
+            if let Some(Ok(v)) = value {
                 for v in v {
                     num_notations += 1;
                     notations_bytes +=
@@ -489,10 +498,12 @@ where
         for d in &self.documents_cache.map {
             documents_bytes += std::mem::size_of::<DocumentUri>();
             num_documents += 1;
-            let value = d.value().read();
+            let Ok(value) = d.value().inner.0.lock() else {
+                continue;
+            };
             let value = &*value;
             documents_bytes += std::mem::size_of_val(value);
-            if let MaybeValue::Done(Ok(v)) = value {
+            if let Some(Ok(v)) = value {
                 documents_bytes += v.deep_size_of();
             }
         }
@@ -501,10 +512,12 @@ where
         for d in &self.modules_cache.map {
             num_modules += 1;
             modules_bytes += std::mem::size_of::<ModuleUri>();
-            let value = d.value().read();
+            let Ok(value) = d.value().inner.0.lock() else {
+                continue;
+            };
             let value = &*value;
             modules_bytes += std::mem::size_of_val(value);
-            if let MaybeValue::Done(Ok(v)) = value {
+            if let Some(Ok(v)) = value {
                 modules_bytes += v.deep_size_of();
             }
         }
@@ -513,10 +526,12 @@ where
         for d in &self.fragment_cache.map {
             num_fragments += 1;
             fragments_bytes += std::mem::size_of::<(Uri, Option<NarrativeUri>)>();
-            let value = d.value().read();
+            let Ok(value) = d.value().inner.0.lock() else {
+                continue;
+            };
             let value = &*value;
             fragments_bytes += std::mem::size_of_val(value);
-            if let MaybeValue::Done(Ok((s, c, _))) = value {
+            if let Some(Ok((s, c, _))) = value {
                 fragments_bytes += s.len();
                 for c in c {
                     fragments_bytes += std::mem::size_of_val(c);
@@ -533,10 +548,12 @@ where
         for n in &self.paragraphs_cache.map {
             num_paragraphs += 1;
             paragraphs_bytes += std::mem::size_of::<SymbolUri>();
-            let value = n.value().read();
+            let Ok(value) = n.value().inner.0.lock() else {
+                continue;
+            };
             let value = &*value;
             fragments_bytes += std::mem::size_of_val(value);
-            if let MaybeValue::Done(Ok(v)) = value {
+            if let Some(Ok(v)) = value {
                 fragments_bytes +=
                     v.len() * std::mem::size_of::<(DocumentElementUri, ParagraphOrProblemKind)>();
             }

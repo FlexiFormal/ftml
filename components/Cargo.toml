@@ -10,6 +10,8 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [features]
+## use leptos nightly feature
+nightly = ["thaw/nightly", "leptos/nightly","ftml-dom/nightly"]
 ## Pure client-side rendering
 csr = [
     "leptos/csr",

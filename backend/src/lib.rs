@@ -1,4 +1,4 @@
-#![allow(unexpected_cfgs)]
+#![allow(unexpected_cfgs, clippy::type_complexity)]
 #![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 /*!
@@ -8,8 +8,7 @@
 
 #[cfg(feature = "cached")]
 mod cache;
-#[cfg(feature = "wasm")]
-mod utils;
+pub mod utils;
 #[cfg(feature = "cached")]
 pub use cache::*;
 
@@ -171,7 +170,7 @@ pub trait FtmlBackend {
     fn cached(self) -> cache::CachedBackend<Self>
     where
         Self: Sized,
-        Self::Error: Clone + Send + Sync,
+        Self::Error: Clone + Send + Sync + From<crate::utils::async_cache::CacheError>,
     {
         cache::CachedBackend::new(self)
     }
@@ -384,6 +383,13 @@ pub trait FtmlBackend {
     }
 }
 
+#[cfg(all(feature = "server_fn", feature = "cached"))]
+impl From<crate::utils::async_cache::CacheError> for ::server_fn::error::ServerFnErrorErr {
+    fn from(value: crate::utils::async_cache::CacheError) -> Self {
+        Self::Request(value.to_string())
+    }
+}
+
 #[cfg(feature = "server_fn")]
 pub trait FlamsBackend {
     fn document_link_url(&self, uri: &DocumentUri) -> String;
@@ -557,7 +563,7 @@ where
     + Send
     + use<FB>
     + 'static {
-        <Self as FlamsBackend>::check_term(&self, global_context, in_term, subterm)
+        <Self as FlamsBackend>::check_term(self, global_context, in_term, subterm)
     }
 
     fn get_fragment(

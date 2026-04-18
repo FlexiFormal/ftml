@@ -90,8 +90,8 @@ bytecount = {workspace = true}
 tracing = { workspace = true }
 
 #kanal = { workspace = true }
-pollster = { workspace = true }
-async-broadcast = { workspace = true }
+#pollster = { workspace = true }
+#async-broadcast = { workspace = true }
 # syntree = { workspace = true }
 
 serde = { workspace = true, optional = true }
