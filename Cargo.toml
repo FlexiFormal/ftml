@@ -83,7 +83,7 @@ strumbra = "0.6"
 serde = { version = "1" }
 serde_with = "3"
 miniserde = "0.1"
-serde-lite = "0.5.1"
+serde-lite = {version="0.5.1",features=["derive"]}
 wasm-bindgen = "0.2"
 web-sys = { version = "0.3", default-features = false }
 url = { version = "2.5" }
