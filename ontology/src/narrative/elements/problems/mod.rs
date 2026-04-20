@@ -215,7 +215,10 @@ impl std::hash::Hash for AnswerClass {
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
+#[cfg_attr(
+    any(feature = "serde", feature = "serde-lite"),
+    serde(tag = "type", content = "value")
+)]
 pub enum AnswerKind {
     Class(f32),
     Trait(f32),
