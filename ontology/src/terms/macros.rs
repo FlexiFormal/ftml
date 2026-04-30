@@ -1,4 +1,24 @@
 #[macro_export]
+macro_rules! tm {
+    ($t:expr; $e:expr) => {
+        $t == $e
+    };
+    ($t:expr; $($r:tt)*) => {
+        matches!($t,$crate::tm!(BOOL $($r)*))
+    };
+    (BOOL ($($head:tt)*)@_) => {
+        $crate::terms::Term::Application(app) if $crate::tm!(app.head;$($head)*)
+    };
+    (BOOL ($($head:tt)*)@($($args:tt)*)) => {
+        $crate::terms::Term::Application(app) if $crate::tm!(app.head;$($head)*) &&
+        matches!(&*app.arguments,[$crate::tm!(ARGS INIF $($args)*)])
+    };
+    (ARGS INIF [$($seq:tt)*],$($rest:tt)*) => {
+        $crate::terms::Argument::Sequence(_)
+    };
+}
+/*
+#[macro_export]
 macro_rules! matchtm {
     (
         sym(_)
@@ -103,3 +123,4 @@ macro_rules! matchtm {
         $crate::terms::Argument::Simple($name)
     };
 }
+ */

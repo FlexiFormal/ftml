@@ -106,7 +106,9 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
                 }
                 match c {
                     Some(Right(s)) if !s.chars().all(is_whitespace) => {
-                        children.push(NotationComponent::Text(s.into_boxed_str()));
+                        children.push(NotationComponent::Text {
+                            txt: s.into_boxed_str(),
+                        });
                     }
                     Some(Left(n)) => {
                         #[allow(clippy::cast_possible_truncation)]

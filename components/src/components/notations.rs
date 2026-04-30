@@ -113,9 +113,12 @@ pub fn notation_selector(uri: LeafUri) -> impl IntoView {
                 if (global.is_none()
                     || global
                         .as_ref()
-                        .is_some_and(|r| r.is_err() || r.as_ref().is_ok_and(Vec::is_empty)))
-                    && local.is_none() =>
+                        .is_some_and(|r|
+                            r.as_ref().is_err_and(|e| {tracing::error!("Notation error: {e}");true})
+                            || r.as_ref().is_ok_and(Vec::is_empty))
+                ) && local.is_none() =>
             {
+                tracing::warn!("No notations for {uri}");
                 A(())
             }
             Some(Ok(v)) => B(do_notation_selector(&uri, v)),
@@ -132,6 +135,7 @@ fn do_notation_selector(
     use ftml_dom::notations::NotationExt;
     use leptos::prelude::*;
     use thaw::{Combobox, ComboboxOption};
+    tracing::warn!("Rendering notation selector");
     let mut all = notations.local.unwrap_or_default();
     match notations.global {
         None => (),

@@ -13,8 +13,10 @@ pub mod simplify;
 pub mod subst;
 mod term;
 pub mod termpaths;
+pub mod termpaths2;
 //pub mod traverser;
 mod debug;
+pub mod patterns;
 mod variables;
 
 pub use arguments::{Argument, ArgumentMode, BoundArgument, ComponentVar, MaybeSequence};

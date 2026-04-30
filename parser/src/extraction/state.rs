@@ -1899,9 +1899,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 },
             ) => {
                 let comp = if is_main {
-                    NotationComponent::MainComp(component)
+                    NotationComponent::MainComp { node: component }
                 } else {
-                    NotationComponent::Comp(component)
+                    NotationComponent::Comp { node: component }
                 };
                 components.push((comp, node.path_from(ancestor)));
                 Ok(())
@@ -3329,11 +3329,15 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                 None,
             )
         };
-        let term = Term::Application(ApplicationTerm::new(
-            head,
-            args.into_boxed_slice(),
-            presentation,
-        ))
+        let term = (if args.is_empty() {
+            head
+        } else {
+            Term::Application(ApplicationTerm::new(
+                head,
+                args.into_boxed_slice(),
+                presentation,
+            ))
+        })
         .simplify();
         self.close_app_term(uri, term, node)
     }

@@ -895,7 +895,7 @@ pub(crate) fn view_component_with_args<Views: FtmlViews, A: ArgumentRender>(
     argument_precs: &[i64],
 ) -> AnyView {
     match comp {
-        NotationComponent::Text(s) => s.to_string().into_any(),
+        NotationComponent::Text { txt } => txt.to_string().into_any(),
         NotationComponent::Node {
             tag,
             attributes,
@@ -922,7 +922,7 @@ pub(crate) fn view_component_with_args<Views: FtmlViews, A: ArgumentRender>(
                 |n, (k, v)| n.attr(k.to_string(), v.to_string()),
             )
             .into_any(),
-        NotationComponent::MainComp(n) if this.is_some() => {
+        NotationComponent::MainComp { node: n } if this.is_some() => {
             // SAFETY: defined
             let this = unsafe { this.unwrap_unchecked().clone() };
             let n = n.clone();
@@ -935,7 +935,7 @@ pub(crate) fn view_component_with_args<Views: FtmlViews, A: ArgumentRender>(
             };
             view!(<msub>{inner}{this.into_view::<Views>()}</msub>).into_any()
         }
-        NotationComponent::Comp(n) | NotationComponent::MainComp(n) => {
+        NotationComponent::Comp { node: n } | NotationComponent::MainComp { node: n } => {
             let n = n.clone();
             if with_context::<CurrentUri, _>(|_| ()).is_some() {
                 Views::comp(ClonableView::new(true, move || view_node(&n, true)))

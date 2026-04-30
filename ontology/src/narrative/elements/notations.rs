@@ -120,10 +120,15 @@ pub enum NotationComponent {
         #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         segments: Box<[NotationComponent]>,
     },
-    MainComp(NotationNode),
-    Comp(NotationNode),
-    #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(untagged))]
-    Text(Box<str>),
+    MainComp {
+        node: NotationNode,
+    },
+    Comp {
+        node: NotationNode,
+    },
+    Text {
+        txt: Box<str>,
+    },
 }
 impl crate::__private::Sealed for NotationReference {}
 impl Ftml for NotationReference {
@@ -225,9 +230,10 @@ impl crate::utils::RefTree for NotationComponent {
         Self: 'a;
     fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
         match self {
-            Self::Comp(_) | Self::Text(_) | Self::MainComp(_) | Self::Argument { .. } => {
-                either::Left(std::iter::empty())
-            }
+            Self::Comp { .. }
+            | Self::Text { .. }
+            | Self::MainComp { .. }
+            | Self::Argument { .. } => either::Left(std::iter::empty()),
             Self::Node { children, .. }
             | Self::ArgSep { sep: children, .. }
             | Self::ArgMap {
@@ -240,7 +246,7 @@ impl crate::utils::RefTree for NotationComponent {
 impl std::fmt::Debug for NotationComponent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Text(t) => write!(f, "\"{t}\""),
+            Self::Text { txt } => write!(f, "\"{txt}\""),
             Self::Argument { index, mode } => write!(f, "<arg {index}@{mode:?}/>"),
             Self::Node {
                 tag,
@@ -271,7 +277,7 @@ impl std::fmt::Debug for NotationComponent {
                 }
                 write!(f, "<argsep/>")
             }
-            Self::MainComp(c) => {
+            Self::MainComp { node: c } => {
                 write!(f, "<{} data-ftml-maincomp", c.tag)?;
                 for (k, v) in &c.attributes {
                     write!(f, " {k}=\"{v}\"")?;
@@ -282,7 +288,7 @@ impl std::fmt::Debug for NotationComponent {
                 }
                 write!(f, "</{}>", c.tag)
             }
-            Self::Comp(c) => {
+            Self::Comp { node: c } => {
                 write!(f, "<{} data-ftml-comp", c.tag)?;
                 for (k, v) in &c.attributes {
                     write!(f, " {k}=\"{v}\"")?;
@@ -417,8 +423,8 @@ impl deepsize::DeepSizeOf for NotationComponent {
                 .iter()
                 .map(|p| std::mem::size_of_val(p) + p.deep_size_of_children(context))
                 .sum::<usize>(),
-            Self::Comp(c) | Self::MainComp(c) => c.deep_size_of_children(context),
-            Self::Text(t) => t.len(),
+            Self::Comp { node: c } | Self::MainComp { node: c } => c.deep_size_of_children(context),
+            Self::Text { txt } => txt.len(),
             Self::Argument { .. } => 0,
         }
     }

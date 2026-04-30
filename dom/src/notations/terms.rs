@@ -32,10 +32,11 @@ use leptos::{math::mtext, prelude::*};
 
 macro_rules! commata {
     ($args:expr) => {{
-        $args.next().map(|first| {
+        let mut args = $args;
+        args.next().map(|first| {
             view! {
                 {first}
-                {$args.map(|a| view!{{mo().child(',')}{a}}).collect_view()}
+                {args.map(|a| view!{{mo().child(',')}{a}}).collect_view()}
             }
         })
     }};
@@ -199,13 +200,7 @@ impl TermExt for Term {
         tracing::trace!("Presenting {self:?}");
         if self.as_sequence().is_some_and(|v| {
             !matches!(v,Sequence::Var(_)) &&
-            v.is_concrete_or(&mut |v| {
-                if let Variable::Ref { .. } = v {
-                    true
-                } else {
-                    false
-                }
-            })
+            v.is_concrete_or(&mut |v| matches!(v,Variable::Ref{..}))
         }) {
             let mut r = unsafe { super::make_sequence(&self) };
             let len = r.len();
