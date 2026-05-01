@@ -347,7 +347,10 @@ impl std::fmt::Debug for NotationNode {
 )]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(untagged))]
+#[cfg_attr(
+    any(feature = "serde", feature = "serde-lite"),
+    serde(tag = "type", content = "value")
+)]
 pub enum NodeOrText {
     Node(NotationNode),
     Text(Box<str>),
