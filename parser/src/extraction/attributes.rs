@@ -290,17 +290,19 @@ pub trait Attributes {
     fn get_elem_uri_from(
         &mut self,
         key: FtmlKey,
-        // this doesn't actually need mut, by rust-analyzer doesn't realize that
-        #[allow(unused_mut)] mut extractor: &mut Self::Ext,
+        extractor: &mut Self::Ext,
         prefix: impl Into<Cow<'static, str>>,
     ) -> Result<DocumentElementUri> {
         if let Some(f) = extractor.forced_element_uri() {
             return Ok(f);
         }
         let id: Id = if let Some(id) = self.get(key) {
-            id.as_ref()
+            let r: Id = id
+                .as_ref()
                 .parse()
-                .map_err(|_| FtmlExtractionError::InvalidValue(key))?
+                .map_err(|_| FtmlExtractionError::InvalidValue(key))?;
+            extractor.id_store().update(prefix, &r);
+            r
         } else {
             extractor.new_id(key, prefix)?
         };

@@ -46,6 +46,7 @@ pub trait FtmlNode: Clone + std::fmt::Debug {
             .parse()
             .map_err(|e| format!("invalid attribute: {e}"))
     }
+    fn set_attr(&self, key: Cow<'static, str>, value: String);
 
     /// ### Errors
     fn collect_attributes(&self) -> Result<Vec<(Id, Box<str>)>, String> {

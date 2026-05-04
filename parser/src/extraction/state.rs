@@ -74,6 +74,37 @@ impl IdCounter {
     pub fn forced(&mut self) -> Option<DocumentElementUri> {
         self.forced.lock().ok().and_then(|mut e| e.take())
     }
+    pub fn update(&mut self, prefix: impl Into<Cow<'static, str>>, value: &Id) {
+        fn update_i(slf: &mut IdCounter, prefix: Cow<'static, str>, value: &Id) {
+            use std::collections::hash_map::Entry;
+            let value = value.as_ref();
+            if let Some(rest) = value.strip_prefix(&*prefix) {
+                if rest.is_empty() {
+                    match slf.inner.entry(prefix) {
+                        Entry::Occupied(_) => {
+                            // should be fine
+                        }
+                        Entry::Vacant(e) => {
+                            e.insert(0);
+                        }
+                    }
+                }
+            } else if let Some(rest) = value.strip_prefix('_')
+                && let Ok(value) = rest.parse::<u32>()
+            {
+                match slf.inner.entry(prefix) {
+                    Entry::Occupied(mut e) => {
+                        let v = e.get_mut();
+                        *v = (*v).max(value);
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(value);
+                    }
+                }
+            }
+        }
+        update_i(self, prefix.into(), value);
+    }
     pub fn new_id(&mut self, prefix: impl Into<Cow<'static, str>>) -> String {
         use std::collections::hash_map::Entry;
         let prefix = prefix.into();

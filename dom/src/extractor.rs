@@ -201,6 +201,9 @@ impl FtmlNode for FtmlDomElement {
         }
         NodeIter(self.0.child_nodes(), 0)
     }
+    fn set_attr(&self, key: Cow<'static, str>, value: String) {
+        let _ = self.0.set_attribute(&key, &value);
+    }
     #[inline]
     fn tag_name(&self) -> Result<Cow<'_, str>, String> {
         Ok(Cow::Owned(self.0.tag_name()))

@@ -167,6 +167,20 @@ impl FtmlNode for NodeRef {
         //let mut p = self.parent();
         self.detach();
     }
+    #[allow(clippy::cast_possible_wrap)]
+    fn set_attr(&self, key: Cow<'static, str>, value: String) {
+        use ftml_parser::extraction::attributes::Attributes;
+        if let Some(slf) = self.0.as_element() {
+            let mut attrs = slf.attributes.borrow_mut();
+            let update_len = attrs
+                .value(&key)
+                .map_or((key.len() + value.len() + " =\"\"".len()) as isize, |v| {
+                    value.len() as isize - v.len() as isize
+                });
+            attrs.new_attr(&key, value);
+            self.len_update(update_len);
+        }
+    }
 
     fn string(&self) -> Cow<'_, str> {
         let mut html = Vec::new();
