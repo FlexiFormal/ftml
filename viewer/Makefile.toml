@@ -50,7 +50,7 @@ args = [
 
 [tasks.patch-js]
 script = '''
-sed -i 's/wasm_bindgen = Object/ftmlViewer = Object/g' ../bin/viewer/ftml.js
+sed -i 's/let wasm_bindgen = (function/let ftmlViewer = (function/g' ../bin/viewer/ftml.js
 echo "ftmlViewer();" >> ../bin/viewer/ftml.js
 '''
 
