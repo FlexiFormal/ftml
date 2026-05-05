@@ -8,10 +8,10 @@ use ftml_uris::{
 use super::Result;
 use crate::{
     FtmlKey,
-    extraction::{FtmlExtractionError, FtmlExtractor},
+    extraction::{FtmlExtractionError, FtmlExtractor, nodes::FtmlNode},
 };
 
-pub trait Attributes {
+pub trait Attributes: std::fmt::Debug {
     type Ext: FtmlExtractor;
     /*type KeyIter<'a>: Iterator<Item = FtmlKey>
     where
@@ -304,7 +304,9 @@ pub trait Attributes {
             extractor.id_store().update(prefix, &r);
             r
         } else {
-            extractor.new_id(key, prefix)?
+            let id = extractor.new_id(key, prefix)?;
+            self.set(key.attr_name(), &id);
+            id
         };
         let curr_uri = extractor.get_narrative_uri();
 

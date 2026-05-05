@@ -146,6 +146,11 @@ impl ftml_parser::extraction::attributes::Attributes for Attributes {
     fn set(&mut self, key: &str, value: impl std::fmt::Display) {
         if let Some((_, v)) = self.0.iter_mut().find(|(k, _)| &k.local == key) {
             *v = value.to_string().into();
+        } else {
+            self.0.push((
+                QualName::new(None, Namespace::from(""), LocalName::from(key.to_string())),
+                value.to_string().into(),
+            ));
         }
     }
     fn take(&mut self, key: &str) -> Option<String> {
@@ -166,20 +171,6 @@ impl FtmlNode for NodeRef {
         self.len_update(-(self.len() as isize));
         //let mut p = self.parent();
         self.detach();
-    }
-    #[allow(clippy::cast_possible_wrap)]
-    fn set_attr(&self, key: Cow<'static, str>, value: String) {
-        use ftml_parser::extraction::attributes::Attributes;
-        if let Some(slf) = self.0.as_element() {
-            let mut attrs = slf.attributes.borrow_mut();
-            let update_len = attrs
-                .value(&key)
-                .map_or((key.len() + value.len() + " =\"\"".len()) as isize, |v| {
-                    value.len() as isize - v.len() as isize
-                });
-            attrs.new_attr(&key, value);
-            self.len_update(update_len);
-        }
     }
 
     fn string(&self) -> Cow<'_, str> {

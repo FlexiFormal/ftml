@@ -2189,10 +2189,6 @@ fn do_problem<E: crate::extraction::FtmlExtractor>(
     crate::extraction::FtmlExtractionError,
 > {
     let uri = attrs.get_elem_uri_from_id(ext, Cow::Borrowed("problem"))?;
-    node.set_attr(
-        Cow::Borrowed(FtmlKey::Id.attr_name()),
-        uri.name().last().to_string(),
-    );
     let styles = opt!(
         attrs.get_typed_vec::<FtmlExtractionError, _>(FtmlKey::Styles, |s| {
             s.trim()
