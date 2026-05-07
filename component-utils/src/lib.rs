@@ -128,7 +128,7 @@ fn do_inject_css(id: Cow<'static, str>, content: Cow<'static, str>, after: bool)
 }
 
 #[cfg(feature = "ssr")]
-mod ssr {
+pub mod ssr {
     use std::borrow::Cow;
 
     #[cfg(feature = "ssr")]
