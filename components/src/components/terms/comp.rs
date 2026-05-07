@@ -34,7 +34,7 @@ pub fn comp_like<V: IntoView + 'static>(
     top_term: bool,
     children: impl FnOnce() -> V + Send + 'static,
 ) -> AnyView {
-    use thaw::{Popover, PopoverSize, PopoverTrigger};
+    use ftml_component_utils::{Popover, PopoverSize, PopoverTrigger};
 
     inject_css("ftml-comp", include_str!("comp.css"));
     let is_hovered = is_hovered.unwrap_or_else(|| RwSignal::new(false));

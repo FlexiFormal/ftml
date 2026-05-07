@@ -18,10 +18,10 @@ pub struct Header {
 }
 
 pub fn error_toast(msg: impl IntoView + std::fmt::Display + 'static) {
-    use leptos::view;
-    use thaw::{
+    use ftml_component_utils::{
         MessageBar, MessageBarBody, MessageBarIntent, ToastOptions, ToastPosition, ToasterInjection,
     };
+    use leptos::view;
     tracing::error!("{msg}");
     let toaster = ToasterInjection::expect_context();
     toaster.dispatch_toast(
@@ -95,8 +95,8 @@ impl ReactiveStore {
     }
     /// #### Panics
     pub fn on_click(vos: &VarOrSym) -> OnClickData {
+        use ftml_component_utils::{Dialog, DialogSurface};
         use leptos::prelude::*;
-        use thaw::{Dialog, DialogSurface};
         let slf = Self::get();
         let (owner, (data, on_clicked, uri, allow_formals)) = {
             let mut slf = slf.0.lock().expect("error locking");
@@ -183,11 +183,11 @@ impl LocalCacheExt for LocalCache {
         E: std::fmt::Debug + Send + Sync + 'static,
         Fut: Future<Output = Result<R, ftml_backend::BackendError<E>>> + Send + 'static,
     {
-        use leptos::prelude::*;
-        use thaw::{
+        use ftml_component_utils::{
             MessageBar, MessageBarBody, MessageBarIntent, ToastOptions, ToastPosition,
             ToasterInjection,
         };
+        use leptos::prelude::*;
         let toaster = ToasterInjection::expect_context();
         Self::with_or_err(f, view, move |e| {
             tracing::error!("{e:?}");
@@ -228,11 +228,11 @@ where
     R: Send + Sync + 'static + Clone,
     Fut: Future<Output = Result<R, E>> + Send + 'static,
 {
+    use ftml_component_utils::Spinner;
     use leptos::{
         either::Either::{Left, Right},
         prelude::*,
     };
-    use thaw::Spinner;
     view! {
         <Suspense fallback = || view!(<Spinner/>)>{move || {
             let v = view.clone();

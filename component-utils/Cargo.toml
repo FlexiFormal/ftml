@@ -1,0 +1,68 @@
+[package]
+name = "ftml-component-utils"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[features]
+## use leptos nightly feature
+nightly = ["thaw/nightly", "leptos/nightly"]
+## Pure client-side rendering
+csr = [
+    "leptos/csr",
+    "thaw/csr",
+]
+## Client-side in combination with ssr
+hydrate = [
+    "leptos/hydrate",
+    "thaw/hydrate",
+]
+## Server-side rendering
+ssr = ["leptos/ssr", "thaw/ssr"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "-Zunstable-options",
+    "--generate-link-to-definition",
+    "--html-in-header",
+    "doc/katex-header.html",
+    "--html-in-header",
+    "doc/docs.html",
+]
+# cargo +nightly doc --no-deps --all-features --release --open
+
+[build-dependencies]
+rustc_version = { workspace = true }
+
+[dev-dependencies]
+#tracing-subscriber = { workspace = true }
+#rstest = { workspace = true }
+#criterion = { workspace = true }
+
+[dependencies]
+document-features = { workspace = true }
+
+leptos = { workspace = true }
+leptos_meta = { workspace = true }
+send_wrapper = {workspace = true}
+tracing = { workspace = true }
+
+thaw = { workspace = true }
+thaw_utils = {workspace = true}
+
+rustc-hash = { workspace = true }
+
+icondata_ai = {workspace = true}
+icondata_bi = {workspace = true}
+icondata_bs = {workspace = true}
+icondata_tb = {workspace = true}
+icondata_ch = {workspace = true}
+icondata_core = "0"

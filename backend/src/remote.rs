@@ -238,6 +238,7 @@ where
     }
 
     #[allow(clippy::similar_names)]
+    #[allow(refining_impl_trait)]
     fn get_fragment(
         &self,
         uri: ftml_uris::Uri,

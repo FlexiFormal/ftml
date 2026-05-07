@@ -6,6 +6,7 @@ use crate::{
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
+use ftml_component_utils::{BoldCaption, Code, Flex, Text};
 use ftml_dom::{FtmlViews, notations::NotationExt, utils::local_cache::LocalCache};
 use ftml_ontology::{
     narrative::{
@@ -20,7 +21,6 @@ use ftml_ontology::{
 };
 use ftml_uris::{DocumentElementUri, DocumentUri, ModuleUri, SymbolUri};
 use leptos::prelude::*;
-use thaw::{Caption1Strong, Flex, Text};
 
 impl super::FtmlViewable for Document {
     fn as_view(&self) -> AnyView {
@@ -188,7 +188,7 @@ impl super::FtmlViewable for DocumentElement {
             Self::Term(term) => view_term(term),
             Self::Problem(p) => {
                 let txt = format!("{p:?}");
-                view!(<div><Text tag=thaw::TextTag::Code>"TODO: "{txt}</Text></div>).into_any()
+                view!(<div><Code>"TODO: "{txt}</Code></div>).into_any()
             }
         }
     }
@@ -241,9 +241,9 @@ impl super::FtmlViewable for Problem {
 
         view! {
           <Block>
-            <Header slot><Caption1Strong>
+            <Header slot><BoldCaption>
                 {prefix}{title}
-            </Caption1Strong></Header>
+            </BoldCaption></Header>
             <HeaderLeft slot>{uses}</HeaderLeft>
             <HeaderRight slot>{fors}</HeaderRight>
             {children}
@@ -263,7 +263,7 @@ fn view_term(term: &DocumentTerm) -> AnyView {
     view! {//<Block>
         <Flex>
             <div style="min-width:150px;">
-                <Caption1Strong>"Term "{name}</Caption1Strong>
+                <BoldCaption>"Term "{name}</BoldCaption>
             </div>
             <span>{ftml_dom::utils::math(|| tm)}</span>
             {tp}
@@ -300,7 +300,7 @@ fn view_notation(uri: DocumentElementUri, head: VarOrSym) -> impl IntoView + 'st
     view! {//<Block>
         <Flex>
             <div style="min-width:150px;">
-                <Caption1Strong>"Notation "{name}</Caption1Strong>
+                <BoldCaption>"Notation "{name}</BoldCaption>
             </div>
             <div style="min-width:100px;">
                 <span>{ftml_dom::utils::math(|| not)}</span>
@@ -318,7 +318,7 @@ fn view_inputref(uri: &DocumentUri) -> AnyView {
     view! {
     <LazyCollapsible>
         <Header slot>
-            <Caption1Strong>"Document "{name}</Caption1Strong>
+            <BoldCaption>"Document "{name}</BoldCaption>
         </Header>
         <div style="padding-left:15px;">{
             let uri = uri.clone();
@@ -327,7 +327,7 @@ fn view_inputref(uri: &DocumentUri) -> AnyView {
                     let title = d.title.as_ref().map(ToString::to_string);
                     view!{
                         {title.map(|s|
-                            view!(<Caption1Strong>{crate::Views::render_ftml(s,None)}</Caption1Strong>)
+                            view!(<BoldCaption>{crate::Views::render_ftml(s,None)}</BoldCaption>)
                         )}
                         { d.as_view() }
                     }.into_any()
@@ -336,7 +336,8 @@ fn view_inputref(uri: &DocumentUri) -> AnyView {
             )
         }</div>
     </LazyCollapsible>
-    }.into_any()
+    }
+    .into_any()
 }
 
 fn view_module(uri: &ModuleUri, children: &[DocumentElement]) -> impl IntoView + 'static {
@@ -352,7 +353,7 @@ fn view_module(uri: &ModuleUri, children: &[DocumentElement]) -> impl IntoView +
     let children = children.iter().map(FtmlViewable::as_view).collect_view();
     view! {<Block show_separator=true>
         <Header slot>
-            <Caption1Strong>"Module "{name}</Caption1Strong>
+            <BoldCaption>"Module "{name}</BoldCaption>
         </Header>
         <HeaderRight slot>{imports}</HeaderRight>
         {children}
@@ -372,7 +373,7 @@ fn view_structure(uri: &SymbolUri, children: &[DocumentElement]) -> impl IntoVie
     let children = children.iter().map(FtmlViewable::as_view).collect_view();
     view! {<Block show_separator=false>
         <Header slot>
-            <Caption1Strong>"Structure "{name}</Caption1Strong>
+            <BoldCaption>"Structure "{name}</BoldCaption>
         </Header>
         <HeaderRight slot>{imports}</HeaderRight>
         {children}
@@ -397,7 +398,7 @@ fn view_extension(
     let children = children.iter().map(FtmlViewable::as_view).collect_view();
     view! {<Block show_separator=false>
         <Header slot>
-            <Caption1Strong>"Conservative Extension "{name}" for "{target}</Caption1Strong>
+            <BoldCaption>"Conservative Extension "{name}" for "{target}</BoldCaption>
         </Header>
         <HeaderRight slot>{imports}</HeaderRight>
         {children}

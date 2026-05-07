@@ -5,13 +5,13 @@ use crate::{
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
+use ftml_component_utils::BoldCaption;
 use ftml_dom::{FtmlViews, notations::TermExt};
 use ftml_ontology::narrative::elements::{
     DocumentElement, FlatIterable, LogicalParagraph, Section,
 };
 use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
-use thaw::Caption1Strong;
 
 pub(super) fn slide(
     uri: &DocumentElementUri,
@@ -41,9 +41,9 @@ pub(super) fn slide(
 
     view! {
       <Block>
-        <Header slot><Caption1Strong>
+        <Header slot><BoldCaption>
             "Slide "{title}
-        </Caption1Strong></Header>
+        </BoldCaption></Header>
         <HeaderLeft slot>{uses}</HeaderLeft>
         {children}
       </Block>
@@ -76,9 +76,9 @@ impl FtmlViewable for Section {
 
         view! {
           <Block>
-            <Header slot><Caption1Strong>
+            <Header slot><BoldCaption>
                 "Section "{title}
-            </Caption1Strong></Header>
+            </BoldCaption></Header>
             <HeaderLeft slot>{uses}</HeaderLeft>
             {children}
           </Block>
@@ -142,9 +142,9 @@ impl FtmlViewable for LogicalParagraph {
         .into_view();
         view! {
           <Block>
-            <Header slot><Caption1Strong>
+            <Header slot><BoldCaption>
                 {kind}" "{title}
-            </Caption1Strong></Header>
+            </BoldCaption></Header>
             <HeaderLeft slot>{uses}</HeaderLeft>
             <HeaderRight slot>{fors}</HeaderRight>
             {children}

@@ -7,7 +7,7 @@ use crate::{
     toc::TocSource,
     utils::{ContextChain, ModuleContext, owned},
 };
-use ftml_backend::{SendBackend, dynbackend::DynBackend};
+use ftml_backend::dynbackend::DynBackend;
 use ftml_ontology::{
     narrative::elements::paragraphs::{ParagraphFormatting, ParagraphKind},
     terms::VarOrSym,

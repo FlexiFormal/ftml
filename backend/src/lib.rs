@@ -566,6 +566,7 @@ where
         <Self as FlamsBackend>::check_term(self, global_context, in_term, subterm)
     }
 
+    #[allow(refining_impl_trait)]
     fn get_fragment(
         &self,
         uri: Uri,

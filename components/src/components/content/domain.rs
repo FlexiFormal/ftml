@@ -5,6 +5,7 @@ use crate::{
         block::{Block, HeaderLeft, HeaderRight},
     },
 };
+use ftml_component_utils::{BoldCaption, Caption, Divider, Text};
 use ftml_dom::notations::TermExt;
 use ftml_ontology::{
     domain::{
@@ -21,7 +22,6 @@ use ftml_ontology::{
 };
 use ftml_uris::Id;
 use leptos::prelude::*;
-use thaw::{Caption1, Caption1Strong, Divider};
 
 impl FtmlViewable for ModuleLike {
     fn as_view(&self) -> AnyView {
@@ -54,10 +54,9 @@ impl FtmlViewable for AnyDeclarationRef<'_> {
 }
 
 fn rule(id: &Id, args: &[Term]) -> AnyView {
-    use thaw::Text;
     let id = id.to_string();
     let header = view! {
-        <Caption1Strong>"Inference Rule "{id}</Caption1Strong>
+        <BoldCaption>"Inference Rule "{id}</BoldCaption>
     };
     let fors = CommaSep(
         "for",
@@ -94,7 +93,7 @@ impl FtmlViewable for MathStructure {
             .map(|n| super::symbols::do_macroname(n, &ArgumentSpec::default()));
         view! {<Block show_separator=true>
             <Header slot>
-                <Caption1Strong>"Structure "{name}</Caption1Strong>
+                <BoldCaption>"Structure "{name}</BoldCaption>
                 {macroname}
             </Header>
             <HeaderRight slot>{imports}</HeaderRight>
@@ -120,7 +119,7 @@ impl FtmlViewable for StructureExtension {
         let children = self.declarations().map(|d| d.as_view()).collect_view();
         view! {<Block show_separator=false>
             <Header slot>
-                <Caption1Strong>"Conservative Extension "{name}" for "{target}</Caption1Strong>
+                <BoldCaption>"Conservative Extension "{name}" for "{target}</BoldCaption>
             </Header>
             <HeaderRight slot>{imports}</HeaderRight>
             {children}
@@ -150,7 +149,7 @@ impl FtmlViewable for NestedModule {
         let children = self.declarations().map(|d| d.as_view()).collect_view();
         view! {<Block show_separator=true>
             <Header slot>
-                <Caption1Strong>"Nested Module "{name}</Caption1Strong>
+                <BoldCaption>"Nested Module "{name}</BoldCaption>
             </Header>
             <HeaderRight slot>{imports}</HeaderRight>
             {children}
@@ -173,7 +172,7 @@ impl FtmlViewable for Module {
         let children = self.declarations().map(|d| d.as_view()).collect_view();
         view! {<Block show_separator=true>
             <Header slot>
-                <Caption1Strong>"Module "{name}</Caption1Strong>
+                <BoldCaption>"Module "{name}</BoldCaption>
             </Header>
             <HeaderRight slot>{imports}</HeaderRight>
             {children}
@@ -194,9 +193,9 @@ pub fn morphism(m: &Morphism, doc_elems: Option<AnyView>) -> AnyView {
     });
     view! {<Block>
             <Header slot>
-                <Caption1Strong>"Morphism "{name}</Caption1Strong>
+                <BoldCaption>"Morphism "{name}</BoldCaption>
             </Header>
-            <HeaderLeft slot><Caption1>"From "{domain}</Caption1></HeaderLeft>
+            <HeaderLeft slot><Caption>"From "{domain}</Caption></HeaderLeft>
             {assignments}
             {elems}
         </Block>
@@ -207,15 +206,15 @@ pub fn morphism(m: &Morphism, doc_elems: Option<AnyView>) -> AnyView {
 fn do_assignment(a: &Assignment) -> AnyView {
     let elaborated_uri = a.elaborated_uri();
     let name = super::symbol_uri(elaborated_uri.name().to_string(), &elaborated_uri);
-    let header = view!(<Caption1Strong>"Symbol "{name}</Caption1Strong>);
+    let header = view!(<BoldCaption>"Symbol "{name}</BoldCaption>);
     let orig = a.original.as_view();
     let paragraphs = super::symbols::do_paragraphs(elaborated_uri.clone());
     let notations = super::symbols::do_notations(elaborated_uri.into(), ArgumentSpec::default());
     let df = a.definiens.as_ref().map(|t| {
         let t = t.clone().into_view::<crate::Views>(crate::backend(), false);
-        view! {<Caption1>
+        view! {<Caption>
             "Assigned to: "{ftml_dom::utils::math(|| t)}
-            </Caption1>
+            </Caption>
         }
         .attr("style", "white-space:nowrap;")
     });
@@ -223,7 +222,7 @@ fn do_assignment(a: &Assignment) -> AnyView {
         <Block show_separator=true>
             <Header slot>{header}</Header>
             <HeaderLeft slot>
-                <Caption1>"Elaborated from "{orig}</Caption1>
+                <Caption>"Elaborated from "{orig}</Caption>
             </HeaderLeft>
             <HeaderRight slot>{df}</HeaderRight>
             {notations}

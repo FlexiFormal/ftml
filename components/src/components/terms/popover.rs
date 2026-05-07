@@ -38,7 +38,7 @@ pub fn unresolved_var_popover(name: Id, notated: Option<Id>) -> AnyView {
 }
 
 pub fn resolved_var_popover(uri: DocumentElementUri, is_sequence: bool) -> AnyView {
-    use thaw::Text;
+    use ftml_component_utils::Text;
     let title = if is_sequence {
         "Variable Sequence "
     } else {
@@ -118,7 +118,7 @@ ftml_js_utils::split! {
         allow_formals: ReadSignal<bool>
     ) -> AnyView {
         use leptos::prelude::*;
-        use thaw::Divider;
+        use ftml_component_utils::Divider;
         let s = match vos {
             VarOrSym::Var(Variable::Name {
                 notated: Some(n), ..

@@ -11,12 +11,12 @@ workspace = true
 
 [features]
 ## use leptos nightly feature
-nightly = ["thaw/nightly", "leptos/nightly","ftml-dom/nightly"]
+nightly = ["leptos/nightly","ftml-dom/nightly","ftml-component-utils/nightly"]
 ## Pure client-side rendering
 csr = [
     "leptos/csr",
+    "ftml-component-utils/csr",
     "ftml-dom/csr",
-    "thaw/csr",
     "dep:gloo-storage",
     "ftml-backend/wasm",
     "ftml-backend/cached",
@@ -25,13 +25,14 @@ csr = [
 ## Client-side in combination with ssr
 hydrate = [
     "leptos/hydrate",
+    "ftml-component-utils/hydrate",
     "ftml-dom/hydrate",
-    "thaw/hydrate",
     "dep:gloo-storage",
     "dep:web-sys"
 ]
 ## Server-side rendering
-ssr = ["leptos/ssr", "thaw/ssr", "ftml-dom/ssr"]
+ssr = ["leptos/ssr", "ftml-dom/ssr",
+    "ftml-component-utils/ssr"]
 ## generate typescript bindings
 typescript = ["csr", "dep:tsify", "ftml-dom/typescript","ftml-ontology/typescript"]
 ## Adds javascript callbacks for some components
@@ -72,7 +73,6 @@ ftml-js-utils = { workspace = true,features=["serde-lite"] }
 rustc-hash = { workspace = true }
 leptos = { workspace = true }
 leptos-posthoc = { workspace = true }
-thaw = { workspace = true }
 serde_json = { workspace = true }
 serde-lite = { workspace = true }
 tracing = { workspace = true }
@@ -80,12 +80,8 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 send_wrapper = { workspace = true }
 either = { workspace = true }
-icondata_ai = { workspace = true }
-icondata_bi = { workspace = true }
-icondata_bs = { workspace = true }
 smallvec = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
-thaw_utils = { workspace = true }
 wasm-bindgen = { workspace = true }
 uuid = {workspace = true}
 
@@ -94,3 +90,5 @@ gloo-storage = { workspace = true, optional = true }
 tsify = { workspace = true, optional = true }
 leptos-react = { workspace = true, optional = true }
 web-sys = {workspace = true,features=["Selection","Range","Node"],optional=true}
+
+ftml-component-utils = {workspace = true}

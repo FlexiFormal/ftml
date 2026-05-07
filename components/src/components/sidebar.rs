@@ -6,6 +6,7 @@ use crate::{
         collapsible::{collapse_marker, fancy_collapsible},
     },
 };
+use ftml_component_utils::Caption;
 use ftml_dom::{
     DocumentState,
     utils::{css::inject_css, local_cache::LocalCache},
@@ -36,7 +37,7 @@ fn flex_sidebar(
     choose_highlight_style: bool,
     children: impl FnOnce() -> AnyView,
 ) -> AnyView {
-    use thaw::{Button, ButtonShape, ButtonSize, Caption1, Flex};
+    use ftml_component_utils::{Button, ButtonShape, ButtonSize, Flex};
 
     let visible = RwSignal::new(true);
     let body = fancy_collapsible(
@@ -67,7 +68,7 @@ fn flex_sidebar(
                     size=ButtonSize::Small
                     on_click=move |_| visible.set(!visible.get_untracked())
                 >
-                    <Caption1>{collapse_marker(visible,true)}"FTML"</Caption1>
+                    <Caption>{collapse_marker(visible,true)}"FTML"</Caption>
                 </Button>
                 {body}
             </div>
@@ -83,7 +84,7 @@ fn floating_sidebar(
     choose_highlight_style: bool,
     children: impl FnOnce() -> AnyView,
 ) -> AnyView {
-    use thaw::{Button, ButtonShape, ButtonSize, Caption1, Flex};
+    use ftml_component_utils::{Button, ButtonShape, ButtonSize, Flex};
 
     let pos_ref = NodeRef::new();
     let sidebar_ref = NodeRef::new();
@@ -122,7 +123,7 @@ fn floating_sidebar(
                     size=ButtonSize::Small
                     on_click=move |_| visible.set(!visible.get_untracked())
                 >
-                    <Caption1>{collapse_marker(visible,true)}"FTML"</Caption1>
+                    <Caption>{collapse_marker(visible,true)}"FTML"</Caption>
                 </Button>
                 {body}
             </div>
@@ -187,10 +188,9 @@ fn max_child(e: &leptos::web_sys::Element) -> Option<leptos::web_sys::Element> {
 }
 
 fn content_drawer() -> AnyView {
-    use thaw::{
+    use ftml_component_utils::{
         Button, ButtonAppearance, DrawerBody, DrawerHeader, DrawerHeaderTitle,
-        DrawerHeaderTitleAction, DrawerPosition, Icon, OverlayDrawer, Popover, PopoverTrigger,
-        Text,
+        DrawerHeaderTitleAction, DrawerPosition, OverlayDrawer, Popover, PopoverTrigger, Text,
     };
 
     let uri = DocumentState::document_uri();
@@ -209,10 +209,9 @@ fn content_drawer() -> AnyView {
            appearance=ButtonAppearance::Subtle
            on_click=move |_| open.set(true)
         >
-           <Icon
-                icon=icondata_bi::BiBookContentRegular
-                height="1.5em".to_string()
-                width="1.5em".to_string()
+           <ftml_component_utils::icons::OpenBookIcon
+                height="1.5em"
+                width="1.5em"
             />
         </Button>
         <OverlayDrawer class="ftml-drawer-absolute-wide" open position=DrawerPosition::Right>
@@ -283,7 +282,7 @@ ftml_js_utils::split! {
 }
 
 fn pdf() -> impl IntoView {
-    use thaw::{Button, ButtonAppearance, Icon};
+    use ftml_component_utils::{Button, ButtonAppearance};
 
     let uri = DocumentState::document_uri();
     if uri == *DocumentUri::no_doc() {
@@ -294,10 +293,9 @@ fn pdf() -> impl IntoView {
             <a target="_blank" href=url ><Button
                 attr:title="Download PDF"
                appearance=ButtonAppearance::Subtle>
-               <Icon
-                    icon=icondata_bs::BsFiletypePdf
-                    height="1.5em".to_string()
-                    width="1.5em".to_string()
+               <ftml_component_utils::icons::PdfIcon
+                    height="1.5em"
+                    width="1.5em"
                 />
             </Button></a>
         }
@@ -305,7 +303,7 @@ fn pdf() -> impl IntoView {
 }
 
 fn select_highlighting() -> impl IntoView {
-    use thaw::{Select, SelectSize, Text};
+    use ftml_component_utils::{Select, SelectSize, Text};
     let highlight = expect_context::<RwSignal<HighlightStyle>>();
     let value = RwSignal::new(highlight.get_untracked().as_str().to_string());
     Effect::new(move || {

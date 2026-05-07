@@ -181,15 +181,8 @@ fn render_arg_with_sep_default<Views: FtmlViews, Args: ArgumentRender>(
 }
 
 fn is_sequence(t: &Term) -> bool {
-    t.as_sequence().is_some_and(|v| {
-        v.is_concrete_or(&mut |v| {
-            if let Variable::Ref { .. } = v {
-                true
-            } else {
-                false
-            }
-        })
-    })
+    t.as_sequence()
+        .is_some_and(|v| v.is_concrete_or(&mut |v| matches!(v, Variable::Ref { .. })))
 }
 
 // UNSAFE: requires as_sequence().is_concrete_or(...)
@@ -472,7 +465,7 @@ impl ArgumentRender for Box<[Argument]> {
 impl ArgumentRender for Box<[BoundArgument]> {
     #[inline]
     fn is_empty(&self) -> bool {
-        (&**self).is_empty()
+        (**self).is_empty()
     }
     #[inline]
     fn num_args(&self) -> usize {
@@ -648,7 +641,7 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
     }
     fn render_arg<Views: FtmlViews>(
         &self,
-        backend: &'static dyn DynBackend,
+        _: &'static dyn DynBackend,
         index: u8,
         mode: ArgumentMode,
         _: i64,
@@ -698,7 +691,7 @@ impl ArgumentRender for Vec<Either<ClonableView, Vec<ClonableView>>> {
     }
     fn render_arg_at<Views: FtmlViews>(
         &self,
-        backend: &'static dyn DynBackend,
+        _: &'static dyn DynBackend,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,
@@ -872,12 +865,14 @@ impl AnyMaybeAttr {
             Self::Attr(a) => a.attr(k, v),
         })
     }
+    /*
     fn into_view(self) -> impl IntoView {
         match self {
             Self::Any(a) => leptos::either::Either::Left(a),
             Self::Attr(a) => leptos::either::Either::Right(a),
         }
     }
+     */
     fn into_any(self) -> AnyView {
         match self {
             Self::Any(a) => a,
@@ -988,7 +983,7 @@ impl ArgumentRender for DummyRender {
     }
     fn render_arg<Views: FtmlViews>(
         &self,
-        backend: &'static dyn DynBackend,
+        _: &'static dyn DynBackend,
         index: u8,
         mode: ArgumentMode,
         _: i64,
@@ -1001,7 +996,7 @@ impl ArgumentRender for DummyRender {
     }
     fn render_arg_at<Views: FtmlViews>(
         &self,
-        backend: &'static dyn DynBackend,
+        _: &'static dyn DynBackend,
         index: u8,
         seq_index: usize,
         mode: ArgumentMode,

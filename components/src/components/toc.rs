@@ -77,7 +77,7 @@ impl Gottos {
 ftml_js_utils::split! {
 #[must_use]
 pub fn toc() -> AnyView {
-    use thaw::Spinner;
+    use ftml_component_utils::Spinner;
     wrap_toc(move |data| {
         //move || {
         // TODO: eliminate non-toc gottos
@@ -103,7 +103,7 @@ pub fn toc() -> AnyView {
 }
 
 fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl IntoView {
-    use thaw::Scrollbar;
+    use ftml_component_utils::Scrollbar;
     inject_css("ftml-toc", include_str!("toc.css"));
     //owned(move || {
     let anchor_ref = NodeRef::new();
@@ -153,7 +153,7 @@ fn do_toc(
     line: AnyView,
     children: Option<AnyView>,
 ) -> AnyView {
-    use thaw::Caption1Strong;
+    use ftml_component_utils::BoldCaption;
     let mut style = "";
     let mut after = None;
     gottos.update_value(|gottos| {
@@ -216,7 +216,7 @@ fn do_toc(
     });
     view! {
         <div class=class>
-            <Caption1Strong>
+            <BoldCaption>
                 {visible.map(|visible|
                     view!{
                         <span on:click=move |_| visible.set(!visible.get_untracked())>
@@ -233,138 +233,12 @@ fn do_toc(
                 >
                     {line}{after}
                 </a>
-            </Caption1Strong>
+            </BoldCaption>
             {children}
         </div>
     }
     .into_any()
 }
-
-/*
-fn do_toc<Be: SendBackend>(
-    toc: &[TocElem],
-    gottos: &mut Gottos,
-    data: AnchorData,
-    lvl: SectionLevel,
-) -> impl IntoView + use<Be> {
-    use leptos::either::{
-        Either::{Left, Right},
-        EitherOf3::{A, B, C},
-    };
-    use thaw::Caption1Strong;
-
-    toc.iter()
-        .map(|toc_elem| match toc_elem {
-            TocElem::Section {
-                title,
-                uri,
-                id,
-                children,
-            } => {
-                let style = if gottos.current.is_some() {
-                    "background-color:var(--colorPaletteYellowBorder1);"
-                } else {
-                    ""
-                };
-                let after = gottos.current.as_ref().and_then(|e| e.timestamp).map(|ts| {
-                    view! {
-                        <sup><i>" Covered: "{ts.into_date().to_string()}</i></sup>
-                    }
-                });
-                gottos.next(uri);
-                let href = StoredValue::new(format!("#{id}"));
-                let title_ref = NodeRef::<leptos::html::A>::new();
-                let is_active = Memo::new(move |_| {
-                    data.active_id.with(|active_id| {
-                        active_id
-                            .as_ref()
-                            .is_some_and(|s| href.with_value(|v| s.with_value(|s| s == v)))
-                    })
-                });
-                data.append_id(href);
-                on_cleanup(move || href.with_value(|s| data.remove_id(s)));
-                Effect::new(move |_| {
-                    let Some(title_el) = title_ref.get() else {
-                        return;
-                    };
-
-                    if is_active.get() {
-                        let title_rect = ftml_dom::utils::get_true_rect(&title_el);
-                        data.update_background_position(&title_rect);
-                    }
-                });
-                let title = title.as_ref().map_or_else(
-                    || Right(uri.name().last().to_string()),
-                    |t| Left(crate::Views::<Be>::render_ftml(t.to_string(), None)),
-                );
-                let class = Memo::new(move |_| {
-                    if is_active.get() {
-                        "thaw-anchor-link thaw-anchor-link--active"
-                    } else {
-                        "thaw-anchor-link"
-                    }
-                });
-
-                let (visible, children) = if has_section(children) {
-                    let visible = RwSignal::new(true);
-                    let i = do_toc::<Be>(children, gottos, data, lvl.inc()).into_any();
-                    let ch = fancy_collapsible(move || i, visible, "", "");
-                    (Some(visible), Some(ch))
-                } else {
-                    (None, None)
-                };
-                let counter = DocumentStructure::display_counter(id);
-
-                A(view! {
-                    <div class=class>
-                        <Caption1Strong>
-                            {visible.map(|visible|
-                                view!{
-                                    <span on:click=move |_| visible.set(!visible.get_untracked())>
-                                        {collapse_marker(visible,true)}
-                                    </span>
-                                    " "
-                                }
-                            )}
-                            <a
-                                href=href.get_value()
-                                class="thaw-anchor-link__title"
-                                node_ref=title_ref
-                                style=style
-                            >
-                                {counter}" "{title}{after}
-                            </a>
-                        </Caption1Strong>
-                        {children}
-                    </div>
-                })
-            }
-            TocElem::Inputref { children, .. } => {
-                B(do_toc::<Be>(children, gottos, data, lvl).into_any())
-            }
-            TocElem::SkippedSection { children } => {
-                B(do_toc::<Be>(children, gottos, data, lvl.inc()).into_any())
-            }
-            _ => C(()),
-        })
-        .collect_view()
-}
-
-fn has_section(elems: &[TocElem]) -> bool {
-    for e in elems {
-        match e {
-            TocElem::Section { .. } => return true,
-            TocElem::Inputref { children, .. } | TocElem::SkippedSection { children }
-                if has_section(children) =>
-            {
-                return true;
-            }
-            _ => (),
-        }
-    }
-    false
-}
-*/
 
 #[cfg(any(feature = "csr", feature = "hydrate"))]
 fn scroll_listener(
@@ -372,7 +246,6 @@ fn scroll_listener(
     active_id: RwSignal<Option<StoredValue<String>>>,
 ) {
     use leptos::ev;
-    use thaw_utils::{add_event_listener_with_bool, throttle};
 
     let on_scroll = move || {
         element_ids.with(|ids| {
@@ -394,13 +267,13 @@ fn scroll_listener(
             active_id.set(temp_link);
         });
     };
-    let cb = throttle(
+    let cb = ftml_component_utils::events::throttle(
         move || {
             on_scroll();
         },
         std::time::Duration::from_millis(200),
     );
-    let scroll_handle = add_event_listener_with_bool(
+    let scroll_handle = ftml_component_utils::events::add_event_listener_with_bool(
         document(),
         ev::scroll,
         move |_| {

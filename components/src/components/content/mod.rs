@@ -4,6 +4,7 @@ pub mod paragraphs;
 pub mod symbols;
 
 use crate::{config::FtmlConfig, utils::LocalCacheExt};
+use ftml_component_utils::Text;
 use ftml_dom::{
     FtmlViews,
     utils::{
@@ -37,7 +38,6 @@ pub struct CommaSep<V: IntoView + 'static, I: IntoIterator<Item = V>>(pub &'stat
 
 impl<V: IntoView + 'static, I: IntoIterator<Item = V>> CommaSep<V, I> {
     pub fn into_view(self) -> AnyView {
-        use thaw::Text;
         let mut elems = self.1.into_iter();
         let Some(first) = elems.next() else {
             return ().into_any();
@@ -62,7 +62,6 @@ pub fn uses<'a, I: IntoIterator<Item = &'a ModuleUri>>(header: &'static str, use
 
 impl FtmlViewable for DocumentUri {
     fn as_view(&self) -> AnyView {
-        use thaw::Text;
         let uristring = self.to_string();
         let name = self.name.to_string();
         view! {
@@ -73,7 +72,7 @@ impl FtmlViewable for DocumentUri {
                 target="_blank"
                 href={crate::backend().document_link_url(self)}
             >
-                <thaw::Icon icon=icondata_bi::BiLinkRegular />
+                <ftml_component_utils::icons::LinkIcon/>
             </a>
           </div>
         }
@@ -83,7 +82,6 @@ impl FtmlViewable for DocumentUri {
 
 impl FtmlViewable for DocumentElementUri {
     fn as_view(&self) -> AnyView {
-        use thaw::Text;
         let name = self.name.last().to_string();
         let title = view!(<Text class="ftml-comp">{name}</Text>).into_any();
         hover_paragraph(self.clone(), title)
@@ -92,7 +90,7 @@ impl FtmlViewable for DocumentElementUri {
 
 #[must_use]
 pub fn hover_paragraph(uri: DocumentElementUri, title: AnyView) -> AnyView {
-    use thaw::{Popover, PopoverTrigger};
+    use ftml_component_utils::{Divider, Popover, PopoverTrigger};
     let uristring = uri.to_string();
     inject_css("ftml-symbol-popup", include_str!("../terms/popup.css"));
 
@@ -100,7 +98,7 @@ pub fn hover_paragraph(uri: DocumentElementUri, title: AnyView) -> AnyView {
         <Popover>
           <PopoverTrigger slot>{title}</PopoverTrigger>
           <div style="font-size:small;">{uristring}</div>
-          <div style="margin-bottom:5px;"><thaw::Divider/></div>
+          <div style="margin-bottom:5px;"><Divider/></div>
           <div class="ftml-symbol-popup">
           {
               LocalCache::with_or_err(
@@ -122,7 +120,7 @@ pub fn hover_paragraph(uri: DocumentElementUri, title: AnyView) -> AnyView {
 
 #[must_use]
 pub fn module_with_hover(uri: &ModuleUri) -> AnyView {
-    use thaw::{Popover, PopoverTrigger, Text};
+    use ftml_component_utils::{Popover, PopoverTrigger};
     let name = uri.module_name().to_string();
     let uri = uri.to_string();
     view! {
@@ -138,7 +136,7 @@ pub fn module_with_hover(uri: &ModuleUri) -> AnyView {
 
 impl FtmlViewable for ModuleUri {
     fn as_view(&self) -> AnyView {
-        use thaw::{Dialog, DialogSurface, Popover, PopoverTrigger, Scrollbar, Text};
+        use ftml_component_utils::{Dialog, DialogSurface, Popover, PopoverTrigger, Scrollbar};
         let name = self.module_name().to_string();
         let uri = self.to_string();
         let on_click = RwSignal::new(false);
@@ -173,7 +171,6 @@ impl FtmlViewable for SymbolUri {
 }
 
 pub fn symbol_uri(name: String, uri: &SymbolUri) -> AnyView {
-    use thaw::Text;
     inject_css("ftml-comp", include_str!("../terms/comp.css"));
     if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");
@@ -184,7 +181,6 @@ pub fn symbol_uri(name: String, uri: &SymbolUri) -> AnyView {
 }
 
 pub fn variable_uri(name: String, uri: &DocumentElementUri) -> AnyView {
-    use thaw::Text;
     inject_css("ftml-comp", include_str!("../terms/comp.css"));
     if !FtmlConfig::allow_hovers() {
         tracing::trace!("hovers disabled");

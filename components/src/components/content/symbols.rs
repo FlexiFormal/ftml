@@ -7,6 +7,9 @@ use crate::{
     },
 };
 use ftml_backend::BackendError;
+use ftml_component_utils::{
+    BoldCaption, Caption, Code, Table, TableCell, TableHeader, TableHeaderCell, TableRow,
+};
 use ftml_dom::{
     notations::{NotationExt, TermExt},
     utils::{
@@ -23,7 +26,6 @@ use ftml_ontology::{
 };
 use ftml_uris::{DocumentElementUri, Id, IsNarrativeUri, LeafUri, SymbolUri};
 use leptos::{html::span, prelude::*};
-use thaw::{Caption1, Caption1Strong, Text, TextTag};
 
 #[must_use]
 pub fn do_macroname(name: &Id, arity: &ArgumentSpec) -> AnyView {
@@ -38,7 +40,7 @@ pub fn do_macroname(name: &Id, arity: &ArgumentSpec) -> AnyView {
             ArgumentMode::BoundVariableSequence => write!(name, "{{B_{i}^1,...,B_{i}^n}}"),
         };
     }
-    view!(<span>" ("<Text tag=TextTag::Code>"\\"{name}</Text>")"</span>).into_any()
+    view!(<span>" ("<Code>"\\"{name}</Code>")"</span>).into_any()
 }
 
 //impl super::FtmlViewable for Symbol {
@@ -70,22 +72,22 @@ pub fn symbol_view(s: &Symbol, show_paras: bool) -> AnyView {
     let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
     let tp = tp.map(|t| {
         let t = t.into_view::<crate::Views>(crate::backend(), false);
-        view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
+        view! {<Caption>" of type "{ftml_dom::utils::math(|| t)}</Caption>}
     });
     let df = df.map(|t| {
         let t = t.into_view::<crate::Views>(crate::backend(), false);
-        view! {<Caption1>
+        view! {<Caption>
             "Definiens: "{ftml_dom::utils::math(|| t)}
-            </Caption1>
+            </Caption>
         }
         .attr("style", "white-space:nowrap;")
     });
     let header = view! {
-        <Caption1Strong>{symbol_str}{name}</Caption1Strong>
+        <BoldCaption>{symbol_str}{name}</BoldCaption>
         {macroname}
         {if role.is_empty() {None} else {Some(role.iter().map(|r| {
             let s = r.to_string();
-            view!{<Text tag=TextTag::Code>{s}</Text>}
+            view!{<Code>{s}</Code>}
         }).collect_view())}}
     };
     let notations = do_notations(LeafUri::Symbol(uri.clone()), arity.clone());
@@ -110,7 +112,6 @@ pub fn symbol_view(s: &Symbol, show_paras: bool) -> AnyView {
 
 impl super::FtmlViewable for VariableDeclaration {
     fn as_view(&self) -> AnyView {
-        use thaw::Caption1;
         let Self { uri, data } = self;
         let VariableData {
             arity,
@@ -134,15 +135,15 @@ impl super::FtmlViewable for VariableDeclaration {
         let macroname = macroname.as_ref().map(|n| do_macroname(n, arity));
         let tp = tp.map(|t| {
             let t = t.into_view::<crate::Views>(crate::backend(), false);
-            view! {<Caption1>" of type "{ftml_dom::utils::math(|| t)}</Caption1>}
+            view! {<Caption>" of type "{ftml_dom::utils::math(|| t)}</Caption>}
         });
         let df = df.map(|t| {
             let t = t.into_view::<crate::Views>(crate::backend(), false);
-            view! {<Caption1>"Definiens: "{ftml_dom::utils::math(|| t)}</Caption1>}
+            view! {<Caption>"Definiens: "{ftml_dom::utils::math(|| t)}</Caption>}
                 .attr("style", "white-space:nowrap;")
         });
         let header = view! {
-            <Caption1Strong>"Variable "{name}</Caption1Strong>
+            <BoldCaption>"Variable "{name}</BoldCaption>
             {macroname}
         };
         let notations = do_notations(LeafUri::Element(uri.clone()), arity.clone());
@@ -227,7 +228,7 @@ fn do_table(
     arity: ArgumentSpec,
     nots: GlobalLocal<Vec<(DocumentElementUri, Notation)>, BackendError<String>>,
 ) -> AnyView {
-    use thaw::{Popover, PopoverTrigger, Table, TableCell, TableHeader, TableHeaderCell, TableRow};
+    use ftml_component_utils::{Popover, PopoverTrigger};
     fn render_not(
         head: &VarOrSym,
         arity: &ArgumentSpec,

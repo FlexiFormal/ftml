@@ -106,8 +106,8 @@ pub fn slide<V: IntoView>(
     uri: DocumentElementUri,
     then: impl FnOnce() -> V + Send + 'static,
 ) -> impl IntoView {
+    use ftml_component_utils::{Button, ButtonAppearance, ButtonShape, ButtonSize};
     use leptos::either::Either::{Left, Right};
-    use thaw::{Button, ButtonAppearance, ButtonShape, ButtonSize, Icon};
     inject_css("ftml-slide", include_str!("slides.css"));
     if FtmlConfig::allow_fullscreen() {
         let div = NodeRef::new();
@@ -133,7 +133,7 @@ pub fn slide<V: IntoView>(
                     shape=ButtonShape::Circular
                     on:click=move |_| slides.go(index)
                 >
-                    <Icon icon=icondata_ai::AiFullscreenOutlined/>
+                    <ftml_component_utils::icons::FullscreenIcon/>
                 </Button></div>
             </div>
         })

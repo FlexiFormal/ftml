@@ -86,6 +86,7 @@ dependencies = ["wasm-pack-dev", "patch-dev","copy-dev"]
 #env = { "RUSTFLAGS" = "--cfg getrandom_backend=\"wasm_js\" -Ctarget-cpu=mvp -Ctarget-feature=+multivalue,+mutable-globals,+reference-types,+sign-ext" }
 install_crate = "wasm-pack"
 command = "wasm-pack"
+toolchain = "nightly"
 args = [
     "build",
     #"--verbose",

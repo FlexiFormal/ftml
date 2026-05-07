@@ -1,5 +1,6 @@
 #![allow(clippy::must_use_candidate)]
 
+use ftml_component_utils::theming::{Theme, Themer as BaseThemer};
 use leptos::prelude::*;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -10,8 +11,8 @@ pub enum ThemeType {
     Light,
     Dark,
 }
-impl<'a> From<&'a thaw::Theme> for ThemeType {
-    fn from(theme: &'a thaw::Theme) -> Self {
+impl<'a> From<&'a Theme> for ThemeType {
+    fn from(theme: &'a Theme) -> Self {
         if theme.name == "dark" {
             Self::Dark
         } else {
@@ -19,7 +20,7 @@ impl<'a> From<&'a thaw::Theme> for ThemeType {
         }
     }
 }
-impl From<ThemeType> for thaw::Theme {
+impl From<ThemeType> for Theme {
     fn from(tp: ThemeType) -> Self {
         match tp {
             ThemeType::Light => Self::light(),
@@ -33,13 +34,13 @@ pub fn Themer<Ch: IntoView + 'static>(
     children: TypedChildren<Ch>,
     #[prop(optional)] safe: bool,
 ) -> impl IntoView {
+    use ftml_component_utils::toasts::ToasterProvider;
     use leptos::either::EitherOf3::{A, B, C};
-    use thaw::{ConfigProvider, Theme, ToasterProvider};
     let children = children.into_inner();
-    if use_context::<RwSignal<thaw::Theme>>().is_some() {
+    if use_context::<RwSignal<Theme>>().is_some() {
         return A(children());
     }
-    let theme = RwSignal::<thaw::Theme>::new(Theme::light());
+    let theme = RwSignal::<Theme>::new(Theme::light());
     let theme_set = RwSignal::new(false);
     provide_context(theme);
     Effect::new(move || {
@@ -65,9 +66,9 @@ pub fn Themer<Ch: IntoView + 'static>(
         });
     });
     let i = view! {
-        <ConfigProvider theme>
+        <BaseThemer theme>
           <ToasterProvider>{children()}</ToasterProvider>
-        </ConfigProvider>
+        </BaseThemer>
     };
     if safe {
         B(i.attr(

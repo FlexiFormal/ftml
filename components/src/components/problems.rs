@@ -299,7 +299,7 @@ pub fn problem<V: IntoView>(
 
 ftml_js_utils::split! {
 fn submit_answer() -> AnyView {
-    use thaw::{Button, ButtonSize};
+    use ftml_component_utils::{Button, ButtonSize};
     with_context(|current: &CurrentProblem| {
         let uri = current.uri.clone();
         let responses = current.responses;
@@ -377,8 +377,8 @@ pub fn hint<V: IntoView + 'static>(children: impl FnOnce() -> V + Send + 'static
 
 #[allow(clippy::missing_panics_doc)]
 pub fn fillinsol(wd: Option<f32>) -> impl IntoView {
+    use leptos::either::Either::{Left, Right};
     use leptos::either::EitherOf3 as Either;
-    use thaw::Icon;
     let Some(ex) = use_context::<CurrentProblem>() else {
         tracing::error!("choice outside of problem!");
         return None;
@@ -414,9 +414,9 @@ pub fn fillinsol(wd: Option<f32>) -> impl IntoView {
         })
       };
       let icon = if correct {
-        view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)
+        Left(view!(<ftml_component_utils::icons::CheckmarkIcon green=true/>))
       } else {
-        view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)
+        Right(view!(<ftml_component_utils::icons::XMarkIcon red=true/>))
       };
       Either::B(view!{
         {icon}" "
@@ -596,7 +596,6 @@ fn multiple_choice<V: IntoView + 'static>(
         Either::Right,
         EitherOf3::{A, B, C},
     };
-    use thaw::Icon;
     let bx = move || {
         feedback.with(|v| if let Some(feedback) = v.as_ref() {
             tracing::debug!("multiple choice has feedback");
@@ -608,9 +607,9 @@ fn multiple_choice<V: IntoView + 'static>(
             let Some(selected) = selected.get(idx).copied() else { return err() };
             let Some(BlockFeedback{is_correct,..}) = choices.get(idx) else { return err() };
             let icon = if selected == *is_correct {
-            view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)
+                Left(view!(<ftml_component_utils::icons::CheckmarkIcon green=true/>))
             } else {
-            view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)
+                Right(view!(<ftml_component_utils::icons::XMarkIcon red=true/>))
             };
             let bx = if selected {
             Left(view!({icon}<input type="checkbox" checked disabled/>))
@@ -681,7 +680,6 @@ fn single_choice<V: IntoView + 'static>(
         Either::Right,
         EitherOf3::{A, B, C},
     };
-    use thaw::Icon;
     let bx = move || {
         feedback.with(|v| if let Some(feedback) = v.as_ref() {
             tracing::debug!("single choice has feedback");
@@ -692,9 +690,9 @@ fn single_choice<V: IntoView + 'static>(
             let Some(CheckedResult::SingleChoice{selected,choices}) = feedback.data.get(block) else {return err()};
             let Some(BlockFeedback{is_correct,..}) = choices.get(idx as usize) else { return err() };
             let icon = if selected.is_some_and(|s| s ==  idx) && *is_correct {
-              Some(Left(view!(<Icon icon=icondata_ai::AiCheckCircleOutlined style="color:green;"/>)))
+              Some(Left(view!(<ftml_component_utils::icons::CheckmarkIcon green=true/>)))
             } else if selected.is_some_and(|s| s ==  idx) {
-              Some(Right(view!(<Icon icon=icondata_ai::AiCloseCircleOutlined style="color:red;"/>)))
+              Some(Right(view!(<ftml_component_utils::icons::XMarkIcon red=true/>)))
             } else {None};
             let bx = if selected.is_some_and(|s| s ==  idx) {
               Left(view!({icon}<input type="radio" checked disabled/>))

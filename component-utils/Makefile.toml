@@ -1,0 +1,37 @@
+[tasks.test-no-features]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--no-default-features"]
+
+[tasks.test-csr]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=csr"]
+
+[tasks.test-hydrate]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=hydrate"]
+
+[tasks.test-ssr]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "test", "--features=ssr"]
+
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
+[tasks.all-tests]
+dependencies = [
+    "test-no-features",
+    "test-csr",
+    "test-hydrate",
+    #"test-ssr", # queries overflow depth limit in ssr
+    "clean"
+]
+
+[tasks.doc]
+command = "cargo"
+install_crate = false
+args = ["+nightly", "doc", "--no-deps", "--all-features"]

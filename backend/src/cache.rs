@@ -294,10 +294,7 @@ where
                         .map(|(_, n)| n.clone())
                 },
             )
-            .map_ok_or_else(
-                |e| Err(e.into()),
-                move |v| v.ok_or(BackendError::NotFound(uri.into())),
-            )
+            .map_ok_or_else(Err, move |v| v.ok_or(BackendError::NotFound(uri.into())))
     }
 }
 

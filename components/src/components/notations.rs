@@ -94,8 +94,8 @@ fn with_notation(
 }
 
 pub fn notation_selector(uri: LeafUri) -> impl IntoView {
+    use ftml_component_utils::Spinner;
     use leptos::either::Either::{Left, Right};
-    use thaw::Spinner;
     if !FtmlConfig::allow_notation_changes() {
         tracing::trace!("No notation changes");
         return Left(());
@@ -132,9 +132,9 @@ fn do_notation_selector(
     uri: &LeafUri,
     notations: GlobalLocal<Vec<(DocumentElementUri, Notation)>, ftml_backend::BackendError<String>>,
 ) -> impl IntoView + use<> {
+    use ftml_component_utils::{Combobox, ComboboxOption};
     use ftml_dom::notations::NotationExt;
     use leptos::prelude::*;
-    use thaw::{Combobox, ComboboxOption};
     tracing::warn!("Rendering notation selector");
     let mut all = notations.local.unwrap_or_default();
     match notations.global {

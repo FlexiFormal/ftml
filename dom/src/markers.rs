@@ -455,7 +455,7 @@ impl Marker {
                 formatting,
                 styles,
                 fors,
-                varname,
+                varname: _,
             } => Some(Self::Paragraph {
                 uri: uri.clone(),
                 kind: *kind,

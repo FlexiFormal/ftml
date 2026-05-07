@@ -10,7 +10,8 @@ members = [
     "dom",
     "components",
     "viewer",
-    "leptos-react"
+    "leptos-react",
+    "component-utils"
 ]
 exclude = ["tests"]
 resolver = "3"
@@ -57,6 +58,7 @@ ftml5ever = { path = "ftml5ever" }
 ftml-dom = { path = "dom" }
 ftml-components = { path = "components" }
 ftml-js-utils = { path = "js-utils" }
+ftml-component-utils = {path = "component-utils"}
 
 leptos-react = {path = "leptos-react"}
 
@@ -78,6 +80,8 @@ leptos_meta = "0.8"
 icondata_ai = "0"
 icondata_bi = "0"
 icondata_bs = "0"
+icondata_tb = "0"
+icondata_ch = "0"
 
 strumbra = "0.6"
 serde = { version = "1" }
@@ -166,4 +170,3 @@ wasm_split_helpers="0.2"
 
 [replace]
 "serde-lite:0.5.1" = { git = 'https://github.com/Jazzpirate/serde-lite',branch="hashmaps" }
-#"gloo-net:0.1.0" = { version="0.6.0" }

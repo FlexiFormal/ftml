@@ -15,14 +15,15 @@ nightly = ["leptos/nightly"]
 ## Pure client-side rendering
 csr = [
     "leptos-posthoc/csr",
+    "ftml-component-utils/csr",
     "dep:wasm-bindgen",
     "leptos/csr",
     # "ftml-backend/wasm",
 ]
 ## Client-side in compbination with ssr
-hydrate = ["leptos-posthoc/hydrate", "dep:wasm-bindgen", "leptos/hydrate"]
+hydrate = ["leptos-posthoc/hydrate", "dep:wasm-bindgen", "leptos/hydrate","ftml-component-utils/hydrate"]
 ## Server-side rendering
-ssr = ["leptos/ssr"]
+ssr = ["leptos/ssr","ftml-component-utils/ssr"]
 ## generate typescript bindings
 typescript = ["csr", "dep:tsify", "ftml-parser/typescript"]
 ## uses deepsize to compute RAM usage
@@ -62,6 +63,7 @@ ftml-parser = { workspace = true }
 ftml-uris = { workspace = true, features = ["serde-lite"] }
 ftml-ontology = { workspace = true, features = ["serde-lite"] }
 ftml-backend = { workspace = true,features=["serde-lite"] }
+ftml-component-utils = {workspace=true}
 ftml-js-utils = {workspace=true}
 
 leptos-posthoc = { workspace = true }

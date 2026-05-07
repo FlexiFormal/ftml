@@ -390,7 +390,11 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
             }
             MetaDatum::AnswerClassFeedback => {
                 if let Some(nodes) = self.narrative.iter_mut().find_map(|e| {
-                    if let OpenNarrativeElement::AnswerClass { nodes, .. } = e {
+                    if let OpenNarrativeElement::AnswerClass {
+                        nodes, feedback, ..
+                    } = e
+                    {
+                        *feedback = node.inner_string().into();
                         Some(nodes)
                     } else {
                         None

@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub(super) fn formals(symbol: SymbolUri, uri: ReadSignal<Option<DocumentElementUri>>) -> AnyView {
-    use thaw::Divider;
+    use ftml_component_utils::Divider;
     view! {
         <div style="margin:5px;"><Divider/></div>
         {lazy_collapsible(Some(|| "Formal Details"), move ||view!{
@@ -66,8 +66,8 @@ pub(super) fn paras_selector(
     paras: ReadSignal<Option<Paras>>,
     selected: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    use ftml_component_utils::{Combobox, ComboboxOption, ComboboxOptionGroup, Spinner};
     use leptos::either::EitherOf3::{A, B, C};
-    use thaw::{Combobox, ComboboxOption, ComboboxOptionGroup, Spinner};
     move || {
         paras.with(|p| match p {
             Some(Ok(v)) => {
@@ -123,8 +123,8 @@ fn para_line(uri: &DocumentElementUri) -> impl IntoView + 'static {
 }
 
 pub(super) fn para_window(selected: RwSignal<Option<String>>) -> impl IntoView {
+    use ftml_component_utils::Spinner;
     use leptos::either::Either::{Left, Right};
-    use thaw::Spinner;
     move || {
         selected
             .with(|u| {

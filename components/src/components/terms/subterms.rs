@@ -13,7 +13,7 @@ use crate::utils::ReactiveStore;
 
 ftml_js_utils::split! {
     pub(super) fn with_subterm(t: ReadSignal<Option<Term>>, v: AnyView) -> AnyView {
-        let Some(ti) = use_context::<thaw::ToasterInjection>() else {
+        let Some(ti) = use_context::<ftml_component_utils::ToasterInjection>() else {
             return v;
         };
         let selected = RwSignal::new(false);
@@ -25,7 +25,7 @@ ftml_js_utils::split! {
         let ownerclcl = ownercl.clone();
         Owner::on_cleanup(move || drop(ownerclcl));
         let _ = Effect::new(move || {
-            use thaw::{Button, ButtonShape, ButtonSize, Toast, ToastBody, ToastTitle};
+            use ftml_component_utils::{Button, ButtonShape, ButtonSize, Toast, ToastBody, ToastTitle};
             ownercl.with(|| {
                 if selected.get() && current.get().is_none() {
                     let id = uuid::Uuid::new_v4();
@@ -55,11 +55,11 @@ ftml_js_utils::split! {
                                 </Toast>
                             }
                         },
-                        thaw::ToastOptions::default()
+                        ftml_component_utils::ToastOptions::default()
                             .with_id(id)
                             .with_timeout(std::time::Duration::from_secs(0))
-                            .with_intent(thaw::ToastIntent::Info)
-                            .with_position(thaw::ToastPosition::BottomEnd),
+                            .with_intent(ftml_component_utils::ToastIntent::Info)
+                            .with_position(ftml_component_utils::ToastPosition::BottomEnd),
                     );
                 } else if !selected.get()
                     && let Some(id) = current.get()
@@ -82,7 +82,7 @@ fn subterm_dialog(
     selected: RwSignal<bool>,
     dialog_open: RwSignal<bool>,
 ) -> AnyView {
-    use thaw::{
+    use ftml_component_utils::{
         Dialog, DialogBody, DialogSurface, Table, TableBody, TableCell, TableCellLayout, TableRow,
         Tooltip,
     };
@@ -147,7 +147,7 @@ fn subterm_dialog(
             }
         });
         let inferred = full_term.as_ref().map(|(_, full_term)| {
-            use thaw::Spinner;
+            use ftml_component_utils::Spinner;
             let full_term = *full_term;
             let sig = RwSignal::new(None);
             let context = ModuleContext::get_context().into_iter().collect::<Vec<_>>();
@@ -262,7 +262,7 @@ fn check_result(
         simplified,
     }: BackendCheckResult,
 ) -> impl IntoView {
-    use thaw::{TableCell, TableCellLayout, TableRow};
+    use ftml_component_utils::{TableCell, TableCellLayout, TableRow};
     #[allow(clippy::option_if_let_else)]
     let tp = if let Some(tp) = inferred_type {
         let tp = ftml_dom::utils::math(move || ReactiveStore::render_term(tp));
