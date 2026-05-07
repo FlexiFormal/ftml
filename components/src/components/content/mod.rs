@@ -90,7 +90,7 @@ impl FtmlViewable for DocumentElementUri {
 
 #[must_use]
 pub fn hover_paragraph(uri: DocumentElementUri, title: AnyView) -> AnyView {
-    use ftml_component_utils::{Divider, Popover, PopoverTrigger};
+    use ftml_component_utils::{Code, Divider, Popover, PopoverTrigger};
     let uristring = uri.to_string();
     inject_css("ftml-symbol-popup", include_str!("../terms/popup.css"));
 
@@ -109,7 +109,7 @@ pub fn hover_paragraph(uri: DocumentElementUri, title: AnyView) -> AnyView {
                       }
                       crate::Views::render_ftml(html.into_string(),None).into_any()
                   },
-                  |e| view!(<code>{e.to_string()}</code>).into_any()
+                  |e| view!(<Code>{e.to_string()}</Code>).into_any()
               )
           }
           </div>

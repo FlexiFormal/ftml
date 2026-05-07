@@ -317,7 +317,7 @@ pub enum OpenNarrativeElement<N: FtmlNode> {
     AnswerClass {
         id: Id,
         kind: AnswerKind,
-        feedback: Box<str>,
+        feedback: Option<N>,
         nodes: Vec<N>,
     },
     ChoiceBlock {
@@ -1110,7 +1110,7 @@ impl OpenFtmlElement {
                 narrative: Some(OpenNarrativeElement::AnswerClass {
                     id,
                     kind,
-                    feedback: Box::default(),
+                    feedback: None,
                     nodes: Vec::new(),
                 }),
             },

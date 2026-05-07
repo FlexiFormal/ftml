@@ -394,7 +394,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                         nodes, feedback, ..
                     } = e
                     {
-                        *feedback = node.inner_string().into();
+                        *feedback = Some(node.clone());
                         Some(nodes)
                     } else {
                         None
@@ -933,6 +933,8 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     feedback,
                     nodes,
                 }) => {
+                    let feedback =
+                        feedback.map_or_else(Box::default, |fb| fb.inner_string().into());
                     for n in nodes {
                         n.delete();
                     }

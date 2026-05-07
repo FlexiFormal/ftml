@@ -1,18 +1,15 @@
+use leptos::html::div;
 use leptos::prelude::*;
 
 pub use thaw::Body1 as BodyText;
 pub use thaw::Caption1 as Caption;
 pub use thaw::Caption1Strong as BoldCaption;
 pub use thaw::Text;
+
 #[component]
 pub fn Code(children: Children) -> impl IntoView {
-    use thaw::{Text, TextProps, TextTag};
-    thaw::Text(
-        TextProps::builder()
-            .children(children)
-            .tag(TextTag::Code)
-            .build(),
-    )
+    inject_css("ftml-viewer-text", include_str!("text.css"));
+    view!(<div class="ftml-viewer-code">{children()}</div>)
 }
 
 /*
