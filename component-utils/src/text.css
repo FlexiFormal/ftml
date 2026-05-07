@@ -1,0 +1,22 @@
+.ftml-viewer-text,
+.ftml-viewer-code {
+    text-overflow: clip;
+    overflow-y: visible;
+    overflow-x: visible;
+    white-space: normal;
+    text-align: start;
+    display: inline;
+    line-height: var(--lineHeightBase300);
+    font-weight: var(--fontWeightRegular);
+    font-size: var(--fontSizeBase300);
+    font-family: var(--fontFamilyBase);
+}
+
+.ftml-viewer-code {
+    padding: 1px 4px;
+    margin: 0 3px 0 3px;
+    background-color: var(--colorNeutralBackground4);
+    color: var(--colorNeutralForeground1);
+    font-family: var(--fontFamilyMonospace);
+    border-radius: var(--borderRadiusMedium);
+}
