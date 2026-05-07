@@ -40,8 +40,8 @@ pub use views::*;
 pub fn global_setup<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
     #[cfg(feature = "ssr")]
     {
-        if use_context::<utils::css::CssIds>().is_none() {
-            provide_context(utils::css::CssIds::default());
+        if use_context::<ftml_component_utils::ssr::CssIds>().is_none() {
+            provide_context(ftml_component_utils::ssr::CssIds::default());
         }
     }
     f()

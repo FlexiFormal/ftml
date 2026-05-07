@@ -133,12 +133,12 @@ mod ssr {
 
     #[cfg(feature = "ssr")]
     #[derive(Default, Clone)]
-    pub(crate) struct CssIds(
-        std::sync::Arc<std::sync::Mutex<rustc_hash::FxHashSet<Cow<'static, str>>>>,
+    pub struct CssIds(
+        pub std::sync::Arc<std::sync::Mutex<rustc_hash::FxHashSet<Cow<'static, str>>>>,
     );
     #[cfg(feature = "ssr")]
     impl CssIds {
-        pub(crate) fn add(id: Cow<'static, str>, content: Cow<'static, str>) {
+        pub fn add(id: Cow<'static, str>, content: Cow<'static, str>) {
             use leptos::prelude::*;
             if let Some(slf) = use_context::<Self>() {
                 Self::add_i(&slf.0, id, content)

@@ -35,8 +35,8 @@ fn do_css(css: Css) {
             {
                 use leptos::prelude::expect_context;
                 use leptos_meta::Stylesheet;
-                let ids = expect_context::<CssIds>();
-                let mut ids = ids.0.lock();
+                let ids = expect_context::<ftml_component_utils::ssr::CssIds>();
+                let mut ids = ids.0.lock().expect("poisoned lock");
                 if !ids.contains(&*id) {
                     ids.insert(id.clone().into());
                     let _ = leptos::view! {
