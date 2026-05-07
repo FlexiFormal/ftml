@@ -8,7 +8,7 @@ pub use thaw::Text;
 
 #[component]
 pub fn Code(children: Children) -> impl IntoView {
-    inject_css("ftml-viewer-text", include_str!("text.css"));
+    super::inject_css("ftml-viewer-text", include_str!("text.css"));
     view!(<div class="ftml-viewer-code">{children()}</div>)
 }
 
