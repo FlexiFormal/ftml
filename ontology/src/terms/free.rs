@@ -119,10 +119,10 @@ impl Term {
                     for e in d.dfs() {
                         match e {
                             DocumentElementRef::Module { module: uri, .. }
-                            | DocumentElementRef::UseModule { uri, .. } => {
-                                if !mods.contains(uri) {
-                                    mods.insert(uri.clone());
-                                }
+                            | DocumentElementRef::UseModule { uri, .. }
+                                if !mods.contains(uri) =>
+                            {
+                                mods.insert(uri.clone());
                             }
                             _ => (),
                         }
@@ -133,44 +133,6 @@ impl Term {
             o => {
                 for t in o.subterms() {
                     t.full_context_i(mods, get_doc, all_docs);
-                }
-            }
-        }
-    }
-
-    fn free_vars_i<'t>(
-        &'t self,
-        vars: &mut smallvec::SmallVec<&'t Variable, 4>,
-        ctx: &mut smallvec::SmallVec<&'t str, 4>,
-    ) {
-        match self {
-            Self::Var { variable, .. }
-                if !ctx.contains(&variable.name())
-                    && !vars.iter().any(|v| v.name() == variable.name()) =>
-            {
-                vars.push(variable);
-            }
-            Self::Opaque(o) => {
-                for t in &o.terms {
-                    t.free_vars_i(vars, ctx);
-                }
-            }
-            Self::Field(f) => f.record.free_vars_i(vars, ctx),
-            Self::Var { .. } | Self::Symbol { .. } | Self::Label { .. } | Self::Number(_) => (),
-            Self::Application(a) => {
-                a.head.free_vars_i(vars, ctx);
-                for a in &a.arguments {
-                    a.free_vars_i(vars, ctx);
-                }
-            }
-            Self::Bound(b) => {
-                b.head.free_vars_i(vars, ctx);
-                let mut added = 0;
-                for a in &b.arguments {
-                    a.free_vars_i(vars, ctx, &mut added);
-                }
-                for _ in 0..added {
-                    let _ = ctx.pop();
                 }
             }
         }
@@ -289,22 +251,7 @@ impl Argument {
         self.all_vars_i(&mut vars, &mut smallvec::SmallVec::new());
         vars
     }
-    fn free_vars_i<'t>(
-        &'t self,
-        vars: &mut smallvec::SmallVec<&'t Variable, 4>,
-        ctx: &mut smallvec::SmallVec<&'t str, 4>,
-    ) {
-        match self {
-            Self::Simple(t) | Self::Sequence(MaybeSequence::One(t)) => {
-                t.free_vars_i(vars, ctx);
-            }
-            Self::Sequence(MaybeSequence::Seq(ts)) => {
-                for t in ts {
-                    t.free_vars_i(vars, ctx);
-                }
-            }
-        }
-    }
+
     fn has_free_i<'t>(
         &'t self,
         ctx: &mut smallvec::SmallVec<&'t str, 4>,
@@ -361,45 +308,6 @@ impl BoundArgument {
         let mut vars = smallvec::SmallVec::new();
         self.all_vars_i(&mut vars, &mut smallvec::SmallVec::new(), &mut 0);
         vars
-    }
-    fn free_vars_i<'t>(
-        &'t self,
-        vars: &mut smallvec::SmallVec<&'t Variable, 4>,
-        ctx: &mut smallvec::SmallVec<&'t str, 4>,
-        added: &mut usize,
-    ) {
-        match self {
-            Self::Simple(t) | Self::Sequence(MaybeSequence::One(t)) => {
-                t.free_vars_i(vars, ctx);
-            }
-            Self::Sequence(MaybeSequence::Seq(ts)) => {
-                for t in ts {
-                    t.free_vars_i(vars, ctx);
-                }
-            }
-            Self::Bound(v) | Self::BoundSeq(MaybeSequence::One(v)) => {
-                if let Some(tp) = &v.tp {
-                    tp.free_vars_i(vars, ctx);
-                }
-                if let Some(df) = &v.df {
-                    df.free_vars_i(vars, ctx);
-                }
-                *added += 1;
-                ctx.push(v.var.name());
-            }
-            Self::BoundSeq(MaybeSequence::Seq(vs)) => {
-                for v in vs {
-                    if let Some(tp) = &v.tp {
-                        tp.free_vars_i(vars, ctx);
-                    }
-                    if let Some(df) = &v.df {
-                        df.free_vars_i(vars, ctx);
-                    }
-                    *added += 1;
-                    ctx.push(v.var.name());
-                }
-            }
-        }
     }
 
     fn has_free_i<'t>(

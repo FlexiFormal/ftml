@@ -1,5 +1,3 @@
-pub mod block;
-pub mod collapsible;
 pub mod theming;
 
 use crate::components::terms::OnClickData;
@@ -11,11 +9,6 @@ use leptos::{
     prelude::{AnyView, IntoAny, Owner, RwSignal, expect_context},
     tachys::reactive_graph::OwnedView,
 };
-
-#[leptos::prelude::slot]
-pub struct Header {
-    children: leptos::prelude::Children,
-}
 
 pub fn error_toast(msg: impl IntoView + std::fmt::Display + 'static) {
     use ftml_component_utils::{

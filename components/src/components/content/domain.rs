@@ -1,11 +1,7 @@
-use crate::{
-    components::content::{CommaSep, FtmlViewable},
-    utils::{
-        Header,
-        block::{Block, HeaderLeft, HeaderRight},
-    },
+use crate::components::content::{CommaSep, FtmlViewable};
+use ftml_component_utils::{
+    Block, BoldCaption, Caption, Divider, Header, HeaderLeft, HeaderRight, Text,
 };
-use ftml_component_utils::{BoldCaption, Caption, Divider, Text};
 use ftml_dom::notations::TermExt;
 use ftml_ontology::{
     domain::{
@@ -65,7 +61,7 @@ fn rule(id: &Id, args: &[Term]) -> AnyView {
     )
     .into_view();
     view! {
-        <Block show_separator=false>
+        <Block>
             <Header slot>{header}</Header>
             <HeaderRight slot><Text>{fors}</Text></HeaderRight>
             ""
@@ -117,7 +113,7 @@ impl FtmlViewable for StructureExtension {
         });
         let imports = super::uses("Extends", imports);
         let children = self.declarations().map(|d| d.as_view()).collect_view();
-        view! {<Block show_separator=false>
+        view! {<Block>
             <Header slot>
                 <BoldCaption>"Conservative Extension "{name}" for "{target}</BoldCaption>
             </Header>

@@ -1,11 +1,5 @@
-use crate::{
-    components::content::{CommaSep, FtmlViewable},
-    utils::{
-        Header,
-        block::{Block, HeaderLeft, HeaderRight},
-    },
-};
-use ftml_component_utils::BoldCaption;
+use crate::components::content::{CommaSep, FtmlViewable};
+use ftml_component_utils::{Block, BoldCaption, Header, HeaderLeft, HeaderRight};
 use ftml_dom::{FtmlViews, notations::TermExt};
 use ftml_ontology::narrative::elements::{
     DocumentElement, FlatIterable, LogicalParagraph, Section,

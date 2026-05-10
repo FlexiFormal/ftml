@@ -347,9 +347,10 @@ impl<T> std::fmt::Debug for DataRef<T> {
             .finish()
     }
 }
+
+#[allow(clippy::non_canonical_clone_impl)]
 impl<T> Clone for DataRef<T> {
     #[inline]
-    #[allow(clippy::non_canonical_clone_impl)]
     fn clone(&self) -> Self {
         Self {
             start: self.start,

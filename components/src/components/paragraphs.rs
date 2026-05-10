@@ -4,10 +4,8 @@ use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
-use crate::{
-    config::FtmlConfig,
-    utils::collapsible::{collapse_marker, fancy_collapsible},
-};
+use crate::config::FtmlConfig;
+use ftml_component_utils::{collapse_marker, fancy_collapsible};
 
 pub fn paragraph<V: IntoView>(
     info: ftml_dom::markers::ParagraphInfo,

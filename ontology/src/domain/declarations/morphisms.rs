@@ -342,10 +342,10 @@ impl Elaboration {
 // --------------------------------------------------------------------------
 
 impl std::hash::Hash for Elaboration {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {}
+    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {}
 }
 impl PartialEq for Elaboration {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _: &Self) -> bool {
         true
     }
 }
@@ -354,7 +354,7 @@ impl Eq for Elaboration {}
 impl bincode::Encode for Elaboration {
     fn encode<E: bincode::enc::Encoder>(
         &self,
-        encoder: &mut E,
+        _: &mut E,
     ) -> Result<(), bincode::error::EncodeError> {
         Ok(())
     }
@@ -362,7 +362,7 @@ impl bincode::Encode for Elaboration {
 #[cfg(feature = "serde")]
 impl<'de, C> bincode::BorrowDecode<'de, C> for Elaboration {
     fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = C>>(
-        decoder: &mut D,
+        _: &mut D,
     ) -> Result<Self, bincode::error::DecodeError> {
         Ok(Self::default())
     }
@@ -370,7 +370,7 @@ impl<'de, C> bincode::BorrowDecode<'de, C> for Elaboration {
 #[cfg(feature = "serde")]
 impl<C> bincode::Decode<C> for Elaboration {
     fn decode<D: bincode::de::Decoder<Context = C>>(
-        decoder: &mut D,
+        _: &mut D,
     ) -> Result<Self, bincode::error::DecodeError> {
         Ok(Self::default())
     }

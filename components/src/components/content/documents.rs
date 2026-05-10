@@ -1,12 +1,9 @@
 use crate::{
     components::content::{CommaSep, FtmlViewable, paragraphs},
     config::FtmlConfig,
-    utils::{
-        Header, LocalCacheExt, ReactiveStore,
-        block::{Block, HeaderLeft, HeaderRight},
-    },
+    utils::{LocalCacheExt, ReactiveStore},
 };
-use ftml_component_utils::{BoldCaption, Code, Flex, Text};
+use ftml_component_utils::{Block, BoldCaption, Code, Flex, Header, HeaderLeft, HeaderRight, Text};
 use ftml_dom::{FtmlViews, notations::NotationExt, utils::local_cache::LocalCache};
 use ftml_ontology::{
     narrative::{
@@ -84,7 +81,7 @@ impl super::FtmlViewable for Document {
             .iter()
             .map(FtmlViewable::as_view)
             .collect_view();
-        view! {<Block show_separator=false>
+        view! {<Block>
           <HeaderLeft slot>{uses}</HeaderLeft>
           {knd}<br/>
           {children}
@@ -312,7 +309,7 @@ fn view_notation(uri: DocumentElementUri, head: VarOrSym) -> impl IntoView + 'st
 }
 
 fn view_inputref(uri: &DocumentUri) -> AnyView {
-    use crate::utils::collapsible::LazyCollapsible;
+    use ftml_component_utils::LazyCollapsible;
     let name = uri.as_view();
     let uri = uri.clone();
     view! {
@@ -371,7 +368,7 @@ fn view_structure(uri: &SymbolUri, children: &[DocumentElement]) -> impl IntoVie
     });
     let imports = super::uses("Extends", imports);
     let children = children.iter().map(FtmlViewable::as_view).collect_view();
-    view! {<Block show_separator=false>
+    view! {<Block>
         <Header slot>
             <BoldCaption>"Structure "{name}</BoldCaption>
         </Header>
@@ -396,7 +393,7 @@ fn view_extension(
     });
     let imports = super::uses("Extends", imports);
     let children = children.iter().map(FtmlViewable::as_view).collect_view();
-    view! {<Block show_separator=false>
+    view! {<Block>
         <Header slot>
             <BoldCaption>"Conservative Extension "{name}" for "{target}</BoldCaption>
         </Header>

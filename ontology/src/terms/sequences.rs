@@ -142,10 +142,13 @@ impl Term {
             return true;
         }
         if force
-            && let Self::Var {
-                variable: v @ Variable::Ref { .. },
-                ..
-            } = self
+            && matches!(
+                self,
+                Self::Var {
+                    variable: Variable::Ref { .. },
+                    ..
+                }
+            )
         {
             return true;
         }
@@ -160,11 +163,7 @@ impl Term {
         {
             true
         } else if *uri == *ftml_uris::metatheory::SEQUENCE_MAP {
-            if let [_, Argument::Simple(_)] = &*app.arguments {
-                true
-            } else {
-                false
-            }
+            matches!(&*app.arguments, [_, Argument::Simple(_)])
         } else if *uri == *ftml_uris::metatheory::SEQUENCE_CONC {
             if let [Argument::Sequence(MaybeSequence::Seq(seq))] = &*app.arguments
                 && seq.iter().all(Self::is_sequence)

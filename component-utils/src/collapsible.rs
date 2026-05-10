@@ -1,6 +1,5 @@
 #![allow(clippy::must_use_candidate)]
 
-use ftml_dom::utils::css::inject_css;
 use leptos::{html::Details, prelude::*};
 
 #[component]
@@ -46,23 +45,6 @@ pub fn lazy_collapsible<H: IntoView, V: IntoView + 'static>(
     mut children: impl FnMut() -> V + Send + 'static,
 ) -> impl IntoView {
     let expanded = RwSignal::new(false);
-    /*
-    let spread = leptos::attr::open(move || {
-        if expanded.get() {
-            tracing::warn!("Setting to {}", expanded.get());
-            Some(expanded.get().to_string())
-        } else {
-            tracing::warn!("Setting to None");
-            None
-        }
-    });
-    let spread = if expanded {
-        leptos::either::Either::Left(view!(<{..} open="true"/>))
-    } else {
-        leptos::either::Either::Right(view!(<{..}/>))
-    };
-     */
-    //let click = RwSignal::new(false);
     let rf: NodeRef<Details> = NodeRef::new();
     let _ = Effect::new(move || {
         let _ = expanded.get();
@@ -86,7 +68,7 @@ pub fn fancy_collapsible<V: IntoView>(
     class: &'static str,
     style: &'static str,
 ) -> impl IntoView {
-    inject_css("ftml-collapsible", include_str!("collapsible.css"));
+    super::inject_css("ftml-collapsible", include_str!("collapsible.css"));
     let style = Memo::new(move |_| {
         if !style.is_empty() && visible.get() {
             Some(style)

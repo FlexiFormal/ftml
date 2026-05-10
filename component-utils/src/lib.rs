@@ -1,5 +1,5 @@
 #![recursion_limit = "256"]
-#![allow(unexpected_cfgs)]
+#![allow(unexpected_cfgs, clippy::must_use_candidate)]
 #![cfg_attr(all(doc, CHANNEL_NIGHTLY), feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 /*!
@@ -9,24 +9,31 @@
 
 pub mod icons;
 pub mod text;
-pub mod theming;
-use leptos::html::{div, span};
 pub use text::*;
 pub mod popover;
+pub mod theming;
 pub use popover::*;
 pub mod toasts;
 pub use toasts::*;
+pub mod tables;
+pub use tables::*;
+pub mod block;
+pub use block::*;
+pub mod collapsible;
+pub use collapsible::*;
 
 #[cfg(any(feature = "csr", feature = "hydrate"))]
 pub mod events;
 
-pub use thaw::{Avatar, Scrollbar, Tooltip};
+use leptos::html::{div, span};
+
+pub use thaw::{Avatar, Tooltip};
 pub use thaw::{Badge, BadgeAppearance, BadgeColor};
 pub use thaw::{Button, ButtonAppearance, ButtonShape, ButtonSize};
-pub use thaw::{
+/*pub use thaw::{
     Card, CardFooter, CardHeader, CardHeaderAction, CardHeaderDescription, CardHeaderProps,
     CardPreview,
-};
+};*/
 pub use thaw::{Checkbox, Input, InputPrefix, InputType, Radio, RadioGroup};
 pub use thaw::{Combobox, ComboboxOption, ComboboxOptionGroup};
 pub use thaw::{Dialog, DialogBody, DialogContent, DialogSurface, ProgressBar};
@@ -36,17 +43,26 @@ pub use thaw::{
 };
 pub use thaw::{Flex, FlexAlign};
 pub use thaw::{Grid, GridItem};
-pub use thaw::{Layout, LayoutHeader, LayoutPosition, LayoutSider};
 pub use thaw::{Menu, MenuItem, MenuPosition, MenuTrigger, MenuTriggerType, NavDrawer, NavItem};
 pub use thaw::{Select, SelectSize};
 pub use thaw::{Tab, TabList};
-pub use thaw::{
-    Table, TableBody, TableCell, TableCellLayout, TableHeader, TableHeaderCell, TableRow,
-};
 pub use thaw::{Tag, TagPicker, TagPickerControl, TagPickerGroup, TagPickerInput, TagPickerOption};
 
 use leptos::prelude::*;
 use std::borrow::Cow;
+
+#[component]
+pub fn Scrollbar(
+    children: Children,
+    #[prop(optional)] style: Option<&'static str>,
+) -> impl IntoView {
+    inject_css("ftml-viewer-scrollbar", include_str!("scrollbar.css"));
+    view! {
+        <div class="ftml-viewer-scrollbar" style=style>
+            {children()}
+        </div>
+    }
+}
 
 #[component]
 pub fn Spinner(#[prop(default = false)] small: bool) -> impl IntoView {

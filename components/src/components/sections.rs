@@ -1,7 +1,5 @@
-use crate::{
-    config::FtmlConfig,
-    utils::collapsible::{collapse_marker, fancy_collapsible},
-};
+use crate::config::FtmlConfig;
+use ftml_component_utils::{collapse_marker, fancy_collapsible};
 use ftml_dom::{
     DocumentState,
     counters::LogicalLevel,

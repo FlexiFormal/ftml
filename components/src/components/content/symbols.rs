@@ -1,14 +1,8 @@
-use crate::{
-    components::content::FtmlViewable,
-    config::FtmlConfig,
-    utils::{
-        Header, LocalCacheExt,
-        block::{Block, HeaderLeft, HeaderRight},
-    },
-};
+use crate::{components::content::FtmlViewable, config::FtmlConfig, utils::LocalCacheExt};
 use ftml_backend::BackendError;
 use ftml_component_utils::{
-    BoldCaption, Caption, Code, Table, TableCell, TableHeader, TableHeaderCell, TableRow,
+    Block, BoldCaption, Caption, Code, Header, HeaderLeft, HeaderRight, Table, TableCell,
+    TableHeader, TableRow,
 };
 use ftml_dom::{
     notations::{NotationExt, TermExt},
@@ -161,7 +155,7 @@ impl super::FtmlViewable for VariableDeclaration {
 }
 
 pub(super) fn do_paragraphs(uri: SymbolUri) -> AnyView {
-    use crate::utils::collapsible::LazyCollapsible;
+    use ftml_component_utils::LazyCollapsible;
 
     let cached = move || {
         let uri = uri.clone();
@@ -248,12 +242,12 @@ fn do_table(
             <Popover>
                 <PopoverTrigger slot><span>{notation}</span></PopoverTrigger>
                 <Table class="ftml-notation-table">
-                    <TableHeader>
-                        <TableRow>
-                            <TableHeaderCell class="ftml-notation-header">"source document"</TableHeaderCell>
-                            {if functional {Some(view!{<TableHeaderCell class="ftml-notation-header">"operation"</TableHeaderCell>})} else {None}}
-                            <TableHeaderCell class="fftml-notation-header">"notation"</TableHeaderCell>
-                        </TableRow>
+                    <TableHeader slot>
+                        //<TableRow>
+                            <TableCell class="ftml-notation-header">"source document"</TableCell>
+                            {if functional {Some(view!{<TableCell class="ftml-notation-header">"operation"</TableCell>})} else {None}}
+                            <TableCell class="fftml-notation-header">"notation"</TableCell>
+                        //</TableRow>
                     </TableHeader>
                     <TableRow>
                         <TableCell class="ftml-notation-cell">{not_uri.document_uri().as_view()}</TableCell>

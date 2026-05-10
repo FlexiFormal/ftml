@@ -216,6 +216,7 @@ pub enum OpenDomainElement<N: FtmlNode> {
     SeqRange(Vec<(Term, crate::NodePath)>, N),
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum OpenNarrativeElement<N: FtmlNode> {
     FoldExpr(bool),

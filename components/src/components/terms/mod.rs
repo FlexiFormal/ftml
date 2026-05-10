@@ -7,6 +7,7 @@ pub mod subterms;
 pub mod symvars;
 
 use crate::config::FtmlConfig;
+use ftml_component_utils::inject_css;
 use ftml_dom::{
     ClonableView, DocumentState, FtmlViews, terms::ReactiveApplication, utils::ContextChain,
 };
@@ -23,6 +24,10 @@ struct InTerm {
 
 #[derive(Default, Clone)]
 struct FoldExpr(Option<SendWrapper<OriginalNode>>);
+
+pub fn inject_comp_css() {
+    inject_css("ftml-comp", include_str!("comp.css"));
+}
 
 #[derive(Copy, Clone)]
 struct InBinder {

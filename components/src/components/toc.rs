@@ -3,7 +3,7 @@ use ftml_ontology::utils::{TreeIter, time::Timestamp};
 use ftml_uris::DocumentElementUri;
 use leptos::prelude::*;
 
-use crate::utils::collapsible::{collapse_marker, fancy_collapsible};
+use ftml_component_utils::{collapse_marker, fancy_collapsible};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]

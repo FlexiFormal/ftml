@@ -1,11 +1,9 @@
 use super::{BoundArgument, arguments::Argument, variables::Variable};
 use crate::terms::IsTerm;
-use crate::terms::arguments::ComponentVar;
 use crate::terms::opaque::OpaqueNode;
 use crate::terms::{VarOrSym, arguments::MaybeSequence};
 use crate::utils::{Float64, RefTree, TreeIter};
 use ftml_uris::{SymbolUri, UriName};
-use std::fmt::Write;
 use std::str::FromStr;
 
 /// The type of FTML expressions.
@@ -149,7 +147,6 @@ impl std::ops::BitXor for Numeric {
                 }
                 Some(Self::Float((a.as_float().powf(b)).into()))
             }
-            _ => None,
         }
     }
 }

@@ -1,0 +1,73 @@
+.ftml-viewer-table {
+    display: table;
+    table-layout: fixed;
+    vertical-align: middle;
+    border-collapse: collapse;
+    width: 100%;
+    background-color: var(--colorSubtleBackground);
+    & > tbody,
+    > thead {
+        display: table-row-group;
+        & > tr {
+            display: table-row;
+            box-sizing: border-box;
+            color: var(--colorNeutralForeground1);
+            border-bottom: var(--strokeWidthThin) solid
+                var(--colorNeutralStroke2);
+            & > td,
+            > th {
+                position: relative;
+                /*height: 44px;*/
+                display: table-cell;
+                vertical-align: middle;
+                font-weight: normal;
+                padding: 0px var(--spacingHorizontalS);
+            }
+        }
+    }
+    & > thead > tr > th > button {
+        position: relative;
+        display: flex;
+        flex: 1 1 0px;
+        align-items: center;
+        gap: var(--spacingHorizontalXS);
+        padding: 0px;
+        width: 100%;
+        height: 100%;
+        min-height: 32px;
+        text-align: unset;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: normal;
+        color: inherit;
+        background-color: inherit;
+        box-sizing: content-box;
+        resize: horizontal;
+        overflow: visible;
+        outline-style: none;
+        border: none;
+    }
+    & > tbody > tr {
+        & > td > div {
+            display: flex;
+            flex: 1 1 0px;
+            align-items: center;
+            gap: var(--spacingHorizontalS);
+            & > div {
+                display: flex;
+                flex-direction: column;
+                & > span {
+                    text-overflow: ellipsis;
+                }
+            }
+        }
+        &:hover {
+            color: var(--colorNeutralForeground1Hover);
+            background-color: var(--colorSubtleBackgroundHover);
+        }
+        &:active {
+            color: var(--colorNeutralForeground1Pressed);
+            background-color: var(--colorSubtleBackgroundPressed);
+        }
+    }
+}

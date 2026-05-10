@@ -97,6 +97,7 @@ impl Notation {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(tag = "type"))]
+#[allow(clippy::use_self)] // Self does not work well with typescript
 pub enum NotationComponent {
     Node {
         tag: ftml_uris::Id,

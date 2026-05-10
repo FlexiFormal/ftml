@@ -78,7 +78,7 @@ impl Css {
         );
         for s in &strings {
             if let Ok(rs) = StyleSheet::parse(s, ParserOptions::default()) {
-                sheet.rules.0.extend(rs.rules.0.into_iter());
+                sheet.rules.0.extend(rs.rules.0);
             } else {
                 tracing::warn!("Not class-able: {s}");
             }

@@ -83,8 +83,7 @@ fn subterm_dialog(
     dialog_open: RwSignal<bool>,
 ) -> AnyView {
     use ftml_component_utils::{
-        Dialog, DialogBody, DialogSurface, Table, TableBody, TableCell, TableCellLayout, TableRow,
-        Tooltip,
+        Dialog, DialogBody, DialogSurface, Table, TableCell, TableRow, Tooltip,
     };
 
     let nv = v.directive(move |e| selection_listener(e, &owner, selected), ());
@@ -127,10 +126,10 @@ fn subterm_dialog(
                         };
                         /*
                         let ts = move || t.get().map(|t| format!("{:?}", t.debug_short())); */
-                        view!{
+                        view! {
                             <TableRow>
-                                <TableCell><TableCellLayout>"In full term: "</TableCellLayout></TableCell>
-                                <TableCell><TableCellLayout>
+                                <TableCell>"In full term: "</TableCell>
+                                <TableCell>
                                     {ftml_dom::utils::math(move || {
                                         let ts = format!("{:?}",t.debug_short());
                                         view! {<msup>{
@@ -139,7 +138,7 @@ fn subterm_dialog(
                                             <mo>"🛈"</mo>
                                         </Tooltip></msup>}
                                     })}
-                                </TableCellLayout></TableCell>
+                                </TableCell>
                             </TableRow>
                         }
                     })
@@ -209,7 +208,7 @@ fn subterm_dialog(
                     || {
                         leptos::either::Either::Left(view! {
                             <TableRow>
-                                <TableCell><TableCellLayout><Spinner/></TableCellLayout></TableCell>
+                                <TableCell><Spinner/></TableCell>
                             </TableRow>
                         })
                     },
@@ -218,12 +217,10 @@ fn subterm_dialog(
                             Ok(r) => leptos::either::Either::Left(check_result(r)),
                             Err(e) => leptos::either::Either::Right(view! {
                                 <TableRow>
-                                    <TableCell><TableCellLayout>
+                                    <TableCell>
                                         <span style="color:red;">"Error"</span>
-                                    </TableCellLayout></TableCell>
-                                    <TableCell><TableCellLayout>
-                                        {e}
-                                    </TableCellLayout></TableCell>
+                                    </TableCell>
+                                    <TableCell>{e}</TableCell>
                                 </TableRow>
                             }),
                         })
@@ -233,14 +230,12 @@ fn subterm_dialog(
         });
         view! {
             <Table>
-                <TableBody>
-                    <TableRow>
-                        <TableCell><TableCellLayout>"Selected term: "</TableCellLayout></TableCell>
-                        <TableCell><TableCellLayout>{term}</TableCellLayout></TableCell>
-                    </TableRow>
-                    {rendered_term}
-                    {inferred}
-                </TableBody>
+                <TableRow>
+                    <TableCell>"Selected term: "</TableCell>
+                    <TableCell>{term}</TableCell>
+                </TableRow>
+                {rendered_term}
+                {inferred}
             </Table>
         }
         .attr("style", "width:max-content;")
@@ -262,30 +257,30 @@ fn check_result(
         simplified,
     }: BackendCheckResult,
 ) -> impl IntoView {
-    use ftml_component_utils::{TableCell, TableCellLayout, TableRow};
+    use ftml_component_utils::{TableCell, TableRow};
     #[allow(clippy::option_if_let_else)]
     let tp = if let Some(tp) = inferred_type {
         let tp = ftml_dom::utils::math(move || ReactiveStore::render_term(tp));
         leptos::either::Either::Left(view! {
             <TableRow>
-                <TableCell><TableCellLayout>"Inferred type:"</TableCellLayout></TableCell>
-                <TableCell><TableCellLayout>{tp}</TableCellLayout></TableCell>
+                <TableCell>"Inferred type:"</TableCell>
+                <TableCell>{tp}</TableCell>
             </TableRow>
         })
     } else {
         leptos::either::Either::Right(view! {
             <TableRow>
                 <TableCell>""</TableCell>
-                <TableCell><TableCellLayout>"(Type inferrence failed)"</TableCellLayout></TableCell>
+                <TableCell>"(Type inferrence failed)"</TableCell>
             </TableRow>
         })
     };
     let simplified = view! {
         <TableRow>
-            <TableCell><TableCellLayout>"Simplified:"</TableCellLayout></TableCell>
-            <TableCell><TableCellLayout>
+            <TableCell>"Simplified:"</TableCell>
+            <TableCell>
                 {ftml_dom::utils::math(move || ReactiveStore::render_term(simplified))}
-            </TableCellLayout></TableCell>
+            </TableCell>
         </TableRow>
     };
     let ctx = if context.is_empty() {
@@ -299,7 +294,7 @@ fn check_result(
         Some(view! {
             <TableRow>
                 <TableCell>""</TableCell>
-                <TableCell><TableCellLayout>"...where " {inner}</TableCellLayout></TableCell>
+                <TableCell>"...where " {inner}</TableCell>
             </TableRow>
         })
     };

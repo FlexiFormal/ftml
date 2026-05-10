@@ -156,6 +156,20 @@ pub enum Uri {
 impl crate::sealed::Sealed for Uri {}
 crate::ts!(Uri);
 crate::debugdisplay!(Uri);
+impl Uri {
+    #[must_use]
+    pub const fn kind(&self) -> UriKind {
+        match self {
+            Self::Base(_) => UriKind::Base,
+            Self::Archive(_) => UriKind::Archive,
+            Self::Path(_) => UriKind::Path,
+            Self::Module(_) => UriKind::Module,
+            Self::Symbol(_) => UriKind::Symbol,
+            Self::Document(_) => UriKind::Document,
+            Self::DocumentElement(_) => UriKind::DocumentElement,
+        }
+    }
+}
 
 #[cfg_attr(feature = "typescript", wasm_bindgen::prelude::wasm_bindgen)]
 #[must_use]

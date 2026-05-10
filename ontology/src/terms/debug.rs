@@ -11,7 +11,7 @@ impl std::fmt::Debug for Term {
                 variable: Variable::Name { name, .. },
                 ..
             } => write!(f, "V({name})"),
-            Term::Var {
+            Self::Var {
                 variable: Variable::Ref { declaration, .. },
                 ..
             } => write!(f, "V({declaration})"),
@@ -44,32 +44,32 @@ impl std::fmt::Debug for Term {
                 .field(":=", df)
                 .finish(),
 
-            Term::Label {
+            Self::Label {
                 name, tp: Some(tp), ..
             } => f
                 .debug_struct("Label")
                 .field("", name)
                 .field(":", tp)
                 .finish(),
-            Term::Label {
+            Self::Label {
                 name, df: Some(df), ..
             } => f
                 .debug_struct("Label")
                 .field("", name)
                 .field(":=", df)
                 .finish(),
-            Term::Application(a) => f
+            Self::Application(a) => f
                 .debug_struct("OMA")
                 .field("head", &a.head)
                 .field("arguments", &a.arguments)
                 .finish(),
-            Term::Bound(b) => f
+            Self::Bound(b) => f
                 .debug_struct("OMBIND")
                 .field("head", &b.head)
                 .field("arguments", &b.arguments)
                 //.field("body", &b.body)
                 .finish(),
-            Term::Opaque(o) => {
+            Self::Opaque(o) => {
                 write!(f, "<{}", o.node.tag)?;
                 for (k, v) in &o.node.attributes {
                     write!(f, " {k}=\"{v}\"")?;

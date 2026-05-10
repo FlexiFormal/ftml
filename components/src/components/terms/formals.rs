@@ -13,8 +13,9 @@ use leptos::prelude::*;
 
 use crate::{
     components::content::FtmlViewable,
-    utils::{LocalCacheExt, ReactiveStore, collapsible::lazy_collapsible},
+    utils::{LocalCacheExt, ReactiveStore},
 };
+use ftml_component_utils::lazy_collapsible;
 
 pub(super) fn formals(symbol: SymbolUri, uri: ReadSignal<Option<DocumentElementUri>>) -> AnyView {
     use ftml_component_utils::Divider;

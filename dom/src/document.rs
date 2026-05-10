@@ -164,7 +164,7 @@ impl DocumentState {
         f()
     }
 
-    pub fn no_document<V: IntoView, F: FnOnce() -> V>(f: F) -> impl IntoView + use<V, F> {
+    pub fn no_document<V: IntoView, F: FnOnce() -> V>(f: F) -> V {
         fn setup() {
             provide_context(RwSignal::new(DomExtractor::new(
                 DocumentUri::no_doc().clone(),

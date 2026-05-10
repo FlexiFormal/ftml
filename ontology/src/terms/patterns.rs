@@ -144,7 +144,11 @@ impl Pattern {
         )
     }
 
-    #[allow(clippy::option_if_let_else, clippy::too_many_lines)]
+    #[allow(
+        clippy::option_if_let_else,
+        clippy::too_many_lines,
+        clippy::type_complexity
+    )]
     pub fn match_rec<'t: 's, 's>(
         //&self,
         term: &'t Term,
@@ -264,7 +268,7 @@ impl Pattern {
         }
     }
 
-    #[allow(clippy::option_if_let_else)]
+    #[allow(clippy::option_if_let_else, clippy::type_complexity)]
     fn match_args<'t: 's, 's>(
         //&self,
         term: &'t Argument,
@@ -300,7 +304,7 @@ impl Pattern {
         }
     }
 
-    #[allow(clippy::option_if_let_else)]
+    #[allow(clippy::option_if_let_else, clippy::type_complexity)]
     fn match_bargs<'t: 's, 's>(
         //&self,
         term: &'t BoundArgument,
@@ -358,6 +362,7 @@ impl Pattern {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn match_cv<'t: 's, 's>(
         //&self,
         term: &'t ComponentVar,

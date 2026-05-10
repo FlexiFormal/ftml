@@ -8,32 +8,47 @@
     --colorNeutralForeground1: #242424;
     --colorNeutralForeground2: #424242;
     --colorNeutralBackground4: #f0f0f0;
+    --colorNeutralForeground1Hover: #242424;
+    --colorNeutralForeground1Pressed: #242424;
 
+    --colorNeutralBackground1: #ffffff;
+    --colorSubtleBackground: transparent;
+    --colorSubtleBackgroundHover: #f5f5f5;
+    --colorSubtleBackgroundPressed: #e0e0e0;
+
+    --colorBrandForeground1: #0f6cbd;
     --colorBrandStroke1: #0f6cbd;
+    --colorNeutralStroke1: #d1d1d1;
     --colorBrandStroke2Contrast: #b4d6fa;
     --colorNeutralStroke2: #e0e0e0;
 
     --strokeWidthThin: 1px;
     --strokeWidthThick: 2px;
     --strokeWidthThicker: 3px;
+    --strokeWidthThickest: 4px;
 
     --lineHeightBase300: 20px;
     --lineHeightBase200: 16px;
 
     --fontWeightRegular: 400;
+    --fontWeightSemibold: 600;
 
     --fontSizeBase300: 14px;
+    --fontSizeBase200: 12px;
 
     --borderRadiusMedium: 4px;
 
+    --spacingHorizontalXS: 4px;
+    --spacingHorizontalS: 8px;
+
     --curveEasyEase: cubic-bezier(0.33, 0, 0.67, 1);
+    --shadow4: 0 0 2px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.14);
 }
 
 /*
 
 --fontFamilyNumeric: Bahnschrift, 'Segoe UI', 'Segoe UI Web (West European)', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
 --fontSizeBase100: 10px;
---fontSizeBase200: 12px;
 --fontSizeBase400: 16px;
 --fontSizeBase500: 20px;
 --fontSizeBase600: 24px;
@@ -43,18 +58,14 @@
 --fontSizeBase1000: 60px;
 --lineHeightBase400: 22px;
 --lineHeightBase500: 28px;
---fontWeightSemibold: 600;
 --fontWeightBold: 700;
---strokeWidthThickest: 4px;
 --borderRadiusNone: 0;
 --borderRadiusSmall: 2px;
 --borderRadiusLarge: 6px;
 --borderRadiusXLarge: 8px;
 --borderRadiusCircular: 10000px;
 --spacingHorizontalXXS: 2px;
---spacingHorizontalXS: 4px;
 --spacingHorizontalSNudge: 6px;
---spacingHorizontalS: 8px;
 --spacingHorizontalMNudge: 10px;
 --spacingHorizontalM: 12px;
 --spacingHorizontalL: 16px;
@@ -81,7 +92,6 @@
 --colorNeutralBackgroundStatic: #333333;
 --colorNeutralBackgroundInverted: #292929;
 --colorNeutralBackgroundDisabled: #f0f0f0;
---colorNeutralBackground1: #ffffff;
 --colorNeutralBackground1Hover: #f5f5f5;
 --colorNeutralBackground1Pressed: #e0e0e0;
 --colorNeutralBackground3: #f5f5f5;
@@ -93,8 +103,6 @@
 --colorNeutralBackground6: #e6e6e6;
 --colorNeutralForegroundStaticInverted: #ffffff;
 --colorNeutralForegroundDisabled: #bdbdbd;
---colorNeutralForeground1Hover: #242424;
---colorNeutralForeground1Pressed: #242424;
 --colorNeutralForeground2Hover: #242424;
 --colorNeutralForeground2Pressed: #242424;
 --colorNeutralForeground2BrandHover: #0f6cbd;
@@ -105,7 +113,6 @@
 --colorNeutralForegroundOnBrand: #fff;
 --colorNeutralForegroundInverted: #fff;
 --colorNeutralStrokeDisabled: #e0e0e0;
---colorNeutralStroke1: #d1d1d1;
 --colorNeutralStroke1Hover: #c7c7c7;
 --colorNeutralStroke1Pressed: #b3b3b3;
 --colorNeutralStrokeAccessible: #616161;
@@ -127,7 +134,6 @@
 --colorBrandBackgroundHover: #115ea3;
 --colorBrandBackgroundPressed: #0c3b5e;
 --colorBrandBackground2: #ebf3fc;
---colorBrandForeground1: #0f6cbd;
 --colorBrandForeground2: #115ea3;
 --colorBrandStroke2: #b4d6fa;
 --colorBrandForegroundLink: #115ea3;
@@ -167,15 +173,11 @@
 --colorStatusDangerBackground1: #fdf3f4;
 --colorStatusDangerForeground1: #b10e1c;
 --colorStatusDangerBorder1: #eeacb2;
---colorSubtleBackground: transparent;
---colorSubtleBackgroundHover: #f5f5f5;
---colorSubtleBackgroundPressed: #e0e0e0;
 --colorTransparentBackground: transparent;
 --colorTransparentBackgroundHover: transparent;
 --colorTransparentBackgroundPressed: transparent;
 --colorTransparentStroke: transparent;
 --colorTransparentStrokeDisabled: transparent;
---shadow4: 0 0 2px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.14);
 --shadow8: 0 0 2px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.14);
 --shadow16: 0 0 2px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.14);
 --shadow64: 0 0 8px rgba(0,0,0,0.12), 0 32px 64px rgba(0,0,0,0.14);

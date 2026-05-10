@@ -10,47 +10,6 @@ use crate::{
     },
     utils::SVec,
 };
-/*
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PathIndex {
-    Head,
-    Record,
-    RecordType,
-    LabelType,
-    LabelDefiniens,
-    VarType,
-    VarDefiniens,
-    Argument(u8),
-}
-impl From<u8> for PathIndex {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => Self::Head,
-            1 => Self::Record,
-            2 => Self::RecordType,
-            3 => Self::LabelType,
-            4 => Self::LabelDefiniens,
-            5 => Self::VarType,
-            6 => Self::VarDefiniens,
-            i => Self::Argument(i - 7),
-        }
-    }
-}
-impl From<PathIndex> for u8 {
-    fn from(value: PathIndex) -> Self {
-        match value {
-            PathIndex::Head => 0,
-            PathIndex::Record => 1,
-            PathIndex::RecordType => 2,
-            PathIndex::LabelType => 3,
-            PathIndex::LabelDefiniens => 4,
-            PathIndex::VarType => 5,
-            PathIndex::VarDefiniens => 6,
-            PathIndex::Argument(i) => i.saturating_add(7),
-        }
-    }
-}
- */
 
 #[derive(Clone, Debug)]
 #[cfg_attr(
@@ -191,7 +150,7 @@ impl Term {
             Self::Bound(b) => {
                 let (b, a) = b.path_of_subterm_with_ctx_i(sub, ret, vars);
                 if !b {
-                    for i in 0..a {
+                    for _ in 0..a {
                         vars.pop();
                     }
                 }

@@ -14,8 +14,8 @@
     flex-shrink: 0;
     mask-image: radial-gradient(
         closest-side,
-        transparent calc(100% - var(--thaw-spinner--stroke-width) - 1px),
-        white calc(100% - var(--thaw-spinner--stroke-width)) calc(100% - 1px),
+        transparent calc(100% - var(--ftml-spinner--stroke-width) - 1px),
+        white calc(100% - var(--ftml-spinner--stroke-width)) calc(100% - 1px),
         transparent 100%
     );
     background-color: var(--colorBrandStroke2Contrast);
@@ -25,11 +25,11 @@
     animation-timing-function: linear;
     animation-name: ftml-viewer-spinner;
 
-    --thaw-spinner--stroke-width: var(--strokeWidthThicker);
+    --ftml-spinner--stroke-width: var(--strokeWidthThicker);
 }
 
 .ftml-viewer-spinner--small > .ftml-viewer-spinner__spinner {
-    --thaw-spinner--stroke-width: var(--strokeWidthThick);
+    --ftml-spinner--stroke-width: var(--strokeWidthThick);
     width: 20px;
     height: 20px;
 }

@@ -1,5 +1,7 @@
 .ftml-viewer-text,
-.ftml-viewer-code {
+.ftml-viewer-code,
+.ftml-viewer-caption,
+.ftml-viewer-bold-caption {
     text-overflow: clip;
     overflow-y: visible;
     overflow-x: visible;
@@ -12,6 +14,10 @@
     font-family: var(--fontFamilyBase);
 }
 
+b.ftml-viewer-text {
+    font-weight: bold;
+}
+
 .ftml-viewer-code {
     padding: 1px 4px;
     margin: 0 3px 0 3px;
@@ -19,4 +25,15 @@
     color: var(--colorNeutralForeground1);
     font-family: var(--fontFamilyMonospace);
     border-radius: var(--borderRadiusMedium);
+}
+
+.ftml-viewer-caption {
+    font-size: var(--fontSizeBase200);
+    line-height: var(--lineHeightBase200);
+}
+
+.ftml-viewer-bold-caption {
+    font-size: var(--fontSizeBase200);
+    font-weight: var(--fontWeightSemibold);
+    line-height: var(--lineHeightBase200);
 }

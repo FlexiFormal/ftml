@@ -1,0 +1,62 @@
+.ftml-viewer-block {
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    row-gap: 0;
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 12px;
+    row-gap: 12px;
+    column-gap: 12px;
+
+    background-color: var(--colorNeutralBackground1);
+    color: var(--colorNeutralForeground1);
+    box-shadow: var(--shadow4);
+    border-radius: var(--borderRadiusMedium);
+    /*box-shadow: -3px 3px 5px -1px var(--colorBrandForeground1);*/
+}
+.ftml-viewer-block-inner {
+    margin: 0;
+    position: relative;
+}
+
+.ftml-viewer-block-footer {
+    display: flex;
+    flex-direction: row;
+    column-gap: 12px;
+    row-gap: 12px;
+}
+
+.ftml-viewer-block-header {
+    display: flex;
+    align-items: center;
+    & > .ftml-viewer-block-header__inner {
+        flex-grow: 1;
+        display: flex;
+    }
+}
+
+.ftml-viewer-block-complex-header {
+    display: grid;
+    grid-auto-columns: min-content 1fr min-content;
+    & > .ftml-viewer-block-header__inner {
+        grid-row-start: 1;
+        grid-column-start: 2;
+    }
+    & > .ftml-viewer-block-header-right {
+        grid-column-start: 3;
+        grid-row-start: span 2;
+    }
+}
+.ftml-viewer-block-header-left {
+    grid-row-start: 2;
+    grid-column-start: 2;
+    display: flex;
+}
+.ftml-viewer-block-header-right {
+    margin-left: 12px;
+}

@@ -8,7 +8,7 @@ use ftml_uris::{
 use super::Result;
 use crate::{
     FtmlKey,
-    extraction::{FtmlExtractionError, FtmlExtractor, nodes::FtmlNode},
+    extraction::{FtmlExtractionError, FtmlExtractor},
 };
 
 pub trait Attributes: std::fmt::Debug {

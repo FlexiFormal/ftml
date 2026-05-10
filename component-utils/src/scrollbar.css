@@ -1,0 +1,25 @@
+.ftml-viewer-scrollbar {
+    overflow: auto;
+    position: relative;
+    z-index: auto;
+    height: 100%;
+    width: 100%;
+    padding: 0 3px 3px 0;
+    &::-webkit-scrollbar-track {
+        -webkit-box-shadow: inset 0 0 var(--borderRadiusMedium)
+            var(--colorNeutralForeground2);
+        border-radius: 4px;
+        background-color: var(--colorNeutralBackground4);
+    }
+    &::-webkit-scrollbar {
+        width: 8px;
+        margin: 6px;
+        background-color: var(--colorNeutralBackground4);
+    }
+    &::-webkit-scrollbar-thumb {
+        border-radius: 4px;
+        -webkit-box-shadow: inset 0 0 var(--borderRadiusMedium)
+            var(--colorNeutralForeground2);
+        background-color: var(--colorNeutralForeground4);
+    }
+}

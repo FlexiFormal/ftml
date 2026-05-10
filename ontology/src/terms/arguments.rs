@@ -103,6 +103,7 @@ where
 }
 
 #[cfg(feature = "serde-lite")]
+#[allow(clippy::len_without_is_empty)]
 impl<T> MaybeSequence<T>
 where
     T: serde_lite::Serialize + serde_lite::Deserialize + 'static,
@@ -116,6 +117,7 @@ where
 }
 
 #[cfg(not(feature = "serde-lite"))]
+#[allow(clippy::len_without_is_empty)]
 impl<T> MaybeSequence<T>
 where
     T: 'static,

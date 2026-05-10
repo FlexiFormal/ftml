@@ -284,12 +284,18 @@ pub struct Permutation(Box<[u8]>);
 impl Permutation {
     #[inline]
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.0.len()
+    }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     /// ### Errors
     /// (obviously)
+    #[allow(clippy::result_unit_err)]
     pub fn parse(spec: &ArgumentSpec, s: &str) -> Result<Self, ()> {
         use std::str::FromStr;
         let mut ret = s
@@ -315,6 +321,7 @@ impl Permutation {
 
     /// ### Errors
     /// (obviously)
+    #[allow(clippy::result_unit_err)]
     pub fn apply<T: Clone + std::fmt::Debug>(&self, arguments: &[T]) -> Result<Vec<T>, ()> {
         if arguments.len() != self.0.len() {
             return Err(());
@@ -340,6 +347,7 @@ impl Permutation {
 
     /// ### Errors
     /// (obviously)
+    #[allow(clippy::result_unit_err)]
     pub fn revert<T: Clone>(&self, arguments: &[T]) -> Result<Vec<T>, ()> {
         if arguments.len() != self.0.len() {
             return Err(());

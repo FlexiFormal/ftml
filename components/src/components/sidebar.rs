@@ -1,12 +1,5 @@
-use crate::{
-    components::content::FtmlViewable,
-    config::HighlightStyle,
-    utils::{
-        LocalCacheExt,
-        collapsible::{collapse_marker, fancy_collapsible},
-    },
-};
-use ftml_component_utils::Caption;
+use crate::{components::content::FtmlViewable, config::HighlightStyle, utils::LocalCacheExt};
+use ftml_component_utils::{Caption, collapse_marker, fancy_collapsible};
 use ftml_dom::{
     DocumentState,
     utils::{css::inject_css, local_cache::LocalCache},

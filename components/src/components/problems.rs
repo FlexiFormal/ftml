@@ -366,7 +366,7 @@ fn submit_answer() -> AnyView {
 }
 
 pub fn hint<V: IntoView + 'static>(children: impl FnOnce() -> V + Send + 'static) -> impl IntoView {
-    use crate::utils::{Header, collapsible::Collapsible};
+    use ftml_component_utils::{Collapsible, Header};
     view! {
       <Collapsible>
         <Header slot><span style="font-style:italic;color:gray;cursor:pointer;">"Hint"</span></Header>

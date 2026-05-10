@@ -741,7 +741,8 @@ impl<S1: AsRef<str>, S2: AsRef<str> + Into<S1>> TryFrom<UriComponentTuple<S2>>
         Err(ComponentError::NoValidCombination)
     }
 }
-impl UriComponents {
+
+impl<S: AsRef<str>> UriComponents<S> {
     /// #### Errors
     pub fn parse(
         self,
@@ -754,24 +755,40 @@ impl UriComponents {
             }
             Self::PathComponents { a, p } => Ok((get(&a)
                 .ok_or(ComponentError::UnknownArchive(a))?
-                / p.parse::<UriPath>()?)
+                / p.as_ref().parse::<UriPath>()?)
             .into()),
-            Self::RelPath { a, rp } => Self::from_archive_relpath(a, &rp, get).map(Uri::from),
+            Self::RelPath { a, rp } => {
+                UriComponents::from_archive_relpath(a, rp.as_ref(), get).map(Uri::from)
+            }
             Self::DocumentComponents { a, p, l, d } => {
-                Self::get_doc_uri(a, p.as_deref(), l, &d, get).map(Uri::from)
+                UriComponents::get_doc_uri(a, p.as_ref().map(S::as_ref), l, d.as_ref(), get)
+                    .map(Uri::from)
             }
-            Self::ElementComponents { a, p, l, d, e } => {
-                Self::get_elem_uri(a, p.as_deref(), l, &d, &e, get).map(Uri::from)
-            }
+            Self::ElementComponents { a, p, l, d, e } => UriComponents::get_elem_uri(
+                a,
+                p.as_ref().map(S::as_ref),
+                l,
+                d.as_ref(),
+                e.as_ref(),
+                get,
+            )
+            .map(Uri::from),
             Self::ModuleComponents { a, p, m } => {
-                Self::get_mod_uri(a, p.as_deref(), &m, get).map(Uri::from)
+                UriComponents::get_mod_uri(a, p.as_ref().map(S::as_ref), m.as_ref(), get)
+                    .map(Uri::from)
             }
-            Self::SymbolComponents { a, p, m, s } => {
-                Self::get_sym_uri(a, p.as_deref(), &m, &s, get).map(Uri::from)
-            }
+            Self::SymbolComponents { a, p, m, s } => UriComponents::get_sym_uri(
+                a,
+                p.as_ref().map(S::as_ref),
+                m.as_ref(),
+                s.as_ref(),
+                get,
+            )
+            .map(Uri::from),
         }
     }
-
+}
+impl UriComponents {
     #[inline]
     fn from_archive_relpath(
         a: ArchiveId,
@@ -1287,6 +1304,49 @@ pub trait UriComponentsTrait {
     where
         Self: 's;
     fn get<'slf>(&'slf self, key: &str) -> Option<Self::S<'slf>>;
+    /// ### Errors
+    fn kind(&self) -> Result<UriKind, ComponentError> {
+        if let Some(uri) = self.get("uri") {
+            return uri
+                .as_ref()
+                .parse()
+                .map_err(ComponentError::Parse)
+                .map(|uri: Uri| uri.kind());
+        }
+        if self.get("a").is_none() {
+            forbidden!(self => UriKind::Base;p,d,l,e,m,s,rp);
+            return Ok(UriKind::Base);
+        }
+        if self.get("rp").is_some() {
+            forbidden!(self => UriKind::Document;p,d,l,e,m,s);
+            return Ok(UriKind::Document);
+        }
+        if self.get("m").is_some() {
+            forbidden!(self => UriKind::Module; d,e,l);
+            if self.get("s").is_some() {
+                Ok(UriKind::Symbol)
+            } else {
+                Ok(UriKind::Module)
+            }
+        } else if self.get("d").is_some() {
+            forbidden!(self => UriKind::Module; s);
+            if self.get("l").is_none() {
+                return Err(ComponentError::MissingComponents(
+                    UriKind::Document,
+                    UriComponentKind::l,
+                ));
+            }
+            if self.get("e").is_some() {
+                Ok(UriKind::DocumentElement)
+            } else {
+                Ok(UriKind::Document)
+            }
+        } else if self.get("p").is_some() {
+            Ok(UriKind::Path)
+        } else {
+            Ok(UriKind::Archive)
+        }
+    }
 
     /// #### Errors
     fn as_document(&self) -> Result<DocumentUriComponents<Self::S<'_>>, ComponentError> {
@@ -1319,8 +1379,8 @@ pub trait UriComponentsTrait {
             return Ok(UriComponents::RelPath { a, rp });
         }
         let p = self.get("p");
+        let a = need!(self[ArchiveId] => DocumentElement;a);
         if let Some(e) = self.get("e") {
-            let a = need!(self[ArchiveId] => DocumentElement;a);
             let l = need!(self[Language] => DocumentElement;l);
             let d = need!(self => DocumentElement;d);
             forbidden!(self => UriKind::DocumentElement;m,s);
@@ -1328,22 +1388,23 @@ pub trait UriComponentsTrait {
         }
         if let Some(d) = self.get("d") {
             forbidden!(self => UriKind::Document;m,s);
-            let a = need!(self[ArchiveId] => DocumentElement;a);
             let l = need!(self[Language] => DocumentElement;l);
             return Ok(UriComponents::DocumentComponents { a, p, l, d });
         }
         if let Some(s) = self.get("s") {
             forbidden!(self => UriKind::Symbol;d,l,e);
-            let a = need!(self[ArchiveId] => Symbol;a);
             let m = need!(self => Symbol;m);
             return Ok(UriComponents::SymbolComponents { a, p, m, s });
         }
         if let Some(m) = self.get("m") {
             forbidden!(self => UriKind::Symbol;d,l,e);
-            let a = need!(self[ArchiveId] => Symbol;a);
             return Ok(UriComponents::ModuleComponents { a, p, m });
         }
-        Err(ComponentError::NoValidCombination)
+        if let Some(p) = p {
+            Ok(UriComponents::PathComponents { a, p })
+        } else {
+            Ok(UriComponents::ArchiveComponents { a })
+        }
     }
 }
 
