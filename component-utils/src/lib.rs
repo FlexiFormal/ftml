@@ -21,9 +21,10 @@ pub mod block;
 pub use block::*;
 pub mod collapsible;
 pub use collapsible::*;
+pub mod anchor_menu;
+pub use anchor_menu::*;
 
-#[cfg(any(feature = "csr", feature = "hydrate"))]
-pub mod events;
+pub mod js;
 
 use leptos::html::{div, span};
 

@@ -849,6 +849,7 @@ impl TocStateReady {
                 } else {
                     *toc = either::Right(ret);
                 }
+                self.inputrefs.update_value(|slf| *slf = state.inputrefs);
             }
         });
         r

@@ -1,14 +1,14 @@
-.thaw-anchor {
+.ftml-viewer-anchor {
     position: relative;
     padding-left: 4px;
 }
 
-.thaw-anchor .thaw-anchor-link + .thaw-anchor-link,
-.thaw-anchor .thaw-anchor-link > .thaw-anchor-link {
+.ftml-viewer-anchor .ftml-viewer-anchor-link + .ftml-viewer-anchor-link,
+.ftml-viewer-anchor .ftml-viewer-anchor-link > .ftml-viewer-anchor-link {
     margin-top: 0.5em;
 }
 
-.thaw-anchor-rail {
+.ftml-viewer-anchor-rail {
     position: absolute;
     left: 0;
     top: 0;
@@ -20,7 +20,7 @@
     background-color: var(--colorNeutralStroke2);
 }
 
-.thaw-anchor-rail__bar {
+.ftml-viewer-anchor-rail__bar {
     position: absolute;
     left: 0;
     width: 4px;
@@ -30,11 +30,11 @@
         background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.thaw-anchor-rail__bar.thaw-anchor-rail__bar--active {
+.ftml-viewer-anchor-rail__bar.ftml-viewer-anchor-rail__bar--active {
     background-color: var(--colorBrandBackground);
 }
 
-.thaw-anchor-link {
+.ftml-viewer-anchor-link {
     padding: 0 0 0 16px;
     position: relative;
     line-height: var(--lineHeightBase200);
@@ -44,11 +44,12 @@
     flex-direction: column;
 }
 
-.thaw-anchor-link.thaw-anchor-link--active > .thaw-anchor-link__title {
+.ftml-viewer-anchor-link.ftml-viewer-anchor-link--active
+    > .ftml-viewer-anchor-link__title {
     color: var(--colorNeutralForeground2Active);
 }
 
-.thaw-anchor-link__title {
+.ftml-viewer-anchor-link__title {
     /* outline: none; */
     max-width: 100%;
     text-decoration: none;
@@ -63,6 +64,6 @@
     color: var(--colorNeutralForeground2);
 }
 
-.thaw-anchor-link__title:hover {
+.ftml-viewer-anchor-link__title:hover {
     color: var(--colorNeutralForeground2Hover);
 }

@@ -77,11 +77,48 @@ impl Gottos {
 ftml_js_utils::split! {
 #[must_use]
 pub fn toc() -> AnyView {
-    use ftml_component_utils::Spinner;
+    use ftml_component_utils::{Spinner,AnchorMenu,AnchorMenuEntry,AnchorSubMenu,BoldCaption};
+
+    let gottos = StoredValue::new(Gottos::default());
+    let ctx: TocProgresses = use_context().unwrap_or_default();
+
+    let inner = move || DocumentStructure::render_toc::<crate::Views, _, _, _>(
+        move |href, uri, line, sub_menu| {
+            let mut style = "";
+            let mut after = None;
+            gottos.update_value(|gottos| {
+                if let Some(g) = gottos.current.as_ref() {
+                    style = "background-color:var(--colorPaletteYellowBorder1);";
+                    after = g.timestamp.map(|ts| {
+                        view! {
+                            <sup><i>" Covered: "{ts.into_date().to_string()}</i></sup>
+                        }
+                    });
+                }
+                gottos.next(uri);
+            });
+            let line = view!(<BoldCaption>{line}{after}</BoldCaption>);
+            if let Some(sub_menu) = sub_menu {
+                view!(<AnchorMenuEntry href=href>
+                    {line}
+                    <AnchorSubMenu slot collapsible=true>
+                        {sub_menu}
+                    </AnchorSubMenu>
+                </AnchorMenuEntry>).into_any()
+            } else {
+                view!(<AnchorMenuEntry href=href>{line}</AnchorMenuEntry>).into_any()
+            }
+        },
+        move |es| {
+            gottos.update_value(|g| *g = Gottos::new(ctx.clone(), es));
+        },
+        || view!(<Spinner/>).into_any(),
+    );
+
+    view!{<AnchorMenu>{inner()}</AnchorMenu>}.into_any()
+    /*
     wrap_toc(move |data| {
-        //move || {
-        // TODO: eliminate non-toc gottos
-        let gottos = StoredValue::new(Gottos::default()); //new(use_context().unwrap_or_default(), &[]));
+        let gottos = StoredValue::new(Gottos::default());
         let data = StoredValue::new(data);
         let ctx: TocProgresses = use_context().unwrap_or_default();
         DocumentStructure::render_toc::<crate::Views, _, _, _>(
@@ -91,21 +128,14 @@ pub fn toc() -> AnyView {
             },
             || view!(<Spinner/>).into_any(),
         )
-
-        /*DocumentStructure::with_toc(|toc| {
-            let gottos: TocProgresses = use_context().unwrap_or_default();
-            let mut gottos = Gottos::new(gottos, toc);
-            do_toc::<Be>(toc, &mut gottos, data, SectionLevel::Part)
-        })*/
-        //}
     }).into_any()
-}
-}
+     */
+}}
 
+/*
 fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl IntoView {
     use ftml_component_utils::Scrollbar;
     inject_css("ftml-toc", include_str!("toc.css"));
-    //owned(move || {
     let anchor_ref = NodeRef::new();
     let bar_ref = NodeRef::new();
     let element_ids = RwSignal::new(Vec::new());
@@ -142,7 +172,6 @@ fn wrap_toc<V: IntoView + 'static>(body: impl FnOnce(AnchorData) -> V) -> impl I
             </div>
         </Scrollbar>
     }
-    //})
 }
 
 fn do_toc(
@@ -267,13 +296,13 @@ fn scroll_listener(
             active_id.set(temp_link);
         });
     };
-    let cb = ftml_component_utils::events::throttle(
+    let cb = ftml_component_utils::js::throttle(
         move || {
             on_scroll();
         },
         std::time::Duration::from_millis(200),
     );
-    let scroll_handle = ftml_component_utils::events::add_event_listener_with_bool(
+    let scroll_handle = ftml_component_utils::js::add_event_listener_with_bool(
         document(),
         ev::scroll,
         move |_| {
@@ -326,3 +355,5 @@ impl AnchorData {
         }
     }
 }
+
+*/

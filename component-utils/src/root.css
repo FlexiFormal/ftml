@@ -22,6 +22,8 @@
     --colorBrandStroke2Contrast: #b4d6fa;
     --colorNeutralStroke2: #e0e0e0;
 
+    --colorPaletteYellowBorder1: #fef7b2;
+
     --strokeWidthThin: 1px;
     --strokeWidthThick: 2px;
     --strokeWidthThicker: 3px;
@@ -156,7 +158,6 @@
 --colorPaletteYellowBackground3: #fde300;
 --colorPaletteYellowForeground1: #817400;
 --colorPaletteYellowForeground2: #817400;
---colorPaletteYellowBorder1: #fef7b2;
 --colorPaletteMarigoldBackground2: #f9e2ae;
 --colorPaletteMarigoldBorderActive: #eaa300;
 --colorPaletteDarkOrangeBackground1: #fdf6f3;

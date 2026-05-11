@@ -17,6 +17,21 @@ impl EventListenerHandle {
     }
 }
 
+pub fn get_true_rect(elem: &leptos::web_sys::Element) -> leptos::web_sys::DomRect {
+    let rect = elem.get_bounding_client_rect();
+    let Some(window) = leptos::web_sys::window() else {
+        return rect;
+    };
+    if let Ok(s) = window.scroll_x() {
+        rect.set_x(rect.x() + s);
+    }
+    if let Ok(s) = window.scroll_y() {
+        rect.set_y(rect.y() + s);
+    }
+    rect
+}
+
+#[allow(clippy::needless_pass_by_value)]
 pub fn add_event_listener_with_bool<E: leptos::ev::EventDescriptor + 'static>(
     target: impl Into<EventTarget>,
     event: E,
@@ -70,7 +85,8 @@ fn add_event_listener_untyped_with_bool(
     wel(target.into(), Box::new(cb), event_name, use_capture)
 }
 
-pub fn throttle(cb: impl Fn() + Send + Sync + 'static, duration: Duration) -> impl Fn() -> () {
+/// #### Panics
+pub fn throttle(cb: impl Fn() + Send + Sync + 'static, duration: Duration) -> impl Fn() {
     let cb = Arc::new(cb);
     let timeout_handle = StoredValue::new(None::<TimeoutHandle>);
     on_cleanup(move || {
@@ -82,7 +98,7 @@ pub fn throttle(cb: impl Fn() + Send + Sync + 'static, duration: Duration) -> im
     });
 
     move || {
-        if timeout_handle.with_value(|handle| handle.is_some()) {
+        if timeout_handle.with_value(Option::is_some) {
             return;
         }
         let cb = cb.clone();
@@ -95,7 +111,7 @@ pub fn throttle(cb: impl Fn() + Send + Sync + 'static, duration: Duration) -> im
             },
             duration,
         )
-        .unwrap();
+        .expect("bug");
         timeout_handle.set_value(Some(handle));
     }
 }

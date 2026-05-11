@@ -1,10 +1,7 @@
 use crate::config::FtmlConfig;
-use ftml_component_utils::{collapse_marker, fancy_collapsible};
+use ftml_component_utils::{collapse_marker, fancy_collapsible, js::get_true_rect};
 use ftml_dom::{
-    DocumentState,
-    counters::LogicalLevel,
-    structure::SectionInfo,
-    utils::{css::inject_css, get_true_rect},
+    DocumentState, counters::LogicalLevel, structure::SectionInfo, utils::css::inject_css,
 };
 use ftml_ontology::narrative::elements::SectionLevel;
 use leptos::prelude::*;
