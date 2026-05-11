@@ -11,7 +11,7 @@ workspace = true
 
 [features]
 ## use leptos nightly feature
-nightly = ["leptos/nightly","ftml-dom/nightly","ftml-component-utils/nightly"]
+#nightly = ["leptos/nightly","ftml-dom/nightly","ftml-component-utils/nightly"]
 ## Pure client-side rendering
 csr = [
     "leptos/csr",

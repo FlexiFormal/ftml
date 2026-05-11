@@ -11,7 +11,7 @@ workspace = true
 
 [features]
 ## Uses leptos nightly feature
-nightly = ["leptos/nightly"]
+#nightly = ["leptos/nightly"]
 ## Pure client-side rendering
 csr = [
     "leptos-posthoc/csr",
