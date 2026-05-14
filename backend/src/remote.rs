@@ -1210,7 +1210,7 @@ where
 }
 
 #[cfg(not(feature = "serde-lite"))]
-pub use post_serde as post;
+use post_serde as post;
 
 #[cfg(feature = "wasm")]
 impl From<gloo_net::Error> for RequestError {
