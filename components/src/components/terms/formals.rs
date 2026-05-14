@@ -76,8 +76,16 @@ pub(super) fn paras_selector(
                 let mut examples = Vec::new();
                 for (uri, knd) in v.iter() {
                     match knd {
-                        ParagraphOrProblemKind::Definition => definitions.push(uri.clone()),
-                        ParagraphOrProblemKind::Example => examples.push(uri.clone()),
+                        ParagraphOrProblemKind::Definition => {
+                            if !definitions.contains(uri) {
+                                definitions.push(uri.clone())
+                            }
+                        }
+                        ParagraphOrProblemKind::Example => {
+                            if !examples.contains(uri) {
+                                examples.push(uri.clone())
+                            }
+                        }
                         _ => (),
                     }
                 }

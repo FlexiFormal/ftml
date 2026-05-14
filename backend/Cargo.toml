@@ -29,6 +29,8 @@ typescript = ["wasm", "dep:tsify", "ftml-ontology/typescript"]
 deepsize = ["cached", "ftml-ontology/deepsize", "dep:bytesize", "dep:deepsize"]
 ## Use serde_lite instead of serde, where adequate
 serde-lite = ["dep:serde-lite","ftml-ontology/serde-lite","server_fn/serde-lite"]
+## add the sparql endpoint to remote flams backends
+rdf = ["dep:ulo"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -85,3 +87,5 @@ pollster = { workspace = true, optional = true }
 bytesize = { workspace = true, optional = true }
 deepsize = { workspace = true, optional = true }
 async-broadcast = { workspace = true,optional = true }
+
+ulo = {workspace=true,optional=true,features=["serde"]}

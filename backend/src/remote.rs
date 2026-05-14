@@ -421,6 +421,30 @@ mod server_fn {
     };
     use futures_util::TryFutureExt;
 
+    impl<Url: std::fmt::Display, Re: Redirects> RemoteFlamsBackend<Url, Re> {
+        #[cfg(feature = "rdf")]
+        pub fn sparql(
+            &self,
+            query: &str,
+            decode_uris: Option<bool>,
+        ) -> impl Future<
+            Output = Result<ulo::sparql::SparqlResult, BackendError<ServerFnErrorErr>>,
+        > + Send
+        + use<Url, Re>
+        + 'static {
+            let url = format!("{}/api/backend/query", self.url);
+            let body = format!(
+                "{{\"query\":\"{query}\",decode_uris:{}}}",
+                match decode_uris {
+                    Some(true) => "true",
+                    Some(false) => "false",
+                    None => "null",
+                }
+            );
+            super::post_serde::<_, SFnE>(url, body).map_err(BackendError::from_other)
+        }
+    }
+
     impl<Url: std::fmt::Display, Re: Redirects> FlamsBackend for RemoteFlamsBackend<Url, Re> {
         #[inline]
         fn stripped(&self) -> bool {
@@ -861,6 +885,13 @@ mod server_fn {
 }
 
 trait JsWrap {
+    #[allow(clippy::future_not_send)]
+    async fn get_serde<
+        T: serde::de::DeserializeOwned,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>>;
     #[cfg(not(feature = "serde-lite"))]
     async fn get<
         T: serde::de::DeserializeOwned,
@@ -879,9 +910,8 @@ trait JsWrap {
 
 #[cfg(feature = "wasm")]
 impl JsWrap for gloo_net::http::Response {
-    #[cfg(not(feature = "serde-lite"))]
     #[allow(clippy::future_not_send)]
-    async fn get<
+    async fn get_serde<
         T: serde::de::DeserializeOwned,
         E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
     >(
@@ -890,6 +920,17 @@ impl JsWrap for gloo_net::http::Response {
         self.json()
             .await
             .map_err(|e| BackendError::Connection(E::from(e.into())))
+    }
+
+    #[cfg(not(feature = "serde-lite"))]
+    #[allow(clippy::future_not_send)]
+    async fn get<
+        T: serde::de::DeserializeOwned,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>> {
+        self.get_serde().await
     }
     #[cfg(feature = "serde-lite")]
     #[allow(clippy::future_not_send)]
@@ -910,8 +951,7 @@ impl JsWrap for gloo_net::http::Response {
 
 #[cfg(feature = "reqwest")]
 impl JsWrap for ::reqwest::Response {
-    #[cfg(not(feature = "serde-lite"))]
-    async fn get<
+    async fn get_serde<
         T: serde::de::DeserializeOwned,
         E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
     >(
@@ -920,6 +960,16 @@ impl JsWrap for ::reqwest::Response {
         self.json()
             .await
             .map_err(|e| BackendError::Connection(E::from(e.into())))
+    }
+
+    #[cfg(not(feature = "serde-lite"))]
+    async fn get<
+        T: serde::de::DeserializeOwned,
+        E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
+    >(
+        self,
+    ) -> Result<T, BackendError<E>> {
+        self.get_serde().await
     }
     #[cfg(feature = "serde-lite")]
     async fn get<
@@ -1033,8 +1083,8 @@ where
     crate::utils::FutWrap::new(call_i(url))
 }
 
-#[cfg(all(feature = "wasm", not(feature = "serde-lite")))]
-fn post<R, E>(url: String, body: String) -> impl Future<Output = Result<R, BackendError<E>>>
+#[cfg(feature = "wasm")]
+fn post_serde<R, E>(url: String, body: String) -> impl Future<Output = Result<R, BackendError<E>>>
 where
     R: serde::de::DeserializeOwned,
     E: From<RequestError> + std::fmt::Display + std::fmt::Debug + std::str::FromStr,
@@ -1056,7 +1106,7 @@ where
             return Err(BackendError::<E>::from_str(&str).map_err(Into::into)?);
         }
 
-        res.get().await
+        res.get_serde().await
     };
     crate::utils::FutWrap::new(fut)
 }
@@ -1084,8 +1134,8 @@ where
     res.get().await
 }
 
-#[cfg(all(not(feature = "wasm"), not(feature = "serde-lite")))]
-async fn post<R, E>(url: String, body: String) -> Result<R, BackendError<E>>
+#[cfg(not(feature = "wasm"))]
+async fn post_serde<R, E>(url: String, body: String) -> Result<R, BackendError<E>>
 where
     R: serde::de::DeserializeOwned,
     E: From<RequestError> + std::fmt::Debug + std::fmt::Display + std::str::FromStr,
@@ -1158,6 +1208,9 @@ where
 
     res.get().await
 }
+
+#[cfg(not(feature = "serde-lite"))]
+pub use post_serde as post;
 
 #[cfg(feature = "wasm")]
 impl From<gloo_net::Error> for RequestError {

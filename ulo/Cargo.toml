@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [features]
-
+serde= ["dep:serde"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -36,4 +36,7 @@ rustdoc-args = [
 
 [dependencies]
 #document-features = { workspace = true }
-oxrdf = { workspace = true }
+oxrdf = { workspace = true,features=["rdf-12"] }
+serde = {workspace = true,optional=true}
+rustc-hash.workspace = true
+urlencoding.workspace = true

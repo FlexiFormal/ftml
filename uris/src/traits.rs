@@ -42,35 +42,7 @@ pub trait FtmlUri:
     fn as_uri(&self) -> UriRef<'_>;
     #[cfg(feature = "rdf")]
     /// Returns this URI as an RDF-IRI; possibly escaping invalid characters.
-    fn to_iri(&self) -> oxrdf::NamedNode; /* {
-    struct Writer(String);
-    impl std::fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-    for c in s.chars() {
-    self.write_char(c)?;
-    }
-    Ok(())
-    }
-    fn write_char(&mut self, c: char) -> std::fmt::Result {
-    self.0.push_str(match c {
-    ' ' => "%20",
-    '\\' => "%5C",
-    '^' => "%5E",
-    '[' => "%5B",
-    ']' => "%5D",
-    '|' => "%7C",
-    c => {
-    self.0.push(c);
-    return Ok(());
-    }
-    });
-    Ok(())
-    }
-    }
-    let mut s = Writer(String::with_capacity(64));
-    let _ = std::fmt::Write::write_fmt(&mut s, format_args!("{self}"));
-    oxrdf::NamedNode::new(s.0).expect("All illegal characters are replaced")
-    } */
+    fn to_iri(&self) -> oxrdf::NamedNode;
 
     #[cfg(feature = "rdf")]
     /// Parses this URI from an RDF-IRI; possibly unescaping characters.
@@ -79,7 +51,7 @@ pub trait FtmlUri:
     /// if the iri is not a valid `Self`.
     fn from_iri(iri: oxrdf::NamedNodeRef) -> Result<Self, crate::errors::UriParseError> {
         let s = iri.as_str();
-        if !s.contains('%') || !s.contains("?a=") {
+        if !s.contains('%') && !s.contains("?a=") {
             return s.parse();
         }
         urlencoding::decode(s)
@@ -89,32 +61,6 @@ pub trait FtmlUri:
                 ))
             })?
             .parse()
-        /*let mut out = String::with_capacity(64);
-        while !s.is_empty() {
-            if s.len() > 3 {
-                match &s[..3] {
-                    "%20" => out.push(' '),
-                    "%5C" => out.push('\\'),
-                    "%5E" => out.push('^'),
-                    "%5B" => out.push('['),
-                    "%5D" => out.push(']'),
-                    "%7C" => out.push('|'),
-                    _ => {
-                        // SAFETY: !is_empty() + len > 3 even
-                        let next = unsafe { s.chars().next().unwrap_unchecked() };
-                        let len = next.len_utf8();
-                        out.push(next);
-                        s = &s[len..];
-                        continue;
-                    }
-                }
-                s = &s[3..];
-            } else {
-                out.push_str(s);
-                break;
-            }
-        }
-        out.parse()*/
     }
 
     /// Display as this Uri url-encoded

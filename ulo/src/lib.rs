@@ -14,6 +14,8 @@ pub mod rdf_types {
 mod ontologies;
 pub use ontologies::{dc, owl, rdf, rdfs, ulo, xsd};
 
+pub mod sparql;
+
 #[macro_export]
 macro_rules! triple {
     (<($sub:expr)> $($tt:tt)*) => {
