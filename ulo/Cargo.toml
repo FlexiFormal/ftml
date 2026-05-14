@@ -37,6 +37,6 @@ rustdoc-args = [
 [dependencies]
 #document-features = { workspace = true }
 oxrdf = { workspace = true,features=["rdf-12"] }
-serde = {workspace = true,optional=true}
+serde = {workspace = true,optional=true,features=["derive"]}
 rustc-hash.workspace = true
 urlencoding.workspace = true
