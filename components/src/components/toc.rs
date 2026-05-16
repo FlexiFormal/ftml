@@ -97,7 +97,7 @@ pub fn toc() -> AnyView {
                 }
                 gottos.next(uri);
             });
-            let line = view!(<BoldCaption>{line}{after}</BoldCaption>);
+            let line = view!(<BoldCaption><span style=style>{line}{after}</span></BoldCaption>);
             if let Some(sub_menu) = sub_menu {
                 view!(<AnchorMenuEntry href=href>
                     {line}
