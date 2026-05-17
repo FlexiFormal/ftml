@@ -43,9 +43,10 @@ impl<V: IntoView + 'static, I: IntoIterator<Item = V>> CommaSep<V, I> {
             return ().into_any();
         };
         let v = elems.map(|e| view!(", "{e.into_view()})).collect_view();
+        let colon = if self.0.is_empty() { "" } else { ": " };
         view! {
           <div style="display:inline-block;width:max-content;">
-            <Text>{self.0}": "</Text>
+            <Text>{self.0}{colon}</Text>
             {first.into_view()}
             {v}
           </div>
