@@ -177,8 +177,8 @@ impl DocumentUri {
         #[cfg(windows)]
         let rel_path = &replaced;
         let (path, mut name) = rel_path.rsplit_once('/').unwrap_or(("", rel_path));
-        name = name.rsplit_once('.').map_or_else(|| name, |(name, _)| name);
         let lang = Language::from_rel_path(name);
+        name = name.rsplit_once('.').map_or_else(|| name, |(name, _)| name);
         let path = if a == *ArchiveUri::no_archive() && path.starts_with('/') {
             path[1..].trim()
         } else {
