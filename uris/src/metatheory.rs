@@ -65,8 +65,4 @@ uri! {
     FIELD_PROJECTION = "record field",
     MATH_STRUCTURE = "mathematical structure",
     LET_IN = "let in",
-
-    // -------------------------------------
-
-    RESOLVED_VARIABLE_URI = "variable uri"
 }

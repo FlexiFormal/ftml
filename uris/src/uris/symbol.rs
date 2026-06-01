@@ -365,6 +365,21 @@ impl openmath::ser::AsOMS for SymbolUri {
         self.name()
     }
 }
+#[cfg(feature = "openmath")]
+impl SymbolUri {
+    pub fn is_om_attr<'o, I>(&self, attr: &'o openmath::Attr<I>, base: &str) -> Option<&'o I> {
+        if attr.cdbase.as_ref().map_or_else(
+            || *self.path_uri() == *base,
+            |cdbase| *self.path_uri() == **cdbase,
+        ) && *attr.cd == *self.module_name().as_ref()
+            && *attr.name == *self.name().as_ref()
+        {
+            Some(&attr.value)
+        } else {
+            None
+        }
+    }
+}
 
 #[cfg(feature = "openmath")]
 impl openmath::OMSerializable for SymbolUri {
