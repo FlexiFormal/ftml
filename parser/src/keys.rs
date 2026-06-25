@@ -1105,13 +1105,14 @@ do_keys! {
     /// Inserts a reference to a paragraph; possibly in a different document ("Section 3.1 in the Documentation")
     SRef = "sref"
         {="[DocumentElementUri]" +(SRefIn)}
-        := (ext,attrs,_keys,node) => {
+        := (ext,attrs,keys,node) => {
             let e = attrs.get_typed(FtmlKey::SRef,DocumentElementUri::from_str)?;
             let in_doc: Option<DocumentUri> = if let Some(v) = attrs.get(FtmlKey::SRefIn) {
                 Some(v.as_ref().parse().map_err(|e| (FtmlKey::SRefIn,e))?)
             } else {
                 None
             };
+            del!(keys -SRefIn);
             ret!(ext,node <- SRef(e,in_doc))
         } => SRef(e:DocumentElementUri,in_doc:Option<DocumentUri>),
 
