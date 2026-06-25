@@ -361,6 +361,7 @@ pub enum MetaDatum {
     Objective(SymbolUri, CognitiveDimension),
     AnswerClassFeedback,
     ProofBody,
+    SRef(DocumentElementUri, Option<DocumentUri>),
 }
 
 #[derive(Debug, Clone)]
@@ -756,6 +757,7 @@ impl OpenFtmlElement {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn split<N: FtmlNode>(self, node: &N) -> AnyOpen<N> {
         match self {
+            Self::SRef(de, d) => AnyOpen::Meta(MetaDatum::SRef(de, d)),
             Self::SeqRange => AnyOpen::Open {
                 domain: Some(OpenDomainElement::SeqRange(Vec::new(), node.clone())),
                 narrative: None,

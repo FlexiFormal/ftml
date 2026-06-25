@@ -9,7 +9,7 @@ use ftml_ontology::{
     narrative::elements::{SectionLevel, problems::ChoiceBlockStyle},
     terms::{VarOrSym, Variable},
 };
-use ftml_uris::{DocumentElementUri, Id, SymbolUri};
+use ftml_uris::{DocumentElementUri, DocumentUri, Id, SymbolUri};
 use leptos::prelude::*;
 use leptos_posthoc::OriginalNode;
 
@@ -77,6 +77,13 @@ pub trait FtmlViews: 'static {
         then()
     }
     fn fold_expr_short(then: OriginalNode) -> impl IntoView {
+        Self::cont(then, true)
+    }
+    fn sref(
+        then: OriginalNode,
+        target: DocumentElementUri,
+        in_doc: Option<DocumentUri>,
+    ) -> impl IntoView {
         Self::cont(then, true)
     }
 

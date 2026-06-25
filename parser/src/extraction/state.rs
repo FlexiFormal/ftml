@@ -408,7 +408,7 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
                     ));
                 }
             }
-            MetaDatum::IfInputref(_) | MetaDatum::ProofBody => (),
+            MetaDatum::IfInputref(_) | MetaDatum::ProofBody | MetaDatum::SRef(_, _) => (),
         }
         Ok(())
     }

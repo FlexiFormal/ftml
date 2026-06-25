@@ -1102,6 +1102,22 @@ do_keys! {
         } => SlideNumber,
 
 
+    /// Inserts a reference to a paragraph; possibly in a different document ("Section 3.1 in the Documentation")
+    SRef = "sref"
+        {="[DocumentElementUri]" +(SRefIn)}
+        := (ext,attrs,_keys,node) => {
+            let e = attrs.get_typed(FtmlKey::SRef,DocumentElementUri::from_str)?;
+            let in_doc: Option<DocumentUri> = if let Some(v) = attrs.get(FtmlKey::SRefIn) {
+                Some(v.as_ref().parse().map_err(|e| (FtmlKey::SRefIn,e))?)
+            } else {
+                None
+            };
+            ret!(ext,node <- SRef(e,in_doc))
+        } => SRef(e:DocumentElementUri,in_doc:Option<DocumentUri>),
+
+    SRefIn = "sref-in"
+        := noop,
+
     /// The CSS styles to use to format this paragraph (in order of priority, if available)
     Styles = "styles"
         {-(Definition, Paragraph, Assertion, Example, Problem, SubProblem, Proof, SubProof, ProblemSingleChoiceBlock, ProblemMultipleChoiceBlock) }
@@ -1940,10 +1956,6 @@ do_keys! {
     Rule = "rule"
         := todo,
 
-    SRef = "sref"
-        := todo,
-    SRefIn = "srefin"
-        := todo,
     Slideshow = "slideshow"
         := todo,
     SlideshowSlide = "slideshow-slide"

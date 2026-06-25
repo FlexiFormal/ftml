@@ -88,6 +88,10 @@ pub enum Marker {
     MultipleChoiceBlock(ChoiceBlockStyle),
     Choice,
     ProofBody,
+    SRef {
+        target: DocumentElementUri,
+        in_document: Option<DocumentUri>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -140,6 +144,10 @@ impl Marker {
                 Self::apply::<Views>(markers, invisible, is_math, orig)
             })
             .into_any(),
+            Self::SRef {
+                target,
+                in_document,
+            } => Views::sref(orig, target, in_document).into_any(),
             Self::FoldExprShort => Views::fold_expr_short(orig).into_any(),
             Self::Module(m, o) => {
                 ModuleContext::barrier();
@@ -375,6 +383,10 @@ impl Marker {
     #[allow(clippy::too_many_lines)]
     pub fn from(ext: &DomExtractor, elem: &OpenFtmlElement) -> Option<Self> {
         match elem {
+            OpenFtmlElement::SRef(e, d) => Some(Self::SRef {
+                target: e.clone(),
+                in_document: d.clone(),
+            }),
             OpenFtmlElement::SetSectionLevel(lvl) => {
                 DocumentStructure::set_max_level(*lvl);
                 None
