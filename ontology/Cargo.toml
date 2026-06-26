@@ -12,7 +12,7 @@ workspace = true
 [features]
 ## Should be used for wasm targets; uses js regexes instead of
 ## the regex crate
-wasm = ["dep:js-regexp"]
+wasm = ["dep:js-regexp","dateparser/wasm"]
 ## Adds [`Serialize`](serde::Serialize) and [`Deserialize`](serde::Deserialize)
 ## to all types in this crate.
 serde = [
@@ -88,6 +88,7 @@ phf = { workspace = true, features = ["macros"] }
 ordered-float = { workspace = true }
 bytecount = {workspace = true}
 tracing = { workspace = true }
+dateparser.workspace = true
 
 #kanal = { workspace = true }
 #pollster = { workspace = true }

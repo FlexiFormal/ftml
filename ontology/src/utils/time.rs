@@ -62,6 +62,10 @@ impl Timestamp {
         Self(non_zero(t))
     }
 
+    pub fn from_any_datetime_str(s: &str) -> Option<Self> {
+        dateparser::parse(s).map(Into::into).ok()
+    }
+
     #[must_use]
     #[inline]
     pub fn zero() -> Self {
