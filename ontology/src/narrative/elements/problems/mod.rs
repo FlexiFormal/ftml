@@ -81,7 +81,8 @@ impl crate::Ftml for Problem {
         let iri2 = iri.clone();
         let iri3 = iri.clone();
 
-        self.contains_triples()
+        let base = self
+            .contains_triples()
             .into_iter()
             .chain(self.data.objectives.iter().flat_map(move |(d, s)| {
                 let b = ulo::rdf_types::BlankNode::default();
@@ -98,7 +99,21 @@ impl crate::Ftml for Problem {
                     triple!((b.clone())! ulo:has_cognitive_dimension <(d.to_iri().into_owned())>),
                     triple!((b)! ulo:po_has_symbol <(s.to_iri())>),
                 ]
-            }))
+            }));
+        // quick but ugly:
+        let mut extra = Vec::new();
+        if let Some(pts) = self.data.points {
+            extra.push(triple!(<(iri.clone())> ulo:has_points !=(ulo::rdf_types::RDFTerm::Literal(
+                ulo::rdf_types::Literal::new_typed_literal(pts.to_string(), ulo::xsd::DOUBLE.into_owned())
+            ))));
+        }
+        if let Some(min) = self.data.minutes {
+            extra.push(triple!(<(iri.clone())> ulo:has_minutes !=(ulo::rdf_types::RDFTerm::Literal(
+                ulo::rdf_types::Literal::new_typed_literal(min.to_string(), ulo::xsd::DOUBLE.into_owned())
+            ))));
+        }
+
+        base.chain(extra)
             .chain(std::iter::once(if self.data.sub_problem {
                 triple!(<(iri)> : ulo:subproblem)
             } else {

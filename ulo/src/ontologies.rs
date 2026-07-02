@@ -430,6 +430,9 @@ dict! { ulo = "http://mathhub.info/ulo":
     justifies : ::owl::ObjectProperty (proof -> statement) << inter_statement;
     notation_for = "notation-for", : ::owl::ObjectProperty (notation -> function) << inter_statement;
 
+    has_points = "has-points", : ::owl::DatatypeProperty @ "Number of points of this problem";
+    has_minutes = "has-minutes", : ::owl::DatatypeProperty @ "Estimated number of minutes this problem takes to solve";
+
     precondition = "precondition-pair", : ::owl::Class;
     objective = "objective-pair", : ::owl::Class;
 

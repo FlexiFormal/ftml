@@ -7,43 +7,45 @@ The ULO implemented as [oxrdf](https://docs.rs/oxrdf) constants; see [this paper
 #### [`Document`](crate::narration::documents::Document) `D`
 | struct | field | triple |
 | -----  | ----- | ------ |
-|   |    | `D` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#document>`](ulo::document) |
-|   | language `l` | `D` [`<dc:#language>`](dc::language) `l` |
-|   | in archive `A`  | `A` [`<ulo:#contains>`](ulo::contains) `D` |
-| [`DocumentReference`](crate::narration::DocumentElement::DocumentReference) | <code>[.target](crate::narration::DocumentElement::DocumentReference::target)=D2</code> | `D` [`<dc:#hasPart>`](dc::hasPart) `D2` |
-| [`UseModule`](crate::narration::DocumentElement::UseModule) | `(M)` | `D` [`<dc:#requires>`](dc::requires) `M` |
-| [`Paragraph`](crate::narration::paragraphs::LogicalParagraph) |   | `D` [`<ulo:#contains>`](ulo::contains) `P` |
-|   | <code>P[.kind](crate::narration::paragraphs::LogicalParagraph::kind)=[Definition](crate::narration::paragraphs::ParagraphKind::Definition)</code> | `P` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#definition>`](ulo::definition) |
-|   | <code>P[.kind](crate::narration::paragraphs::LogicalParagraph::kind)=[Assertion](crate::narration::paragraphs::ParagraphKind::Assertion)</code> | `P` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#proposition>`](ulo::proposition) |
-|   | <code>P[.kind](crate::narration::paragraphs::LogicalParagraph::kind)=[Paragraph](crate::narration::paragraphs::ParagraphKind::Paragraph)</code> | `P` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#para>`](ulo::para) |
-|   | <code>P[.kind](crate::narration::paragraphs::LogicalParagraph::kind)=[Example](crate::narration::paragraphs::ParagraphKind::Example)</code> | `P` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#example>`](ulo::example) |
-|   | is [`Example`](crate::narration::paragraphs::ParagraphKind::Example) and <code>_[.fors](crate::narration::paragraphs::LogicalParagraph::fors).contains(S)</code>  | `P` [`<ulo:#example-for>`](ulo::example_for) `S` |
-|   | [`is_definition_like`](crate::narration::paragraphs::ParagraphKind::is_definition_like) and  <code>_[.fors](crate::narration::paragraphs::LogicalParagraph::fors).contains(S)</code>  | `P` [`<ulo:#defines>`](ulo::defines) `S` |
-| [`Problem`](crate::narration::problems::Problem) `E` |   | `D` [`<ulo:#contains>`](ulo::contains) `E` |
-|   | <code>[.sub_problem](crate::narration::problems::Problem::sub_problem)==false</code>   | `E` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#problem>`](ulo::problem) |
-|   | <code>[.sub_problem](crate::narration::problems::Problem::sub_problem)==true</code>   | `E` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#subproblem>`](ulo::subproblem) |
-|   | <code>_[.preconditions](crate::narration::problems::Problem::preconditions).contains(d,S)</code>  | `E` [`<ulo:#precondition>`](ulo::precondition) `<BLANK>` |
-|   |    | `<BLANK>` [`<ulo:#cognitive-dimension>`](ulo::cognitive_dimension) `d`, where <code>d=[<ulo:#cs-remember>](ulo::remember)</code>⏐[`<ulo:#cs-understand>`](ulo::understand)⏐[`<ulo:#cs-apply>`](ulo::apply)⏐[`<ulo:#cs-analyze>`](ulo::analyze)⏐[`<ulo:#cs-evaluate>`](ulo::evaluate)⏐[`<ulo:#cs-create>`](ulo::create) |
-|   |    | `<BLANK>` [`<ulo:#po-symbol>`](ulo::po_has_symbol) `S` |
-|   | <code>_[.objectives](crate::narration::problems::Problem::objectives).contains(d,S)</code>  | `E` [`<ulo:#objective>`](ulo::objective) `<BLANK>` |
-|   |    | `<BLANK>` [`<ulo:#cognitive-dimension>`](ulo::cognitive_dimension) `d`, where <code>d=[<ulo:#cs-remember>](ulo::remember)</code>⏐[`<ulo:#cs-understand>`](ulo::understand)⏐[`<ulo:#cs-apply>`](ulo::apply)⏐[`<ulo:#cs-analyze>`](ulo::analyze)⏐[`<ulo:#cs-evaluate>`](ulo::evaluate)⏐[`<ulo:#cs-create>`](ulo::create) |
-|   |    | `<BLANK>` [`<ulo:#po-symbol>`](ulo::po_has_symbol) `S` |
+|   |    | `D` [`<rdf:type>`](rdf::TYPE) [`<ulo:document>`](ulo::document) |
+|   | language `l` | `D` [`<dc:language>`](dc::language) `l` |
+|   | in archive `A`  | `A` [`<ulo:contains>`](ulo::contains) `D` |
+| [`DocumentReference`](crate::narration::DocumentElement::DocumentReference) | <code>[.target](crate::narration::DocumentElement::DocumentReference::target)=D2</code> | `D` [`<dc:hasPart>`](dc::hasPart) `D2` |
+| [`UseModule`](crate::narration::DocumentElement::UseModule) | `(M)` | `D` [`<dc:requires>`](dc::requires) `M` |
+| [`Paragraph`](crate::narration::paragraphs::LogicalParagraph) |   | `D` [`<ulo:contains>`](ulo::contains) `P` |
+|   | <code>P[.kind](crate::narration::paragraphs::LogicalParagraph::kind)=[Definition](crate::narration::paragraphs::ParagraphKind::Definition)</code> | `P` [`<rdf:type>`](rdf::TYPE) [`<ulo:definition>`](ulo::definition) |
+|   | <code>P[.kind](crate::narration::paragraphs::LogicalParagraph::kind)=[Assertion](crate::narration::paragraphs::ParagraphKind::Assertion)</code> | `P` [`<rdf:type>`](rdf::TYPE) [`<ulo:proposition>`](ulo::proposition) |
+|   | <code>P[.kind](crate::narration::paragraphs::LogicalParagraph::kind)=[Paragraph](crate::narration::paragraphs::ParagraphKind::Paragraph)</code> | `P` [`<rdf:type>`](rdf::TYPE) [`<ulo:para>`](ulo::para) |
+|   | <code>P[.kind](crate::narration::paragraphs::LogicalParagraph::kind)=[Example](crate::narration::paragraphs::ParagraphKind::Example)</code> | `P` [`<rdf:type>`](rdf::TYPE) [`<ulo:example>`](ulo::example) |
+|   | is [`Example`](crate::narration::paragraphs::ParagraphKind::Example) and <code>_[.fors](crate::narration::paragraphs::LogicalParagraph::fors).contains(S)</code>  | `P` [`<ulo:example-for>`](ulo::example_for) `S` |
+|   | [`is_definition_like`](crate::narration::paragraphs::ParagraphKind::is_definition_like) and  <code>_[.fors](crate::narration::paragraphs::LogicalParagraph::fors).contains(S)</code>  | `P` [`<ulo:defines>`](ulo::defines) `S` |
+| [`Problem`](crate::narration::problems::Problem) `E` |   | `D` [`<ulo:contains>`](ulo::contains) `E` |
+|   | <code>[.sub_problem](crate::narration::problems::Problem::sub_problem)==false</code>   | `E` [`<rdf:type>`](rdf::TYPE) [`<ulo:problem>`](ulo::problem) |
+|   | <code>[.sub_problem](crate::narration::problems::Problem::sub_problem)==true</code>   | `E` [`<rdf:type>`](rdf::TYPE) [`<ulo:subproblem>`](ulo::subproblem) |
+|   | <code>[.pts](crate::narration::problems::Problem::pts)==n</code>   | `E` [`<ulo:has-points>`](ulo::has_points) n |
+|   | <code>[.min](crate::narration::problems::Problem::min)==n</code>   | `E` [`<ulo:has-minutes>`](ulo::has_minutes) n |
+|   | <code>_[.preconditions](crate::narration::problems::Problem::preconditions).contains(d,S)</code>  | `E` [`<ulo:precondition>`](ulo::precondition) `<BLANK>` |
+|   |    | `<BLANK>` [`<ulo:cognitive-dimension>`](ulo::cognitive_dimension) `d`, where <code>d=[<ulo:cd-remember>](ulo::remember)</code>⏐[`<ulo:cd-understand>`](ulo::understand)⏐[`<ulo:cd-apply>`](ulo::apply)⏐[`<ulo:cd-analyze>`](ulo::analyze)⏐[`<ulo:cd-evaluate>`](ulo::evaluate)⏐[`<ulo:cd-create>`](ulo::create) |
+|   |    | `<BLANK>` [`<ulo:po-symbol>`](ulo::po_has_symbol) `S` |
+|   | <code>_[.objectives](crate::narration::problems::Problem::objectives).contains(d,S)</code>  | `E` [`<ulo:objective>`](ulo::objective) `<BLANK>` |
+|   |    | `<BLANK>` [`<ulo:cognitive-dimension>`](ulo::cognitive_dimension) `d`, where <code>d=[<ulo:cd-remember>](ulo::remember)</code>⏐[`<ulo:cd-understand>`](ulo::understand)⏐[`<ulo:cd-apply>`](ulo::apply)⏐[`<ulo:cd-analyze>`](ulo::analyze)⏐[`<ulo:cd-evaluate>`](ulo::evaluate)⏐[`<ulo:cd-create>`](ulo::create) |
+|   |    | `<BLANK>` [`<ulo:po-symbol>`](ulo::po_has_symbol) `S` |
 
 #### [`Module`](crate::content::modules::Module) `M`
 | struct | field | triple |
 | -----  | ----- | ------ |
-|   |    | `D` [`<ulo:#contains>`](ulo::contains) `M` |
-|   |    | `M` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#theory>`](ulo::theory) |
-| [`Import`](crate::content::declarations::OpenDeclaration::Import) | `(M2)` | `M` [`<ulo:#imports>`](ulo::imports) `M2` |
-| [`NestedModule`](crate::content::declarations::OpenDeclaration::NestedModule) | `(M2)` | `D` [`<ulo:#contains>`](ulo::contains) `M2` |
-|   |    | `M` [`<ulo:#contains>`](ulo::contains) `M2` |
-|   |    | `M2` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#theory>`](ulo::theory) |
-| [`MathStructure`](crate::content::declarations::OpenDeclaration::MathStructure) | `(S)` | `M` [`<ulo:#contains>`](ulo::contains) `S` |
-|   |    | `S` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#structure>`](ulo::structure) |
-|   | [`Import`](crate::content::declarations::OpenDeclaration::Import)(`S2`)   | `S` [`<ulo:#extends>`](ulo::extends) `S2` |
-| [`Morphism`](crate::content::declarations::OpenDeclaration::Morphism) | `(F)` | `M` [`<ulo:#contains>`](ulo::contains) `F` |
-|   |    | `F` [`<rdf:#type>`](rdf::TYPE) [`<ulo:#morphism>`](ulo::morphism) |
-|   | <code>[.domain](crate::content::declarations::morphisms::Morphism)=M2</code>   | `F` [`<rdfs:#domain>`](rdfs::DOMAIN) `M2` |
+|   |    | `D` [`<ulo:contains>`](ulo::contains) `M` |
+|   |    | `M` [`<rdf:type>`](rdf::TYPE) [`<ulo:theory>`](ulo::theory) |
+| [`Import`](crate::content::declarations::OpenDeclaration::Import) | `(M2)` | `M` [`<ulo:imports>`](ulo::imports) `M2` |
+| [`NestedModule`](crate::content::declarations::OpenDeclaration::NestedModule) | `(M2)` | `D` [`<ulo:contains>`](ulo::contains) `M2` |
+|   |    | `M` [`<ulo:contains>`](ulo::contains) `M2` |
+|   |    | `M2` [`<rdf:type>`](rdf::TYPE) [`<ulo:theory>`](ulo::theory) |
+| [`MathStructure`](crate::content::declarations::OpenDeclaration::MathStructure) | `(S)` | `M` [`<ulo:contains>`](ulo::contains) `S` |
+|   |    | `S` [`<rdf:type>`](rdf::TYPE) [`<ulo:structure>`](ulo::structure) |
+|   | [`Import`](crate::content::declarations::OpenDeclaration::Import)(`S2`)   | `S` [`<ulo:extends>`](ulo::extends) `S2` |
+| [`Morphism`](crate::content::declarations::OpenDeclaration::Morphism) | `(F)` | `M` [`<ulo:contains>`](ulo::contains) `F` |
+|   |    | `F` [`<rdf:type>`](rdf::TYPE) [`<ulo:morphism>`](ulo::morphism) |
+|   | <code>[.domain](crate::content::declarations::morphisms::Morphism)=M2</code>   | `F` [`<rdfs:domain>`](rdfs::DOMAIN) `M2` |
 
 
 
