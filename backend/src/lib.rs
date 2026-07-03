@@ -44,7 +44,7 @@ use ftml_ontology::{
     utils::Css,
 };
 use ftml_uris::{
-    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
+    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri, UriRef,
 };
 use futures_util::{FutureExt, TryFutureExt};
 
@@ -175,6 +175,7 @@ pub trait FtmlBackend {
         cache::CachedBackend::new(self)
     }
 
+    fn content_link_url(&self, uri: UriRef<'_>) -> String;
     fn document_link_url(&self, uri: &DocumentUri) -> String;
     fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String>;
 
@@ -392,6 +393,7 @@ impl From<crate::utils::async_cache::CacheError> for ::server_fn::error::ServerF
 
 #[cfg(feature = "server_fn")]
 pub trait FlamsBackend {
+    fn content_link_url(&self, uri: UriRef<'_>) -> String;
     fn document_link_url(&self, uri: &DocumentUri) -> String;
     fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String>;
     fn stripped(&self) -> bool;
@@ -545,6 +547,10 @@ where
 {
     type Error = server_fn::error::ServerFnErrorErr;
 
+    #[inline]
+    fn content_link_url(&self, uri: UriRef<'_>) -> String {
+        <Self as FlamsBackend>::content_link_url(self, uri)
+    }
     #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         <Self as FlamsBackend>::document_link_url(self, uri)

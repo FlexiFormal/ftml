@@ -21,7 +21,7 @@ use ftml_ontology::{
     utils::Css,
 };
 use ftml_uris::{
-    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri,
+    DocumentElementUri, DocumentUri, LeafUri, ModuleUri, NarrativeUri, SymbolUri, Uri, UriRef,
 };
 
 use crate::{BackendCheckResult, BackendError, FtmlBackend};
@@ -29,6 +29,7 @@ use crate::{BackendCheckResult, BackendError, FtmlBackend};
 pub type Fut<T> = std::pin::Pin<Box<dyn Future<Output = Result<T, BackendError<String>>> + Send>>;
 
 pub trait DynBackend: Send + Sync {
+    fn content_link_url(&self, uri: UriRef<'_>) -> String;
     fn document_link_url(&self, uri: &DocumentUri) -> String;
     fn resource_link_url(&self, uri: &DocumentUri, kind: &'static str) -> Option<String>;
 
@@ -115,6 +116,10 @@ fn wrap<R, E: std::fmt::Debug + std::fmt::Display>(
 
 impl FtmlBackend for dyn DynBackend {
     type Error = String;
+    #[inline]
+    fn content_link_url(&self, uri: UriRef<'_>) -> String {
+        <Self as DynBackend>::content_link_url(self, uri)
+    }
     #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         <Self as DynBackend>::document_link_url(self, uri)
@@ -288,6 +293,10 @@ impl FtmlBackend for dyn DynBackend {
 }
 
 impl<B: FtmlBackend + Send + Sync> DynBackend for B {
+    #[inline]
+    fn content_link_url(&self, uri: UriRef<'_>) -> String {
+        <Self as FtmlBackend>::content_link_url(self, uri)
+    }
     #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         <Self as FtmlBackend>::document_link_url(self, uri)

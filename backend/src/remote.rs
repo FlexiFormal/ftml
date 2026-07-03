@@ -58,6 +58,7 @@ pub struct RemoteBackend<
     pub paragraphs_url: Url,
     pub modules_url: Url,
     pub documents_url: Url,
+    pub content_url: Url,
     pub toc_url: Url,
     pub resources_url: Option<Url>,
     pub redirects: Re,
@@ -93,6 +94,7 @@ where
         paragraphs_url: Url,
         modules_url: Url,
         documents_url: Url,
+        content_url: Url,
         toc_url: Url,
         check_url: Url,
         redirects: Re,
@@ -106,6 +108,7 @@ where
             modules_url,
             solutions_url,
             documents_url,
+            content_url,
             toc_url,
             resources_url: None,
             redirects,
@@ -128,6 +131,7 @@ where
         paragraphs_url: Url,
         modules_url: Url,
         documents_url: Url,
+        content_url: Url,
         toc_url: Url,
         check_url: Url,
     ) -> Self {
@@ -140,6 +144,7 @@ where
             solutions_url,
             modules_url,
             documents_url,
+            content_url,
             toc_url,
             resources_url: None,
             redirects: NoRedirects,
@@ -225,6 +230,9 @@ where
         futures_util::future::Either::Left(post(url, body))
     }
 
+    fn content_link_url(&self, uri: ftml_uris::UriRef<'_>) -> String {
+        format!("{}?uri={}", self.content_url, uri.url_encoded())
+    }
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         self.redirects.for_documents(uri).map_or_else(
             || format!("{}?uri={}", self.documents_url, uri.url_encoded()),
@@ -449,6 +457,9 @@ mod server_fn {
         #[inline]
         fn stripped(&self) -> bool {
             self.stripped
+        }
+        fn content_link_url(&self, uri: ftml_uris::UriRef<'_>) -> String {
+            format!("{}?uri={}", self.url, uri.url_encoded())
         }
         fn document_link_url(&self, uri: &DocumentUri) -> String {
             self.redirects.for_documents(uri).map_or_else(

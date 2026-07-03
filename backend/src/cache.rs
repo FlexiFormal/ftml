@@ -133,6 +133,10 @@ where
     }
 
     #[inline]
+    fn content_link_url(&self, uri: ftml_uris::UriRef<'_>) -> String {
+        self.inner.content_link_url(uri)
+    }
+    #[inline]
     fn document_link_url(&self, uri: &DocumentUri) -> String {
         self.inner.document_link_url(uri)
     }

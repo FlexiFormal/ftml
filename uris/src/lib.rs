@@ -237,6 +237,19 @@ impl UriRef<'_> {
             Self::DocumentElement(s) => Uri::DocumentElement(s.clone()),
         }
     }
+    #[must_use]
+    pub fn url_encoded(self) -> impl std::fmt::Display {
+        use either_of::EitherOf7 as E;
+        match self {
+            Self::Base(s) => E::A(s.url_encoded()),
+            Self::Archive(s) => E::B(s.url_encoded()),
+            Self::Path(s) => E::C(s.url_encoded()),
+            Self::Module(s) => E::D(s.url_encoded()),
+            Self::Symbol(s) => E::E(s.url_encoded()),
+            Self::Document(s) => E::F(s.url_encoded()),
+            Self::DocumentElement(s) => E::G(s.url_encoded()),
+        }
+    }
 }
 
 /// Enum ranging over all url parameters occurring in [`Uri`]s; used for error messaging etc.

@@ -119,6 +119,7 @@ ftml_js_utils::split! {
     ) -> AnyView {
         use leptos::prelude::*;
         use ftml_component_utils::Divider;
+        use ftml_uris::FtmlUri;
         let s = match vos {
             VarOrSym::Var(Variable::Name {
                 notated: Some(n), ..
@@ -151,10 +152,11 @@ ftml_js_utils::split! {
         });
         let selected = RwSignal::new(None);
         let selector = super::formals::paras_selector(paras.read_only(), selected);
+        let symbol_url = crate::backend().content_link_url(uri.as_uri());
         view! {
             // paras
             <div style="display:flex;flex-direction:row;">
-                <div style="font-weight:bold;" title=uri_string>{name}</div>
+                <a href=symbol_url target="_blank"><div style="font-weight:bold;cursor:pointer;color:blue" title=uri_string>{name}</div></a>
                 <div style="margin-left:auto;">{selector}</div>
             </div>
             <div style="margin:5px;"><Divider/></div>
