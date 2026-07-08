@@ -12,6 +12,13 @@ pub(crate) static BACKEND_URL: std::sync::LazyLock<std::sync::Arc<parking_lot::R
 pub struct BackendUrlRef;
 impl BackendUrlRef {
     pub fn set_url(url: &str) {
+        use leptos::web_sys::js_sys;
+        js_sys::Reflect::set(
+            &leptos::wasm_bindgen::JsValue::from(leptos::web_sys::js_sys::global()),
+            &leptos::wasm_bindgen::JsValue::from("FTML_SERVER_URL"),
+            &leptos::wasm_bindgen::JsValue::from(url),
+        )
+        .expect("error setting Window property");
         *BACKEND_URL.write() = url.to_string().into_boxed_str();
     }
 }

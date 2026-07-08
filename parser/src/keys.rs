@@ -599,7 +599,7 @@ do_keys! {
     /// Denotes a new [`LogicalParagraph`] of [`ParagraphKind::Assertion`] (Theorems, Lemmata,
     /// Axioms, etc.) for the given [Symbol]s using the given styles.
     Assertion = "assertion"
-        { +(Id,Inline,Fors,Styles) &(Title,Bind) }
+        { +(Id,Inline,Fors,Styles) &(Title,Bind, Conclusion, Premise) }
         := (ext,attrs,keys,node) => {
             do_paragraph(ext, attrs, keys, node, ParagraphKind::Assertion)
         },

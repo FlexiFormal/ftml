@@ -273,9 +273,10 @@ mod client {
     pub fn init() {
         INIT.call_once(|| {
             let global = leptos::web_sys::js_sys::global();
+            let global_obj = JsValue::from(global.clone());
 
             web_sys::js_sys::Reflect::set(
-                &JsValue::from(global.clone()),
+                &global_obj,
                 &JsValue::from("hasFtmlAttribute"),
                 &JsValue::from(web_sys::js_sys::Function::new_with_args(
                     "node",
@@ -285,12 +286,25 @@ mod client {
             .expect("error defining js function");
 
             #[cfg(feature = "csr")]
-            web_sys::js_sys::Reflect::set(
-                &JsValue::from(global),
-                &JsValue::from("FTML_SERVER_URL"),
-                &JsValue::from("https://mathhub.info"),
-            )
-            .expect("error setting Window property");
+            {
+                let ftml_server_url = JsValue::from("FTML_SERVER_URL");
+                let current = web_sys::js_sys::Reflect::get(&global_obj, &ftml_server_url);
+                if current.is_err()
+                    || current.is_ok_and(|o| {
+                        o.is_null_or_undefined() || {
+                            let s = o.as_string();
+                            s.is_none_or(|s| s.is_empty())
+                        }
+                    })
+                {
+                    web_sys::js_sys::Reflect::set(
+                        &global_obj,
+                        &ftml_server_url,
+                        &JsValue::from("https://mathhub.info"),
+                    )
+                    .expect("error setting Window property");
+                }
+            }
         });
     }
 
