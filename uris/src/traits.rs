@@ -50,7 +50,13 @@ pub trait FtmlUri:
     /// # Errors
     /// if the iri is not a valid `Self`.
     fn from_iri(iri: oxrdf::NamedNodeRef) -> Result<Self, crate::errors::UriParseError> {
-        let s = iri.as_str();
+        Self::from_iri_str(iri.as_str())
+    }
+    /// Parses this URI from an RDF-IRI; possibly unescaping characters.
+    ///
+    /// # Errors
+    /// if the iri is not a valid `Self`.
+    fn from_iri_str(s: &str) -> Result<Self, crate::errors::UriParseError> {
         if !s.contains('%') && !s.contains("?a=") {
             return s.parse();
         }

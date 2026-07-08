@@ -46,7 +46,7 @@ impl From<&[crate::rdf_types::Variable]> for SparqlResultsHead {
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SparqlResultBindings {
-    bindings: Vec<rustc_hash::FxHashMap<String, SparqlResultTerm>>,
+    pub bindings: Vec<rustc_hash::FxHashMap<String, SparqlResultTerm>>,
 }
 
 impl SparqlResultBindings {
