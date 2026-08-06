@@ -78,16 +78,18 @@ impl From<SharedDeclaration<Morphism>> for ModuleLike {
 }
 impl crate::__private::Sealed for ModuleLike {}
 impl HasDeclarations for ModuleLike {
-    fn declarations(
-        &self,
-    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
-        use either_of::EitherOf5::{A, B, C, D, E};
+    type DeclIter<'a>
+        = super::DeclarationsIter<'a>
+    where
+        Self: 'a;
+    fn declarations(&self) -> Self::DeclIter<'_> {
+        use super::DeclIter;
         match self {
-            Self::Module(m) => A(m.declarations()),
-            Self::Structure(s) => B(s.declarations()),
-            Self::Extension(e) => C(e.declarations()),
-            Self::Morphism(m) => D(m.declarations()),
-            Self::Nested(n) => E(n.declarations()),
+            Self::Module(m) => m.declarations().either(),
+            Self::Structure(s) => s.declarations().either(),
+            Self::Extension(e) => e.declarations().either(),
+            Self::Morphism(m) => m.declarations().either(),
+            Self::Nested(n) => n.declarations().either(),
         }
     }
     fn domain_uri(&self) -> ftml_uris::DomainUriRef<'_> {
@@ -99,6 +101,34 @@ impl HasDeclarations for ModuleLike {
             Self::Nested(s) => ftml_uris::DomainUriRef::Symbol(&s.uri),
         }
     }
+    fn initialize(
+        &self,
+        get: &mut dyn FnMut(&ModuleUri) -> Option<ModuleLike>,
+    ) -> Result<(), ModuleUri> {
+        match self {
+            Self::Module(m) => m.initialize(get),
+            Self::Structure(s) => s.initialize(get),
+            Self::Extension(s) => s.initialize(get),
+            Self::Morphism(s) => s.initialize(get),
+            Self::Nested(s) => s.initialize(get),
+        }
+    }
+    /*
+    async fn initialize_async<E: std::fmt::Display, F, G: Fn(&ModuleUri) -> F + Send>(
+        &self,
+        get: &G,
+    ) where
+        F: Future<Output = Result<ModuleLike, E>> + Send,
+    {
+        match self {
+            Self::Module(m) => m.initialize_async(get).await,
+            Self::Structure(s) => s.initialize_async(get).await,
+            Self::Extension(s) => s.initialize_async(get).await,
+            Self::Morphism(s) => s.initialize_async(get).await,
+            Self::Nested(s) => s.initialize_async(get).await,
+        }
+    }
+    */
 }
 impl crate::Ftml for ModuleLike {
     #[cfg(feature = "rdf")]
@@ -196,10 +226,15 @@ impl RefTree for ModuleData {
 }
 
 impl HasDeclarations for ModuleData {
+    type DeclIter<'a>
+        = std::iter::Map<
+        std::slice::Iter<'a, Declaration>,
+        fn(&'a Declaration) -> AnyDeclarationRef<'a>,
+    >
+    where
+        Self: 'a;
     #[inline]
-    fn declarations(
-        &self,
-    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
+    fn declarations(&self) -> Self::DeclIter<'_> {
         self.declarations.iter().map(Declaration::as_ref)
     }
     #[inline]
@@ -308,10 +343,16 @@ impl crate::Ftml for NestedModule {
     }
 }
 impl HasDeclarations for NestedModule {
+    type DeclIter<'a>
+        = std::iter::Map<
+        std::slice::Iter<'a, Declaration>,
+        fn(&'a Declaration) -> AnyDeclarationRef<'a>,
+    >
+    where
+        Self: 'a;
     #[inline]
-    fn declarations(
-        &self,
-    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
+    fn declarations(&self) -> Self::DeclIter<'_> {
+        //impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
         self.declarations.iter().map(Declaration::as_ref)
     }
     #[inline]
@@ -334,6 +375,67 @@ impl IsDeclaration for NestedModule {
     #[inline]
     fn as_ref(&self) -> AnyDeclarationRef<'_> {
         AnyDeclarationRef::NestedModule(self)
+    }
+    /*
+    #[inline]
+    fn elaborated_from(&self) -> Option<&SymbolUri> {
+        None
+    }
+    */
+}
+
+impl Module {
+    /// includes self
+    pub fn dependencies(&self, get: impl Fn(&ModuleUri) -> Option<Module>) -> Vec<ModuleUri> {
+        let mut ret = Vec::new();
+        Self::topo_sort(vec![self.uri.clone()], &mut ret, get);
+        ret
+    }
+    #[allow(clippy::useless_let_if_seq)]
+    pub fn topo_sort(
+        mut new: Vec<ModuleUri>,
+        sorted: &mut Vec<ModuleUri>,
+        get: impl Fn(&ModuleUri) -> Option<Module>,
+    ) -> usize {
+        let mut added = 0;
+        while let Some(uri) = new.last() {
+            if !uri.is_top() || sorted.contains(uri) {
+                let _ = new.pop();
+                continue;
+            }
+            let Some(m) = get(uri) else {
+                // SAFETY: uris.last() == Some(uri)
+                sorted.push(unsafe { new.pop().unwrap_unchecked() });
+                added += 1;
+                continue;
+            };
+            let curr = new.len();
+            //println!("Sorting {uri}");
+
+            let mut changed = false;
+            if let Some(e) = m.meta_module.as_ref()
+                && !sorted.contains(e)
+            {
+                new.insert(curr, e.clone());
+                changed = true;
+            }
+            for e in m.dfs() {
+                let AnyDeclarationRef::Import { uri, .. } = e else {
+                    continue;
+                };
+                if !uri.is_top() || sorted.contains(uri) {
+                    continue;
+                }
+                new.insert(curr, uri.clone());
+                changed = true;
+            }
+            if !changed {
+                // SAFETY: uris.last() == Some(uri)
+                sorted.push(unsafe { new.pop().unwrap_unchecked() });
+                added += 1;
+            }
+        }
+        added
     }
 }
 

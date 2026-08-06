@@ -8,6 +8,7 @@
 
 use crate::utils::SourceRange;
 
+//pub mod binser;
 pub mod domain;
 pub mod narrative;
 pub mod terms;

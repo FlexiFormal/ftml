@@ -63,6 +63,14 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
         Ok(Self { outer, elem })
     }
 
+    /// #### SAFETY
+    /// requires that the reference target of inner
+    /// is not moved for the lifetime of Self
+    pub const unsafe fn new_unsafe(outer: Outer, inner: &Inner) -> Self {
+        let elem = std::ptr::from_ref(inner);
+        Self { outer, elem }
+    }
+
     /// Like [new](SharedArc::new) for clonable `Arced`s; only clones the arc if
     /// `get` actually succeeds
     ///

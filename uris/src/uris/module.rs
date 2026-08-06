@@ -1,6 +1,6 @@
 use crate::{
-    ArchiveUri, BaseUri, FtmlUri, IsDomainUri, NamedUri, PathUri, SymbolUri, UriComponentKind,
-    UriKind, UriWithArchive, UriWithPath,
+    ArchiveUri, BaseUri, DomainUriRef, FtmlUri, IsDomainUri, NamedUri, PathUri, SymbolUri,
+    UriComponentKind, UriKind, UriWithArchive, UriWithPath,
     errors::{SegmentParseError, UriParseError},
     utils::NonEmptyStr,
 };
@@ -269,6 +269,73 @@ impl std::fmt::Display for ModuleUri {
 
 impl ModuleUri {
     pub(crate) const SEPARATOR: char = 'm';
+
+    /// Whether self is a prefix of other, disregarding the boundary between module name and symbol name.
+    ///
+    /// # Examples
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let module_uri = ModuleUri::from_str("http://example.com?a=archive&p=path&m=some/module").unwrap();
+    /// let other_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some&s=module/foo").unwrap();
+    /// assert!(module_uri.contains(DomainUriRef::Symbol(&other_uri)));
+    /// ````
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn contains(&self, other: DomainUriRef) -> bool {
+        let this = self.name.steps();
+        match other {
+            DomainUriRef::Module(m) => {
+                let mut other = m.name.steps();
+                for s in this {
+                    let Some(o) = other.next() else {
+                        return false;
+                    };
+                    if s != o {
+                        return false;
+                    }
+                }
+                true
+            }
+            DomainUriRef::Symbol(s) => {
+                let mut other = s.module.name.steps().chain(s.name.steps());
+                for s in this {
+                    let Some(o) = other.next() else {
+                        return false;
+                    };
+                    if s != o {
+                        return false;
+                    }
+                }
+                true
+            }
+        }
+    }
+
+    /// Whether self is equivalent to other, disregarding the boundary between module name and symbol name.
+    ///
+    /// # Examples
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let module_uri = ModuleUri::from_str("http://example.com?a=archive&p=path&m=some/module").unwrap();
+    /// let other_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some&s=module").unwrap();
+    /// assert!(module_uri.equivalent(&other_uri));
+    /// ````
+    #[must_use]
+    pub fn equivalent(&self, other: &SymbolUri) -> bool {
+        let this = self.name.steps();
+        let mut other = other.module.name.steps().chain(other.name.steps());
+        for s in this {
+            let Some(o) = other.next() else {
+                return false;
+            };
+            if s != o {
+                return false;
+            }
+        }
+        other.next().is_none()
+    }
 
     /// Returns true iff this is not the Uri of a nested module; equivalently,
     /// that its name is *simple* (does not contain `/`).
@@ -724,7 +791,7 @@ crate::tests! {
                 // Verify all names are valid
                 for name in &names {
                     assert!(!name.as_ref().is_empty());
-                    assert!(name.steps().count() == 2);
+                    assert_eq!(name.steps().count(),2);
                 }
             });
             handles.push(handle);

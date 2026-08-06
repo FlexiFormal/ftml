@@ -70,7 +70,7 @@ pub mod prelude {
     pub use super::language::Language;
     pub use super::paths::{PathUri, UriPath};
     pub use super::symbol::SymbolUri;
-    pub use super::{DomainUri, LeafUri, NarrativeUri, Uri};
+    pub use super::{DomainUri, DomainUriRef, LeafUri, NarrativeUri, Uri, NarrativeUriRef};
     pub use crate::doc_element::DocumentElementUri;
     pub use crate::document::{DocumentUri, SimpleUriName};
     pub use crate::module::{ModuleUri, UriName};

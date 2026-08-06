@@ -36,7 +36,7 @@ macro_rules! ftml {
     };
 }
 pub const PREFIX: &str = "data-ftml-";
-pub const NUM_KEYS: u8 = 130;
+pub const NUM_KEYS: u8 = 129;
 /*
 pub struct FtmlRuleSet<E: crate::extraction::FtmlExtractor>(
     pub(crate)  [fn(
@@ -684,7 +684,7 @@ do_keys! {
         } => ProofBody,
 
     ProofStep = "spfstep"
-        { <=(Proof,SubProof)}
+        { +(ProofStepName) <=(Proof,SubProof)}
         := (ext,attrs,keys,node) => {
             do_proofstep(ext, attrs, keys, node, ParagraphStepKind::ProofStep)
         } => ProofStep{
@@ -693,7 +693,7 @@ do_keys! {
         },
 
     ProofAssumption = "spfassumption"
-        { <=(Proof,SubProof)}
+        { +(ProofStepName) <=(Proof,SubProof)}
         := (ext,attrs,keys,node) => {
             do_proofstep(ext, attrs, keys, node, ParagraphStepKind::Assumption)
         },
@@ -989,7 +989,7 @@ do_keys! {
             ret!(ext,node <- FillinSol(val) + FillinSol)
         } => FillinSol(width:Option<f32>),
 
-    /// Thw width of the text input field for a fill-in-the-blanks element
+    /// The width of the text input field for a fill-in-the-blanks element
     ProblemFillinsolWidth = "fillinsol-width"
         { -(ProblemFillinsol) }
         := noop,
@@ -1299,6 +1299,14 @@ do_keys! {
             ret!(ext,node <- SeqRange + SeqRange)
         } => SeqRange,
 
+    /// Instantiates a parametric inference rule with id and parameters
+    InferenceRule = "inferencerule"
+        { = "[Id]" <= (Module) &(Arg,ArgMode) }
+        := (ext,attrs,_keys,node) => {
+            let id = attrs.get_typed(FtmlKey::InferenceRule, Id::from_str)?;
+            ret!(ext,node <- Rule(id) + Rule)
+        } => Rule(id:Id),
+
     /// Assigns a [`Symbol`] in the domain of a [`Morphism`] to a [`Term`]
     /// provided as a [`Definiens`](FtmlKey::Definiens) child node, with the optional
     /// refined type provided as a [`Type`](FtmlKey::Type) child.
@@ -1309,13 +1317,6 @@ do_keys! {
             ret!(ext,node <- Assign(source) + Assign)
         } => Assign(source:SymbolUri),
 
-    /// Instantiates a parametric inference rule with id and parameters
-    InferenceRule = "inferencerule"
-        { = "[Id]" <= (Module) &(Arg,ArgMode) }
-        := (ext,attrs,_keys,node) => {
-            let id = attrs.get_typed(FtmlKey::InferenceRule, Id::from_str)?;
-            ret!(ext,node <- Rule(id) + Rule)
-        } => Rule(id:Id),
 
     /// Renames a [`Symbol`] in the domain of a [`Morphism`] to the new provided name with
     /// the optional provided new macroname.
@@ -1952,10 +1953,6 @@ do_keys! {
         } => Definiendum(s:SymbolUri),
 
     // --------------------------------------------------------------------------
-
-    /// <div class="ftml-wip">TODO</div>
-    Rule = "rule"
-        := todo,
 
     Slideshow = "slideshow"
         := todo,

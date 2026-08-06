@@ -9,11 +9,23 @@ use crate::terms::{
 };
 
 impl Term {
-    pub fn modify(&self, mut f: impl FnMut(&Self) -> Option<Self>) -> Cow<'_, Self> {
+    /// recursively traverses the term; replacing every subterm t by f(t), if `f(t).is_some()`,
+    /// leaving it unchanged otherwise
+    pub fn modify(
+        &self,
+        mut f: impl FnMut(&Self) -> Option<std::ops::ControlFlow<Self, Self>>,
+    ) -> Cow<'_, Self> {
         self.modify_i(&mut f)
     }
-    fn modify_i<'s>(&'s self, f: &mut impl FnMut(&Self) -> Option<Self>) -> Cow<'s, Self> {
-        let t = f(self).map_or(Cow::Borrowed(self), Cow::Owned);
+    fn modify_i<'s>(
+        &'s self,
+        f: &mut impl FnMut(&Self) -> Option<std::ops::ControlFlow<Self, Self>>,
+    ) -> Cow<'s, Self> {
+        let t = match f(self) {
+            Some(std::ops::ControlFlow::Continue(t)) => Cow::Owned(t),
+            Some(std::ops::ControlFlow::Break(t)) => return Cow::Owned(t),
+            None => Cow::Borrowed(self),
+        };
         match &*t {
             Self::Var { .. } | Self::Symbol { .. } | Self::Number(_) => t,
             Self::Application(app) => match app.modify_i(f) {
@@ -74,7 +86,10 @@ impl Term {
     }
 }
 impl ApplicationTerm {
-    fn modify_i<'s>(&'s self, f: &mut impl FnMut(&Term) -> Option<Term>) -> Cow<'s, Self> {
+    fn modify_i<'s>(
+        &'s self,
+        f: &mut impl FnMut(&Term) -> Option<std::ops::ControlFlow<Term, Term>>,
+    ) -> Cow<'s, Self> {
         let mut changed = false;
         let head = self.head.modify_i(f);
         macro_rules! ch {
@@ -116,7 +131,10 @@ impl ApplicationTerm {
     }
 }
 impl BindingTerm {
-    fn modify_i<'s>(&'s self, f: &mut impl FnMut(&Term) -> Option<Term>) -> Cow<'s, Self> {
+    fn modify_i<'s>(
+        &'s self,
+        f: &mut impl FnMut(&Term) -> Option<std::ops::ControlFlow<Term, Term>>,
+    ) -> Cow<'s, Self> {
         let mut changed = false;
         let head = self.head.modify_i(f);
         macro_rules! ch {
@@ -166,7 +184,10 @@ impl BindingTerm {
     }
 }
 impl ComponentVar {
-    fn modify_i<'s>(&'s self, f: &mut impl FnMut(&Term) -> Option<Term>) -> Cow<'s, Self> {
+    fn modify_i<'s>(
+        &'s self,
+        f: &mut impl FnMut(&Term) -> Option<std::ops::ControlFlow<Term, Term>>,
+    ) -> Cow<'s, Self> {
         let ndf = self.df.as_ref().map(|t| t.modify_i(f));
         let ntp = self.tp.as_ref().map(|t| t.modify_i(f));
         if ndf.as_ref().is_some_and(|t| matches!(t, Cow::Owned(_)))

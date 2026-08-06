@@ -1,7 +1,9 @@
 use crate::{
     domain::{
         HasDeclarations,
-        declarations::{AnyDeclarationRef, IsDeclaration, morphisms::Morphism, symbols::Symbol},
+        declarations::{
+            AnyDeclarationRef, IsDeclaration, IsSymbol, morphisms::Morphism, symbols::Symbol,
+        },
     },
     terms::Term,
     utils::SourceRange,
@@ -26,6 +28,8 @@ pub struct MathStructure {
     pub macroname: Option<Id>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub source: SourceRange,
+    //#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    //pub elaborated_from: Option<SymbolUri>,
 }
 impl crate::__private::Sealed for MathStructure {}
 impl crate::Ftml for MathStructure {
@@ -64,10 +68,10 @@ impl crate::Ftml for MathStructure {
         self.source
     }
 }
-impl IsDeclaration for MathStructure {
+impl IsSymbol for MathStructure {
     #[inline]
-    fn uri(&self) -> Option<&SymbolUri> {
-        Some(&self.uri)
+    fn symbol_uri(&self) -> &SymbolUri {
+        &self.uri
     }
     #[inline]
     fn from_declaration(decl: AnyDeclarationRef<'_>) -> Option<&Self> {
@@ -77,15 +81,26 @@ impl IsDeclaration for MathStructure {
         }
     }
     #[inline]
-    fn as_ref(&self) -> AnyDeclarationRef<'_> {
+    fn as_decl(&self) -> AnyDeclarationRef<'_> {
         AnyDeclarationRef::MathStructure(self)
     }
+    /*
+    #[inline]
+    fn elaborated_from(&self) -> Option<&SymbolUri> {
+        self.elaborated_from.as_ref()
+    }
+    */
 }
 impl HasDeclarations for MathStructure {
+    type DeclIter<'a>
+        = std::iter::Map<
+        std::slice::Iter<'a, StructureDeclaration>,
+        fn(&'a StructureDeclaration) -> AnyDeclarationRef<'a>,
+    >
+    where
+        Self: 'a;
     #[inline]
-    fn declarations(
-        &self,
-    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
+    fn declarations(&self) -> Self::DeclIter<'_> {
         self.elements.iter().map(StructureDeclaration::as_ref)
     }
     #[inline]
@@ -111,6 +126,8 @@ pub enum StructureDeclaration {
         uri: ModuleUri,
         #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         source: SourceRange,
+        //#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        //elaborated_from: Option<SymbolUri>,
     },
     Symbol(Symbol),
     Morphism(Morphism),
@@ -157,9 +174,14 @@ impl IsDeclaration for StructureDeclaration {
     #[inline]
     fn as_ref(&self) -> AnyDeclarationRef<'_> {
         match self {
-            Self::Import { uri, source } => AnyDeclarationRef::Import {
+            Self::Import {
+                uri,
+                source,
+                //elaborated_from,
+            } => AnyDeclarationRef::Import {
                 uri,
                 source: *source,
+                //elaborated_from: elaborated_from.as_ref(),
             },
             Self::Symbol(s) => AnyDeclarationRef::Symbol(s),
             Self::Morphism(m) => AnyDeclarationRef::Morphism(m),
@@ -174,6 +196,19 @@ impl IsDeclaration for StructureDeclaration {
             },
         }
     }
+
+    /*
+    fn elaborated_from(&self) -> Option<&SymbolUri> {
+        match self {
+            Self::Import {
+                elaborated_from, ..
+            } => elaborated_from.as_ref(),
+            Self::Symbol(s) => s.elaborated_from(),
+            Self::Morphism(m) => m.elaborated_from(),
+            Self::Rule { .. } => None,
+        }
+    }
+    */
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -193,6 +228,8 @@ pub struct StructureExtension {
     pub elements: Box<[StructureDeclaration]>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub source: SourceRange,
+    //#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    //pub elaborated_from: Option<SymbolUri>,
 }
 impl crate::__private::Sealed for StructureExtension {}
 impl crate::Ftml for StructureExtension {
@@ -220,10 +257,10 @@ impl crate::Ftml for StructureExtension {
         self.source
     }
 }
-impl IsDeclaration for StructureExtension {
+impl IsSymbol for StructureExtension {
     #[inline]
-    fn uri(&self) -> Option<&SymbolUri> {
-        Some(&self.uri)
+    fn symbol_uri(&self) -> &SymbolUri {
+        &self.uri
     }
     #[inline]
     fn from_declaration(decl: AnyDeclarationRef<'_>) -> Option<&Self> {
@@ -233,15 +270,26 @@ impl IsDeclaration for StructureExtension {
         }
     }
     #[inline]
-    fn as_ref(&self) -> AnyDeclarationRef<'_> {
+    fn as_decl(&self) -> AnyDeclarationRef<'_> {
         AnyDeclarationRef::Extension(self)
     }
+    /*
+    #[inline]
+    fn elaborated_from(&self) -> Option<&SymbolUri> {
+        self.elaborated_from.as_ref()
+    }
+    */
 }
 impl HasDeclarations for StructureExtension {
+    type DeclIter<'a>
+        = std::iter::Map<
+        std::slice::Iter<'a, StructureDeclaration>,
+        fn(&'a StructureDeclaration) -> AnyDeclarationRef<'a>,
+    >
+    where
+        Self: 'a;
     #[inline]
-    fn declarations(
-        &self,
-    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator {
+    fn declarations(&self) -> Self::DeclIter<'_> {
         self.elements.iter().map(StructureDeclaration::as_ref)
     }
     #[inline]

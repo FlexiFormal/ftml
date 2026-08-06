@@ -59,6 +59,56 @@ impl std::fmt::Display for SymbolUri {
 impl SymbolUri {
     pub(crate) const SEPARATOR: char = 's';
 
+    /// Whether self is a prefix of other, disregarding the boundary between module name and symbol name.
+    ///
+    /// # Examples
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let symbol_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some/module&s=symbol/name").unwrap();
+    /// let other_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some&s=module/symbol/name/inner").unwrap();
+    /// assert!(symbol_uri.contains(&other_uri));
+    /// ````
+    #[must_use]
+    pub fn contains(&self, other: &Self) -> bool {
+        let this = self.module.name.steps().chain(self.name.steps());
+        let mut other = other.module.name.steps().chain(other.name.steps());
+        for s in this {
+            let Some(o) = other.next() else {
+                return false;
+            };
+            if s != o {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Whether self is equivalent to other, disregarding the boundary between module name and symbol name.
+    ///
+    /// # Examples
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let symbol_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some/module&s=symbol/name").unwrap();
+    /// let other_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some&s=module/symbol/name").unwrap();
+    /// assert!(symbol_uri.contains(&other_uri));
+    /// ````
+    #[must_use]
+    pub fn equivalent(&self, other: &Self) -> bool {
+        let this = self.module.name.steps().chain(self.name.steps());
+        let mut other = other.module.name.steps().chain(other.name.steps());
+        for s in this {
+            let Some(o) = other.next() else {
+                return false;
+            };
+            if s != o {
+                return false;
+            }
+        }
+        other.next().is_none()
+    }
+
     /// Returns the name of this symbol.
     ///
     /// # Examples
@@ -164,6 +214,34 @@ impl SymbolUri {
         // SAFETY: all segments are valid
         self.name = unsafe { reststr.parse().unwrap_unchecked() };
         self
+    }
+
+    /// Returns this uri's direct parent module, by prefixing all
+    /// name segments other than the last to the module name;
+    /// e.g. transforms `&m=a/b&s=c/d` into `&m=a/b/c`:
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let symbol_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some/module&s=symbol/name").unwrap();
+    /// let as_module = symbol_uri.parent();
+    /// assert_eq!(as_module.to_string(),"http://example.com?a=archive&p=path&m=some/module/symbol");
+    /// ````
+    #[must_use]
+    pub fn parent(self) -> ModuleUri {
+        if self.name.is_simple() {
+            return self.module;
+        }
+        let mut ret = self.module;
+        let mut steps = self.name.steps();
+        let _ = steps.next_back();
+        for seg in steps {
+            // SAFETY: all segments are valid names
+            ret = ret / &unsafe { seg.parse().unwrap_unchecked() };
+        }
+        ret
     }
 
     /// Internal parsing method used by URI parsing infrastructure.

@@ -194,7 +194,7 @@ pub struct ExtractorState<N: FtmlNode + std::fmt::Debug> {
     rdf: Vec<ulo::rdf_types::Triple>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExtractionResult {
     pub document: Document,
     pub modules: Vec<Module>,

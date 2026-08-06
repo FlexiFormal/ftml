@@ -19,6 +19,7 @@ use ftml_uris::DocumentUri;
 mod ever;
 mod parser;
 
+#[derive(Clone)]
 pub struct FtmlResult {
     pub ftml: Box<str>,
     pub css: Box<[Css]>,

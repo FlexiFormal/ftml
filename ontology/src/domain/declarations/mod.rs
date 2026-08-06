@@ -4,7 +4,7 @@ pub mod symbols;
 
 use crate::{
     domain::{
-        HasDeclarations,
+        DeclIter, HasDeclarations, SharedDeclaration,
         declarations::{
             morphisms::Morphism,
             structures::{MathStructure, StructureExtension},
@@ -21,6 +21,70 @@ pub trait IsDeclaration: crate::Ftml {
     fn uri(&self) -> Option<&SymbolUri>;
     fn from_declaration(decl: AnyDeclarationRef<'_>) -> Option<&Self>;
     fn as_ref(&self) -> AnyDeclarationRef<'_>;
+    /*fn elaborated_from(&self) -> Option<&SymbolUri>;
+    #[inline]
+    fn is_primitive(&self) -> bool {
+        self.elaborated_from().is_none()
+    }*/
+}
+
+pub trait IsSymbol: crate::Ftml {
+    fn symbol_uri(&self) -> &SymbolUri;
+    fn from_declaration(decl: AnyDeclarationRef<'_>) -> Option<&Self>;
+    fn as_decl(&self) -> AnyDeclarationRef<'_>;
+}
+impl<T: IsSymbol> IsDeclaration for T {
+    fn uri(&self) -> Option<&SymbolUri> {
+        Some(IsSymbol::symbol_uri(self))
+    }
+    fn from_declaration(decl: AnyDeclarationRef<'_>) -> Option<&Self> {
+        IsSymbol::from_declaration(decl)
+    }
+    fn as_ref(&self) -> AnyDeclarationRef<'_> {
+        IsSymbol::as_decl(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SharedSymbolLike {
+    Symbol(SharedDeclaration<Symbol>),
+    MathStructure(SharedDeclaration<MathStructure>),
+    Extension(SharedDeclaration<StructureExtension>),
+    Morphism(SharedDeclaration<Morphism>),
+}
+/*
+impl TryFrom<Declaration> for SharedSymbolLike {
+    type Error = ();
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Symbol(s) => Ok(Self::Symbol(s)),
+            Declaration::MathStructure(s) => Ok(Self::MathStructure(s)),
+            Declaration::Extension(s) => Ok(Self::Extension(s)),
+            Declaration::Morphism(s) => Ok(Self::Morphism(s)),
+            _ => Err(()),
+        }
+    }
+}
+ */
+#[derive(Debug, Clone)]
+pub enum SymbolLikeRef<'a> {
+    Symbol(&'a Symbol),
+    MathStructure(&'a MathStructure),
+    Extension(&'a StructureExtension),
+    Morphism(&'a Morphism),
+}
+
+impl<'s> TryFrom<AnyDeclarationRef<'s>> for SymbolLikeRef<'s> {
+    type Error = ();
+    fn try_from(value: AnyDeclarationRef<'s>) -> Result<Self, Self::Error> {
+        match value {
+            AnyDeclarationRef::Symbol(s) => Ok(Self::Symbol(s)),
+            AnyDeclarationRef::MathStructure(s) => Ok(Self::MathStructure(s)),
+            AnyDeclarationRef::Extension(s) => Ok(Self::Extension(s)),
+            AnyDeclarationRef::Morphism(s) => Ok(Self::Morphism(s)),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -40,6 +104,8 @@ pub enum Declaration {
         uri: ModuleUri,
         #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         source: SourceRange,
+        //#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        //elaborated_from: Option<SymbolUri>,
     },
     Symbol(Symbol),
     MathStructure(MathStructure),
@@ -77,9 +143,14 @@ impl Declaration {
             Self::MathStructure(s) => AnyDeclarationRef::MathStructure(s),
             Self::Extension(e) => AnyDeclarationRef::Extension(e),
             Self::Morphism(m) => AnyDeclarationRef::Morphism(m),
-            Self::Import { uri, source } => AnyDeclarationRef::Import {
+            Self::Import {
+                uri,
+                source,
+                //elaborated_from,
+            } => AnyDeclarationRef::Import {
                 uri,
                 source: *source,
+                //elaborated_from: elaborated_from.as_ref(),
             },
             Self::Rule {
                 id,
@@ -92,6 +163,24 @@ impl Declaration {
             },
         }
     }
+    /*
+    pub fn elaborated_from(&self) -> Option<&SymbolUri> {
+        match self {
+            Self::NestedModule(_) | Self::Rule { .. } => None,
+            Self::Symbol(s) => s.elaborated_from(),
+            Self::MathStructure(s) => s.elaborated_from(),
+            Self::Extension(e) => e.elaborated_from(),
+            Self::Morphism(m) => m.elaborated_from(),
+            Self::Import {
+                elaborated_from, ..
+            } => elaborated_from.as_ref(),
+        }
+    }
+    #[inline]
+    pub fn is_primitive(&self) -> bool {
+        self.elaborated_from().is_none()
+    }
+    */
 }
 impl crate::Ftml for Declaration {
     #[cfg(feature = "rdf")]
@@ -129,6 +218,8 @@ pub enum AnyDeclarationRef<'d> {
         uri: &'d ModuleUri,
         #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
         source: SourceRange,
+        //#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+        //elaborated_from: Option<&'d SymbolUri>,
     },
     Symbol(&'d Symbol),
     MathStructure(&'d MathStructure),
@@ -143,13 +234,13 @@ pub enum AnyDeclarationRef<'d> {
 }
 impl<'d> TreeChild<'d> for AnyDeclarationRef<'d> {
     fn tree_children(self) -> impl Iterator<Item = Self> {
-        use either_of::EitherOf5 as E;
+        static EMPTY: &[Declaration] = &[];
         match self {
-            Self::NestedModule(m) => E::A(m.declarations()),
-            Self::MathStructure(s) => E::B(s.declarations()),
-            Self::Morphism(m) => E::C(m.declarations()),
-            Self::Extension(e) => E::D(e.declarations()),
-            _ => E::E(std::iter::empty()),
+            Self::NestedModule(m) => m.declarations().either(),
+            Self::MathStructure(s) => s.declarations().either(),
+            Self::Morphism(m) => m.declarations().either(),
+            Self::Extension(e) => e.declarations().either(),
+            _ => either::Left(EMPTY.iter().map(Declaration::as_ref as _)),
         }
     }
 }
@@ -168,6 +259,26 @@ impl<'d> AnyDeclarationRef<'d> {
             Self::Import { .. } | Self::Rule { .. } => None,
         }
     }
+    /*
+    #[must_use]
+    pub fn elaborated_from(&self) -> Option<&'d SymbolUri> {
+        match self {
+            Self::NestedModule(_) | Self::Rule { .. } => None,
+            Self::Symbol(s) => s.elaborated_from(),
+            Self::MathStructure(s) => s.elaborated_from(),
+            Self::Extension(e) => e.elaborated_from(),
+            Self::Morphism(m) => m.elaborated_from(),
+            Self::Import {
+                elaborated_from, ..
+            } => *elaborated_from,
+        }
+    }
+    #[inline]
+    #[must_use]
+    pub fn is_primitive(&self) -> bool {
+        self.elaborated_from().is_none()
+    }
+    */
 }
 impl crate::Ftml for AnyDeclarationRef<'_> {
     #[cfg(feature = "rdf")]

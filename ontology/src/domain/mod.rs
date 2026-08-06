@@ -2,7 +2,10 @@ use ftml_uris::{DomainUriRef, ModuleUri, UriName};
 
 use crate::{
     domain::{
-        declarations::{AnyDeclarationRef, IsDeclaration},
+        declarations::{
+            AnyDeclarationRef, Declaration, IsDeclaration, SharedSymbolLike,
+            structures::StructureDeclaration,
+        },
         modules::{Module, ModuleLike},
     },
     utils::SharedArc,
@@ -26,63 +29,127 @@ impl Module {
             .ok()
             .map(SharedDeclaration)
     }
+    #[must_use]
+    pub fn get_symbol_like(&self, name: &UriName) -> Option<SharedSymbolLike> {
+        Some(match self.find_declaration(name.steps())? {
+            AnyDeclarationRef::Symbol(s) => SharedSymbolLike::Symbol(SharedDeclaration(unsafe {
+                SharedArc::new_unsafe(self.clone(), s)
+            })),
+            AnyDeclarationRef::MathStructure(ms) => {
+                SharedSymbolLike::MathStructure(SharedDeclaration(unsafe {
+                    SharedArc::new_unsafe(self.clone(), ms)
+                }))
+            }
+            AnyDeclarationRef::Extension(e) => {
+                SharedSymbolLike::Extension(SharedDeclaration(unsafe {
+                    SharedArc::new_unsafe(self.clone(), e)
+                }))
+            }
+            AnyDeclarationRef::Morphism(m) => {
+                SharedSymbolLike::Morphism(SharedDeclaration(unsafe {
+                    SharedArc::new_unsafe(self.clone(), m)
+                }))
+            }
+            _ => return None,
+        })
+    }
 
     #[must_use]
     pub fn as_module_like(&self, name: &UriName) -> Option<ModuleLike> {
-        // meh: this needs to find() twice
         Some(match self.find_declaration(name.steps())? {
-            AnyDeclarationRef::NestedModule(_) => ModuleLike::Nested(SharedDeclaration(unsafe {
-                SharedArc::new(self.clone(), |m| &m.0, |e| e.find(name.steps()).ok_or(()))
-                    .unwrap_unchecked()
+            AnyDeclarationRef::NestedModule(nm) => ModuleLike::Nested(SharedDeclaration(unsafe {
+                SharedArc::new_unsafe(self.clone(), nm)
             })),
-            AnyDeclarationRef::MathStructure(_) => {
+            AnyDeclarationRef::MathStructure(ms) => {
                 ModuleLike::Structure(SharedDeclaration(unsafe {
-                    SharedArc::new(self.clone(), |m| &m.0, |e| e.find(name.steps()).ok_or(()))
-                        .unwrap_unchecked()
+                    SharedArc::new_unsafe(self.clone(), ms)
                 }))
             }
-            AnyDeclarationRef::Extension(_) => ModuleLike::Extension(SharedDeclaration(unsafe {
-                SharedArc::new(self.clone(), |m| &m.0, |e| e.find(name.steps()).ok_or(()))
-                    .unwrap_unchecked()
+            AnyDeclarationRef::Extension(e) => ModuleLike::Extension(SharedDeclaration(unsafe {
+                SharedArc::new_unsafe(self.clone(), e)
             })),
-            AnyDeclarationRef::Morphism(_) => ModuleLike::Morphism(SharedDeclaration(unsafe {
-                SharedArc::new(self.clone(), |m| &m.0, |e| e.find(name.steps()).ok_or(()))
-                    .unwrap_unchecked()
+            AnyDeclarationRef::Morphism(m) => ModuleLike::Morphism(SharedDeclaration(unsafe {
+                SharedArc::new_unsafe(self.clone(), m)
             })),
             _ => return None,
         })
     }
 }
 
+type DeclarationsIter<'a> = either::Either<
+    std::iter::Map<std::slice::Iter<'a, Declaration>, fn(&'a Declaration) -> AnyDeclarationRef<'a>>,
+    std::iter::Map<
+        std::slice::Iter<'a, StructureDeclaration>,
+        fn(&'a StructureDeclaration) -> AnyDeclarationRef<'a>,
+    >,
+>;
+pub trait DeclIter<'a>:
+    ExactSizeIterator<Item = AnyDeclarationRef<'a>> + DoubleEndedIterator
+{
+    fn either(self) -> DeclarationsIter<'a>;
+}
+impl<'a> DeclIter<'a>
+    for std::iter::Map<
+        std::slice::Iter<'a, Declaration>,
+        fn(&'a Declaration) -> AnyDeclarationRef<'a>,
+    >
+{
+    #[inline]
+    fn either(self) -> DeclarationsIter<'a> {
+        either::Left(self)
+    }
+}
+impl<'a> DeclIter<'a>
+    for std::iter::Map<
+        std::slice::Iter<'a, StructureDeclaration>,
+        fn(&'a StructureDeclaration) -> AnyDeclarationRef<'a>,
+    >
+{
+    #[inline]
+    fn either(self) -> DeclarationsIter<'a> {
+        either::Right(self)
+    }
+}
+impl<'a> DeclIter<'a> for DeclarationsIter<'a> {
+    #[inline]
+    fn either(self) -> Self {
+        self
+    }
+}
+
 pub trait HasDeclarations: crate::Ftml + Sync {
-    fn declarations(
-        &self,
-    ) -> impl ExactSizeIterator<Item = AnyDeclarationRef<'_>> + DoubleEndedIterator;
+    type DeclIter<'a>: DeclIter<'a>
+    where
+        Self: 'a;
+    fn declarations(&self) -> Self::DeclIter<'_>;
     fn domain_uri(&self) -> DomainUriRef<'_>;
 
-    fn initialize<E: std::fmt::Display>(
+    /// #### Errors
+    /// ...if get errors
+    fn initialize(
         &self,
-        get: &mut dyn FnMut(&ModuleUri) -> Result<ModuleLike, E>,
-    ) {
+        get: &mut dyn FnMut(&ModuleUri) -> Option<ModuleLike>,
+    ) -> Result<(), ModuleUri> {
         for d in self.declarations() {
             match d {
-                AnyDeclarationRef::Extension(e) => e.initialize(get),
-                AnyDeclarationRef::MathStructure(e) => e.initialize(get),
-                AnyDeclarationRef::Morphism(e) => e.initialize(get),
-                AnyDeclarationRef::NestedModule(e) => e.initialize(get),
+                AnyDeclarationRef::Extension(e) => e.initialize(get)?,
+                AnyDeclarationRef::MathStructure(e) => e.initialize(get)?,
+                AnyDeclarationRef::Morphism(e) => e.initialize(get)?,
+                AnyDeclarationRef::NestedModule(e) => e.initialize(get)?,
                 AnyDeclarationRef::Import { .. }
                 | AnyDeclarationRef::Symbol(_)
                 | AnyDeclarationRef::Rule { .. } => (),
             }
         }
+        Ok(())
     }
-
+    /*
     fn initialize_async<E: std::fmt::Display, F>(
         &self,
         get: &mut dyn FnMut(&ModuleUri) -> F,
     ) -> impl std::future::Future<Output = ()>
     where
-        F: Future<Output = Result<ModuleLike, E>>,
+        F: Future<Output = Result<ModuleLike, E>> + Send,
     {
         async {
             for d in self.declarations() {
@@ -114,42 +181,58 @@ pub trait HasDeclarations: crate::Ftml + Sync {
             }
         }
     }
+     */
 
     fn find_declaration<'s>(
         &self,
         steps: impl IntoIterator<Item = &'s str>,
     ) -> Option<AnyDeclarationRef<'_>> {
-        use either_of::EitherOf5::{A, B, C, D, E};
-        let mut steps = steps.into_iter().peekable();
-        let mut curr = A(self.declarations());
-        'outer: while let Some(step) = steps.next() {
-            macro_rules! ret {
-                ($i:ident $e:expr;$m:expr) => {{
-                    if steps.peek().is_none() {
-                        return Some($e);
+        fn get<'d>(
+            step: &str,
+            d: AnyDeclarationRef<'d>,
+        ) -> (Option<AnyDeclarationRef<'d>>, Option<DeclarationsIter<'d>>) {
+            match d {
+                AnyDeclarationRef::NestedModule(m) if m.uri.name().last() == step => {
+                    (Some(d), Some(m.declarations().either()))
+                }
+                AnyDeclarationRef::MathStructure(m) if m.uri.name().last() == step => {
+                    (Some(d), Some(m.declarations().either()))
+                }
+                AnyDeclarationRef::Morphism(m) if m.uri.name().last() == step => {
+                    (Some(d), Some(m.declarations().either()))
+                }
+                AnyDeclarationRef::Morphism(m) => {
+                    for d in m.declarations() {
+                        if d.uri().is_some_and(|uri| {
+                            !uri.name().as_ref().starts_with(m.uri.name().as_ref())
+                        }) {
+                            let r = get(step, d);
+                            if r.0.is_some() {
+                                return r;
+                            }
+                        }
                     }
-                    curr = $i($m.declarations());
-                    continue 'outer;
-                }};
+                    (None, None)
+                }
+                AnyDeclarationRef::Extension(m) if m.uri.name().last() == step => {
+                    (Some(d), Some(m.declarations().either()))
+                }
+                AnyDeclarationRef::Symbol(s) if s.uri.name().last() == step => (Some(d), None),
+                _ => (None, None),
             }
+        }
+        let mut steps = steps.into_iter().peekable();
+        let mut curr: DeclarationsIter = self.declarations().either();
+        'outer: while let Some(step) = steps.next() {
             while let Some(c) = curr.next() {
-                match c {
-                    AnyDeclarationRef::NestedModule(m) if m.uri.name().last() == step => {
-                        ret!(B c;m);
+                match get(step, c) {
+                    (Some(d), _) if steps.peek().is_none() => return Some(d),
+                    (Some(_), Some(e)) => {
+                        curr = e;
+                        continue 'outer;
                     }
-                    AnyDeclarationRef::MathStructure(m) if m.uri.name().last() == step => {
-                        ret!(C c;m);
-                    }
-                    AnyDeclarationRef::Morphism(m) if m.uri.name().last() == step => ret!(D c;m),
-                    AnyDeclarationRef::Extension(m) if m.uri.name().last() == step => ret!(E c;m),
-                    AnyDeclarationRef::Symbol(s) if s.uri.name().last() == step => {
-                        return if steps.peek().is_none() {
-                            Some(c)
-                        } else {
-                            None
-                        };
-                    }
-                    _ => (),
+                    (Some(_), None) => return None,
+                    (None, _) => (),
                 }
             }
             return None;

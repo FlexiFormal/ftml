@@ -89,8 +89,13 @@ impl std::fmt::Debug for Term {
     }
 }
 pub(super) struct Short<'e>(pub &'e Term);
-impl std::fmt::Debug for Short<'_> {
+impl std::fmt::Display for Short<'_> {
     #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self,f)
+    }
+}
+impl std::fmt::Debug for Short<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
             Term::Symbol { uri, .. } => write!(f, "\"{}\"", uri.name()),

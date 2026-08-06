@@ -227,6 +227,25 @@ pub enum Language {
     Slovenian = 9,
 }
 
+impl TryFrom<u8> for Language {
+    type Error = ();
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::English,
+            1 => Self::German,
+            2 => Self::French,
+            3 => Self::Romanian,
+            4 => Self::Arabic,
+            5 => Self::Bulgarian,
+            6 => Self::Russian,
+            7 => Self::Finnish,
+            8 => Self::Turkish,
+            9 => Self::Slovenian,
+            _ => return Err(()),
+        })
+    }
+}
+
 impl Language {
     pub(crate) const SEPARATOR: char = 'l';
 

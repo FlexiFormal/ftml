@@ -561,7 +561,7 @@ impl Term {
     /// implements [`Debug`](std::fmt::Debug), but only prints the *names* of [`Uri`](ftml_uris::Uri)s
     #[inline]
     #[must_use]
-    pub fn debug_short(&self) -> impl std::fmt::Debug {
+    pub fn debug_short(&self) -> impl std::fmt::Debug + std::fmt::Display {
         super::debug::Short(self)
     }
 

@@ -3,7 +3,7 @@ use smallvec::SmallVec;
 use std::str::FromStr;
 
 use crate::{
-    domain::declarations::{AnyDeclarationRef, IsDeclaration},
+    domain::declarations::{AnyDeclarationRef, IsDeclaration, IsSymbol},
     terms::{ArgumentMode, Term, TermContainer},
     utils::{Permutation, SourceRange},
 };
@@ -55,6 +55,8 @@ pub struct SymbolData {
     pub reordering: Option<Permutation>,
     #[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
     pub source: SourceRange,
+    //#[cfg_attr(any(feature = "serde", feature = "serde-lite"), serde(default))]
+    //pub elaborated_from: Option<SymbolUri>,
 }
 
 impl crate::__private::Sealed for Symbol {}
@@ -102,10 +104,10 @@ impl crate::Ftml for Symbol {
         self.data.source
     }
 }
-impl IsDeclaration for Symbol {
+impl IsSymbol for Symbol {
     #[inline]
-    fn uri(&self) -> Option<&SymbolUri> {
-        Some(&self.uri)
+    fn symbol_uri(&self) -> &SymbolUri {
+        &self.uri
     }
     fn from_declaration(decl: AnyDeclarationRef<'_>) -> Option<&Self> {
         match decl {
@@ -114,9 +116,14 @@ impl IsDeclaration for Symbol {
         }
     }
     #[inline]
-    fn as_ref(&self) -> AnyDeclarationRef<'_> {
+    fn as_decl(&self) -> AnyDeclarationRef<'_> {
         AnyDeclarationRef::Symbol(self)
     }
+    /*
+    fn elaborated_from(&self) -> Option<&SymbolUri> {
+        self.data.elaborated_from.as_ref()
+    }
+    */
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
