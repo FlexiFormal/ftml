@@ -654,6 +654,7 @@ impl Elaboration {
             dones.insert(todo);
             ret.push(module);
         }
+        ret.reverse();
         Ok(ret)
     }
     /*
