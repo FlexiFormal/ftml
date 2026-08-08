@@ -2,6 +2,8 @@ pub mod actions;
 pub mod css;
 pub mod local_cache;
 
+use std::ops::Deref;
+
 use ftml_ontology::utils::Css;
 use ftml_uris::ModuleUri;
 use leptos::{
@@ -86,6 +88,14 @@ pub trait FutureExt {
         f: impl FnOnce(Self::T) -> V + Clone + Send + 'static,
     ) -> impl IntoView;
 }
+
+pub trait MaybeFutureExt {
+    type T;
+    fn into_view<V: IntoView + Send + 'static>(
+        self,
+        f: impl FnOnce(Self::T) -> V + Clone + Send + 'static,
+    ) -> impl IntoView;
+}
 impl<T, Fut: std::future::Future<Output = T>, F: Fn() -> Fut + Clone + Send + 'static> FutureExt
     for F
 {
@@ -101,6 +111,44 @@ impl<T, Fut: std::future::Future<Output = T>, F: Fn() -> Fut + Clone + Send + 's
             let fut = send_wrapper::SendWrapper::new(async move {let ret = s().await;f(ret)});
             Suspend::new(fut)
         }}</Suspense>)
+    }
+}
+impl<
+    T,
+    Fut: std::future::Future<Output = T> + 'static,
+    F: Fn() -> leptos::either::Either<T, Fut> + Clone + Send + 'static,
+> MaybeFutureExt for F
+{
+    type T = T;
+    fn into_view<V: IntoView + Send + 'static>(
+        self,
+        f: impl FnOnce(Self::T) -> V + Clone + Send + 'static,
+    ) -> impl IntoView {
+        use leptos::prelude::{Suspense, view};
+        match self() {
+            leptos::either::Either::Left(r) => leptos::either::Either::Left(f(r)),
+            leptos::either::Either::Right(fut) => leptos::either::Either::Right({
+                let fut = std::sync::Arc::new(send_wrapper::SendWrapper::new(
+                    std::cell::Cell::new(Some(fut)),
+                ));
+                view! {
+                    <Suspense fallback = || "…">{move || {
+                        let f = f.clone();
+                        let fut = fut.clone();
+                        let fut = send_wrapper::SendWrapper::new(async move {
+                            if let Some(fut) = std::cell::Cell::take(&fut) {
+                                let ret = fut.await;
+                                leptos::either::Either::Left(f(ret))
+                            } else {
+                                leptos::either::Either::Right("Error awaiting future")
+                            }
+                        });
+                        Suspend::new(fut)
+
+                    }}</Suspense>
+                }
+            }),
+        }
     }
 }
 

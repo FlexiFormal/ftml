@@ -272,6 +272,89 @@ impl LocalCache {
         )
     }
 
+    pub fn get_notation_for<B: FtmlBackend<Error: Send> + ?Sized>(
+        &'static self,
+        backend: &B,
+        uri: LeafUri,
+    ) -> leptos::either::Either<
+        Result<(DocumentElementUri, Notation), BackendError<B::Error>>,
+        impl Future<Output = Result<(DocumentElementUri, Notation), BackendError<B::Error>>>
+        + Send
+        + 'static,
+    > {
+        /*
+        *
+        #[allow(clippy::cast_possible_truncation)]
+        fn select_notation(
+            notations: Vec<(DocumentElementUri, Notation)>,
+            uri: &LeafUri,
+        ) -> Option<Notation> {
+            fn score(not: &DocumentElementUri, sym: &LeafUri) -> u8 {
+                let mut ret = 0;
+                if not.name.as_ref().starts_with("notation") {
+                    ret += 1;
+                }
+                if not.archive_uri() == sym.archive_uri() {
+                    ret += 1;
+                } else {
+                    return ret;
+                }
+                if not.path().is_none() && sym.path().is_none() {
+                    ret += 1;
+                } else if let Some(np) = not.path()
+                    && let Some(up) = sym.path()
+                {
+                    if np == up {
+                        ret += np.steps().count() as u8;
+                    } else {
+                        let mut i = np.steps().zip(up.steps());
+                        while let Some((a, b)) = i.next()
+                            && a == b
+                        {
+                            ret += 1;
+                        }
+                        return ret;
+                    }
+                } else {
+                    return ret;
+                }
+                match sym {
+                    LeafUri::Element(e) if not.document_name() == e.document_name() => ret += 1,
+                    LeafUri::Symbol(s) if not.document_name().as_ref() == s.module_name().first() => {
+                        ret += 1;
+                    }
+                    _ => (),
+                }
+                ret
+            }
+            notations
+                .into_iter()
+                .max_by_key(|(u, _)| score(u, uri))
+                .map(|(_, n)| n)
+        }
+        */
+        if let Some(n) = self.notations.get(&uri)
+            && !n.is_empty()
+        {
+            // SAFETY: !n.is_empty()
+            return leptos::either::Either::Left(Ok(unsafe {
+                n.first().cloned().unwrap_unchecked()
+            }));
+        }
+        let fut = backend.get_notations(uri.clone());
+        leptos::either::Either::Right(async move {
+            let global = fut.await;
+            if let Ok(r) = global.as_ref()
+                && let Some(n) = r.first()
+            {
+                self.notations.insert(uri, r.clone());
+            }
+            global
+                .map(|mut r| r.pop().ok_or_else(|| BackendError::NoFragment))
+                .flatten()
+        })
+    }
+
     pub fn get_notations<B: FtmlBackend<Error: Send> + ?Sized>(
         &self,
         backend: &B,

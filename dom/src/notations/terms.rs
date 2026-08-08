@@ -928,16 +928,19 @@ fn with_notations<
     uri: LeafUri,
     then: F,
 ) -> AnyView {
-    use crate::utils::FutureExt;
+    use crate::utils::MaybeFutureExt;
     let uricl = uri.clone();
-    FutureExt::into_view(
-        move || LocalCache::get().get_notations(backend, uricl.clone()),
+    MaybeFutureExt::into_view(
+        move || LocalCache::get().get_notation_for(backend, uricl.clone()),
         move |gl| {
+            then(gl.ok().map(|(_,n)| n))
+            /*
             let not = gl.local.and_then(|v| select_notation(v, &uri)).or_else(|| {
                 gl.global
                     .and_then(|r| r.ok().and_then(|v| select_notation(v, &uri)))
             });
             then(not)
+            */
         },
     ).into_any()
 }

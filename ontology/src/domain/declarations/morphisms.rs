@@ -50,6 +50,61 @@ impl crate::Ftml for Morphism {
             triple!(<(iri.clone())> rdfs:DOMAIN <(self.domain.to_iri())>),
         ]
         .into_iter()
+        .chain(
+            self.elaboration
+                .contents
+                .get()
+                .map(|e| {
+                    e.contents
+                        .iter()
+                        .flat_map(|d| {
+                            let Some((i, s)) = (match d {
+                                Declaration::Import { uri, .. } => Some((
+                                    triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>),
+                                    None,
+                                )),
+                                Declaration::Extension(e) => Some((
+                                    triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>),
+                                    None,
+                                )),
+                                Declaration::MathStructure(e) => Some((
+                                    triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>),
+                                    None,
+                                )),
+                                Declaration::Morphism(e) => Some((
+                                    triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>),
+                                    None,
+                                )),
+                                Declaration::NestedModule(e) => Some((
+                                    triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>),
+                                    None,
+                                )),
+                                Declaration::Symbol(e) => Some((
+                                    triple!(<(iri.clone())> ulo:declares <(e.uri.to_iri())>),
+                                    Some(&e.uri),
+                                )),
+                                Declaration::Rule { .. } => None,
+                            }) else {
+                                return Vec::new();
+                            };
+                            if let Some(tgt) = s
+                                && let Some(src) = e.domain.iter().find_map(|(src, (tgt, _))| {
+                                    if tgt == src { Some(src) } else { None }
+                                })
+                            {
+                                vec![
+                                    i,
+                                    triple!(<(tgt.to_iri())> ulo:generated_by <(src.to_iri())> ),
+                                ]
+                            } else {
+                                vec![i]
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+        )
+        /*
         .chain(self.declarations().filter_map(move |e| match e {
             AnyDeclarationRef::Import { uri, .. } => {
                 Some(triple!(<(iri.clone())> ulo:imports <(uri.to_iri())>))
@@ -71,6 +126,7 @@ impl crate::Ftml for Morphism {
             }
             AnyDeclarationRef::Rule { .. } => None,
         }))
+         */
     }
     #[inline]
     fn source_range(&self) -> SourceRange {
