@@ -70,7 +70,7 @@ pub mod prelude {
     pub use super::language::Language;
     pub use super::paths::{PathUri, UriPath};
     pub use super::symbol::SymbolUri;
-    pub use super::{DomainUri, DomainUriRef, LeafUri, NarrativeUri, Uri, NarrativeUriRef};
+    pub use super::{DomainUri, DomainUriRef, LeafUri, NarrativeUri, NarrativeUriRef, Uri};
     pub use crate::doc_element::DocumentElementUri;
     pub use crate::document::{DocumentUri, SimpleUriName};
     pub use crate::module::{ModuleUri, UriName};
@@ -346,6 +346,41 @@ pub enum DomainUriRef<'u> {
     Symbol(&'u SymbolUri),
 }
 impl crate::sealed::Sealed for DomainUriRef<'_> {}
+impl<'u> From<&'u ModuleUri> for DomainUriRef<'u> {
+    fn from(value: &'u ModuleUri) -> Self {
+        Self::Module(value)
+    }
+}
+impl<'u> From<&'u SymbolUri> for DomainUriRef<'u> {
+    fn from(value: &'u SymbolUri) -> Self {
+        Self::Symbol(value)
+    }
+}
+
+impl DomainUriRef<'_> {
+    /// Whether self is equivalent to other, disregarding the boundary between module name and symbol name.
+    ///
+    /// # Examples
+    /// ```
+    /// # use ftml_uris::prelude::*;
+    /// # use std::str::FromStr;
+    /// let module_uri = ModuleUri::from_str("http://example.com?a=archive&p=path&m=some/module").unwrap();
+    /// let domuri = DomainUriRef::Module(&module_uri)
+    /// let other_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some&s=module").unwrap();
+    /// assert!(domuri.equivalent(&other_uri));
+    /// ````
+    pub fn equivalent<'r>(self, other: impl Into<DomainUriRef<'r>>) -> bool {
+        fn equiv(slf: DomainUriRef<'_>, other: DomainUriRef<'_>) -> bool {
+            match (slf, other) {
+                (DomainUriRef::Module(m), DomainUriRef::Module(n)) => m.name == n.name,
+                (DomainUriRef::Module(m), DomainUriRef::Symbol(s))
+                | (DomainUriRef::Symbol(s), DomainUriRef::Module(m)) => m.equivalent(s),
+                (DomainUriRef::Symbol(s1), DomainUriRef::Symbol(s2)) => s1.equivalent(s2),
+            }
+        }
+        equiv(self, other.into())
+    }
+}
 
 /// Like [`NarrativeUri`] but wrapping around references
 #[derive(Clone, PartialEq, Eq, Hash)]

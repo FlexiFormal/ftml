@@ -23,6 +23,15 @@ impl<T: IsDeclaration> std::ops::Deref for SharedDeclaration<T> {
         &self.0
     }
 }
+impl<T: IsDeclaration> SharedDeclaration<T> {
+    /// #### Safety
+    /// requires that `other` is a "child" of this, i.e. the reference is guaranteed
+    /// to be valid for the lifetime of `self`.
+    pub unsafe fn inherit_unsafe<T2: IsDeclaration>(&self, other: &T2) -> SharedDeclaration<T2> {
+        SharedDeclaration(unsafe { self.0.clone().inherit_unchecked(other) })
+    }
+}
+
 impl Module {
     pub fn get_as<T: IsDeclaration>(&self, name: &UriName) -> Option<SharedDeclaration<T>> {
         SharedArc::opt_new(self, |m| &m.0, move |e| e.find(name.steps()).ok_or(()))

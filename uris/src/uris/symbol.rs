@@ -71,6 +71,9 @@ impl SymbolUri {
     /// ````
     #[must_use]
     pub fn contains(&self, other: &Self) -> bool {
+        if self.module.path != other.module.path {
+            return false;
+        }
         let this = self.module.name.steps().chain(self.name.steps());
         let mut other = other.module.name.steps().chain(other.name.steps());
         for s in this {
@@ -96,6 +99,9 @@ impl SymbolUri {
     /// ````
     #[must_use]
     pub fn equivalent(&self, other: &Self) -> bool {
+        if self.module.path != other.module.path {
+            return false;
+        }
         let this = self.module.name.steps().chain(self.name.steps());
         let mut other = other.module.name.steps().chain(other.name.steps());
         for s in this {

@@ -2426,7 +2426,9 @@ impl<N: FtmlNode + std::fmt::Debug> ExtractorState<N> {
         }
         for n in self.narrative.iter_mut() {
             match n {
-                OpenNarrativeElement::VariableDeclaration { uri, data } if data.tp.is_none() => {
+                OpenNarrativeElement::VariableDeclaration { uri, data }
+                    if data.return_type.is_none() =>
+                {
                     data.return_type = Some(term);
                     return Ok(());
                 }

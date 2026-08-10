@@ -51,6 +51,45 @@ impl ModuleLike {
             }
         }
     }
+
+    #[allow(clippy::useless_let_if_seq)]
+    pub fn topo_sort(
+        mut new: Vec<ModuleUri>,
+        sorted: &mut Vec<ModuleLike>,
+        mut get: impl FnMut(&ModuleUri) -> Option<ModuleLike>,
+    ) -> usize {
+        let mut added = 0;
+        while let Some(uri) = new.last() {
+            if sorted.iter().any(|ml| ml.domain_uri().equivalent(uri)) {
+                let _ = new.pop();
+                continue;
+            }
+            let Some(m) = get(uri) else {
+                let _ = new.pop();
+                continue;
+            };
+            let curr = new.len();
+            //println!("Sorting {uri}");
+
+            let mut changed = false;
+            for e in m.dfs() {
+                let AnyDeclarationRef::Import { uri, .. } = e else {
+                    continue;
+                };
+                if sorted.iter().any(|ml| ml.domain_uri().equivalent(uri)) {
+                    continue;
+                }
+                new.insert(curr, uri.clone());
+                changed = true;
+            }
+            if !changed {
+                let _ = new.pop();
+                sorted.push(m);
+                added += 1;
+            }
+        }
+        added
+    }
 }
 impl From<Module> for ModuleLike {
     #[inline]
@@ -150,6 +189,17 @@ impl crate::Ftml for ModuleLike {
             Self::Morphism(s) => s.source_range(),
             Self::Nested(s) => s.source_range(),
         }
+    }
+}
+
+impl RefTree for ModuleLike {
+    type Child<'a>
+        = AnyDeclarationRef<'a>
+    where
+        Self: 'a;
+    #[inline]
+    fn tree_children(&self) -> impl Iterator<Item = Self::Child<'_>> {
+        super::DeclIter::either(self.declarations())
     }
 }
 

@@ -283,6 +283,14 @@ impl ModuleUri {
     #[must_use]
     #[allow(clippy::needless_pass_by_value)]
     pub fn contains(&self, other: DomainUriRef) -> bool {
+        if self.path
+            != *(match other {
+                DomainUriRef::Module(m) => &m.path,
+                DomainUriRef::Symbol(s) => &s.module.path,
+            })
+        {
+            return false;
+        }
         let this = self.name.steps();
         match other {
             DomainUriRef::Module(m) => {
@@ -324,6 +332,9 @@ impl ModuleUri {
     /// ````
     #[must_use]
     pub fn equivalent(&self, other: &SymbolUri) -> bool {
+        if self.path != other.module.path {
+            return false;
+        }
         let this = self.name.steps();
         let mut other = other.module.name.steps().chain(other.name.steps());
         for s in this {

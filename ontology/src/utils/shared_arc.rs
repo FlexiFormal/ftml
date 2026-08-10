@@ -8,11 +8,20 @@
 /// behind the [`Arc`](triomphe::Arc), an instance of which is owned by `o`.
 ///
 /// [`SharedArc`] conceptually is such a pair `(o,i)` which dereferences to `Inner`.
-#[derive(Clone)]
+
 pub struct SharedArc<Outer, Inner> {
     outer: Outer,
     elem: *const Inner,
 }
+impl<Outer: Clone, Inner> Clone for SharedArc<Outer, Inner> {
+    fn clone(&self) -> Self {
+        Self {
+            outer: self.outer.clone(),
+            elem: self.elem,
+        }
+    }
+}
+
 impl<O, I: std::fmt::Debug> std::fmt::Debug for SharedArc<O, I> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -122,6 +131,12 @@ impl<Outer, Inner> SharedArc<Outer, Inner> {
         SharedArc {
             outer: self.outer,
             elem,
+        }
+    }
+    pub unsafe fn inherit_unchecked<NewInner>(self, new: &NewInner) -> SharedArc<Outer, NewInner> {
+        SharedArc {
+            outer: self.outer,
+            elem: new,
         }
     }
 
