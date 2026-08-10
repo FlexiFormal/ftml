@@ -365,7 +365,7 @@ impl DomainUriRef<'_> {
     /// # use ftml_uris::prelude::*;
     /// # use std::str::FromStr;
     /// let module_uri = ModuleUri::from_str("http://example.com?a=archive&p=path&m=some/module").unwrap();
-    /// let domuri = DomainUriRef::Module(&module_uri)
+    /// let domuri = DomainUriRef::Module(&module_uri);
     /// let other_uri = SymbolUri::from_str("http://example.com?a=archive&p=path&m=some&s=module").unwrap();
     /// assert!(domuri.equivalent(&other_uri));
     /// ````
