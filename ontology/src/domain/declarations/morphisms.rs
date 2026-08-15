@@ -243,15 +243,38 @@ impl Morphism {
                 Term::Application(app) if app.head.is(&*ftml_uris::metatheory::APPLY_IMPLICIT) => {
                     if let [
                         Argument::Simple(Term::Symbol { uri, presentation }),
-                        Argument::Sequence(MaybeSequence::Seq(_)),
+                        Argument::Sequence(MaybeSequence::Seq(seq)),
                     ] = &*app.arguments
-                        && matches!(
-                            self.apply_symbol(uri, presentation),
-                            None | Some(std::ops::ControlFlow::Break(Term::Symbol { .. }))
-                        )
                     {
-                        None
-                    } else {
+                        match self.apply_symbol(uri, presentation) {
+                            None => None,
+                            Some(std::ops::ControlFlow::Break(Term::Symbol {
+                                uri,
+                                presentation,
+                            })) => Some(std::ops::ControlFlow::Break(Term::Application(
+                                ApplicationTerm::new(
+                                    ftml_uris::metatheory::APPLY_IMPLICIT.clone().into(),
+                                    Box::new([
+                                        Argument::Simple(Term::Symbol { uri, presentation }),
+                                        Argument::Sequence(MaybeSequence::Seq(seq.clone())),
+                                    ]),
+                                    None,
+                                ),
+                            ))),
+                            _ => Some(std::ops::ControlFlow::Break(Term::Application(
+                                ApplicationTerm::new(
+                                    self.uri.clone().into(),
+                                    Box::new([Argument::Simple(t.clone())]),
+                                    None,
+                                ),
+                            ))),
+                        }
+                    }
+                    /*&& matches!(
+                        self.apply_symbol(uri, presentation),
+                        None | Some(std::ops::ControlFlow::Break(Term::Symbol { .. }))
+                    )*/
+                    else {
                         Some(std::ops::ControlFlow::Break(Term::Application(
                             ApplicationTerm::new(
                                 self.uri.clone().into(),
