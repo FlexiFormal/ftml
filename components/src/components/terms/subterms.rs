@@ -335,7 +335,7 @@ fn selection_listener(e: Element, owner: &Owner, is_selected: RwSignal<bool>) {
                 use wasm_bindgen::JsCast;
 
                 let closure = leptos::wasm_bindgen::closure::Closure::<dyn Fn(_)>::new(|_| {
-                    let Some(e) = get_selection() else {
+                    let Some(mut e) = get_selection() else {
                         STORE.with_borrow(|o| {
                             if let Some((_, sigs)) = o {
                                 for s in sigs {
@@ -347,8 +347,17 @@ fn selection_listener(e: Element, owner: &Owner, is_selected: RwSignal<bool>) {
                         });
                         return;
                     };
-                    STORE.with_borrow(|o| {
+                    STORE.with_borrow(move |o| {
                         let Some((_, sigs)) = o else { return };
+                        while !e.has_attribute(ftml_parser::FtmlKey::Term.attr_name()) {
+                            let Some(p) = e.parent_element() else {
+                                for (_, s) in sigs {
+                                    s.set(false);
+                                }
+                                return;
+                            };
+                            e = p;
+                        }
                         if let Some((_, sig)) = sigs.iter().find(|(a, _)| *a == e) {
                             sig.set(true);
                             for (n, s) in sigs {
