@@ -208,6 +208,8 @@ fn binding_term<'s, S: openmath::ser::OMSerializer<'s>>(
     let Some(BoundArgument::Simple(bd)) = b.arguments.last() else {
         return Err(openmath::ser::Error::custom("Malformed binding term"));
     };
+    todo!()
+    /*
     serializer.omattr(
         std::iter::once((&*IS_BOUND_APP, len)),
         Binder {
@@ -215,13 +217,14 @@ fn binding_term<'s, S: openmath::ser::OMSerializer<'s>>(
             hob:HeadOrBd::Both(&b.head, bd)
         },
     )
+     */
 }
 
+/*
 struct Binder<'s, H: OMSerializable> {
     args: &'s [BoundArgument],
     hob: HeadOrBd<'s,H>
 }
-/*
 enum HeadOrBd<'s, H: OMSerializable> {
     Head(&'s H),
     Body(&'s H),
