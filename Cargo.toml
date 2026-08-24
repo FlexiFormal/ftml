@@ -102,12 +102,12 @@ const_format = "0.2"
 thiserror = "2"
 arrayvec = "0.7"
 document-features = "0.2"
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 oxrdf = "0.3"
 # reqwasm = { version = "0.5" }
 send_wrapper = "0.6.0"
-html5ever = "0.38"
-phf = "0.13"
+html5ever = "0.39"
+phf = "0.14"
 lightningcss = { version = "1.0.0-alpha.68", default-features = false }
 console_error_panic_hook = "0.1"
 tracing-wasm = { version = "0.2" }
@@ -135,17 +135,17 @@ tsify = { version = "0.5", features = ["js"] }
 derive_more = "2"
 base64 = "0.22"
 enum_dispatch = "0.3"
-tantivy = "0.25"
+tantivy = "0.26"
 syntree = "0.18"
 js-regexp = "0.2"
 regex = "1.10"
-gloo-storage = "0.3"
-gloo-net = "0.6"
+gloo-storage = "0.4"
+gloo-net = "0.7"
 urlencoding = "2.1"
 futures-util = { version = "0.3", default-features = false }
 kanal = "0.1"
 #flume = { version = "0.11", features = ["async"] }
-pollster = "0.4"
+pollster = "1"
 bytesize = "2"
 deepsize = "0.2"
 serde-wasm-bindgen = "0.6"
@@ -153,6 +153,7 @@ impl-tools = { version="0.11.4" }
 dateparser = "0.3.1"#{git = "https://github.com/Jazzpirate/dateparser"}
 
 openmath = "0.1"
+#openmath = {path = "../OMDoc/openmath" }
 #thaw = { version = "0.5.0-beta" }
 #thaw = { path = "../../thaw/thaw" }
 #thaw_utils = { path = "../../thaw/thaw_utils" }

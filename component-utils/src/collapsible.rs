@@ -21,12 +21,12 @@ pub fn collapsible<H: IntoView, V: IntoView>(
     expanded: Option<RwSignal<bool>>,
 ) -> impl IntoView {
     let expanded = expanded.unwrap_or_else(|| RwSignal::new(false));
-    view! {<details open=move || expanded.get()>
-        <summary on:click=move |_| expanded.update(|b| *b = !*b)>{
+    view! {<div>
+        <div on:click=move |_| expanded.update(|b| *b = !*b) style=move || if expanded.get() {"margin-left:15px;display:list-item;list-style-type:disclosure-open"} else {"margin-left:15px;display:list-item;list-style-type:disclosure-closed"}>{
             {header.map(|h| h())}
-        }</summary>
-        <div>{children()}</div>
-    </details>}
+        }</div>
+        <div style=move || if expanded.get() {""} else {"display:none;"}>{children()}</div>
+    </div>}
 }
 
 #[component]
@@ -45,21 +45,14 @@ pub fn lazy_collapsible<H: IntoView, V: IntoView + 'static>(
     mut children: impl FnMut() -> V + Send + 'static,
 ) -> impl IntoView {
     let expanded = RwSignal::new(false);
-    let rf: NodeRef<Details> = NodeRef::new();
-    let _ = Effect::new(move || {
-        let _ = expanded.get();
-        if let Some(node) = rf.get() {
-            node.set_open(!expanded.get());
-        }
-    });
-    view! {<details node_ref = rf>
-        <summary on:click=move |_| expanded.update(|b| *b = !*b)>{
+    view! {<div>
+        <div on:click=move |_| expanded.update(|b| *b = !*b)  style=move || if expanded.get() {"margin-left:15px;display:list-item;list-style-type:disclosure-open"} else {"margin-left:15px;display:list-item;list-style-type:disclosure-closed"}>{
             {header.map(|h| h())}
-        }</summary>
-        <div>{move || if expanded.get() {
+        }</div>
+        <div style=move || if expanded.get() {""} else {"display:none;"}>{move || if expanded.get() {
           Some(children())
         } else { None }}</div>
-    </details>}
+    </div>}
 }
 
 pub fn fancy_collapsible<V: IntoView>(

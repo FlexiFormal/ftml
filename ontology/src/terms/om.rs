@@ -1,13 +1,13 @@
 use crate::terms::arguments::MaybeSequence;
 use crate::terms::helpers::IntoTerm;
-use crate::terms::{ApplicationTerm, VarOrSym};
+use crate::terms::{ApplicationTerm, BindingTerm, VarOrSym};
 
 use super::Variable;
 use super::{Argument, BoundArgument, Term};
 use ftml_uris::{
     DocumentElementUri, Id, Language, ModuleUri, PathUri, SimpleUriName, SymbolUri, UriName,
 };
-use openmath::ser::{AsOMS, OMAttr, Omv};
+use openmath::ser::{AsOMS, Omv};
 use openmath::{OM, OMMaybeForeign, OMSerializable};
 use std::hint::unreachable_unchecked;
 use std::str::FromStr;
@@ -39,7 +39,63 @@ uri! {
     SEQUENCE_ARGUMENT_ONE = "sequence argument one",
     NOTATED = "variable notation",
     PRESENTATION = "presentation",
-    IS_BOUND_APP = "binding application"
+    IS_BOUND_APP = "binding application",
+    NONE = "none"
+}
+
+impl openmath::ser::OMSerializable for Term {
+    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Err> {
+        let presentation = match self {
+            Self::Symbol { presentation, .. } | Self::Var { presentation, .. } => {
+                presentation.as_ref()
+                //do_presentation(serializer, presentation.as_ref(), self)
+            }
+            Self::Application(a) => a.presentation.as_ref(), //do_presentation(serializer, a.presentation.as_ref(), self),
+            Self::Bound(a) => a.presentation.as_ref(), //do_presentation(serializer, a.presentation.as_ref(), self),
+            _ => todo!(),
+        };
+        if let Some(VarOrSym::Sym(uri)) = presentation {
+            serializer.omattr(
+                std::iter::once((&*PRESENTATION, &uri.as_oms())),
+                NoPres(self),
+            )
+        } else if let Some(VarOrSym::Var(v)) = presentation {
+            serializer.omattr(std::iter::once((&*PRESENTATION, v)), NoPres(self))
+        } else {
+            NoPres(self).as_openmath(serializer)
+        }
+    }
+}
+
+struct NoPres<'t>(&'t Term);
+impl openmath::ser::OMSerializable for NoPres<'_> {
+    // TODO: is_sequence
+    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Err> {
+        match self.0 {
+            Term::Symbol { uri, .. } => uri.as_oms().as_openmath(serializer),
+            Term::Var { variable, .. } => variable.as_openmath(serializer),
+            Term::Application(app) => serializer.oma(
+                &app.head,
+                app.arguments.iter().map(|a| match a {
+                    Argument::Simple(a) => either_of::EitherOf3::A(a),
+                    Argument::Sequence(MaybeSequence::One(e)) => {
+                        either_of::EitherOf3::B(OneAsSequence(e))
+                    }
+                    Argument::Sequence(MaybeSequence::Seq(e)) => {
+                        either_of::EitherOf3::C(SequenceArgument(e))
+                    }
+                }),
+            ),
+            Term::Bound(b) => binding_term(b, serializer),
+            _ => todo!(),
+        }
+    }
 }
 
 impl openmath::ser::OMSerializable for Variable {
@@ -71,72 +127,6 @@ impl openmath::ser::OMSerializable for Variable {
                 std::iter::once((&*RESOLVED_VARIABLE_URI, &declaration.as_oms())),
                 &Omv(declaration.name()),
             ),
-        }
-    }
-}
-
-impl openmath::ser::OMSerializable for Term {
-    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
-        &self,
-        serializer: S,
-    ) -> Result<S::Ok, S::Err> {
-        match self {
-            Self::Symbol { presentation, .. } | Self::Var { presentation, .. } => {
-                do_presentation(serializer, presentation.as_ref(), self)
-            }
-            Self::Application(a) => do_presentation(serializer, a.presentation.as_ref(), self),
-            Self::Bound(a) => do_presentation(serializer, a.presentation.as_ref(), self),
-            _ => todo!(),
-        }
-    }
-}
-
-fn do_presentation<'s, S: openmath::ser::OMSerializer<'s>>(
-    serializer: S,
-    presentation: Option<&VarOrSym>,
-    then: &Term,
-) -> Result<S::Ok, S::Err> {
-    if let Some(VarOrSym::Sym(uri)) = presentation {
-        serializer.omattr(
-            std::iter::once((&*PRESENTATION, &uri.as_oms())),
-            NoPres(then),
-        )
-    } else if let Some(VarOrSym::Var(v)) = presentation {
-        serializer.omattr(std::iter::once((&*PRESENTATION, v)), NoPres(then))
-    } else {
-        then.as_openmath(serializer)
-    }
-}
-
-struct NoPres<'t>(&'t Term);
-impl openmath::ser::OMSerializable for NoPres<'_> {
-    // TODO: is_sequence
-    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
-        &self,
-        serializer: S,
-    ) -> Result<S::Ok, S::Err> {
-        match self.0 {
-            Term::Symbol { uri, .. } => uri.as_oms().as_openmath(serializer),
-            Term::Var { variable, .. } => variable.as_openmath(serializer),
-            Term::Application(app) => serializer.oma(
-                &app.head,
-                app.arguments.iter().map(|a| match a {
-                    Argument::Simple(a) => either_of::EitherOf3::A(a),
-                    Argument::Sequence(MaybeSequence::One(e)) => {
-                        either_of::EitherOf3::B(OneAsSequence(e))
-                    }
-                    Argument::Sequence(MaybeSequence::Seq(e)) => {
-                        either_of::EitherOf3::C(SequenceArgument(e))
-                    }
-                }),
-            ),
-            Term::Bound(b) => BoundArgs {
-                head: &b.head,
-                args: &b.arguments,
-                //bd: &b.body,
-            }
-            .as_openmath(serializer),
-            _ => todo!(),
         }
     }
 }
@@ -179,6 +169,103 @@ impl openmath::ser::OMSerializable for SequenceArgument<'_> {
     }
 }
 
+struct OmaInBind<'a, H: OMSerializable, A: OMSerializable> {
+    head: H,
+    args: &'a [A],
+}
+impl<H: OMSerializable, A: OMSerializable> openmath::ser::OMSerializable for OmaInBind<'_, H, A> {
+    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Err> {
+        serializer.oma(&self.head, self.args.iter())
+    }
+}
+
+fn binding_term<'s, S: openmath::ser::OMSerializer<'s>>(
+    b: &BindingTerm,
+    serializer: S,
+) -> Result<S::Ok, S::Err> {
+    let len = match &*b.arguments {
+        [BoundArgument::Bound(a), BoundArgument::Simple(bd)] => {
+            return serializer.ombind(&b.head, std::iter::once(Var(&a.var, false)), bd);
+        }
+        [
+            BoundArgument::BoundSeq(MaybeSequence::One(v)),
+            BoundArgument::Simple(bd),
+        ] => {
+            return serializer.ombind(&b.head, std::iter::once(Var(&v.var, true)), bd);
+        }
+        [
+            BoundArgument::BoundSeq(MaybeSequence::Seq(v)),
+            BoundArgument::Simple(bd),
+        ] => {
+            return serializer.ombind(&b.head, v.iter().map(|v| Var(&v.var, false)), bd);
+        }
+        ls => ls.len(),
+    };
+
+    let Some(BoundArgument::Simple(bd)) = b.arguments.last() else {
+        return Err(openmath::ser::Error::custom("Malformed binding term"));
+    };
+    serializer.omattr(
+        std::iter::once((&*IS_BOUND_APP, len)),
+        Binder {
+            args: &b.arguments[..b.arguments.len() - 1],
+            hob:HeadOrBd::Both(&b.head, bd)
+        },
+    )
+}
+
+struct Binder<'s, H: OMSerializable> {
+    args: &'s [BoundArgument],
+    hob: HeadOrBd<'s,H>
+}
+/*
+enum HeadOrBd<'s, H: OMSerializable> {
+    Head(&'s H),
+    Body(&'s H),
+    Both(&'s H,&'s H)
+}
+
+impl<H: OMSerializable> openmath::ser::OMSerializable for Binder<'_, H> {
+    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Err> {
+        let Some(next) = self.args.first() else {
+            return match self.hob {
+                HeadOrBd::Head(t) | HeadOrBd::Body(t) => self.bd.as_openmath(serializer),
+                HeadOrBd::Both(h, b) => serializer.oma(h, std::iter::once(b))
+            }
+        };
+        match next {
+            BoundArgument::Bound(a) => {
+                let (h,b) = match self.hob {
+                    HeadOrBd::Both(h, b) => (either::Left(h),either::Left(Self {
+                        args:&self.args[1..],
+                        hob:HeadOrBd::Body(b)
+                    })),
+                    HeadOrBd::Body(b) => (either::Right(IS_BOUND_APP.clone()),either::Left(b)),
+                    HeadOrBd::Head(h) => (either::Left(h),either::Right(NONE.clone()))
+                };
+                serializer.ombind(h, std::iter::once(Var(&a.var, false)),b);
+            }
+            BoundArgument::BoundSeq(MaybeSequence::One(v)) => {
+                let next = Self {
+                    head:self.head,
+                    args:&self.args[1..],
+                    bd:self.bd
+                };
+                serializer.ombind(&b.head, std::iter::once(Var(&v.var, true)), bd);
+            }
+            BoundArgument::BoundSeq(MaybeSequence::Seq(v)) => {
+                serializer.ombind(&b.head, v.iter().map(|v| Var(&v.var, false)), bd);
+            }
+    }
+}
+ */
+
 // -----------------------------------------------------------------------------------------
 
 pub enum IntermediateTerm {
@@ -202,20 +289,68 @@ impl TryInto<Term> for IntermediateTerm {
     }
 }
 
-// this should be moved to the openmath crate
-const fn attrs<'s, 'o, I>(
-    om: &'s mut openmath::OM<'o, I>,
-) -> &'s mut Vec<openmath::Attr<'o, OMMaybeForeign<'o, I>>> {
-    match om {
-        OM::OMA { attrs, .. }
-        | OM::OMB { attrs, .. }
-        | OM::OMBIND { attrs, .. }
-        | OM::OME { attrs, .. }
-        | OM::OMF { attrs, .. }
-        | OM::OMI { attrs, .. }
-        | OM::OMS { attrs, .. }
-        | OM::OMSTR { attrs, .. }
-        | OM::OMV { attrs, .. } => attrs,
+impl IntermediateTerm {
+    fn from_om(om: openmath::OM<'_, Self>, cd_base: &str, attrs: Attrs) -> Result<Self, Error> {
+        match om {
+            OM::OMS { cd, name, .. } => {
+                let path: PathUri = cd_base.parse()?;
+                if let Some((d, l)) = cd.split_once("&l=") {
+                    let elem =
+                        path & (
+                            SimpleUriName::from_str(d)?,
+                            Language::from_str(l)
+                                .map_err(|_| ftml_uris::errors::UriParseError::InvalidLanguage)?,
+                        ) & UriName::from_str(&name)?;
+                    Ok(Self::Element(elem))
+                } else {
+                    let sym = path | UriName::from_str(&cd)? | UriName::from_str(&name)?;
+                    Ok(Self::Term(Term::Symbol {
+                        uri: sym,
+                        presentation: attrs.presentation,
+                    }))
+                }
+            }
+            OM::OMV { .. } if let Some(uri) = attrs.resolved_variable_uri => {
+                Ok(Self::Term(Term::Var {
+                    variable: Variable::Ref {
+                        declaration: uri,
+                        is_sequence: Some(attrs.seq_var),
+                    },
+                    presentation: attrs.presentation,
+                }))
+            }
+            OM::OMV { name, .. } => Ok(Self::Term(Term::Var {
+                variable: Variable::Name {
+                    name: Id::from_str(&name)?,
+                    notated: attrs.notated,
+                },
+                presentation: attrs.presentation,
+            })),
+            OM::OMA {
+                applicant: Self::Term(head),
+                arguments,
+                ..
+            } => Ok(Self::Term(Term::Application(ApplicationTerm::new(
+                head,
+                arguments
+                    .into_iter()
+                    .map(|t| match t {
+                        Self::Element(_) => Err(Error::UriParser(
+                            ftml_uris::errors::UriParseError::TooManyPartsFor {
+                                uri_kind: ftml_uris::UriKind::Symbol,
+                            },
+                        )),
+                        Self::Term(t) => Ok(Argument::Simple(t)),
+                        Self::ArgumentSequence(s) => Ok(Argument::Sequence(MaybeSequence::Seq(s))),
+                        Self::ArgumentSequenceOne(t) => {
+                            Ok(Argument::Sequence(MaybeSequence::One(t)))
+                        }
+                    })
+                    .collect::<Result<Box<[Argument]>, _>>()?,
+                attrs.presentation,
+            )))),
+            o => Err(Error::Unsupported(o.kind())),
+        }
     }
 }
 
@@ -232,7 +367,7 @@ impl Attrs {
     fn parse(om: &mut openmath::OM<'_, IntermediateTerm>, cd_base: &str) -> Self {
         let mut ret = Self::default();
 
-        for a in std::mem::take(attrs(om)) {
+        for a in std::mem::take(om.attrs_mut()) {
             if PRESENTATION.is_om_attr(&a, cd_base).is_some() {
                 match a.value {
                     OMMaybeForeign::OM(IntermediateTerm::Term(Term::Var { variable, .. })) => {
@@ -296,83 +431,10 @@ impl openmath::de::OMDeserializable<'_> for Term {
     where
         Self: Sized,
     {
-        fn inner(
-            mut om: openmath::OM<'_, IntermediateTerm>,
-            cd_base: &str,
-            attrs: Attrs,
-        ) -> Result<IntermediateTerm, Error> {
-            match om {
-                OM::OMS { cd, name, .. } => {
-                    let path: PathUri = cd_base.parse()?;
-                    if let Some((d, l)) = cd.split_once("&l=") {
-                        let elem =
-                            path & (
-                                SimpleUriName::from_str(d)?,
-                                Language::from_str(l).map_err(|_| {
-                                    ftml_uris::errors::UriParseError::InvalidLanguage
-                                })?,
-                            ) & UriName::from_str(&name)?;
-                        Ok(IntermediateTerm::Element(elem))
-                    } else {
-                        let sym = path | UriName::from_str(&cd)? | UriName::from_str(&name)?;
-                        Ok(IntermediateTerm::Term(Term::Symbol {
-                            uri: sym,
-                            presentation: attrs.presentation,
-                        }))
-                    }
-                }
-                OM::OMV { .. } if let Some(uri) = attrs.resolved_variable_uri => {
-                    Ok(IntermediateTerm::Term(Term::Var {
-                        variable: Variable::Ref {
-                            declaration: uri,
-                            is_sequence: Some(attrs.seq_var),
-                        },
-                        presentation: attrs.presentation,
-                    }))
-                }
-                OM::OMV { name, .. } => Ok(IntermediateTerm::Term(Term::Var {
-                    variable: Variable::Name {
-                        name: Id::from_str(&name)?,
-                        notated: attrs.notated,
-                    },
-                    presentation: attrs.presentation,
-                })),
-                OM::OMA {
-                    applicant: IntermediateTerm::Term(head),
-                    arguments,
-                    ..
-                } => Ok(IntermediateTerm::Term(Term::Application(
-                    ApplicationTerm::new(
-                        head,
-                        arguments
-                            .into_iter()
-                            .map(|t| match t {
-                                IntermediateTerm::Element(_) => Err(Error::UriParser(
-                                    ftml_uris::errors::UriParseError::TooManyPartsFor {
-                                        uri_kind: ftml_uris::UriKind::Symbol,
-                                    },
-                                )),
-                                IntermediateTerm::Term(t) => Ok(Argument::Simple(t)),
-                                IntermediateTerm::ArgumentSequence(s) => {
-                                    Ok(Argument::Sequence(MaybeSequence::Seq(s)))
-                                }
-                                IntermediateTerm::ArgumentSequenceOne(t) => {
-                                    Ok(Argument::Sequence(MaybeSequence::One(t)))
-                                }
-                            })
-                            .collect::<Result<Box<[Argument]>, _>>()?,
-                        attrs.presentation,
-                    ),
-                ))),
-
-                o => Err(Error::Unsupported(o.kind())),
-            }
-        }
         let attrs = Attrs::parse(&mut om, cd_base);
         let is_arg_seq = attrs.seq_arg;
         let is_arg_seq_one = attrs.single_seq;
-        // TODO: is_sequence
-        let tm = inner(om, cd_base, attrs)?;
+        let tm = IntermediateTerm::from_om(om, cd_base, attrs)?;
         if is_arg_seq {
             let IntermediateTerm::Term(Self::Application(app)) = tm else {
                 return Ok(tm);
@@ -420,104 +482,34 @@ pub enum Error {
     Misplaced,
 }
 
-struct Var<'a>(&'a Variable);
+struct Var<'a>(&'a Variable, bool);
 impl openmath::ser::BindVar for Var<'_> {
     fn name(&self) -> impl std::fmt::Display {
         match self.0 {
-            Variable::Name { name, .. } => either::Left(name),
-            Variable::Ref { declaration, .. } => either::Right(declaration.name()),
+            Variable::Name { name, .. } => name.as_ref(),
+            Variable::Ref { declaration, .. } => declaration.name().last(),
         }
     }
     fn attrs(&self) -> impl ExactSizeIterator<Item: openmath::ser::OMAttr> {
-        match self.0 {
-            Variable::Name { .. } => either::Left(std::iter::empty()),
-            Variable::Ref { declaration, .. } => {
-                either::Right(std::iter::once((&*RESOLVED_VARIABLE_URI, declaration)))
-            }
-        }
-    }
-}
-
-struct Oma<'a, H: OMSerializable, A: OMSerializable> {
-    head: H,
-    args: &'a [A],
-}
-impl<H: OMSerializable, A: OMSerializable> openmath::ser::OMSerializable for Oma<'_, H, A> {
-    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
-        &self,
-        serializer: S,
-    ) -> Result<S::Ok, S::Err> {
-        serializer.oma(&self.head, self.args.iter())
-    }
-}
-
-#[allow(clippy::struct_field_names)]
-struct BoundArgs<'a, H: OMSerializable = &'a Term> {
-    head: &'a H,
-    args: &'a [BoundArgument],
-    //bd: &'a Term,
-}
-impl<H: OMSerializable> openmath::ser::OMSerializable for BoundArgs<'_, H> {
-    fn as_openmath<'s, S: openmath::ser::OMSerializer<'s>>(
-        &self,
-        serializer: S,
-    ) -> Result<S::Ok, S::Err> {
-        match self.args.first() {
-            None => self.head.as_openmath(serializer), //self.bd.as_openmath(serializer),
-            Some(BoundArgument::Bound(a)) => serializer.ombind(
-                &self.head,
-                std::iter::once(&a.var),
-                &Self {
-                    head: self.head,
-                    args: &self.args[1..],
-                    //bd: self.bd,
-                },
+        match (self.0, self.1) {
+            (Variable::Name { .. }, false) => either_of::EitherOf3::A(std::iter::empty()),
+            (Variable::Name { .. }, true) => either_of::EitherOf3::B(std::iter::once((
+                &*SEQUENCE_ARGUMENT_ONE,
+                either::Left(&*SEQUENCE_ARGUMENT_ONE),
+            ))),
+            (Variable::Ref { declaration, .. }, false) => either_of::EitherOf3::B(std::iter::once(
+                (&*RESOLVED_VARIABLE_URI, either::Right(declaration)),
+            )),
+            (Variable::Ref { declaration, .. }, true) => either_of::EitherOf3::C(
+                [
+                    (&*RESOLVED_VARIABLE_URI, either::Right(declaration)),
+                    (
+                        &*SEQUENCE_ARGUMENT_ONE,
+                        either::Left(&*SEQUENCE_ARGUMENT_ONE),
+                    ),
+                ]
+                .into_iter(),
             ),
-            Some(BoundArgument::BoundSeq(MaybeSequence::One(v))) => serializer.ombind(
-                &self.head,
-                std::iter::once(Var(&v.var)),
-                &Self {
-                    head: self.head,
-                    args: &self.args[1..],
-                    //bd: self.bd,
-                },
-            ),
-            Some(BoundArgument::BoundSeq(MaybeSequence::Seq(s))) => serializer.ombind(
-                &self.head,
-                s.iter().map(|v| &v.var),
-                &Self {
-                    head: self.head,
-                    args: &self.args[1..],
-                    //bd: self.bd,
-                },
-            ),
-            Some(BoundArgument::Simple(t)) => BoundArgs {
-                head: &Oma {
-                    head: &self.head,
-                    args: &[t],
-                },
-                args: &self.args[1..],
-                //bd: self.bd,
-            }
-            .as_openmath(serializer),
-            Some(BoundArgument::Sequence(MaybeSequence::One(t))) => BoundArgs {
-                head: &Oma {
-                    head: &self.head,
-                    args: &[OneAsSequence(t)],
-                },
-                args: &self.args[1..],
-                //bd: self.bd,
-            }
-            .as_openmath(serializer),
-            Some(BoundArgument::Sequence(MaybeSequence::Seq(s))) => BoundArgs {
-                head: &Oma {
-                    head: &self.head,
-                    args: s,
-                },
-                args: &self.args[1..],
-                //bd: self.bd,
-            }
-            .as_openmath(serializer),
         }
     }
 }

@@ -1145,7 +1145,7 @@ where
     res.get().await
 }
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(all(not(feature = "serde-lite"), not(feature = "wasm")))]
 async fn post_serde<R, E>(url: String, body: String) -> Result<R, BackendError<E>>
 where
     R: serde::de::DeserializeOwned,
