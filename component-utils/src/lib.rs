@@ -37,7 +37,7 @@ pub use thaw::{Button, ButtonAppearance, ButtonShape, ButtonSize};
 };*/
 pub use thaw::{Checkbox, Input, InputPrefix, InputType, Radio, RadioGroup};
 pub use thaw::{Combobox, ComboboxOption, ComboboxOptionGroup};
-pub use thaw::{Dialog, DialogBody, DialogContent, DialogSurface, ProgressBar};
+pub use thaw::{Dialog, DialogBody, DialogContent, ProgressBar};
 pub use thaw::{
     DrawerBody, DrawerHeader, DrawerHeaderTitle, DrawerHeaderTitleAction, DrawerPosition,
     OverlayDrawer,
@@ -51,6 +51,15 @@ pub use thaw::{Tag, TagPicker, TagPickerControl, TagPickerGroup, TagPickerInput,
 
 use leptos::prelude::*;
 use std::borrow::Cow;
+
+#[component(transparent)]
+pub fn DialogSurface(children: Children) -> impl IntoView {
+    use thaw::DialogSurface as Orig;
+    view! {
+        <Orig>{children()}</Orig>
+    }
+    .attr("style", "width:fit-content;max-width:90vw;")
+}
 
 #[component]
 pub fn Scrollbar(
