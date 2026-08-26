@@ -44,7 +44,7 @@ pub fn init(lvl: config::LogLevel, targets: &[&'static str]) {
         .init();
 }
 
-#[cfg(not(feature = "typescript"))]
+#[cfg(any(feature = "norun", not(feature = "typescript")))]
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
 pub fn run() {
     let meta = ftml_dom::DocumentMeta::get();
