@@ -169,7 +169,8 @@ impl FromStr for AssocType {
 #[cfg_attr(feature = "typescript", derive(tsify::Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ArgumentSpec(
-    #[cfg_attr(feature = "typescript", tsify(type = "ArgumentMode[]"))] SmallVec<ArgumentMode, 8>,
+    #[cfg_attr(feature = "typescript", tsify(type = "ArgumentMode[]"))]
+    pub(crate)  SmallVec<ArgumentMode, 8>,
 );
 impl std::fmt::Debug for ArgumentSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

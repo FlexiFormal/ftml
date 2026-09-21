@@ -45,6 +45,8 @@ rdf = ["ftml-uris/rdf", "dep:ulo", "dep:arrayvec"]
 css_normalize = ["dep:lightningcss"]
 ## Adds deepsize implementations to everything
 deepsize = ["dep:deepsize", "dep:bytesize"]
+## Tokio async read/write
+tokio = ["dep:tokio"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -100,6 +102,7 @@ serde_with = { workspace = true, optional = true }
 serde-lite = { workspace = true, optional = true }
 #postcard = { workspace = true, optional = true }
 bincode = { workspace = true, optional = true, features = ["derive"] }
+tokio = { workspace = true,optional = true,features=["io-util"]}
 
 ftml-js-utils = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }

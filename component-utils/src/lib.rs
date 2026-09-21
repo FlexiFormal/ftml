@@ -28,13 +28,9 @@ pub mod js;
 
 use leptos::html::{div, span};
 
-pub use thaw::{Avatar, Tooltip};
-pub use thaw::{Badge, BadgeAppearance, BadgeColor};
-pub use thaw::{Button, ButtonAppearance, ButtonShape, ButtonSize};
-/*pub use thaw::{
-    Card, CardFooter, CardHeader, CardHeaderAction, CardHeaderDescription, CardHeaderProps,
-    CardPreview,
-};*/
+pub use thaw::{Avatar, Tooltip}; // DONE
+pub use thaw::{Badge, BadgeAppearance, BadgeColor}; // DONE
+pub use thaw::{Button, ButtonAppearance, ButtonShape, ButtonSize}; // DONE
 pub use thaw::{Checkbox, Input, InputPrefix, InputType, Radio, RadioGroup};
 pub use thaw::{Combobox, ComboboxOption, ComboboxOptionGroup};
 pub use thaw::{Dialog, DialogBody, DialogContent, ProgressBar};
