@@ -10,6 +10,9 @@ keywords = ["leptos", "hydrate", "HTML"]
 readme = "README.md"
 exclude = [".idea/*", ".zed/*", "examples/*", "target/*"]
 
+[lints]
+workspace = true
+
 [features]
 csr = ["leptos/csr"]
 hydrate = ["leptos/hydrate"]

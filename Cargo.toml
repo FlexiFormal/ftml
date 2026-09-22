@@ -93,7 +93,7 @@ web-sys = { version = "0.3", default-features = false }
 url = { version = "2.5" }
 rustc-hash = "2"
 either = "1"
-smallvec = { version = "2.0.0-alpha.10" }
+smallvec = { version = "2.0.0-beta.1" }
 triomphe = "0.1"
 parking_lot = "0.12"
 futures = "0.3"

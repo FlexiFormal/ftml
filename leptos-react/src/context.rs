@@ -15,6 +15,7 @@ pub struct LeptosMountHandle {
 impl LeptosMountHandle {
     /// unmounts the view and cleans up the reactive system.
     /// Not calling this is a memory leak
+    /// #### Errors
     pub fn unmount(&self) -> Result<(), wasm_bindgen::JsError> {
         if let Some(mount) = self.mount.take() {
             drop(mount); //try_catch(move || drop(mount))?;
@@ -44,7 +45,8 @@ pub struct LeptosContext {
 }
 impl LeptosContext {
     pub fn with<R>(&self, f: impl FnOnce() -> R) -> R {
-        if let Some(o) = (*self.inner.read()).clone() {
+        let inner = (*self.inner.read()).clone();
+        if let Some(o) = inner {
             o.with(f)
         } else {
             tracing::error!("Leptos context already cleaned up!");
@@ -56,13 +58,16 @@ impl LeptosContext {
 #[wasm_bindgen]
 impl LeptosContext {
     /// Cleans up the reactive system.
+    /// #### Errors
     pub fn cleanup(&self) -> Result<(), wasm_bindgen::JsError> {
-        if let Some(mount) = self.inner.write().take() {
+        let inner = self.inner.write().take();
+        if let Some(mount) = inner {
             mount.cleanup(); //flams_web_utils::try_catch(move || mount.cleanup())?;
         }
         Ok(())
     }
 
+    #[must_use]
     pub fn wasm_clone(&self) -> Self {
         self.clone()
     }

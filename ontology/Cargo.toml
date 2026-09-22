@@ -91,6 +91,7 @@ ordered-float = { workspace = true }
 bytecount = {workspace = true}
 tracing = { workspace = true }
 dateparser.workspace = true
+allocator-api2 = "*"
 
 #kanal = { workspace = true }
 #pollster = { workspace = true }

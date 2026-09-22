@@ -247,7 +247,7 @@ mod bincode_impl {
 
 impl IntoIterator for ArgumentSpec {
     type Item = ArgumentMode;
-    type IntoIter = smallvec::IntoIter<ArgumentMode, 8>;
+    type IntoIter = smallvec::IntoIter<ArgumentMode, 8, allocator_api2::alloc::Global>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
