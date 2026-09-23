@@ -18,14 +18,14 @@ use leptos::{
 use crate::utils::css::CssExt;
 
 pub fn math<V: IntoView>(f: impl FnOnce() -> V) -> impl IntoView {
-    static CSS: std::sync::LazyLock<Css> = std::sync::LazyLock::new(|| {
+    /*static CSS: std::sync::LazyLock<Css> = std::sync::LazyLock::new(|| {
         Css::Link(
             "https://fonts.googleapis.com/css2?family=STIX+Two+Math"
                 .to_string()
                 .into_boxed_str(),
         )
     });
-    CSS.clone().inject();
+    CSS.clone().inject();*/
     leptos::math::math()
         .style("font-family:'STIX Two Math'")
         .child(f())
