@@ -126,7 +126,10 @@ impl SparqlResultTerm {
     fn from_node(r: &crate::rdf_types::NamedNode, decode_uris: bool) -> Self {
         let as_str = r.as_str();
         Self::Iri {
-            value: if decode_uris && !(as_str.contains('%') || as_str.contains("?a=")) {
+            value: if decode_uris
+                && let Some(i) = as_str.find("?a=")
+                && as_str[i + 3..].contains('%')
+            {
                 urlencoding::decode(as_str)
                     .map_or_else(|_| as_str.to_string(), std::borrow::Cow::into_owned)
             } else {
