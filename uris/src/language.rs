@@ -1,3 +1,4 @@
+#![allow(clippy::float_cmp)]
 use std::path::Path;
 
 /// Represents supported languages in [`DocumentUri`](crate::DocumentUri)s

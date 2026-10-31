@@ -27,7 +27,7 @@ impl TermPath {
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
     pub fn inner(&self) -> &[u8] {
-        self.0.0.as_slice()
+        &self.0.0
     }
     #[must_use]
     pub const fn inner_mut(&mut self) -> &mut smallvec::SmallVec<u8, 16> {
@@ -41,9 +41,10 @@ impl From<Vec<u8>> for TermPath {
 }
 impl From<TermPath> for Vec<u8> {
     fn from(value: TermPath) -> Self {
-        value.0.0.into_vec()
+        value.0.0.into()
     }
 }
+/*
 impl From<smallvec::SmallVec<u8, 16>> for TermPath {
     fn from(value: smallvec::SmallVec<u8, 16>) -> Self {
         Self(SVec(value))
@@ -54,6 +55,7 @@ impl From<TermPath> for smallvec::SmallVec<u8, 16> {
         value.0.0
     }
 }
+ */
 
 impl Term {
     #[must_use]
@@ -80,7 +82,7 @@ impl Term {
     #[must_use]
     pub fn subterm_at_path(&self, path: &TermPath) -> Option<(Vec<&ComponentVar>, &Self)> {
         let mut vars = Vec::new();
-        self.subterm_at_path_i(path.0.as_slice(), &mut vars)
+        self.subterm_at_path_i(&path.0, &mut vars)
             .map(|t| (vars, t))
     }
 

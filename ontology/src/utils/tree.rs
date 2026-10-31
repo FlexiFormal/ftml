@@ -328,7 +328,7 @@ impl<'a, T: DisplayIndentedChild<'a>> Indented<'a, T> {
 }
 
 impl<'a, T: DisplayIndentedChild<'a>> std::fmt::Display for Indented<'a, T> {
-    fn fmt(&self, mut f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut curr = Indentation {
             with: self.indent,
             times: 0,
@@ -338,7 +338,7 @@ impl<'a, T: DisplayIndentedChild<'a>> std::fmt::Display for Indented<'a, T> {
         curr.times += 1;
         if let Some(r) = self.slf.tree_children().dfs_with_state(
             curr,
-            &mut f,
+            &mut *f,
             |e, curr, f| match Self::open(e, *curr, f) {
                 Err(e) => IterCont::Break(e),
                 Ok(c) => c,

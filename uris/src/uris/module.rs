@@ -788,6 +788,7 @@ crate::tests! {
         let barrier = Arc::new(Barrier::new(NUM_THREADS));
         let mut handles = vec![];
 
+        #[allow(clippy::assert_is_empty)]
         for i in 0..NUM_THREADS {
             let barrier = Arc::clone(&barrier);
             let handle = std::thread::spawn(move || {
